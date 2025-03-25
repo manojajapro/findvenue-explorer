@@ -16,12 +16,18 @@ const Cities = () => {
       try {
         setIsLoading(true);
         const { data, error } = await supabase
-          .from('cities')
-          .select('*');
+          .from('city_groups')
+          .select('*')
+          .order('venue_count', { ascending: false });
           
         if (error) throw error;
         
-        setCities(data || []);
+        setCities(data.map(city => ({
+          id: city.city_id,
+          name: city.city_name,
+          image_url: city.image_url,
+          venue_count: city.venue_count
+        })) || []);
       } catch (error) {
         console.error('Error fetching cities:', error);
       } finally {

@@ -9,100 +9,15 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      categories: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          id: string
-          image_url: string | null
-          name: string
-          venue_count: number | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          image_url?: string | null
-          name: string
-          venue_count?: number | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          image_url?: string | null
-          name?: string
-          venue_count?: number | null
-        }
-        Relationships: []
-      }
-      cities: {
-        Row: {
-          created_at: string | null
-          featured: boolean | null
-          id: string
-          image_url: string | null
-          name: string
-          venue_count: number | null
-        }
-        Insert: {
-          created_at?: string | null
-          featured?: boolean | null
-          id?: string
-          image_url?: string | null
-          name: string
-          venue_count?: number | null
-        }
-        Update: {
-          created_at?: string | null
-          featured?: boolean | null
-          id?: string
-          image_url?: string | null
-          name?: string
-          venue_count?: number | null
-        }
-        Relationships: []
-      }
-      user_profiles: {
-        Row: {
-          created_at: string | null
-          email: string | null
-          first_name: string | null
-          id: string
-          last_name: string | null
-          phone: string | null
-          profile_image: string | null
-          user_role: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email?: string | null
-          first_name?: string | null
-          id: string
-          last_name?: string | null
-          phone?: string | null
-          profile_image?: string | null
-          user_role?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string | null
-          first_name?: string | null
-          id?: string
-          last_name?: string | null
-          phone?: string | null
-          profile_image?: string | null
-          user_role?: string | null
-        }
-        Relationships: []
-      }
       venues: {
         Row: {
           address: string | null
           amenities: string[] | null
           availability: string[] | null
           category_id: string | null
+          category_name: string | null
           city_id: string | null
+          city_name: string | null
           created_at: string | null
           currency: string | null
           description: string | null
@@ -125,7 +40,9 @@ export type Database = {
           amenities?: string[] | null
           availability?: string[] | null
           category_id?: string | null
+          category_name?: string | null
           city_id?: string | null
+          city_name?: string | null
           created_at?: string | null
           currency?: string | null
           description?: string | null
@@ -148,7 +65,9 @@ export type Database = {
           amenities?: string[] | null
           availability?: string[] | null
           category_id?: string | null
+          category_name?: string | null
           city_id?: string | null
+          city_name?: string | null
           created_at?: string | null
           currency?: string | null
           description?: string | null
@@ -166,26 +85,28 @@ export type Database = {
           starting_price?: number | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "venues_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "venues_city_id_fkey"
-            columns: ["city_id"]
-            isOneToOne: false
-            referencedRelation: "cities"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
-      [_ in never]: never
+      category_groups: {
+        Row: {
+          category_id: string | null
+          category_name: string | null
+          image_url: string | null
+          venue_count: number | null
+        }
+        Relationships: []
+      }
+      city_groups: {
+        Row: {
+          city_id: string | null
+          city_name: string | null
+          image_url: string | null
+          venue_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

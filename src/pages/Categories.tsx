@@ -16,12 +16,19 @@ const Categories = () => {
       try {
         setIsLoading(true);
         const { data, error } = await supabase
-          .from('categories')
-          .select('*');
+          .from('category_groups')
+          .select('*')
+          .order('venue_count', { ascending: false });
           
         if (error) throw error;
         
-        setCategories(data || []);
+        setCategories(data.map(category => ({
+          id: category.category_id,
+          name: category.category_name,
+          image_url: category.image_url,
+          venue_count: category.venue_count,
+          description: `Find perfect ${category.category_name.toLowerCase()} for your events`
+        })) || []);
       } catch (error) {
         console.error('Error fetching categories:', error);
       } finally {
@@ -73,7 +80,7 @@ const Categories = () => {
                   </div>
                   <CardContent className="p-4">
                     <p className="text-findvenue-text-muted mb-4 line-clamp-2">
-                      {category.description || `Find perfect ${category.name.toLowerCase()} for your events`}
+                      {category.description}
                     </p>
                     <Button variant="outline" className="w-full border-findvenue text-findvenue hover:bg-findvenue/10">
                       Browse Venues

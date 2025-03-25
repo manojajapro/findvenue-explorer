@@ -11,11 +11,39 @@ export interface VenueFilter {
   amenities?: string[];
 }
 
+export interface Venue {
+  id: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+  galleryImages: string[];
+  address: string;
+  city: string;
+  cityId: string;
+  category: string;
+  categoryId: string;
+  capacity: {
+    min: number;
+    max: number;
+  };
+  pricing: {
+    currency: string;
+    startingPrice: number;
+    pricePerPerson: number;
+  };
+  amenities: string[];
+  rating: number;
+  reviews: number;
+  featured: boolean;
+  popular: boolean;
+  availability: string[];
+}
+
 export const useSupabaseVenues = () => {
   const [searchParams] = useSearchParams();
-  const [venues, setVenues] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [cities, setCities] = useState<any[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [categories, setCategories] = useState<{id: string, name: string, venue_count: number, image_url: string}[]>([]);
+  const [cities, setCities] = useState<{id: string, name: string, venue_count: number, image_url: string}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -58,7 +86,7 @@ export const useSupabaseVenues = () => {
       const filters = extractFilters();
       
       // Start building the query
-      let query = supabase.from('venues').select('*, categories(*), cities(*)');
+      let query = supabase.from('venues').select('*', { count: 'exact' });
       
       // Apply filters
       if (filters.cityId) {
@@ -95,7 +123,7 @@ export const useSupabaseVenues = () => {
       }
       
       // Execute the query
-      const { data, error: venuesError, count } = await query.limit(20);
+      const { data, error: venuesError, count } = await query.limit(100);
       
       if (venuesError) throw venuesError;
       
@@ -107,9 +135,9 @@ export const useSupabaseVenues = () => {
         imageUrl: venue.image_url,
         galleryImages: venue.gallery_images || [],
         address: venue.address,
-        city: venue.cities?.name || '',
+        city: venue.city_name || '',
         cityId: venue.city_id,
-        category: venue.categories?.name || '',
+        category: venue.category_name || '',
         categoryId: venue.category_id,
         capacity: {
           min: venue.min_capacity,
@@ -125,7 +153,7 @@ export const useSupabaseVenues = () => {
         reviews: venue.reviews_count,
         featured: venue.featured,
         popular: venue.popular,
-        availability: venue.availability
+        availability: venue.availability || []
       }));
       
       setVenues(transformedData);
@@ -139,31 +167,41 @@ export const useSupabaseVenues = () => {
     }
   }, [extractFilters]);
   
-  // Fetch categories
+  // Fetch categories from our view
   const fetchCategories = useCallback(async () => {
     try {
       const { data, error: categoriesError } = await supabase
-        .from('categories')
+        .from('category_groups')
         .select('*');
       
       if (categoriesError) throw categoriesError;
       
-      setCategories(data);
+      setCategories(data.map(cat => ({
+        id: cat.category_id,
+        name: cat.category_name,
+        venue_count: cat.venue_count,
+        image_url: cat.image_url
+      })));
     } catch (error: any) {
       console.error('Error fetching categories:', error);
     }
   }, []);
   
-  // Fetch cities
+  // Fetch cities from our view
   const fetchCities = useCallback(async () => {
     try {
       const { data, error: citiesError } = await supabase
-        .from('cities')
+        .from('city_groups')
         .select('*');
       
       if (citiesError) throw citiesError;
       
-      setCities(data);
+      setCities(data.map(city => ({
+        id: city.city_id,
+        name: city.city_name,
+        venue_count: city.venue_count,
+        image_url: city.image_url
+      })));
     } catch (error: any) {
       console.error('Error fetching cities:', error);
     }
