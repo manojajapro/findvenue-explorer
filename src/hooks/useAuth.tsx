@@ -45,11 +45,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Use the correct table name 'profiles' and ensure we handle the types correctly
+            // We need to use RPC call instead of from() since profiles table isn't in types
             const { data: profileData, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', currentSession.user.id)
+              .rpc('get_user_profile', { user_id: currentSession.user.id })
               .single();
               
             if (profileData) {
@@ -82,11 +80,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        // Fix the query to 'profiles' table and handle the promise chain properly
+        // Use RPC call for profiles instead of direct table access
         supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentSession.user.id)
+          .rpc('get_user_profile', { user_id: currentSession.user.id })
           .single()
           .then(({ data: profileData, error }) => {
             if (profileData) {
