@@ -39,20 +39,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        console.log("Auth state changed:", event, currentSession?.user?.id);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
           // Fetch user profile
           const { data: profileData, error } = await supabase
-            .from('user_profiles' as any)
+            .from('user_profiles')
             .select('*')
             .eq('id', currentSession.user.id)
             .single();
             
           if (profileData) {
+            console.log("Profile data loaded:", profileData);
             setProfile(profileData as unknown as UserProfile);
-            setIsVenueOwner((profileData as unknown as UserProfile).user_role === 'venue-owner');
+            setIsVenueOwner(profileData.user_role === 'venue-owner');
           } else {
             console.error("Failed to fetch user profile:", error);
             setProfile(null);
@@ -69,29 +71,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log("Checking for existing session:", currentSession?.user?.id);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
         // Fetch user profile
         supabase
-          .from('user_profiles' as any)
+          .from('user_profiles')
           .select('*')
           .eq('id', currentSession.user.id)
           .single()
           .then(({ data: profileData, error }) => {
             if (profileData) {
+              console.log("Initial profile data loaded:", profileData);
               setProfile(profileData as unknown as UserProfile);
-              setIsVenueOwner((profileData as unknown as UserProfile).user_role === 'venue-owner');
+              setIsVenueOwner(profileData.user_role === 'venue-owner');
             } else {
-              console.error("Failed to fetch user profile:", error);
+              console.error("Failed to fetch initial user profile:", error);
               setProfile(null);
               setIsVenueOwner(false);
             }
+            
+            setIsLoading(false);
           });
+      } else {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     });
 
     return () => {
@@ -101,6 +107,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log("Attempting to sign in:", email);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
@@ -113,6 +120,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
     } catch (error: any) {
+      console.error("Sign in error:", error.message);
       toast({
         title: "Error signing in",
         description: error.message,
@@ -124,6 +132,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async (email: string, password: string, userData: any) => {
     try {
+      console.log("Attempting to sign up:", email, userData);
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -146,6 +155,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       
     } catch (error: any) {
+      console.error("Sign up error:", error.message);
       toast({
         title: "Error signing up",
         description: error.message,
@@ -157,6 +167,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
+      console.log("Signing out");
       await supabase.auth.signOut();
       
       toast({
@@ -164,11 +175,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: "You've been signed out successfully.",
       });
       
-      // Update localStorage to maintain compatibility with existing code
-      localStorage.removeItem('isLoggedIn');
-      localStorage.removeItem('userRole');
-      
     } catch (error: any) {
+      console.error("Sign out error:", error.message);
       toast({
         title: "Error signing out",
         description: error.message,
