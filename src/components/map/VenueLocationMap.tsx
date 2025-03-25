@@ -64,9 +64,9 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
           <MapContainer 
             style={{ height: '100%', width: '100%', background: '#1e2734' }}
             className="z-10"
-            whenReady={(map) => {
-              mapRef.current = map.target;
-              map.target.setView(position, 14);
+            whenReady={(mapInstance) => {
+              mapRef.current = mapInstance.target;
+              mapInstance.target.setView(position, 14);
             }}
           >
             <TileLayer
