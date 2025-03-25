@@ -187,9 +187,24 @@ const FilterPanel = ({ cities, categories, onApplyFilters }: FilterPanelProps) =
 };
 
 const VenuesList = () => {
-  const { venues, categories, cities, isLoading, fetchVenues, totalCount } = useSupabaseVenues();
-  const [listView, setListView] = useState<'grid' | 'list'>('grid');
+  const [searchParams] = useSearchParams();
+  const searchTerm = searchParams.get('search') || '';
   const navigate = useNavigate();
+  
+  // Get all venues data and apply filtering in the component
+  const { venues: allVenues, categories, cities, isLoading, fetchVenues, totalCount } = useSupabaseVenues();
+  const [listView, setListView] = useState<'grid' | 'list'>('grid');
+  
+  // Filter venues based on search term if present
+  const venues = searchTerm 
+    ? allVenues.filter(venue => 
+        venue.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        venue.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        venue.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        venue.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        venue.amenities.some(a => a.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
+    : allVenues;
   
   const handleVenueClick = (venueId: string) => {
     navigate(`/venue/${venueId}`);
@@ -200,7 +215,12 @@ const VenuesList = () => {
       <div className="flex justify-between items-center mb-6">
         <div>
           <p className="text-sm text-findvenue-text-muted">
-            {isLoading ? 'Loading venues...' : `Showing ${venues.length} of ${totalCount} venues`}
+            {isLoading 
+              ? 'Loading venues...' 
+              : searchTerm 
+                ? `Found ${venues.length} venues matching "${searchTerm}"` 
+                : `Showing ${venues.length} of ${totalCount} venues`
+            }
           </p>
         </div>
         
@@ -263,6 +283,16 @@ const VenuesList = () => {
           <p className="text-findvenue-text-muted mb-6">
             Try adjusting your search filters to find more options
           </p>
+          <Button
+            className="bg-findvenue hover:bg-findvenue-dark"
+            onClick={() => {
+              const newParams = new URLSearchParams(searchParams);
+              if (searchTerm) newParams.delete('search');
+              setSearchParams(newParams);
+            }}
+          >
+            Clear Search
+          </Button>
         </div>
       )}
     </div>

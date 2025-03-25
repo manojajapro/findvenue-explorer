@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Category } from '@/data/categories';
 import { Card } from '@/components/ui/card';
 
@@ -10,9 +10,14 @@ interface CategoryCardProps {
 
 const CategoryCard = ({ category }: CategoryCardProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    navigate(`/venues?categoryId=${category.id}`);
+  };
 
   return (
-    <Link to={`/?category=${category.id}`} className="block h-full">
+    <div className="block h-full cursor-pointer" onClick={handleClick}>
       <Card className="relative overflow-hidden h-full hover-scale glass-card border-white/10">
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent z-10" />
         {!isLoaded && (
@@ -29,7 +34,7 @@ const CategoryCard = ({ category }: CategoryCardProps) => {
           <p className="text-sm text-white/80">{category.venueCount} spaces</p>
         </div>
       </Card>
-    </Link>
+    </div>
   );
 };
 

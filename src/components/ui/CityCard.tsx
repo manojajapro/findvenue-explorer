@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { City } from '@/data/cities';
 import { Card } from '@/components/ui/card';
 
@@ -10,9 +10,14 @@ interface CityCardProps {
 
 const CityCard = ({ city }: CityCardProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    navigate(`/venues?cityId=${city.id}`);
+  };
 
   return (
-    <Link to={`/?city=${city.id}`} className="block h-full">
+    <div className="block h-full cursor-pointer" onClick={handleClick}>
       <Card className="relative overflow-hidden h-full hover-scale glass-card border-white/10">
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent z-10" />
         {!isLoaded && (
@@ -29,7 +34,7 @@ const CityCard = ({ city }: CityCardProps) => {
           <p className="text-sm text-white/80">{city.venueCount} venues</p>
         </div>
       </Card>
-    </Link>
+    </div>
   );
 };
 
