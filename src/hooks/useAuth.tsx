@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (currentSession?.user) {
           // Fetch user profile
           const { data: profileData, error } = await supabase
-            .from('user_profiles')
+            .from('user_profiles' as any)
             .select('*')
             .eq('id', currentSession.user.id)
             .single();
@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (currentSession?.user) {
         // Fetch user profile
         supabase
-          .from('user_profiles')
+          .from('user_profiles' as any)
           .select('*')
           .eq('id', currentSession.user.id)
           .single()
