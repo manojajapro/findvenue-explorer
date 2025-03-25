@@ -45,9 +45,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Fix: Type the RPC function call properly
+            // Define a type for the RPC function parameter
+            type GetUserProfileParams = { user_id: string };
+            
             const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', { user_id: currentSession.user.id } as any)
+              .rpc('get_user_profile', { user_id: currentSession.user.id } as GetUserProfileParams)
               .single();
               
             if (profileData) {
@@ -82,9 +84,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        // Fix: Type the RPC call properly
+        // Define a type for the RPC function parameter
+        type GetUserProfileParams = { user_id: string };
+        
         supabase
-          .rpc('get_user_profile', { user_id: currentSession.user.id } as any)
+          .rpc('get_user_profile', { user_id: currentSession.user.id } as GetUserProfileParams)
           .single()
           .then(({ data: profileData, error }) => {
             if (profileData) {
@@ -109,7 +113,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setIsLoading(false);
       }
     })
-    // Fix: Add proper catch handler to the Promise chain
+    // Add proper catch handler to the Promise chain
     .catch(error => {
       console.error("Error getting session:", error);
       setIsLoading(false);
