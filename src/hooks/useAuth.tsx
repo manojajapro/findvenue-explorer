@@ -52,8 +52,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               
             if (profileData) {
               console.log("Profile data loaded:", profileData);
-              setProfile(profileData as UserProfile);
-              setIsVenueOwner(profileData.user_role === 'venue-owner');
+              // Explicitly cast the data to UserProfile type
+              const userProfileData = profileData as UserProfile;
+              setProfile(userProfileData);
+              setIsVenueOwner(userProfileData.user_role === 'venue-owner');
             } else {
               console.error("Failed to fetch user profile:", error);
               setProfile(null);
@@ -87,8 +89,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .then(({ data: profileData, error }) => {
             if (profileData) {
               console.log("Initial profile data loaded:", profileData);
-              setProfile(profileData as UserProfile);
-              setIsVenueOwner(profileData.user_role === 'venue-owner');
+              // Explicitly cast the data to UserProfile type
+              const userProfileData = profileData as UserProfile;
+              setProfile(userProfileData);
+              setIsVenueOwner(userProfileData.user_role === 'venue-owner');
             } else {
               console.error("Failed to fetch initial user profile:", error);
               setProfile(null);
