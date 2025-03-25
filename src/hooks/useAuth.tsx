@@ -45,16 +45,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Use a type assertion to specify the expected return type
+            // Type the response properly with a generic
             const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', { user_id: currentSession.user.id }) as { 
-                data: UserProfile | null;
-                error: any;
-              };
+              .rpc<UserProfile>('get_user_profile', { 
+                user_id: currentSession.user.id 
+              });
               
             if (profileData) {
               console.log("Profile data loaded:", profileData);
-              setProfile(profileData as UserProfile);
+              setProfile(profileData);
               setIsVenueOwner(profileData.user_role === 'venue-owner');
             } else {
               console.error("Failed to fetch user profile:", error);
@@ -82,13 +81,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        // Use a type assertion to specify the expected return type
+        // Use proper generic typing for RPC calls
         supabase
-          .rpc('get_user_profile', { user_id: currentSession.user.id })
+          .rpc<UserProfile>('get_user_profile', { 
+            user_id: currentSession.user.id 
+          })
           .then(({ data: profileData, error }) => {
             if (profileData) {
               console.log("Initial profile data loaded:", profileData);
-              setProfile(profileData as UserProfile);
+              setProfile(profileData);
               setIsVenueOwner(profileData.user_role === 'venue-owner');
             } else {
               console.error("Failed to fetch initial user profile:", error);
