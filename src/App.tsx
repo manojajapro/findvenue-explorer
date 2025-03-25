@@ -59,6 +59,7 @@ function RevealOnScroll() {
 
 const queryClient = new QueryClient();
 
+// Separate AppContent as a React component
 const AppContent = () => {
   return (
     <>
@@ -85,18 +86,21 @@ const AppContent = () => {
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+// Main App component as a function component to properly use hooks
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Toaster />
-        <Sonner />
         <BrowserRouter>
-          <AppContent />
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AppContent />
+          </TooltipProvider>
         </BrowserRouter>
       </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+}
 
 export default App;
