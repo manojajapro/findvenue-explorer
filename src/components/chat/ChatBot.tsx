@@ -76,7 +76,7 @@ const ChatBot = () => {
     } else if (lowerMessage.includes('jeddah')) {
       return 'Jeddah offers beautiful beachfront venues with Red Sea views, as well as modern event spaces in the city center. The Marsa Beach Venue is especially popular for outdoor events.';
     } else if (lowerMessage.includes('book') || lowerMessage.includes('reserve')) {
-      return 'To book a venue, you can browse our listings, select your preferred venue, and click the "Book Now" button on the venue details page. You'll need to create an account to complete your booking.';
+      return 'To book a venue, you can browse our listings, select your preferred venue, and click the "Book Now" button on the venue details page. You\'ll need to create an account to complete your booking.';
     } else if (lowerMessage.includes('thank')) {
       return 'You\'re welcome! I\'m glad I could help. Feel free to ask if you have any other questions about finding the perfect venue.';
     } else if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
