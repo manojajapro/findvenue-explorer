@@ -9,11 +9,12 @@ import Index from "./pages/Index";
 import VenueDetails from "./pages/VenueDetails";
 import Login from "./pages/Login";
 import ListVenue from "./pages/ListVenue";
+import VenueOwnerPromo from "./pages/VenueOwnerPromo";
 import NotFound from "./pages/NotFound";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import ChatBot from "./components/chat/ChatBot";
-import VoiceAssistant from "./components/voice/VoiceAssistant";
+import { VoiceAssistant } from "./components/ui";
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -64,6 +65,7 @@ const AppContent = () => {
           <Route path="/venue/:id" element={<VenueDetails />} />
           <Route path="/login" element={<Login />} />
           <Route path="/list-venue" element={<ListVenue />} />
+          <Route path="/venue-owner" element={<VenueOwnerPromo />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

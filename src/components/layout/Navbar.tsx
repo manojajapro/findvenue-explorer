@@ -61,7 +61,7 @@ const Navbar = () => {
               Log in
             </Button>
           </Link>
-          <Link to="/list-venue">
+          <Link to="/venue-owner">
             <Button className="bg-findvenue hover:bg-findvenue-dark">
               List Your Venue
             </Button>
@@ -97,7 +97,7 @@ const Navbar = () => {
                     Log in
                   </Button>
                 </Link>
-                <Link to="/list-venue" className="block">
+                <Link to="/venue-owner" className="block">
                   <Button className="w-full bg-findvenue hover:bg-findvenue-dark">
                     List Your Venue
                   </Button>

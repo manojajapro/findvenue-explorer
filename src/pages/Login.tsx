@@ -1,20 +1,22 @@
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Facebook, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Facebook, Mail, Lock, Eye, EyeOff, User, Building } from 'lucide-react';
 
 const Login = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [userRole, setUserRole] = useState('customer');
   
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +39,13 @@ const Login = () => {
         description: 'You have been logged in successfully'
       });
       setIsLoading(false);
-      // Redirect would happen here
+      
+      // Redirect based on user role
+      if (userRole === 'venue-owner') {
+        navigate('/list-venue');
+      } else {
+        navigate('/');
+      }
     }, 1500);
   };
   
@@ -62,7 +70,13 @@ const Login = () => {
         description: 'Your account has been created successfully'
       });
       setIsLoading(false);
-      // Redirect would happen here
+      
+      // Redirect based on user role
+      if (userRole === 'venue-owner') {
+        navigate('/list-venue');
+      } else {
+        navigate('/');
+      }
     }, 1500);
   };
   
@@ -76,6 +90,35 @@ const Login = () => {
               <p className="text-findvenue-text-muted">
                 Log in or create an account to get started
               </p>
+            </div>
+            
+            <div className="mb-6">
+              <Label className="mb-2 block">I am a:</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border cursor-pointer transition-all ${
+                    userRole === 'customer'
+                      ? 'border-findvenue bg-findvenue/10'
+                      : 'border-white/10 hover:bg-findvenue-surface/50'
+                  }`}
+                  onClick={() => setUserRole('customer')}
+                >
+                  <User className={`h-6 w-6 mb-2 ${userRole === 'customer' ? 'text-findvenue' : 'text-findvenue-text-muted'}`} />
+                  <span className={userRole === 'customer' ? 'text-findvenue font-medium' : 'text-findvenue-text'}>Customer</span>
+                </div>
+                
+                <div
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border cursor-pointer transition-all ${
+                    userRole === 'venue-owner'
+                      ? 'border-findvenue bg-findvenue/10'
+                      : 'border-white/10 hover:bg-findvenue-surface/50'
+                  }`}
+                  onClick={() => setUserRole('venue-owner')}
+                >
+                  <Building className={`h-6 w-6 mb-2 ${userRole === 'venue-owner' ? 'text-findvenue' : 'text-findvenue-text-muted'}`} />
+                  <span className={userRole === 'venue-owner' ? 'text-findvenue font-medium' : 'text-findvenue-text'}>Venue Owner</span>
+                </div>
+              </div>
             </div>
             
             <Tabs defaultValue="login" className="w-full">
@@ -136,7 +179,7 @@ const Login = () => {
                       className="w-full bg-findvenue hover:bg-findvenue-dark"
                       disabled={isLoading}
                     >
-                      {isLoading ? 'Logging in...' : 'Log In'}
+                      {isLoading ? 'Logging in...' : userRole === 'venue-owner' ? 'Log In as Venue Owner' : 'Log In'}
                     </Button>
                     
                     <div className="relative my-6">
@@ -213,7 +256,7 @@ const Login = () => {
                       className="w-full bg-findvenue hover:bg-findvenue-dark"
                       disabled={isLoading}
                     >
-                      {isLoading ? 'Creating Account...' : 'Create Account'}
+                      {isLoading ? 'Creating Account...' : userRole === 'venue-owner' ? 'Create Venue Owner Account' : 'Create Customer Account'}
                     </Button>
                     
                     <div className="relative my-6">
