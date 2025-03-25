@@ -11,10 +11,14 @@ import Login from "./pages/Login";
 import ListVenue from "./pages/ListVenue";
 import VenueOwnerPromo from "./pages/VenueOwnerPromo";
 import NotFound from "./pages/NotFound";
+import Venues from "./pages/Venues";
+import Categories from "./pages/Categories";
+import Cities from "./pages/Cities";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import ChatBot from "./components/chat/ChatBot";
 import { VoiceAssistant } from "./components/ui";
+import { AuthProvider } from "./hooks/useAuth";
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -66,6 +70,9 @@ const AppContent = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/list-venue" element={<ListVenue />} />
           <Route path="/venue-owner" element={<VenueOwnerPromo />} />
+          <Route path="/venues" element={<Venues />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/cities" element={<Cities />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
@@ -81,11 +88,13 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AppContent />
-      </BrowserRouter>
+      <AuthProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

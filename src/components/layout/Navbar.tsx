@@ -12,13 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from '@/hooks/useAuth';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState<'customer' | 'venue-owner'>('customer');
-  const [userName, setUserName] = useState('Sarah Ahmed');
+  const { user, profile, signOut, isVenueOwner } = useAuth();
   
   // Track scroll position
   useEffect(() => {
@@ -29,33 +28,17 @@ const Navbar = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // Simulating user authentication check
-  useEffect(() => {
-    // This would normally be a real auth check
-    const checkLoginStatus = () => {
-      // For demo purposes, we'll just assume the user is logged in
-      // In a real app, this would check session/local storage or context
-      setIsLoggedIn(localStorage.getItem('isLoggedIn') === 'true');
-      setUserRole(localStorage.getItem('userRole') as 'customer' | 'venue-owner' || 'customer');
-    };
-    
-    checkLoginStatus();
-  }, []);
   
   // Navbar items
   const navItems = [
     { name: 'Home', path: '/' },
-    { name: 'Venues', path: '/?view=all' },
-    { name: 'Categories', path: '/?view=categories' },
-    { name: 'Cities', path: '/?view=cities' },
+    { name: 'Venues', path: '/venues' },
+    { name: 'Categories', path: '/categories' },
+    { name: 'Cities', path: '/cities' },
   ];
   
-  const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('userRole');
-    setIsLoggedIn(false);
-    // In a real app, this would also redirect to home or login page
+  const handleLogout = async () => {
+    await signOut();
   };
   
   return (
@@ -87,9 +70,9 @@ const Navbar = () => {
         
         {/* Auth Buttons or User Profile */}
         <div className="hidden md:flex items-center space-x-4">
-          {isLoggedIn ? (
+          {user ? (
             <>
-              {userRole === 'venue-owner' && (
+              {isVenueOwner && (
                 <Link to="/list-venue">
                   <Button className="bg-findvenue hover:bg-findvenue-dark">
                     List Your Venue
@@ -100,26 +83,26 @@ const Navbar = () => {
                 <DropdownMenuTrigger asChild>
                   <div className="flex items-center space-x-3 cursor-pointer">
                     <Avatar className="h-9 w-9 border border-findvenue/20">
-                      <AvatarImage src="/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png" alt={userName} />
+                      <AvatarImage src={profile?.profile_image || "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png"} alt={profile?.first_name} />
                       <AvatarFallback className="bg-findvenue/10 text-findvenue">
-                        {userName.split(' ').map(part => part[0]).join('')}
+                        {profile?.first_name?.charAt(0) || ''}{profile?.last_name?.charAt(0) || ''}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm font-medium">{userName}</span>
+                    <span className="text-sm font-medium">{profile?.first_name} {profile?.last_name}</span>
                   </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 bg-findvenue-card-bg border-white/10">
                   <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium text-findvenue-text">{userName}</p>
+                    <p className="text-sm font-medium text-findvenue-text">{profile?.first_name} {profile?.last_name}</p>
                     <p className="text-xs text-findvenue-text-muted">
-                      {userRole === 'venue-owner' ? 'Venue Owner' : 'Customer'}
+                      {isVenueOwner ? 'Venue Owner' : 'Customer'}
                     </p>
                   </div>
                   <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
                     <Link to="/profile" className="w-full">Profile</Link>
                   </DropdownMenuItem>
-                  {userRole === 'venue-owner' && (
+                  {isVenueOwner && (
                     <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
                       <Link to="/my-venues" className="w-full">My Venues</Link>
                     </DropdownMenuItem>
@@ -161,18 +144,18 @@ const Navbar = () => {
           <SheetContent side="right" className="bg-findvenue-card-bg border-l border-white/10">
             <div className="flex flex-col h-full">
               {/* User Profile for Mobile */}
-              {isLoggedIn && (
+              {user && (
                 <div className="flex items-center space-x-3 mb-6 p-2">
                   <Avatar className="h-10 w-10 border border-findvenue/20">
-                    <AvatarImage src="/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png" alt={userName} />
+                    <AvatarImage src={profile?.profile_image || "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png"} alt={profile?.first_name} />
                     <AvatarFallback className="bg-findvenue/10 text-findvenue">
-                      {userName.split(' ').map(part => part[0]).join('')}
+                      {profile?.first_name?.charAt(0) || ''}{profile?.last_name?.charAt(0) || ''}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-medium text-findvenue-text">{userName}</p>
+                    <p className="text-sm font-medium text-findvenue-text">{profile?.first_name} {profile?.last_name}</p>
                     <p className="text-xs text-findvenue-text-muted">
-                      {userRole === 'venue-owner' ? 'Venue Owner' : 'Customer'}
+                      {isVenueOwner ? 'Venue Owner' : 'Customer'}
                     </p>
                   </div>
                 </div>
@@ -193,14 +176,14 @@ const Navbar = () => {
               </div>
               
               <div className="mt-auto space-y-4">
-                {isLoggedIn ? (
+                {user ? (
                   <>
                     <Link to="/profile" className="block">
                       <Button variant="outline" className="w-full border-findvenue text-findvenue">
                         Profile
                       </Button>
                     </Link>
-                    {userRole === 'venue-owner' && (
+                    {isVenueOwner && (
                       <Link to="/list-venue" className="block">
                         <Button className="w-full bg-findvenue hover:bg-findvenue-dark">
                           List Your Venue

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -7,17 +8,28 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Facebook, Mail, Lock, Eye, EyeOff, User, Building } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { signIn, signUp, user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [userRole, setUserRole] = useState('customer');
   
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Redirect if user is already logged in
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
+  
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!email || !password) {
@@ -31,28 +43,20 @@ const Login = () => {
     
     setIsLoading(true);
     
-    setTimeout(() => {
-      toast({
-        title: 'Success',
-        description: 'You have been logged in successfully'
-      });
+    try {
+      await signIn(email, password);
+      navigate('/');
+    } catch (error) {
+      console.error('Login error:', error);
+    } finally {
       setIsLoading(false);
-      
-      localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('userRole', userRole);
-      
-      if (userRole === 'venue-owner') {
-        navigate('/list-venue');
-      } else {
-        navigate('/');
-      }
-    }, 1500);
+    }
   };
   
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
+    if (!email || !password || !firstName || !lastName) {
       toast({
         title: 'Error',
         description: 'Please fill in all required fields',
@@ -63,22 +67,19 @@ const Login = () => {
     
     setIsLoading(true);
     
-    setTimeout(() => {
-      toast({
-        title: 'Account Created',
-        description: 'Your account has been created successfully'
+    try {
+      await signUp(email, password, {
+        firstName,
+        lastName,
+        userRole
       });
+      
+      navigate('/');
+    } catch (error) {
+      console.error('Signup error:', error);
+    } finally {
       setIsLoading(false);
-      
-      localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('userRole', userRole);
-      
-      if (userRole === 'venue-owner') {
-        navigate('/list-venue');
-      } else {
-        navigate('/');
-      }
-    }, 1500);
+    }
   };
   
   return (
@@ -207,6 +208,29 @@ const Login = () => {
               <TabsContent value="signup">
                 <form onSubmit={handleSignup}>
                   <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          type="text"
+                          placeholder="First Name"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          type="text"
+                          placeholder="Last Name"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  
                     <div className="space-y-2">
                       <Label htmlFor="signup-email">Email</Label>
                       <div className="relative">
