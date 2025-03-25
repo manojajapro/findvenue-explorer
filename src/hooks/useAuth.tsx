@@ -45,9 +45,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Type the response properly with a generic
+            // Type the response properly with TWO generic parameters
             const { data: profileData, error } = await supabase
-              .rpc<UserProfile>('get_user_profile', { 
+              .rpc<UserProfile, { user_id: string }>('get_user_profile', { 
                 user_id: currentSession.user.id 
               });
               
@@ -81,9 +81,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        // Use proper generic typing for RPC calls
+        // Use proper generic typing with TWO type parameters
         supabase
-          .rpc<UserProfile>('get_user_profile', { 
+          .rpc<UserProfile, { user_id: string }>('get_user_profile', { 
             user_id: currentSession.user.id 
           })
           .then(({ data: profileData, error }) => {
