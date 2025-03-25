@@ -45,9 +45,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // We need to use RPC call instead of from() since profiles table isn't in types
+            // Fix: Type the RPC function call properly
             const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', { user_id: currentSession.user.id })
+              .rpc('get_user_profile', { user_id: currentSession.user.id } as any)
               .single();
               
             if (profileData) {
@@ -82,9 +82,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        // Use RPC call for profiles instead of direct table access
+        // Fix: Type the RPC call properly
         supabase
-          .rpc('get_user_profile', { user_id: currentSession.user.id })
+          .rpc('get_user_profile', { user_id: currentSession.user.id } as any)
           .single()
           .then(({ data: profileData, error }) => {
             if (profileData) {
@@ -108,6 +108,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         setIsLoading(false);
       }
+    })
+    // Fix: Add proper catch handler to the Promise chain
+    .catch(error => {
+      console.error("Error getting session:", error);
+      setIsLoading(false);
     });
 
     return () => {
