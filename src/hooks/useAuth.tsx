@@ -84,11 +84,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (currentSession?.user) {
         // Use a type assertion to specify the expected return type
         supabase
-          .rpc('get_user_profile', { user_id: currentSession.user.id }) as unknown as {
-            data: UserProfile | null;
-            error: any;
-            then: (onfulfilled?: ((value: { data: UserProfile | null; error: any; }) => any)) => any;
-          }
+          .rpc('get_user_profile', { user_id: currentSession.user.id })
           .then(({ data: profileData, error }) => {
             if (profileData) {
               console.log("Initial profile data loaded:", profileData);
