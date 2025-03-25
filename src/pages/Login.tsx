@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -32,7 +31,6 @@ const Login = () => {
     
     setIsLoading(true);
     
-    // Simulate API call
     setTimeout(() => {
       toast({
         title: 'Success',
@@ -40,7 +38,9 @@ const Login = () => {
       });
       setIsLoading(false);
       
-      // Redirect based on user role
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('userRole', userRole);
+      
       if (userRole === 'venue-owner') {
         navigate('/list-venue');
       } else {
@@ -63,7 +63,6 @@ const Login = () => {
     
     setIsLoading(true);
     
-    // Simulate API call
     setTimeout(() => {
       toast({
         title: 'Account Created',
@@ -71,7 +70,9 @@ const Login = () => {
       });
       setIsLoading(false);
       
-      // Redirect based on user role
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('userRole', userRole);
+      
       if (userRole === 'venue-owner') {
         navigate('/list-venue');
       } else {

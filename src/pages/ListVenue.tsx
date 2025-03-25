@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -10,12 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { saudiCities } from '@/data/cities';
 import { categories } from '@/data/categories';
-import { Check, Upload, AlertCircle } from 'lucide-react';
+import { Check, Upload, AlertCircle, ImageIcon } from 'lucide-react';
 
 const ListVenue = () => {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState<string[]>(['/lovable-uploads/25610b8c-bf06-4ae3-8110-9c4e8133a31b.png']);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -74,6 +74,14 @@ const ListVenue = () => {
         [day]: checked
       }
     }));
+  };
+  
+  // Simulate image upload
+  const handleImageUpload = () => {
+    toast({
+      title: 'Image Uploaded',
+      description: 'Your venue image has been uploaded successfully'
+    });
   };
   
   // Handle next step
@@ -165,6 +173,7 @@ const ListVenue = () => {
         }
       });
       setStep(1);
+      setUploadedImages([]);
       
       // Redirect would happen here
     }, 2000);
@@ -291,18 +300,65 @@ const ListVenue = () => {
                   
                   <div className="space-y-2">
                     <Label>Venue Photos</Label>
-                    <div className="border border-dashed border-white/20 rounded-md p-6 text-center">
-                      <div className="flex flex-col items-center">
-                        <Upload className="h-10 w-10 text-findvenue-text-muted mb-2" />
-                        <p className="text-findvenue-text-muted mb-2">Drag and drop photos or click to upload</p>
-                        <p className="text-xs text-findvenue-text-muted mb-4">
-                          Upload high-quality images (up to 10 images, max 5MB each)
-                        </p>
-                        <Button type="button" variant="outline" className="border-findvenue text-findvenue hover:bg-findvenue/10">
-                          Select Files
-                        </Button>
+                    
+                    {/* Image preview area */}
+                    {uploadedImages.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                        {uploadedImages.map((image, index) => (
+                          <div key={index} className="relative group aspect-video rounded-md overflow-hidden border border-white/10">
+                            <img 
+                              src={image} 
+                              alt={`Venue image ${index + 1}`} 
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Button 
+                                variant="destructive" 
+                                size="sm" 
+                                className="text-xs"
+                                onClick={() => setUploadedImages(prev => prev.filter((_, i) => i !== index))}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Add more images box */}
+                        {uploadedImages.length < 10 && (
+                          <div 
+                            className="aspect-video rounded-md border border-dashed border-white/20 flex items-center justify-center bg-findvenue-surface/20 hover:bg-findvenue-surface/30 cursor-pointer transition-colors"
+                            onClick={handleImageUpload}
+                          >
+                            <div className="text-center p-4">
+                              <ImageIcon className="h-6 w-6 mx-auto text-findvenue-text-muted mb-2" />
+                              <p className="text-sm text-findvenue-text-muted">Add More</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    )}
+                    
+                    {/* Upload area when no images */}
+                    {uploadedImages.length === 0 && (
+                      <div className="border border-dashed border-white/20 rounded-md p-6 text-center">
+                        <div className="flex flex-col items-center">
+                          <Upload className="h-10 w-10 text-findvenue-text-muted mb-2" />
+                          <p className="text-findvenue-text-muted mb-2">Drag and drop photos or click to upload</p>
+                          <p className="text-xs text-findvenue-text-muted mb-4">
+                            Upload high-quality images (up to 10 images, max 5MB each)
+                          </p>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            className="border-findvenue text-findvenue hover:bg-findvenue/10"
+                            onClick={handleImageUpload}
+                          >
+                            Select Files
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

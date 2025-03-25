@@ -4,10 +4,21 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, X } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState<'customer' | 'venue-owner'>('customer');
+  const [userName, setUserName] = useState('Sarah Ahmed');
   
   // Track scroll position
   useEffect(() => {
@@ -18,6 +29,19 @@ const Navbar = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Simulating user authentication check
+  useEffect(() => {
+    // This would normally be a real auth check
+    const checkLoginStatus = () => {
+      // For demo purposes, we'll just assume the user is logged in
+      // In a real app, this would check session/local storage or context
+      setIsLoggedIn(localStorage.getItem('isLoggedIn') === 'true');
+      setUserRole(localStorage.getItem('userRole') as 'customer' | 'venue-owner' || 'customer');
+    };
+    
+    checkLoginStatus();
+  }, []);
   
   // Navbar items
   const navItems = [
@@ -26,6 +50,13 @@ const Navbar = () => {
     { name: 'Categories', path: '/?view=categories' },
     { name: 'Cities', path: '/?view=cities' },
   ];
+  
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('userRole');
+    setIsLoggedIn(false);
+    // In a real app, this would also redirect to home or login page
+  };
   
   return (
     <header 
@@ -54,18 +85,69 @@ const Navbar = () => {
           ))}
         </nav>
         
-        {/* Auth Buttons */}
+        {/* Auth Buttons or User Profile */}
         <div className="hidden md:flex items-center space-x-4">
-          <Link to="/login">
-            <Button variant="ghost" className="hover:bg-white/5">
-              Log in
-            </Button>
-          </Link>
-          <Link to="/venue-owner">
-            <Button className="bg-findvenue hover:bg-findvenue-dark">
-              List Your Venue
-            </Button>
-          </Link>
+          {isLoggedIn ? (
+            <>
+              {userRole === 'venue-owner' && (
+                <Link to="/list-venue">
+                  <Button className="bg-findvenue hover:bg-findvenue-dark">
+                    List Your Venue
+                  </Button>
+                </Link>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="flex items-center space-x-3 cursor-pointer">
+                    <Avatar className="h-9 w-9 border border-findvenue/20">
+                      <AvatarImage src="/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png" alt={userName} />
+                      <AvatarFallback className="bg-findvenue/10 text-findvenue">
+                        {userName.split(' ').map(part => part[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium">{userName}</span>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-findvenue-card-bg border-white/10">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium text-findvenue-text">{userName}</p>
+                    <p className="text-xs text-findvenue-text-muted">
+                      {userRole === 'venue-owner' ? 'Venue Owner' : 'Customer'}
+                    </p>
+                  </div>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
+                    <Link to="/profile" className="w-full">Profile</Link>
+                  </DropdownMenuItem>
+                  {userRole === 'venue-owner' && (
+                    <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
+                      <Link to="/my-venues" className="w-full">My Venues</Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
+                    <Link to="/bookings" className="w-full">My Bookings</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem className="cursor-pointer hover:bg-destructive/10 text-destructive" onClick={handleLogout}>
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <>
+              <Link to="/login">
+                <Button variant="ghost" className="hover:bg-white/5">
+                  Log in
+                </Button>
+              </Link>
+              <Link to="/venue-owner">
+                <Button className="bg-findvenue hover:bg-findvenue-dark">
+                  List Your Venue
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
         
         {/* Mobile Menu */}
@@ -78,6 +160,24 @@ const Navbar = () => {
           </SheetTrigger>
           <SheetContent side="right" className="bg-findvenue-card-bg border-l border-white/10">
             <div className="flex flex-col h-full">
+              {/* User Profile for Mobile */}
+              {isLoggedIn && (
+                <div className="flex items-center space-x-3 mb-6 p-2">
+                  <Avatar className="h-10 w-10 border border-findvenue/20">
+                    <AvatarImage src="/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png" alt={userName} />
+                    <AvatarFallback className="bg-findvenue/10 text-findvenue">
+                      {userName.split(' ').map(part => part[0]).join('')}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium text-findvenue-text">{userName}</p>
+                    <p className="text-xs text-findvenue-text-muted">
+                      {userRole === 'venue-owner' ? 'Venue Owner' : 'Customer'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               <div className="space-y-4 py-4">
                 {navItems.map((item) => (
                   <Link
@@ -91,17 +191,44 @@ const Navbar = () => {
                   </Link>
                 ))}
               </div>
+              
               <div className="mt-auto space-y-4">
-                <Link to="/login" className="block">
-                  <Button variant="outline" className="w-full border-findvenue text-findvenue">
-                    Log in
-                  </Button>
-                </Link>
-                <Link to="/venue-owner" className="block">
-                  <Button className="w-full bg-findvenue hover:bg-findvenue-dark">
-                    List Your Venue
-                  </Button>
-                </Link>
+                {isLoggedIn ? (
+                  <>
+                    <Link to="/profile" className="block">
+                      <Button variant="outline" className="w-full border-findvenue text-findvenue">
+                        Profile
+                      </Button>
+                    </Link>
+                    {userRole === 'venue-owner' && (
+                      <Link to="/list-venue" className="block">
+                        <Button className="w-full bg-findvenue hover:bg-findvenue-dark">
+                          List Your Venue
+                        </Button>
+                      </Link>
+                    )}
+                    <Button 
+                      variant="outline" 
+                      className="w-full border-white/10 text-destructive hover:bg-destructive/10"
+                      onClick={handleLogout}
+                    >
+                      Log out
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login" className="block">
+                      <Button variant="outline" className="w-full border-findvenue text-findvenue">
+                        Log in
+                      </Button>
+                    </Link>
+                    <Link to="/venue-owner" className="block">
+                      <Button className="w-full bg-findvenue hover:bg-findvenue-dark">
+                        List Your Venue
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </SheetContent>
