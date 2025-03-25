@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin } from 'lucide-react';
 import L from 'leaflet';
@@ -12,6 +12,17 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+// Map initialization component
+function MapInitializer({ setMapLoaded }: { setMapLoaded: (loaded: boolean) => void }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    setMapLoaded(true);
+  }, [setMapLoaded]);
+  
+  return null;
+}
 
 interface VenueLocationMapProps {
   name: string;
@@ -55,15 +66,14 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
       ) : (
         <div className="h-[250px] w-full relative">
           <MapContainer 
-            center={position}
-            zoom={14}
-            scrollWheelZoom={false}
             style={{ height: '100%', width: '100%', background: '#1e2734' }}
-            whenReady={() => setMapLoaded(true)}
+            scrollWheelZoom={false}
+            zoom={14}
+            className="z-10"
           >
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
             <Marker position={position}>
               <Popup>
@@ -73,6 +83,7 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
                 </div>
               </Popup>
             </Marker>
+            <MapInitializer setMapLoaded={setMapLoaded} />
           </MapContainer>
           
           <div className="p-3 bg-findvenue-card-bg/70 backdrop-blur-sm absolute bottom-0 left-0 right-0 text-sm z-[400]">

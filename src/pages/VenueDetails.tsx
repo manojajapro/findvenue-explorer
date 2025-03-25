@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -20,8 +19,8 @@ import {
   Sparkles,
   Check,
   X,
-  Wheelchair,
-  Clock3
+  Clock3,
+  AccessibilityIcon
 } from 'lucide-react';
 import { VenueCard } from '@/components/ui';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +33,7 @@ const amenityIcons: Record<string, JSX.Element> = {
   'Parking': <Car className="w-4 h-4" />,
   'Sound System': <Music className="w-4 h-4" />,
   'Catering': <UtensilsCrossed className="w-4 h-4" />,
-  'Wheelchair Access': <Wheelchair className="w-4 h-4" />,
+  'Wheelchair Access': <AccessibilityIcon className="w-4 h-4" />,
 };
 
 const VenueDetails = () => {
@@ -65,6 +64,23 @@ const VenueDetails = () => {
         if (error) throw error;
         
         if (venueData) {
+          // Process owner_info from JSON
+          let ownerInfoData = undefined;
+          if (venueData.owner_info) {
+            const ownerInfo = venueData.owner_info as Record<string, any>;
+            ownerInfoData = {
+              name: ownerInfo.name as string,
+              contact: ownerInfo.contact as string,
+              responseTime: ownerInfo.response_time as string
+            };
+          }
+          
+          // Process opening_hours from JSON
+          let openingHoursData = undefined;
+          if (venueData.opening_hours) {
+            openingHoursData = venueData.opening_hours as Record<string, {open: string, close: string}>;
+          }
+          
           const transformedVenue: Venue = {
             id: venueData.id,
             name: venueData.name,
@@ -98,12 +114,8 @@ const VenueDetails = () => {
             wifi: venueData.wifi,
             accessibilityFeatures: venueData.accessibility_features || [],
             acceptedPaymentMethods: venueData.accepted_payment_methods || [],
-            openingHours: venueData.opening_hours,
-            ownerInfo: venueData.owner_info ? {
-              name: venueData.owner_info.name,
-              contact: venueData.owner_info.contact,
-              responseTime: venueData.owner_info.response_time
-            } : undefined,
+            openingHours: openingHoursData,
+            ownerInfo: ownerInfoData,
             additionalServices: venueData.additional_services || []
           };
           
@@ -121,47 +133,62 @@ const VenueDetails = () => {
           if (similarError) throw similarError;
           
           if (similarData) {
-            const transformedSimilar: Venue[] = similarData.map(venue => ({
-              id: venue.id,
-              name: venue.name,
-              description: venue.description || '',
-              imageUrl: venue.image_url || '',
-              galleryImages: venue.gallery_images || [],
-              address: venue.address || '',
-              city: venue.city_name || '',
-              cityId: venue.city_id || '',
-              category: venue.category_name || '',
-              categoryId: venue.category_id || '',
-              capacity: {
-                min: venue.min_capacity || 0,
-                max: venue.max_capacity || 0
-              },
-              pricing: {
-                currency: venue.currency || 'SAR',
-                startingPrice: venue.starting_price || 0,
-                pricePerPerson: venue.price_per_person || 0
-              },
-              amenities: venue.amenities || [],
-              rating: venue.rating || 0,
-              reviews: venue.reviews_count || 0,
-              featured: venue.featured || false,
-              popular: venue.popular || false,
-              availability: venue.availability || [],
-              // New fields matching structure
-              latitude: venue.latitude,
-              longitude: venue.longitude,
-              parking: venue.parking,
-              wifi: venue.wifi,
-              accessibilityFeatures: venue.accessibility_features || [],
-              acceptedPaymentMethods: venue.accepted_payment_methods || [],
-              openingHours: venue.opening_hours,
-              ownerInfo: venue.owner_info ? {
-                name: venue.owner_info.name,
-                contact: venue.owner_info.contact,
-                responseTime: venue.owner_info.response_time
-              } : undefined,
-              additionalServices: venue.additional_services || []
-            }));
+            const transformedSimilar = similarData.map(venue => {
+              // Process owner_info from JSON for similar venues
+              let ownerInfoData = undefined;
+              if (venue.owner_info) {
+                const ownerInfo = venue.owner_info as Record<string, any>;
+                ownerInfoData = {
+                  name: ownerInfo.name as string,
+                  contact: ownerInfo.contact as string,
+                  responseTime: ownerInfo.response_time as string
+                };
+              }
+              
+              // Process opening_hours from JSON for similar venues
+              let openingHoursData = undefined;
+              if (venue.opening_hours) {
+                openingHoursData = venue.opening_hours as Record<string, {open: string, close: string}>;
+              }
+              
+              return {
+                id: venue.id,
+                name: venue.name,
+                description: venue.description || '',
+                imageUrl: venue.image_url || '',
+                galleryImages: venue.gallery_images || [],
+                address: venue.address || '',
+                city: venue.city_name || '',
+                cityId: venue.city_id || '',
+                category: venue.category_name || '',
+                categoryId: venue.category_id || '',
+                capacity: {
+                  min: venue.min_capacity || 0,
+                  max: venue.max_capacity || 0
+                },
+                pricing: {
+                  currency: venue.currency || 'SAR',
+                  startingPrice: venue.starting_price || 0,
+                  pricePerPerson: venue.price_per_person || 0
+                },
+                amenities: venue.amenities || [],
+                rating: venue.rating || 0,
+                reviews: venue.reviews_count || 0,
+                featured: venue.featured || false,
+                popular: venue.popular || false,
+                availability: venue.availability || [],
+                // New fields matching structure
+                latitude: venue.latitude,
+                longitude: venue.longitude,
+                parking: venue.parking,
+                wifi: venue.wifi,
+                accessibilityFeatures: venue.accessibility_features || [],
+                acceptedPaymentMethods: venue.accepted_payment_methods || [],
+                openingHours: openingHoursData,
+                ownerInfo: ownerInfoData,
+                additionalServices: venue.additional_services || []
+              } as Venue;
+            });
             
             setSimilarVenues(transformedSimilar);
           }
@@ -178,7 +205,6 @@ const VenueDetails = () => {
     fetchVenueDetails();
   }, [id, navigate]);
   
-  // Functions to render different sections
   const renderOpeningHours = () => {
     if (!venue?.openingHours) return null;
     
@@ -459,7 +485,7 @@ const VenueDetails = () => {
                 {venue.accessibilityFeatures?.map((feature, index) => (
                   <div key={`acc-${index}`} className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-findvenue/10 flex items-center justify-center mr-3">
-                      <Wheelchair className="w-4 h-4 text-findvenue" />
+                      <AccessibilityIcon className="w-4 h-4 text-findvenue" />
                     </div>
                     <span>{feature}</span>
                   </div>
@@ -500,9 +526,51 @@ const VenueDetails = () => {
               />
             </div>
             
-            {/* Additional features */}
-            {renderAdditionalServices()}
-            {renderOwnerInfo()}
+            {/* Additional features - calling the render functions */}
+            {venue.additionalServices && venue.additionalServices.length > 0 && (
+              <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+                <div className="p-4 border-b border-white/10">
+                  <h3 className="font-semibold flex items-center">
+                    <Sparkles className="w-4 h-4 mr-2 text-findvenue" />
+                    Additional Services
+                  </h3>
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {venue.additionalServices.map((service, index) => (
+                      <div key={index} className="flex items-center">
+                        <Check className="w-4 h-4 mr-2 text-findvenue" />
+                        <span>{service}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {venue.ownerInfo && (
+              <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+                <div className="p-4 border-b border-white/10">
+                  <h3 className="font-semibold">Venue Host Information</h3>
+                </div>
+                <div className="p-4">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted mb-1">Host Name</p>
+                      <p className="font-medium">{venue.ownerInfo.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted mb-1">Contact</p>
+                      <p className="font-medium">{venue.ownerInfo.contact}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
+                      <p className="font-medium">{venue.ownerInfo.responseTime}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Sidebar */}
@@ -547,7 +615,26 @@ const VenueDetails = () => {
               </Button>
               
               {/* Payment information */}
-              {renderPaymentMethods()}
+              {venue.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && (
+                <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mt-6 mb-6">
+                  <div className="p-4 border-b border-white/10">
+                    <h3 className="font-semibold flex items-center">
+                      <CreditCard className="w-4 h-4 mr-2 text-findvenue" />
+                      Accepted Payment Methods
+                    </h3>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex flex-wrap gap-2">
+                      {venue.acceptedPaymentMethods.map((method, index) => (
+                        <Badge key={index} variant="secondary" className="bg-findvenue-surface/50">
+                          {method}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {renderOpeningHours()}
             </Card>
           </div>

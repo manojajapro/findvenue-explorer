@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { Json } from '@/integrations/supabase/types';
 
 export interface VenueFilter {
   cityId?: string;
@@ -142,50 +143,67 @@ export const useSupabaseVenues = () => {
       if (venuesError) throw venuesError;
       
       // Transform the data to match the expected format
-      const transformedData = data.map(venue => ({
-        id: venue.id,
-        name: venue.name,
-        description: venue.description,
-        imageUrl: venue.image_url,
-        galleryImages: venue.gallery_images || [],
-        address: venue.address,
-        city: venue.city_name || '',
-        cityId: venue.city_id,
-        category: venue.category_name || '',
-        categoryId: venue.category_id,
-        capacity: {
-          min: venue.min_capacity,
-          max: venue.max_capacity
-        },
-        pricing: {
-          currency: venue.currency,
-          startingPrice: venue.starting_price,
-          pricePerPerson: venue.price_per_person
-        },
-        amenities: venue.amenities || [],
-        rating: venue.rating,
-        reviews: venue.reviews_count,
-        featured: venue.featured,
-        popular: venue.popular,
-        availability: venue.availability || [],
-        // New fields
-        latitude: venue.latitude,
-        longitude: venue.longitude,
-        parking: venue.parking,
-        wifi: venue.wifi,
-        accessibilityFeatures: venue.accessibility_features || [],
-        acceptedPaymentMethods: venue.accepted_payment_methods || [],
-        openingHours: venue.opening_hours,
-        ownerInfo: venue.owner_info ? {
-          name: venue.owner_info.name,
-          contact: venue.owner_info.contact,
-          responseTime: venue.owner_info.response_time
-        } : undefined,
-        additionalServices: venue.additional_services || []
-      }));
-      
-      setVenues(transformedData);
-      setTotalCount(count || 0);
+      if (data) {
+        const transformedData = data.map(venue => {
+          // Process owner_info from JSON
+          let ownerInfoData = undefined;
+          if (venue.owner_info) {
+            const ownerInfo = venue.owner_info as Record<string, any>;
+            ownerInfoData = {
+              name: ownerInfo.name as string,
+              contact: ownerInfo.contact as string,
+              responseTime: ownerInfo.response_time as string
+            };
+          }
+          
+          // Process opening_hours from JSON
+          let openingHoursData = undefined;
+          if (venue.opening_hours) {
+            openingHoursData = venue.opening_hours as Record<string, {open: string, close: string}>;
+          }
+          
+          return {
+            id: venue.id,
+            name: venue.name,
+            description: venue.description || '',
+            imageUrl: venue.image_url || '',
+            galleryImages: venue.gallery_images || [],
+            address: venue.address || '',
+            city: venue.city_name || '',
+            cityId: venue.city_id || '',
+            category: venue.category_name || '',
+            categoryId: venue.category_id || '',
+            capacity: {
+              min: venue.min_capacity || 0,
+              max: venue.max_capacity || 0
+            },
+            pricing: {
+              currency: venue.currency || 'SAR',
+              startingPrice: venue.starting_price || 0,
+              pricePerPerson: venue.price_per_person || 0
+            },
+            amenities: venue.amenities || [],
+            rating: venue.rating || 0,
+            reviews: venue.reviews_count || 0,
+            featured: venue.featured || false,
+            popular: venue.popular || false,
+            availability: venue.availability || [],
+            // New fields
+            latitude: venue.latitude,
+            longitude: venue.longitude,
+            parking: venue.parking,
+            wifi: venue.wifi,
+            accessibilityFeatures: venue.accessibility_features || [],
+            acceptedPaymentMethods: venue.accepted_payment_methods || [],
+            openingHours: openingHoursData,
+            ownerInfo: ownerInfoData,
+            additionalServices: venue.additional_services || []
+          } as Venue;
+        });
+        
+        setVenues(transformedData);
+        setTotalCount(count || 0);
+      }
       
     } catch (error: any) {
       console.error('Error fetching venues:', error);
