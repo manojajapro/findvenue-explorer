@@ -1,4 +1,3 @@
-
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -44,19 +43,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
-          // Fetch user profile
-          const { data: profileData, error } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', currentSession.user.id)
-            .single();
-            
-          if (profileData) {
-            console.log("Profile data loaded:", profileData);
-            setProfile(profileData as unknown as UserProfile);
-            setIsVenueOwner(profileData.user_role === 'venue-owner');
-          } else {
-            console.error("Failed to fetch user profile:", error);
+          try {
+            // Check if user_profiles table exists
+            const { data: profileData, error } = await supabase
+              .from('user_profiles')
+              .select('*')
+              .eq('id', currentSession.user.id)
+              .single();
+              
+            if (profileData) {
+              console.log("Profile data loaded:", profileData);
+              setProfile(profileData as UserProfile);
+              setIsVenueOwner(profileData.user_role === 'venue-owner');
+            } else {
+              console.error("Failed to fetch user profile:", error);
+              setProfile(null);
+              setIsVenueOwner(false);
+            }
+          } catch (error) {
+            console.error("Error fetching profile:", error);
             setProfile(null);
             setIsVenueOwner(false);
           }
@@ -85,7 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .then(({ data: profileData, error }) => {
             if (profileData) {
               console.log("Initial profile data loaded:", profileData);
-              setProfile(profileData as unknown as UserProfile);
+              setProfile(profileData as UserProfile);
               setIsVenueOwner(profileData.user_role === 'venue-owner');
             } else {
               console.error("Failed to fetch initial user profile:", error);
@@ -93,6 +98,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setIsVenueOwner(false);
             }
             
+            setIsLoading(false);
+          })
+          .catch(error => {
+            console.error("Error in initial profile fetch:", error);
             setIsLoading(false);
           });
       } else {
