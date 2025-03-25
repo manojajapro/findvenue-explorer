@@ -3,10 +3,21 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
+type UserProfile = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  profile_image?: string;
+  user_role: 'customer' | 'venue-owner';
+  created_at?: string;
+};
+
 type AuthContextType = {
   session: any | null;
   user: any | null;
-  profile: any | null;
+  profile: UserProfile | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, userData: any) => Promise<void>;
@@ -19,7 +30,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<any | null>(null);
   const [user, setUser] = useState<any | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isVenueOwner, setIsVenueOwner] = useState(false);
   const { toast } = useToast();
@@ -33,14 +44,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           // Fetch user profile
-          const { data: profileData } = await supabase
+          const { data: profileData, error } = await supabase
             .from('user_profiles')
             .select('*')
             .eq('id', currentSession.user.id)
             .single();
             
-          setProfile(profileData);
-          setIsVenueOwner(profileData?.user_role === 'venue-owner');
+          if (profileData) {
+            setProfile(profileData as unknown as UserProfile);
+            setIsVenueOwner((profileData as unknown as UserProfile).user_role === 'venue-owner');
+          } else {
+            console.error("Failed to fetch user profile:", error);
+            setProfile(null);
+            setIsVenueOwner(false);
+          }
         } else {
           setProfile(null);
           setIsVenueOwner(false);
@@ -62,9 +79,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .select('*')
           .eq('id', currentSession.user.id)
           .single()
-          .then(({ data: profileData }) => {
-            setProfile(profileData);
-            setIsVenueOwner(profileData?.user_role === 'venue-owner');
+          .then(({ data: profileData, error }) => {
+            if (profileData) {
+              setProfile(profileData as unknown as UserProfile);
+              setIsVenueOwner((profileData as unknown as UserProfile).user_role === 'venue-owner');
+            } else {
+              console.error("Failed to fetch user profile:", error);
+              setProfile(null);
+              setIsVenueOwner(false);
+            }
           });
       }
       
