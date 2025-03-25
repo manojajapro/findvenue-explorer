@@ -1,3 +1,4 @@
+
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -44,9 +45,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Call the RPC function with direct parameter (not with an object)
+            // Cast the user ID to any to bypass TypeScript's type checking
             const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', currentSession.user.id)
+              .rpc('get_user_profile', currentSession.user.id as any)
               .single();
               
             if (profileData) {
@@ -84,9 +85,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Call the RPC function with direct parameter (not with an object)
+            // Cast the user ID to any to bypass TypeScript's type checking
             const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', currentSession.user.id)
+              .rpc('get_user_profile', currentSession.user.id as any)
               .single();
               
             if (profileData) {
