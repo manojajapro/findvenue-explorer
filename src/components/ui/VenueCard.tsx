@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Venue } from '@/data/venues';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Star, Users, CalendarDays, MapPin } from 'lucide-react';
+import { Star, Users, CalendarDays, MapPin, Tag } from 'lucide-react';
 
 interface VenueCardProps {
   venue: Venue;
@@ -51,9 +51,14 @@ const VenueCard = ({ venue, featured = false }: VenueCardProps) => {
             </div>
           </div>
           
-          <div className="text-findvenue-text-muted text-sm mb-3 flex items-center">
+          <div className="text-findvenue-text-muted text-sm mb-1 flex items-center">
             <MapPin className="w-3 h-3 mr-1" />
             <span>{venue.city}</span>
+          </div>
+          
+          <div className="text-findvenue-text-muted text-sm mb-3 flex items-center">
+            <Tag className="w-3 h-3 mr-1" />
+            <span>{venue.category}</span>
           </div>
           
           <p className="text-sm text-findvenue-text-muted mb-4 line-clamp-2">

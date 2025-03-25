@@ -1,15 +1,19 @@
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, MapPin } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowRight, MapPin, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 
 const Cities = () => {
   const [cities, setCities] = useState<any[]>([]);
+  const [filteredCities, setFilteredCities] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
   
   useEffect(() => {
     const fetchCities = async () => {
@@ -22,12 +26,15 @@ const Cities = () => {
           
         if (error) throw error;
         
-        setCities(data.map(city => ({
+        const citiesData = data.map(city => ({
           id: city.city_id,
           name: city.city_name,
           image_url: city.image_url,
           venue_count: city.venue_count
-        })) || []);
+        })) || [];
+        
+        setCities(citiesData);
+        setFilteredCities(citiesData);
       } catch (error) {
         console.error('Error fetching cities:', error);
       } finally {
@@ -38,14 +45,46 @@ const Cities = () => {
     fetchCities();
   }, []);
   
+  // Filter cities based on search term
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredCities(cities);
+      return;
+    }
+    
+    const filtered = cities.filter(city => 
+      city.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    setFilteredCities(filtered);
+  }, [searchTerm, cities]);
+  
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+  };
+  
   return (
     <div className="pt-24 pb-16">
       <div className="container mx-auto px-4">
         <div className="mb-12 text-center">
           <h1 className="text-4xl font-bold mb-4">Explore Cities</h1>
-          <p className="text-findvenue-text-muted max-w-2xl mx-auto">
+          <p className="text-findvenue-text-muted max-w-2xl mx-auto mb-8">
             Discover venue options in cities across Saudi Arabia
           </p>
+          
+          {/* Search bar */}
+          <form onSubmit={handleSearch} className="max-w-xl mx-auto mb-12">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
+              <Input
+                type="text"
+                placeholder="Search cities..."
+                className="pl-10 bg-findvenue-surface/50 border-white/10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </form>
         </div>
         
         {isLoading ? (
@@ -54,12 +93,12 @@ const Cities = () => {
               <CitySkeleton key={index} />
             ))}
           </div>
-        ) : (
+        ) : filteredCities.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {cities.map((city) => (
+            {filteredCities.map((city) => (
               <Link 
                 key={city.id}
-                to={`/?cityId=${city.id}`}
+                to={`/venues?cityId=${city.id}`}
                 className="block h-full"
               >
                 <Card className="overflow-hidden h-full transition-transform hover:scale-[1.02] bg-findvenue-card-bg border-white/10">
@@ -89,6 +128,20 @@ const Cities = () => {
                 </Card>
               </Link>
             ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <h3 className="text-xl font-medium mb-2">No cities found</h3>
+            <p className="text-findvenue-text-muted mb-6">
+              Try adjusting your search term
+            </p>
+            <Button 
+              variant="outline" 
+              className="border-white/10"
+              onClick={() => setSearchTerm('')}
+            >
+              Clear Search
+            </Button>
           </div>
         )}
       </div>

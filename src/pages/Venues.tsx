@@ -1,16 +1,18 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import VenuesList from '@/components/venues/VenuesList';
 import { useSupabaseVenues } from '@/hooks/useSupabaseVenues';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const Venues = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { categories, cities } = useSupabaseVenues();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
   
   // Get filter parameters from URL
   const categoryId = searchParams.get('categoryId');
@@ -33,6 +35,21 @@ const Venues = () => {
       document.title = 'All Venues | FindVenue';
     }
   }, [categoryName, cityName]);
+  
+  // Auto-search with debounced term
+  useEffect(() => {
+    if (debouncedSearchTerm !== searchParams.get('search')) {
+      const newParams = new URLSearchParams(searchParams);
+      
+      if (debouncedSearchTerm.trim()) {
+        newParams.set('search', debouncedSearchTerm.trim());
+      } else {
+        newParams.delete('search');
+      }
+      
+      setSearchParams(newParams);
+    }
+  }, [debouncedSearchTerm, searchParams, setSearchParams]);
   
   // Handle search submission
   const handleSearch = (e: React.FormEvent) => {

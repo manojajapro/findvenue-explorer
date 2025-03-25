@@ -1,15 +1,19 @@
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowRight, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 
 const Categories = () => {
   const [categories, setCategories] = useState<any[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
   
   useEffect(() => {
     const fetchCategories = async () => {
@@ -22,13 +26,16 @@ const Categories = () => {
           
         if (error) throw error;
         
-        setCategories(data.map(category => ({
+        const categoriesData = data.map(category => ({
           id: category.category_id,
           name: category.category_name,
           image_url: category.image_url,
           venue_count: category.venue_count,
           description: `Find perfect ${category.category_name.toLowerCase()} for your events`
-        })) || []);
+        })) || [];
+        
+        setCategories(categoriesData);
+        setFilteredCategories(categoriesData);
       } catch (error) {
         console.error('Error fetching categories:', error);
       } finally {
@@ -39,14 +46,47 @@ const Categories = () => {
     fetchCategories();
   }, []);
   
+  // Filter categories based on search term
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredCategories(categories);
+      return;
+    }
+    
+    const filtered = categories.filter(category => 
+      category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      category.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    setFilteredCategories(filtered);
+  }, [searchTerm, categories]);
+  
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+  };
+  
   return (
     <div className="pt-24 pb-16">
       <div className="container mx-auto px-4">
         <div className="mb-12 text-center">
           <h1 className="text-4xl font-bold mb-4">Venue Categories</h1>
-          <p className="text-findvenue-text-muted max-w-2xl mx-auto">
+          <p className="text-findvenue-text-muted max-w-2xl mx-auto mb-8">
             Explore our venues by category to find the perfect space for your event needs
           </p>
+          
+          {/* Search bar */}
+          <form onSubmit={handleSearch} className="max-w-xl mx-auto mb-12">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
+              <Input
+                type="text"
+                placeholder="Search categories..."
+                className="pl-10 bg-findvenue-surface/50 border-white/10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </form>
         </div>
         
         {isLoading ? (
@@ -55,12 +95,12 @@ const Categories = () => {
               <CategorySkeleton key={index} />
             ))}
           </div>
-        ) : (
+        ) : filteredCategories.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-            {categories.map((category) => (
+            {filteredCategories.map((category) => (
               <Link 
                 key={category.id}
-                to={`/?categoryId=${category.id}`}
+                to={`/venues?categoryId=${category.id}`}
                 className="block h-full"
               >
                 <Card className="overflow-hidden h-full transition-transform hover:scale-[1.02] bg-findvenue-card-bg border-white/10">
@@ -90,6 +130,20 @@ const Categories = () => {
                 </Card>
               </Link>
             ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <h3 className="text-xl font-medium mb-2">No categories found</h3>
+            <p className="text-findvenue-text-muted mb-6">
+              Try adjusting your search term
+            </p>
+            <Button 
+              variant="outline" 
+              className="border-white/10"
+              onClick={() => setSearchTerm('')}
+            >
+              Clear Search
+            </Button>
           </div>
         )}
       </div>
