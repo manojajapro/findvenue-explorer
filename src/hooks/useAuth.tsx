@@ -1,3 +1,4 @@
+
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -45,7 +46,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (currentSession?.user) {
           try {
             const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', { user_id: currentSession.user.id })
+              .rpc('get_user_profile', { user_id: currentSession.user.id } as any)
               .single();
               
             if (profileData) {
@@ -84,7 +85,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (currentSession?.user) {
           try {
             const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', { user_id: currentSession.user.id })
+              .rpc('get_user_profile', { user_id: currentSession.user.id } as any)
               .single();
               
             if (profileData) {
