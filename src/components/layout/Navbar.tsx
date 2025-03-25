@@ -46,9 +46,9 @@ const Navbar = () => {
   // Navbar items
   const navItems = [
     { name: 'Home', path: '/' },
-    { name: 'Venues', path: '/?view=all' },
-    { name: 'Categories', path: '/?view=categories' },
-    { name: 'Cities', path: '/?view=cities' },
+    { name: 'Venues', path: '/venues' },
+    { name: 'Categories', path: '/categories' },
+    { name: 'Cities', path: '/cities' },
   ];
   
   const handleLogout = () => {

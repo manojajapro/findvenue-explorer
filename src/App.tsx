@@ -7,6 +7,9 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import Index from "./pages/Index";
 import VenueDetails from "./pages/VenueDetails";
+import VenuesPage from "./pages/VenuesPage";
+import CategoriesPage from "./pages/CategoriesPage";
+import CitiesPage from "./pages/CitiesPage";
 import Login from "./pages/Login";
 import ListVenue from "./pages/ListVenue";
 import VenueOwnerPromo from "./pages/VenueOwnerPromo";
@@ -62,6 +65,9 @@ const AppContent = () => {
       <main className="min-h-screen">
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/venues" element={<VenuesPage />} />
+          <Route path="/categories" element={<CategoriesPage />} />
+          <Route path="/cities" element={<CitiesPage />} />
           <Route path="/venue/:id" element={<VenueDetails />} />
           <Route path="/login" element={<Login />} />
           <Route path="/list-venue" element={<ListVenue />} />
