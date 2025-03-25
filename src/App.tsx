@@ -1,12 +1,80 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import Index from "./pages/Index";
+import VenueDetails from "./pages/VenueDetails";
+import Login from "./pages/Login";
+import ListVenue from "./pages/ListVenue";
 import NotFound from "./pages/NotFound";
+import Navbar from "./components/layout/Navbar";
+import Footer from "./components/layout/Footer";
+import ChatBot from "./components/chat/ChatBot";
+import VoiceAssistant from "./components/voice/VoiceAssistant";
+
+// Scroll to top on route change
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  
+  return null;
+}
+
+// For revealing animations on scroll
+function RevealOnScroll() {
+  useEffect(() => {
+    function reveal() {
+      const reveals = document.querySelectorAll('.reveal');
+      
+      for (let i = 0; i < reveals.length; i++) {
+        const windowHeight = window.innerHeight;
+        const elementTop = reveals[i].getBoundingClientRect().top;
+        const elementVisible = 150;
+        
+        if (elementTop < windowHeight - elementVisible) {
+          reveals[i].classList.add('active');
+        }
+      }
+    }
+    
+    window.addEventListener('scroll', reveal);
+    reveal(); // Initial check
+    
+    return () => window.removeEventListener('scroll', reveal);
+  }, []);
+  
+  return null;
+}
 
 const queryClient = new QueryClient();
+
+const AppContent = () => {
+  return (
+    <>
+      <Navbar />
+      <main className="min-h-screen">
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/venue/:id" element={<VenueDetails />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/list-venue" element={<ListVenue />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+      <Footer />
+      <ChatBot />
+      <VoiceAssistant />
+      <ScrollToTop />
+      <RevealOnScroll />
+    </>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -14,11 +82,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppContent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
