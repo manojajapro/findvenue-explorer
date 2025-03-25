@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { VenueCard } from '@/components/ui';
@@ -45,14 +44,12 @@ const FilterPanel = ({ cities, categories, onApplyFilters }: FilterPanelProps) =
   const applyFilters = () => {
     const newParams = new URLSearchParams(searchParams);
     
-    // Clear existing filters
     newParams.delete('cityId');
     newParams.delete('categoryId');
     newParams.delete('guests');
     newParams.delete('priceRange');
     newParams.delete('amenities');
     
-    // Add new filter values
     if (selectedCity) newParams.set('cityId', selectedCity);
     if (selectedCategory) newParams.set('categoryId', selectedCategory);
     if (guests) newParams.set('guests', guests.toString());
@@ -187,15 +184,13 @@ const FilterPanel = ({ cities, categories, onApplyFilters }: FilterPanelProps) =
 };
 
 const VenuesList = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get('search') || '';
   const navigate = useNavigate();
   
-  // Get all venues data and apply filtering in the component
   const { venues: allVenues, categories, cities, isLoading, fetchVenues, totalCount } = useSupabaseVenues();
   const [listView, setListView] = useState<'grid' | 'list'>('grid');
   
-  // Filter venues based on search term if present
   const venues = searchTerm 
     ? allVenues.filter(venue => 
         venue.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -208,6 +203,12 @@ const VenuesList = () => {
   
   const handleVenueClick = (venueId: string) => {
     navigate(`/venue/${venueId}`);
+  };
+  
+  const handleClearSearch = () => {
+    const newParams = new URLSearchParams(searchParams);
+    if (searchTerm) newParams.delete('search');
+    setSearchParams(newParams);
   };
   
   return (
@@ -285,11 +286,7 @@ const VenuesList = () => {
           </p>
           <Button
             className="bg-findvenue hover:bg-findvenue-dark"
-            onClick={() => {
-              const newParams = new URLSearchParams(searchParams);
-              if (searchTerm) newParams.delete('search');
-              setSearchParams(newParams);
-            }}
+            onClick={handleClearSearch}
           >
             Clear Search
           </Button>

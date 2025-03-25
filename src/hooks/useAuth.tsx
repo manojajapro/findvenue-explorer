@@ -45,6 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
+            // Use the correct table name 'profiles' and ensure we handle the types correctly
             const { data: profileData, error } = await supabase
               .from('profiles')
               .select('*')
@@ -81,6 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
+        // Fix the query to 'profiles' table and handle the promise chain properly
         supabase
           .from('profiles')
           .select('*')
