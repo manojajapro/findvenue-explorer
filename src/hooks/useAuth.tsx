@@ -1,4 +1,3 @@
-
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -45,21 +44,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Use a separate function call to make TypeScript happy
-            const fetchProfile = async (userId: string) => {
-              return await supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
-            };
-            
-            const { data: profileData, error } = await fetchProfile(currentSession.user.id);
+            // Use type assertion to get around TypeScript limitations
+            const { data: profileData, error } = await supabase
+              .from('user_profiles' as any)
+              .select('*')
+              .eq('id', currentSession.user.id)
+              .single();
               
             if (profileData) {
               console.log("Profile data loaded:", profileData);
-              // Explicitly cast the data to UserProfile type
-              const userProfileData = profileData as UserProfile;
+              // Cast to UserProfile type with type assertion
+              const userProfileData = profileData as unknown as UserProfile;
               setProfile(userProfileData);
               setIsVenueOwner(userProfileData.user_role === 'venue-owner');
             } else {
@@ -91,21 +86,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Use a separate function call to make TypeScript happy
-            const fetchProfile = async (userId: string) => {
-              return await supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
-            };
-            
-            const { data: profileData, error } = await fetchProfile(currentSession.user.id);
+            // Use type assertion to get around TypeScript limitations
+            const { data: profileData, error } = await supabase
+              .from('user_profiles' as any)
+              .select('*')
+              .eq('id', currentSession.user.id)
+              .single();
               
             if (profileData) {
               console.log("Initial profile data loaded:", profileData);
-              // Explicitly cast the data to UserProfile type
-              const userProfileData = profileData as UserProfile;
+              // Cast to UserProfile type with type assertion
+              const userProfileData = profileData as unknown as UserProfile;
               setProfile(userProfileData);
               setIsVenueOwner(userProfileData.user_role === 'venue-owner');
             } else {
