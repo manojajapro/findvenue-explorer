@@ -15,11 +15,18 @@ import {
   Music, 
   UtensilsCrossed, 
   ChevronLeft,
-  Share2
+  Share2,
+  CreditCard,
+  Sparkles,
+  Check,
+  X,
+  Wheelchair,
+  Clock3
 } from 'lucide-react';
 import { VenueCard } from '@/components/ui';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
+import VenueLocationMap from '@/components/map/VenueLocationMap';
 
 // Map amenities to icons
 const amenityIcons: Record<string, JSX.Element> = {
@@ -27,6 +34,7 @@ const amenityIcons: Record<string, JSX.Element> = {
   'Parking': <Car className="w-4 h-4" />,
   'Sound System': <Music className="w-4 h-4" />,
   'Catering': <UtensilsCrossed className="w-4 h-4" />,
+  'Wheelchair Access': <Wheelchair className="w-4 h-4" />,
 };
 
 const VenueDetails = () => {
@@ -82,7 +90,21 @@ const VenueDetails = () => {
             reviews: venueData.reviews_count || 0,
             featured: venueData.featured || false,
             popular: venueData.popular || false,
-            availability: venueData.availability || []
+            availability: venueData.availability || [],
+            // New fields
+            latitude: venueData.latitude,
+            longitude: venueData.longitude,
+            parking: venueData.parking,
+            wifi: venueData.wifi,
+            accessibilityFeatures: venueData.accessibility_features || [],
+            acceptedPaymentMethods: venueData.accepted_payment_methods || [],
+            openingHours: venueData.opening_hours,
+            ownerInfo: venueData.owner_info ? {
+              name: venueData.owner_info.name,
+              contact: venueData.owner_info.contact,
+              responseTime: venueData.owner_info.response_time
+            } : undefined,
+            additionalServices: venueData.additional_services || []
           };
           
           setVenue(transformedVenue);
@@ -124,7 +146,21 @@ const VenueDetails = () => {
               reviews: venue.reviews_count || 0,
               featured: venue.featured || false,
               popular: venue.popular || false,
-              availability: venue.availability || []
+              availability: venue.availability || [],
+              // New fields matching structure
+              latitude: venue.latitude,
+              longitude: venue.longitude,
+              parking: venue.parking,
+              wifi: venue.wifi,
+              accessibilityFeatures: venue.accessibility_features || [],
+              acceptedPaymentMethods: venue.accepted_payment_methods || [],
+              openingHours: venue.opening_hours,
+              ownerInfo: venue.owner_info ? {
+                name: venue.owner_info.name,
+                contact: venue.owner_info.contact,
+                responseTime: venue.owner_info.response_time
+              } : undefined,
+              additionalServices: venue.additional_services || []
             }));
             
             setSimilarVenues(transformedSimilar);
@@ -141,6 +177,114 @@ const VenueDetails = () => {
     
     fetchVenueDetails();
   }, [id, navigate]);
+  
+  // Functions to render different sections
+  const renderOpeningHours = () => {
+    if (!venue?.openingHours) return null;
+    
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <Clock3 className="w-4 h-4 mr-2 text-findvenue" />
+            Opening Hours
+          </h3>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-1 gap-2">
+            {days.map(day => {
+              const hours = venue.openingHours?.[day];
+              return (
+                <div key={day} className="flex justify-between items-center py-1 border-b border-white/5 last:border-0">
+                  <span className="capitalize">{day}</span>
+                  <span>{hours ? `${hours.open} - ${hours.close}` : 'Closed'}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderPaymentMethods = () => {
+    if (!venue?.acceptedPaymentMethods?.length) return null;
+    
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <CreditCard className="w-4 h-4 mr-2 text-findvenue" />
+            Accepted Payment Methods
+          </h3>
+        </div>
+        <div className="p-4">
+          <div className="flex flex-wrap gap-2">
+            {venue.acceptedPaymentMethods.map((method, index) => (
+              <Badge key={index} variant="secondary" className="bg-findvenue-surface/50">
+                {method}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderAdditionalServices = () => {
+    if (!venue?.additionalServices?.length) return null;
+    
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <Sparkles className="w-4 h-4 mr-2 text-findvenue" />
+            Additional Services
+          </h3>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {venue.additionalServices.map((service, index) => (
+              <div key={index} className="flex items-center">
+                <Check className="w-4 h-4 mr-2 text-findvenue" />
+                <span>{service}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderOwnerInfo = () => {
+    if (!venue?.ownerInfo) return null;
+    
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold">Venue Host Information</h3>
+        </div>
+        <div className="p-4">
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm text-findvenue-text-muted mb-1">Host Name</p>
+              <p className="font-medium">{venue.ownerInfo.name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-findvenue-text-muted mb-1">Contact</p>
+              <p className="font-medium">{venue.ownerInfo.contact}</p>
+            </div>
+            <div>
+              <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
+              <p className="font-medium">{venue.ownerInfo.responseTime}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
   
   if (loading) {
     return (
@@ -257,11 +401,46 @@ const VenueDetails = () => {
                 <Star className="w-4 h-4 mr-1 text-findvenue-gold fill-findvenue-gold" />
                 <span>{venue.rating} ({venue.reviews} reviews)</span>
               </div>
+              <Badge className="bg-findvenue/20 text-findvenue border-0">
+                {venue.category}
+              </Badge>
             </div>
             
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-3">About this venue</h2>
               <p className="text-findvenue-text-muted mb-4">{venue.description}</p>
+              
+              <div className="flex flex-wrap gap-4 mt-6">
+                {venue.wifi !== undefined && (
+                  <div className="flex items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${venue.wifi ? 'bg-findvenue/10 text-findvenue' : 'bg-findvenue-surface/50 text-findvenue-text-muted'}`}>
+                      <Wifi className="w-4 h-4" />
+                    </div>
+                    <span className="flex items-center">
+                      WiFi
+                      {venue.wifi ? 
+                        <Check className="w-4 h-4 ml-1 text-green-500" /> : 
+                        <X className="w-4 h-4 ml-1 text-red-500" />
+                      }
+                    </span>
+                  </div>
+                )}
+                
+                {venue.parking !== undefined && (
+                  <div className="flex items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${venue.parking ? 'bg-findvenue/10 text-findvenue' : 'bg-findvenue-surface/50 text-findvenue-text-muted'}`}>
+                      <Car className="w-4 h-4" />
+                    </div>
+                    <span className="flex items-center">
+                      Parking
+                      {venue.parking ? 
+                        <Check className="w-4 h-4 ml-1 text-green-500" /> : 
+                        <X className="w-4 h-4 ml-1 text-red-500" />
+                      }
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className="mb-8">
@@ -273,6 +452,16 @@ const VenueDetails = () => {
                       {amenityIcons[amenity] || <Clock className="w-4 h-4 text-findvenue" />}
                     </div>
                     <span>{amenity}</span>
+                  </div>
+                ))}
+                
+                {/* Show accessibility features if available */}
+                {venue.accessibilityFeatures?.map((feature, index) => (
+                  <div key={`acc-${index}`} className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-findvenue/10 flex items-center justify-center mr-3">
+                      <Wheelchair className="w-4 h-4 text-findvenue" />
+                    </div>
+                    <span>{feature}</span>
                   </div>
                 ))}
               </div>
@@ -299,6 +488,21 @@ const VenueDetails = () => {
                 Available dates may vary. Contact venue for specific date availability.
               </p>
             </div>
+            
+            {/* Map */}
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">Location</h2>
+              <VenueLocationMap 
+                name={venue.name}
+                address={venue.address}
+                latitude={venue.latitude}
+                longitude={venue.longitude}
+              />
+            </div>
+            
+            {/* Additional features */}
+            {renderAdditionalServices()}
+            {renderOwnerInfo()}
           </div>
           
           {/* Sidebar */}
@@ -341,6 +545,10 @@ const VenueDetails = () => {
               <Button variant="outline" className="w-full border-white/20 hover:bg-findvenue-surface/50">
                 Contact Host
               </Button>
+              
+              {/* Payment information */}
+              {renderPaymentMethods()}
+              {renderOpeningHours()}
             </Card>
           </div>
         </div>

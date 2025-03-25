@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Venue } from '@/data/venues';
+import { Venue } from '@/hooks/useSupabaseVenues';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Star, Users, CalendarDays, MapPin, Tag } from 'lucide-react';
@@ -38,6 +38,13 @@ const VenueCard = ({ venue, featured = false }: VenueCardProps) => {
             <div className="absolute top-2 left-2">
               <Badge className="bg-findvenue text-white font-medium px-2 py-1">
                 Popular
+              </Badge>
+            </div>
+          )}
+          {venue.category && (
+            <div className="absolute bottom-2 left-2">
+              <Badge variant="outline" className="bg-black/40 backdrop-blur-sm border-white/10 text-white text-xs px-2 py-1">
+                {venue.category}
               </Badge>
             </div>
           )}

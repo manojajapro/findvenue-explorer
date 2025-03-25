@@ -37,6 +37,20 @@ export interface Venue {
   featured: boolean;
   popular: boolean;
   availability: string[];
+  // New fields
+  latitude?: number;
+  longitude?: number;
+  parking?: boolean;
+  wifi?: boolean;
+  accessibilityFeatures?: string[];
+  acceptedPaymentMethods?: string[];
+  openingHours?: Record<string, {open: string, close: string}>;
+  ownerInfo?: {
+    name: string;
+    contact: string;
+    responseTime: string;
+  };
+  additionalServices?: string[];
 }
 
 export const useSupabaseVenues = () => {
@@ -153,7 +167,21 @@ export const useSupabaseVenues = () => {
         reviews: venue.reviews_count,
         featured: venue.featured,
         popular: venue.popular,
-        availability: venue.availability || []
+        availability: venue.availability || [],
+        // New fields
+        latitude: venue.latitude,
+        longitude: venue.longitude,
+        parking: venue.parking,
+        wifi: venue.wifi,
+        accessibilityFeatures: venue.accessibility_features || [],
+        acceptedPaymentMethods: venue.accepted_payment_methods || [],
+        openingHours: venue.opening_hours,
+        ownerInfo: venue.owner_info ? {
+          name: venue.owner_info.name,
+          contact: venue.owner_info.contact,
+          responseTime: venue.owner_info.response_time
+        } : undefined,
+        additionalServices: venue.additional_services || []
       }));
       
       setVenues(transformedData);

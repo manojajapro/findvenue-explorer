@@ -11,6 +11,9 @@ export type Database = {
     Tables: {
       venues: {
         Row: {
+          accepted_payment_methods: string[] | null
+          accessibility_features: string[] | null
+          additional_services: string[] | null
           address: string | null
           amenities: string[] | null
           availability: string[] | null
@@ -25,17 +28,26 @@ export type Database = {
           gallery_images: string[] | null
           id: string
           image_url: string | null
+          latitude: number | null
+          longitude: number | null
           max_capacity: number | null
           min_capacity: number | null
           name: string
+          opening_hours: Json | null
+          owner_info: Json | null
+          parking: boolean | null
           popular: boolean | null
           price_per_person: number | null
           rating: number | null
           reviews_count: number | null
           starting_price: number | null
           updated_at: string | null
+          wifi: boolean | null
         }
         Insert: {
+          accepted_payment_methods?: string[] | null
+          accessibility_features?: string[] | null
+          additional_services?: string[] | null
           address?: string | null
           amenities?: string[] | null
           availability?: string[] | null
@@ -50,17 +62,26 @@ export type Database = {
           gallery_images?: string[] | null
           id?: string
           image_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
           max_capacity?: number | null
           min_capacity?: number | null
           name: string
+          opening_hours?: Json | null
+          owner_info?: Json | null
+          parking?: boolean | null
           popular?: boolean | null
           price_per_person?: number | null
           rating?: number | null
           reviews_count?: number | null
           starting_price?: number | null
           updated_at?: string | null
+          wifi?: boolean | null
         }
         Update: {
+          accepted_payment_methods?: string[] | null
+          accessibility_features?: string[] | null
+          additional_services?: string[] | null
           address?: string | null
           amenities?: string[] | null
           availability?: string[] | null
@@ -75,15 +96,21 @@ export type Database = {
           gallery_images?: string[] | null
           id?: string
           image_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
           max_capacity?: number | null
           min_capacity?: number | null
           name?: string
+          opening_hours?: Json | null
+          owner_info?: Json | null
+          parking?: boolean | null
           popular?: boolean | null
           price_per_person?: number | null
           rating?: number | null
           reviews_count?: number | null
           starting_price?: number | null
           updated_at?: string | null
+          wifi?: boolean | null
         }
         Relationships: []
       }
