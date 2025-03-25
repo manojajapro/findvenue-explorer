@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin } from 'lucide-react';
@@ -22,6 +22,7 @@ interface VenueLocationMapProps {
 
 const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationMapProps) => {
   const [mapReady, setMapReady] = useState(false);
+  const mapRef = useRef<L.Map | null>(null);
 
   // Default to Riyadh coordinates if venue doesn't have coordinates
   const defaultLat = 24.774265;
@@ -36,10 +37,14 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
     // This ensures the map is properly sized after it's rendered
     const timeout = setTimeout(() => {
       setMapReady(true);
+      // Update the map view if we have a map instance
+      if (mapRef.current) {
+        mapRef.current.setView(position, 14);
+      }
     }, 100);
     
     return () => clearTimeout(timeout);
-  }, []);
+  }, [position]);
 
   return (
     <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
@@ -57,13 +62,16 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
       ) : (
         <div className="h-[250px] w-full relative">
           <MapContainer 
-            center={position}
-            zoom={14}
             style={{ height: '100%', width: '100%', background: '#1e2734' }}
             className="z-10"
+            whenCreated={(map) => {
+              mapRef.current = map;
+              map.setView(position, 14);
+            }}
           >
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+              /* @ts-ignore - The type definitions seem incorrect but this works */
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
             <Marker position={position}>

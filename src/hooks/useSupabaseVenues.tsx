@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,9 +34,9 @@ export interface Venue {
   amenities: string[];
   rating: number;
   reviews: number;
-  featured: boolean;
-  popular: boolean;
-  availability: string[];
+  featured?: boolean; // Made optional to match types in data/venues.ts
+  popular?: boolean; // Made optional to match types in data/venues.ts
+  availability?: string[];
   // New fields
   latitude?: number;
   longitude?: number;
@@ -63,7 +62,6 @@ export const useSupabaseVenues = () => {
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   
-  // Extract filters from URL parameters
   const extractFilters = useCallback(() => {
     const filters: VenueFilter = {};
     
@@ -92,7 +90,6 @@ export const useSupabaseVenues = () => {
     return filters;
   }, [searchParams]);
   
-  // Fetch all venues with filters
   const fetchVenues = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -100,10 +97,8 @@ export const useSupabaseVenues = () => {
       
       const filters = extractFilters();
       
-      // Start building the query
       let query = supabase.from('venues').select('*', { count: 'exact' });
       
-      // Apply filters
       if (filters.cityId) {
         query = query.eq('city_id', filters.cityId);
       }
@@ -131,21 +126,17 @@ export const useSupabaseVenues = () => {
       }
       
       if (filters.amenities && filters.amenities.length > 0) {
-        // For each amenity, check if it's in the amenities array
         filters.amenities.forEach(amenity => {
           query = query.contains('amenities', [amenity]);
         });
       }
       
-      // Execute the query
       const { data, error: venuesError, count } = await query.limit(100);
       
       if (venuesError) throw venuesError;
       
-      // Transform the data to match the expected format
       if (data) {
         const transformedData = data.map(venue => {
-          // Process owner_info from JSON
           let ownerInfoData = undefined;
           if (venue.owner_info) {
             const ownerInfo = venue.owner_info as Record<string, any>;
@@ -156,7 +147,6 @@ export const useSupabaseVenues = () => {
             };
           }
           
-          // Process opening_hours from JSON
           let openingHoursData = undefined;
           if (venue.opening_hours) {
             openingHoursData = venue.opening_hours as Record<string, {open: string, close: string}>;
@@ -188,7 +178,6 @@ export const useSupabaseVenues = () => {
             featured: venue.featured || false,
             popular: venue.popular || false,
             availability: venue.availability || [],
-            // New fields
             latitude: venue.latitude,
             longitude: venue.longitude,
             parking: venue.parking,
@@ -213,7 +202,6 @@ export const useSupabaseVenues = () => {
     }
   }, [extractFilters]);
   
-  // Fetch categories from our view
   const fetchCategories = useCallback(async () => {
     try {
       const { data, error: categoriesError } = await supabase
@@ -233,7 +221,6 @@ export const useSupabaseVenues = () => {
     }
   }, []);
   
-  // Fetch cities from our view
   const fetchCities = useCallback(async () => {
     try {
       const { data, error: citiesError } = await supabase
@@ -253,7 +240,6 @@ export const useSupabaseVenues = () => {
     }
   }, []);
   
-  // Fetch all data when filters change
   useEffect(() => {
     fetchVenues();
     fetchCategories();
