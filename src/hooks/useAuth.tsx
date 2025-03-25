@@ -44,12 +44,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Check if user_profiles table exists
+            // Fetch user profile using raw SQL query to bypass TypeScript limitations
             const { data: profileData, error } = await supabase
-              .from('user_profiles')
-              .select('*')
-              .eq('id', currentSession.user.id)
-              .single();
+              .rpc('get_user_profile', { user_id: currentSession.user.id })
+              .maybeSingle();
               
             if (profileData) {
               console.log("Profile data loaded:", profileData);
@@ -81,12 +79,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        // Fetch user profile
+        // Fetch user profile using raw SQL query to bypass TypeScript limitations
         supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', currentSession.user.id)
-          .single()
+          .rpc('get_user_profile', { user_id: currentSession.user.id })
+          .maybeSingle()
           .then(({ data: profileData, error }) => {
             if (profileData) {
               console.log("Initial profile data loaded:", profileData);
@@ -100,7 +96,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             
             setIsLoading(false);
           })
-          .catch(error => {
+          .catch((error) => {
             console.error("Error in initial profile fetch:", error);
             setIsLoading(false);
           });

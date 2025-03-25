@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { VenueCard } from '@/components/ui';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -189,6 +189,11 @@ const FilterPanel = ({ cities, categories, onApplyFilters }: FilterPanelProps) =
 const VenuesList = () => {
   const { venues, categories, cities, isLoading, fetchVenues, totalCount } = useSupabaseVenues();
   const [listView, setListView] = useState<'grid' | 'list'>('grid');
+  const navigate = useNavigate();
+  
+  const handleVenueClick = (venueId: string) => {
+    navigate(`/venue/${venueId}`);
+  };
   
   return (
     <div>
@@ -247,7 +252,7 @@ const VenuesList = () => {
             : "space-y-4"
         }>
           {venues.map((venue) => (
-            <div key={venue.id} className="h-full">
+            <div key={venue.id} className="h-full cursor-pointer" onClick={() => handleVenueClick(venue.id)}>
               <VenueCard venue={venue} featured={venue.featured} />
             </div>
           ))}

@@ -1,7 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { getVenueById, Venue, venues } from '@/data/venues';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +18,8 @@ import {
   Share2
 } from 'lucide-react';
 import { VenueCard } from '@/components/ui';
+import { supabase } from '@/integrations/supabase/client';
+import { Venue } from '@/hooks/useSupabaseVenues';
 
 // Map amenities to icons
 const amenityIcons: Record<string, JSX.Element> = {
@@ -34,31 +35,112 @@ const VenueDetails = () => {
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState<string>('');
   const [similarVenues, setSimilarVenues] = useState<Venue[]>([]);
+  const navigate = useNavigate();
   
   useEffect(() => {
     // Scroll to top on component mount
     window.scrollTo(0, 0);
     
-    if (id) {
-      // Simulate API fetch delay
+    const fetchVenueDetails = async () => {
+      if (!id) return;
+      
       setLoading(true);
       
-      setTimeout(() => {
-        const foundVenue = getVenueById(id);
-        
-        if (foundVenue) {
-          setVenue(foundVenue);
-          setActiveImage(foundVenue.imageUrl);
+      try {
+        // Fetch venue details
+        const { data: venueData, error } = await supabase
+          .from('venues')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
           
-          // Get similar venues (same category, different venue)
-          const similar = venues.filter(v => v.categoryId === foundVenue.categoryId && v.id !== id).slice(0, 4);
-          setSimilarVenues(similar);
-        }
+        if (error) throw error;
         
+        if (venueData) {
+          const transformedVenue: Venue = {
+            id: venueData.id,
+            name: venueData.name,
+            description: venueData.description || '',
+            imageUrl: venueData.image_url || '',
+            galleryImages: venueData.gallery_images || [],
+            address: venueData.address || '',
+            city: venueData.city_name || '',
+            cityId: venueData.city_id || '',
+            category: venueData.category_name || '',
+            categoryId: venueData.category_id || '',
+            capacity: {
+              min: venueData.min_capacity || 0,
+              max: venueData.max_capacity || 0
+            },
+            pricing: {
+              currency: venueData.currency || 'SAR',
+              startingPrice: venueData.starting_price || 0,
+              pricePerPerson: venueData.price_per_person || 0
+            },
+            amenities: venueData.amenities || [],
+            rating: venueData.rating || 0,
+            reviews: venueData.reviews_count || 0,
+            featured: venueData.featured || false,
+            popular: venueData.popular || false,
+            availability: venueData.availability || []
+          };
+          
+          setVenue(transformedVenue);
+          setActiveImage(transformedVenue.imageUrl);
+          
+          // Fetch similar venues (same category, different venue)
+          const { data: similarData, error: similarError } = await supabase
+            .from('venues')
+            .select('*')
+            .eq('category_id', venueData.category_id)
+            .neq('id', id)
+            .limit(4);
+            
+          if (similarError) throw similarError;
+          
+          if (similarData) {
+            const transformedSimilar: Venue[] = similarData.map(venue => ({
+              id: venue.id,
+              name: venue.name,
+              description: venue.description || '',
+              imageUrl: venue.image_url || '',
+              galleryImages: venue.gallery_images || [],
+              address: venue.address || '',
+              city: venue.city_name || '',
+              cityId: venue.city_id || '',
+              category: venue.category_name || '',
+              categoryId: venue.category_id || '',
+              capacity: {
+                min: venue.min_capacity || 0,
+                max: venue.max_capacity || 0
+              },
+              pricing: {
+                currency: venue.currency || 'SAR',
+                startingPrice: venue.starting_price || 0,
+                pricePerPerson: venue.price_per_person || 0
+              },
+              amenities: venue.amenities || [],
+              rating: venue.rating || 0,
+              reviews: venue.reviews_count || 0,
+              featured: venue.featured || false,
+              popular: venue.popular || false,
+              availability: venue.availability || []
+            }));
+            
+            setSimilarVenues(transformedSimilar);
+          }
+        } else {
+          navigate('/venues'); // Redirect if venue not found
+        }
+      } catch (error) {
+        console.error('Error fetching venue details:', error);
+      } finally {
         setLoading(false);
-      }, 800);
-    }
-  }, [id]);
+      }
+    };
+    
+    fetchVenueDetails();
+  }, [id, navigate]);
   
   if (loading) {
     return (
@@ -92,9 +174,9 @@ const VenueDetails = () => {
           <p className="text-findvenue-text-muted mb-8">
             The venue you're looking for doesn't exist or has been removed.
           </p>
-          <Link to="/">
+          <Link to="/venues">
             <Button className="bg-findvenue hover:bg-findvenue-dark">
-              Back to Home
+              Back to Venues
             </Button>
           </Link>
         </div>
@@ -107,7 +189,7 @@ const VenueDetails = () => {
       <div className="container mx-auto px-4">
         {/* Breadcrumb */}
         <div className="mb-6">
-          <Link to="/" className="flex items-center text-findvenue hover:text-findvenue-light transition-colors">
+          <Link to="/venues" className="flex items-center text-findvenue hover:text-findvenue-light transition-colors">
             <ChevronLeft className="w-4 h-4 mr-1" />
             Back to venues
           </Link>
@@ -180,10 +262,6 @@ const VenueDetails = () => {
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-3">About this venue</h2>
               <p className="text-findvenue-text-muted mb-4">{venue.description}</p>
-              <p className="text-findvenue-text-muted">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam vel justo ac augue scelerisque bibendum. 
-                Phasellus eget enim eu lectus faucibus vestibulum. Suspendisse sodales pellentesque elementum.
-              </p>
             </div>
             
             <div className="mb-8">
@@ -273,7 +351,11 @@ const VenueDetails = () => {
             <h2 className="text-2xl font-bold mb-6">Similar Venues You Might Like</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {similarVenues.map((venue) => (
-                <div key={venue.id} className="h-full">
+                <div 
+                  key={venue.id} 
+                  className="h-full cursor-pointer" 
+                  onClick={() => navigate(`/venue/${venue.id}`)}
+                >
                   <VenueCard venue={venue} />
                 </div>
               ))}
