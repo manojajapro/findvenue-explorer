@@ -45,10 +45,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Cast the user ID to any to bypass TypeScript's type checking
-            const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', currentSession.user.id as any)
-              .single();
+            // Use a separate function call to make TypeScript happy
+            const fetchProfile = async (userId: string) => {
+              return await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+            };
+            
+            const { data: profileData, error } = await fetchProfile(currentSession.user.id);
               
             if (profileData) {
               console.log("Profile data loaded:", profileData);
@@ -85,10 +91,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Cast the user ID to any to bypass TypeScript's type checking
-            const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', currentSession.user.id as any)
-              .single();
+            // Use a separate function call to make TypeScript happy
+            const fetchProfile = async (userId: string) => {
+              return await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+            };
+            
+            const { data: profileData, error } = await fetchProfile(currentSession.user.id);
               
             if (profileData) {
               console.log("Initial profile data loaded:", profileData);
