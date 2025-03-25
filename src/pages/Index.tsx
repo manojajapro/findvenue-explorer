@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import HeroSection from '@/components/hero/HeroSection';
@@ -12,17 +11,15 @@ import { useSearch } from '@/hooks/useSearch';
 import { VenueCard } from '@/components/ui';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GridIcon, ListBulletIcon } from 'lucide-react';
+import { GridIcon, List } from 'lucide-react';
 
 const Index = () => {
   const [searchParams] = useSearchParams();
   const { venues, isLoading, filters } = useSearch();
   const [activeView, setActiveView] = useState<string | null>(null);
   
-  // Determine if we should show search results
   const hasFilters = Object.keys(filters).length > 0;
   
-  // Check if a specific view is requested
   useEffect(() => {
     if (searchParams.has('view')) {
       setActiveView(searchParams.get('view'));
@@ -31,7 +28,6 @@ const Index = () => {
     }
   }, [searchParams]);
   
-  // Render search results if filters are applied
   if (hasFilters) {
     return (
       <div className="pt-24 pb-16">
@@ -58,7 +54,7 @@ const Index = () => {
                   <GridIcon className="h-4 w-4" />
                 </TabsTrigger>
                 <TabsTrigger value="list">
-                  <ListBulletIcon className="h-4 w-4" />
+                  <List className="h-4 w-4" />
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -97,7 +93,6 @@ const Index = () => {
     );
   }
   
-  // If a specific view is requested
   if (activeView === 'categories') {
     return (
       <div className="pt-24 pb-16">
@@ -136,7 +131,6 @@ const Index = () => {
     );
   }
   
-  // Default view - landing page
   return (
     <>
       <HeroSection />
