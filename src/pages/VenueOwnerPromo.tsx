@@ -1,14 +1,10 @@
-
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CheckCircle, Calendar, DollarSign, Globe, Clock, Building } from 'lucide-react';
-
 const VenueOwnerPromo = () => {
   const navigate = useNavigate();
-  
-  return (
-    <div className="min-h-screen pt-24 pb-16">
+  return <div className="min-h-screen pt-24 pb-16">
       <div className="container mx-auto px-4">
         {/* Hero Section */}
         <div className="flex flex-col md:flex-row items-center gap-10 mb-20">
@@ -21,26 +17,20 @@ const VenueOwnerPromo = () => {
               and increase your revenue by up to 30%.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                className="bg-findvenue hover:bg-findvenue-dark text-lg py-6 px-8" 
-                onClick={() => navigate('/login', { state: { role: 'venue-owner' } })}
-              >
+              <Button className="bg-findvenue hover:bg-findvenue-dark text-lg py-6 px-8" onClick={() => navigate('/login', {
+              state: {
+                role: 'venue-owner'
+              }
+            })}>
                 Get Started
               </Button>
-              <Button 
-                variant="outline"
-                className="border-white/20 hover:bg-findvenue-surface/50 text-lg py-6 px-8"
-              >
+              <Button variant="outline" className="border-white/20 hover:bg-findvenue-surface/50 text-lg py-6 px-8">
                 Learn More
               </Button>
             </div>
           </div>
           <div className="md:w-1/2">
-            <img 
-              src="/lovable-uploads/25610b8c-bf06-4ae3-8110-9c4e8133a31b.png" 
-              alt="Venue Owner" 
-              className="rounded-lg w-full max-w-lg mx-auto"
-            />
+            <img alt="Venue Owner" className="rounded-lg w-full max-w-lg mx-auto" src="/lovable-uploads/545c1cde-048c-4d24-a229-8931fc3147c8.png" />
           </div>
         </div>
         
@@ -123,11 +113,7 @@ const VenueOwnerPromo = () => {
                 </div>
               </div>
               <div className="md:w-1/2">
-                <img 
-                  src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1674&q=80" 
-                  alt="Venue Owner Dashboard" 
-                  className="rounded-lg w-full"
-                />
+                <img src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1674&q=80" alt="Venue Owner Dashboard" className="rounded-lg w-full" />
               </div>
             </div>
           </div>
@@ -218,16 +204,15 @@ const VenueOwnerPromo = () => {
           <p className="text-findvenue-text-muted max-w-2xl mx-auto mb-8">
             Join thousands of successful venue owners across Saudi Arabia who are growing their business with FindVenue.
           </p>
-          <Button 
-            className="bg-findvenue hover:bg-findvenue-dark text-lg py-6 px-10" 
-            onClick={() => navigate('/login', { state: { role: 'venue-owner' } })}
-          >
+          <Button className="bg-findvenue hover:bg-findvenue-dark text-lg py-6 px-10" onClick={() => navigate('/login', {
+          state: {
+            role: 'venue-owner'
+          }
+        })}>
             Get Started Now
           </Button>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default VenueOwnerPromo;
