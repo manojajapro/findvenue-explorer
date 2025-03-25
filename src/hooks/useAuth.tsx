@@ -1,4 +1,3 @@
-
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -45,11 +44,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Define a type for the RPC function parameter
-            type GetUserProfileParams = { user_id: string };
-            
             const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', { user_id: currentSession.user.id } as GetUserProfileParams)
+              .rpc('get_user_profile', { user_id: currentSession.user.id })
               .single();
               
             if (profileData) {
@@ -78,19 +74,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log("Checking for existing session:", currentSession?.user?.id);
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      if (currentSession?.user) {
-        // Define a type for the RPC function parameter
-        type GetUserProfileParams = { user_id: string };
+    const getInitialSession = async () => {
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        console.log("Checking for existing session:", currentSession?.user?.id);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
         
-        supabase
-          .rpc('get_user_profile', { user_id: currentSession.user.id } as GetUserProfileParams)
-          .single()
-          .then(({ data: profileData, error }) => {
+        if (currentSession?.user) {
+          try {
+            const { data: profileData, error } = await supabase
+              .rpc('get_user_profile', { user_id: currentSession.user.id })
+              .single();
+              
             if (profileData) {
               console.log("Initial profile data loaded:", profileData);
               // Explicitly cast the data to UserProfile type
@@ -102,22 +98,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setProfile(null);
               setIsVenueOwner(false);
             }
-            
-            setIsLoading(false);
-          })
-          .catch((error) => {
+          } catch (error) {
             console.error("Error in initial profile fetch:", error);
-            setIsLoading(false);
-          });
-      } else {
+          }
+        }
+      } catch (error) {
+        console.error("Error getting session:", error);
+      } finally {
         setIsLoading(false);
       }
-    })
-    // Add proper catch handler to the Promise chain
-    .catch(error => {
-      console.error("Error getting session:", error);
-      setIsLoading(false);
-    });
+    };
+
+    getInitialSession();
 
     return () => {
       subscription.unsubscribe();
