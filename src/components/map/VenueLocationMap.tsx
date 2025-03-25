@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin } from 'lucide-react';
 import L from 'leaflet';
@@ -13,17 +13,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Map initialization component
-function MapInitializer({ setMapLoaded }: { setMapLoaded: (loaded: boolean) => void }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    setMapLoaded(true);
-  }, [setMapLoaded]);
-  
-  return null;
-}
-
 interface VenueLocationMapProps {
   name: string;
   address: string;
@@ -32,7 +21,7 @@ interface VenueLocationMapProps {
 }
 
 const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationMapProps) => {
-  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   // Default to Riyadh coordinates if venue doesn't have coordinates
   const defaultLat = 24.774265;
@@ -45,9 +34,11 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
 
   useEffect(() => {
     // This ensures the map is properly sized after it's rendered
-    setTimeout(() => {
-      setMapLoaded(true);
+    const timeout = setTimeout(() => {
+      setMapReady(true);
     }, 100);
+    
+    return () => clearTimeout(timeout);
   }, []);
 
   return (
@@ -66,9 +57,9 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
       ) : (
         <div className="h-[250px] w-full relative">
           <MapContainer 
-            style={{ height: '100%', width: '100%', background: '#1e2734' }}
-            scrollWheelZoom={false}
+            center={position}
             zoom={14}
+            style={{ height: '100%', width: '100%', background: '#1e2734' }}
             className="z-10"
           >
             <TileLayer
@@ -83,7 +74,6 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
                 </div>
               </Popup>
             </Marker>
-            <MapInitializer setMapLoaded={setMapLoaded} />
           </MapContainer>
           
           <div className="p-3 bg-findvenue-card-bg/70 backdrop-blur-sm absolute bottom-0 left-0 right-0 text-sm z-[400]">

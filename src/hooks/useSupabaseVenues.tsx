@@ -30,7 +30,7 @@ export interface Venue {
   pricing: {
     currency: string;
     startingPrice: number;
-    pricePerPerson: number;
+    pricePerPerson?: number; // Made optional to match the data/venues.ts interface
   };
   amenities: string[];
   rating: number;
@@ -180,7 +180,7 @@ export const useSupabaseVenues = () => {
             pricing: {
               currency: venue.currency || 'SAR',
               startingPrice: venue.starting_price || 0,
-              pricePerPerson: venue.price_per_person || 0
+              pricePerPerson: venue.price_per_person
             },
             amenities: venue.amenities || [],
             rating: venue.rating || 0,
