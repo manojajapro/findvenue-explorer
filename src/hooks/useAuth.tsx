@@ -1,3 +1,4 @@
+
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -44,10 +45,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (currentSession?.user) {
           try {
-            // Fetch user profile using raw SQL query to bypass TypeScript limitations
+            // Use a type assertion to specify the expected return type
             const { data: profileData, error } = await supabase
-              .rpc('get_user_profile', { user_id: currentSession.user.id })
-              .maybeSingle();
+              .rpc('get_user_profile', { user_id: currentSession.user.id }) as { 
+                data: UserProfile | null;
+                error: any;
+              };
               
             if (profileData) {
               console.log("Profile data loaded:", profileData);
@@ -79,10 +82,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        // Fetch user profile using raw SQL query to bypass TypeScript limitations
+        // Use a type assertion to specify the expected return type
         supabase
-          .rpc('get_user_profile', { user_id: currentSession.user.id })
-          .maybeSingle()
+          .rpc('get_user_profile', { user_id: currentSession.user.id }) as unknown as {
+            data: UserProfile | null;
+            error: any;
+            then: (onfulfilled?: ((value: { data: UserProfile | null; error: any; }) => any)) => any;
+          }
           .then(({ data: profileData, error }) => {
             if (profileData) {
               console.log("Initial profile data loaded:", profileData);
