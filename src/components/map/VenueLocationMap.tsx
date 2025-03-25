@@ -46,6 +46,16 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
     return () => clearTimeout(timeout);
   }, [position]);
 
+  // Function to handle map ready event
+  const handleMapReady = () => {
+    // We'll use the ref to access the map instance later
+    setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.setView(position, 14);
+      }
+    }, 100);
+  };
+
   return (
     <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
       <div className="p-4 border-b border-white/10">
@@ -64,10 +74,8 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
           <MapContainer 
             style={{ height: '100%', width: '100%', background: '#1e2734' }}
             className="z-10"
-            whenReady={(mapInstance) => {
-              mapRef.current = mapInstance.target;
-              mapInstance.target.setView(position, 14);
-            }}
+            ref={mapRef}
+            whenReady={handleMapReady}
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
