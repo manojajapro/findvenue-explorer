@@ -71,26 +71,29 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
         </div>
       ) : (
         <div className="h-[250px] w-full relative">
-          <MapContainer 
-            style={{ height: '100%', width: '100%', background: '#1e2734' }}
-            className="z-10"
-            ref={mapRef}
-            whenReady={handleMapReady}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
-              /* @ts-ignore - The type definitions seem incorrect but this works */
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            />
-            <Marker position={position}>
-              <Popup>
-                <div className="text-black">
-                  <strong>{name}</strong><br/>
-                  {address}
-                </div>
-              </Popup>
-            </Marker>
-          </MapContainer>
+          {mapReady && (
+            <MapContainer 
+              style={{ height: '100%', width: '100%', background: '#1e2734' }}
+              className="z-10"
+              center={position}
+              zoom={14}
+              ref={mapRef}
+              whenReady={handleMapReady}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              <Marker position={position}>
+                <Popup>
+                  <div className="text-black">
+                    <strong>{name}</strong><br/>
+                    {address}
+                  </div>
+                </Popup>
+              </Marker>
+            </MapContainer>
+          )}
           
           <div className="p-3 bg-findvenue-card-bg/70 backdrop-blur-sm absolute bottom-0 left-0 right-0 text-sm z-[400]">
             {address}
