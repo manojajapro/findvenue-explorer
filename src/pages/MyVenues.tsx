@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const MyVenues = () => {
-  const { user, isVenueOwner } = useAuth();
+  const { user, isVenueOwner, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -214,6 +213,24 @@ const MyVenues = () => {
     }
   };
 
+  if (!user) {
+    return (
+      <div className="min-h-screen pt-28 pb-16 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <p className="text-center">Please log in to access this page.</p>
+            <Button 
+              className="mt-4 w-full bg-findvenue hover:bg-findvenue-dark"
+              onClick={() => navigate('/login')}
+            >
+              Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!isVenueOwner) {
     return (
       <div className="min-h-screen pt-28 pb-16 flex items-center justify-center">
@@ -232,7 +249,11 @@ const MyVenues = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold">Venue Owner Dashboard</h1>
-            <p className="text-findvenue-text-muted">Manage your venues and bookings</p>
+            {profile && (
+              <p className="text-findvenue-text-muted">
+                Welcome, {profile.first_name} {profile.last_name}
+              </p>
+            )}
           </div>
           <Button 
             className="mt-4 sm:mt-0 bg-findvenue hover:bg-findvenue-dark flex items-center gap-2"

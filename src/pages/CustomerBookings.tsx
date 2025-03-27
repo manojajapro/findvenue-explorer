@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -192,6 +191,7 @@ const CustomerBookings = () => {
       
       console.log(`Updating booking ${bookingId} status to ${status}`);
       
+      // Update the booking status in the database
       const { error } = await supabase
         .from('bookings')
         .update({ status })
@@ -233,6 +233,12 @@ const CustomerBookings = () => {
       });
       
       console.log('Booking status updated successfully');
+      
+      // Refetch bookings to make sure we have the latest data
+      setTimeout(() => {
+        fetchBookings();
+      }, 1000);
+      
     } catch (error: any) {
       console.error(`Error updating booking status:`, error);
       toast({
