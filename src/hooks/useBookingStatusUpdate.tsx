@@ -24,8 +24,6 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     }
     
     setIsBusy(true);
-    let retryCount = 0;
-    const maxRetries = 3;
     
     try {
       if (!booking) throw new Error('Booking not found');
@@ -51,55 +49,8 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         )
       );
       
-      let updateSuccess = false;
-      let error = null;
-      let result = null;
-      
-      while (retryCount < maxRetries && !updateSuccess) {
-        try {
-          // First check if the booking is already in the desired state
-          const { data: currentBooking, error: checkError } = await supabase
-            .from('bookings')
-            .select('status')
-            .eq('id', bookingId)
-            .maybeSingle();
-            
-          if (checkError) {
-            console.error('Error checking booking status:', checkError);
-            throw checkError;
-          }
-            
-          if (currentBooking?.status === status) {
-            console.log(`Booking ${bookingId} is already in ${status} state`);
-            updateSuccess = true;
-            result = { success: true, data: currentBooking };
-            break;
-          }
-          
-          // Use the direct update function that includes verification
-          result = await updateBookingStatusInDatabase(bookingId, status);
-          
-          if (result && result.success) {
-            updateSuccess = true;
-            console.log(`Database update successfully verified for booking ${bookingId}`);
-            break;
-          } else {
-            throw new Error('Update verification failed');
-          }
-        } catch (e) {
-          error = e;
-          retryCount++;
-          console.log(`Update attempt ${retryCount} failed:`, e);
-          if (retryCount < maxRetries) {
-            console.log(`Retrying in 2 seconds...`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-        }
-      }
-      
-      if (!updateSuccess || !result) {
-        throw error || new Error(`Failed to update booking status after ${maxRetries} attempts`);
-      }
+      // Perform the actual update
+      const result = await updateBookingStatusInDatabase(bookingId, status);
       
       // Update local state with the verified data
       setBookings(prev => 
@@ -108,7 +59,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         )
       );
       
-      // Send notification to customer - in a separate try-catch to not fail the main process
+      // Send notification to customer
       try {
         const { error: notificationError } = await supabase
           .from('notifications')

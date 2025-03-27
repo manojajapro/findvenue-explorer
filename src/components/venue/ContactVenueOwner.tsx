@@ -43,6 +43,16 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       });
       return;
     }
+
+    // Check if owner ID is valid
+    if (!ownerId) {
+      toast({
+        title: 'Error',
+        description: 'Unable to contact venue owner. Owner information is missing.',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     setIsSending(true);
     
@@ -127,13 +137,13 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <MessageCircle className="h-5 w-5" />
-          <span>Contact {ownerName}</span>
+          <span>Contact {ownerName || 'Venue Owner'}</span>
         </CardTitle>
       </CardHeader>
       <form onSubmit={handleSendMessage}>
         <CardContent>
           <Textarea
-            placeholder={`Ask ${ownerName} about ${venueName}...`}
+            placeholder={`Ask ${ownerName || 'the venue owner'} about ${venueName}...`}
             className="min-h-[120px] bg-findvenue-surface/20"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -144,7 +154,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
           <Button 
             type="submit"
             className="bg-findvenue hover:bg-findvenue-dark"
-            disabled={isSending || !message.trim()}
+            disabled={isSending || !message.trim() || !ownerId}
           >
             {isSending ? (
               <>
