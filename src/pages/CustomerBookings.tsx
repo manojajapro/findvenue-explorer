@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,15 +39,8 @@ const CustomerBookings = () => {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  useEffect(() => {
-    if (user) {
-      fetchBookings();
-    } else {
-      setIsLoading(false);
-    }
-  }, [user]);
-  
-  const fetchBookings = async () => {
+  // Use useCallback to memoize the fetchBookings function
+  const fetchBookings = useCallback(async () => {
     if (!user) return;
     
     setIsLoading(true);
@@ -181,7 +175,16 @@ const CustomerBookings = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, isVenueOwner, toast]);
+  
+  // Fetch bookings when component mounts or when dependencies change
+  useEffect(() => {
+    if (user) {
+      fetchBookings();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user, fetchBookings]);
   
   const updateBookingStatus = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
     setIsBusy(true);
@@ -202,7 +205,7 @@ const CustomerBookings = () => {
         throw error;
       }
       
-      // Update local state
+      // Immediately update local state to show the change
       setBookings(prev => 
         prev.map(booking => 
           booking.id === bookingId ? { ...booking, status } : booking
@@ -235,9 +238,7 @@ const CustomerBookings = () => {
       console.log('Booking status updated successfully');
       
       // Refetch bookings to make sure we have the latest data
-      setTimeout(() => {
-        fetchBookings();
-      }, 1000);
+      await fetchBookings();
       
     } catch (error: any) {
       console.error(`Error updating booking status:`, error);
