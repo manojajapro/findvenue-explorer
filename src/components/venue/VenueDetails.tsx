@@ -1,186 +1,326 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Star, 
+  MapPin, 
+  Users, 
+  Calendar, 
+  Clock, 
+  Wifi, 
+  Car, 
+  Music, 
+  UtensilsCrossed, 
+  ChevronLeft,
+  Share2,
+  CreditCard,
+  Sparkles,
+  Check,
+  X,
+  Clock3,
+  AccessibilityIcon
+} from 'lucide-react';
+import { VenueCard } from '@/components/ui';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/components/ui/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { 
-  Building, 
-  Calendar, 
-  Heart, 
-  Info, 
-  Map, 
-  Star, 
-  Users,
-  Wifi,
-  ParkingSquare,
-  Utensils,
-  Music,
-  Lightbulb,
-  MonitorPlay,
-  Loader2
-} from 'lucide-react';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
-import BookingForm from '@/components/venue/BookingForm';
-import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
 
-const VenueDetailsComponent = () => {
+const amenityIcons: Record<string, JSX.Element> = {
+  'WiFi': <Wifi className="w-4 h-4" />,
+  'Parking': <Car className="w-4 h-4" />,
+  'Sound System': <Music className="w-4 h-4" />,
+  'Catering': <UtensilsCrossed className="w-4 h-4" />,
+  'Wheelchair Access': <AccessibilityIcon className="w-4 h-4" />,
+};
+
+const VenueDetails = () => {
   const { id } = useParams<{ id: string }>();
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const { user, toggleFavoriteVenue, checkIsFavorite } = useAuth();
-  
   const [venue, setVenue] = useState<Venue | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [activeImage, setActiveImage] = useState<string>('');
+  const [similarVenues, setSimilarVenues] = useState<Venue[]>([]);
+  const navigate = useNavigate();
   
   useEffect(() => {
+    window.scrollTo(0, 0);
+    
     const fetchVenueDetails = async () => {
       if (!id) return;
       
+      setLoading(true);
+      
       try {
-        setIsLoading(true);
-        
-        const { data, error } = await supabase
+        const { data: venueData, error } = await supabase
           .from('venues')
           .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle();
           
         if (error) throw error;
         
-        if (data) {
-          let ownerInfo = { name: 'N/A', contact: 'N/A', responseTime: 'N/A' };
-          if (data.owner_info) {
-            const venueOwnerInfo = data.owner_info as Record<string, any>;
-            if (typeof venueOwnerInfo === 'object') {
-              ownerInfo = {
-                name: venueOwnerInfo.name as string,
-                contact: venueOwnerInfo.contact as string,
-                responseTime: venueOwnerInfo.response_time as string
-              };
-            }
+        if (venueData) {
+          let ownerInfoData = undefined;
+          if (venueData.owner_info) {
+            const ownerInfo = venueData.owner_info as Record<string, any>;
+            ownerInfoData = {
+              name: ownerInfo.name as string,
+              contact: ownerInfo.contact as string,
+              responseTime: ownerInfo.response_time as string
+            };
+          }
+          
+          let openingHoursData = undefined;
+          if (venueData.opening_hours) {
+            openingHoursData = venueData.opening_hours as Record<string, {open: string, close: string}>;
           }
           
           const transformedVenue: Venue = {
-            id: data.id,
-            name: data.name,
-            description: data.description || '',
-            imageUrl: data.image_url || '',
-            galleryImages: data.gallery_images || [],
-            address: data.address || '',
-            city: data.city_name || '',
-            cityId: data.city_id || '',
-            category: data.category_name || '',
-            categoryId: data.category_id || '',
+            id: venueData.id,
+            name: venueData.name,
+            description: venueData.description || '',
+            imageUrl: venueData.image_url || '',
+            galleryImages: venueData.gallery_images || [],
+            address: venueData.address || '',
+            city: venueData.city_name || '',
+            cityId: venueData.city_id || '',
+            category: venueData.category_name || '',
+            categoryId: venueData.category_id || '',
             capacity: {
-              min: data.min_capacity || 0,
-              max: data.max_capacity || 0
+              min: venueData.min_capacity || 0,
+              max: venueData.max_capacity || 0
             },
             pricing: {
-              currency: data.currency || 'SAR',
-              startingPrice: data.starting_price || 0,
-              pricePerPerson: data.price_per_person
+              currency: venueData.currency || 'SAR',
+              startingPrice: venueData.starting_price || 0,
+              pricePerPerson: venueData.price_per_person || 0
             },
-            amenities: data.amenities || [],
-            rating: data.rating || 0,
-            reviews: data.reviews_count || 0,
-            featured: data.featured || false,
-            popular: data.popular || false,
-            availability: data.availability || [],
-            ownerInfo: ownerInfo
+            amenities: venueData.amenities || [],
+            rating: venueData.rating || 0,
+            reviews: venueData.reviews_count || 0,
+            featured: venueData.featured || false,
+            popular: venueData.popular || false,
+            availability: venueData.availability || [],
+            latitude: venueData.latitude,
+            longitude: venueData.longitude,
+            parking: venueData.parking,
+            wifi: venueData.wifi,
+            accessibilityFeatures: venueData.accessibility_features || [],
+            acceptedPaymentMethods: venueData.accepted_payment_methods || [],
+            openingHours: openingHoursData,
+            ownerInfo: ownerInfoData,
+            additionalServices: venueData.additional_services || []
           };
           
           setVenue(transformedVenue);
+          setActiveImage(transformedVenue.imageUrl);
           
-          if (user) {
-            setIsFavorite(checkIsFavorite(data.id));
+          const { data: similarData, error: similarError } = await supabase
+            .from('venues')
+            .select('*')
+            .eq('category_id', venueData.category_id)
+            .neq('id', id)
+            .limit(4);
+            
+          if (similarError) throw similarError;
+          
+          if (similarData) {
+            const transformedSimilar = similarData.map(venue => {
+              let ownerInfoData = undefined;
+              if (venue.owner_info) {
+                const ownerInfo = venue.owner_info as Record<string, any>;
+                ownerInfoData = {
+                  name: ownerInfo.name as string,
+                  contact: ownerInfo.contact as string,
+                  responseTime: ownerInfo.response_time as string
+                };
+              }
+              
+              let openingHoursData = undefined;
+              if (venue.opening_hours) {
+                openingHoursData = venue.opening_hours as Record<string, {open: string, close: string}>;
+              }
+              
+              return {
+                id: venue.id,
+                name: venue.name,
+                description: venue.description || '',
+                imageUrl: venue.image_url || '',
+                galleryImages: venue.gallery_images || [],
+                address: venue.address || '',
+                city: venue.city_name || '',
+                cityId: venue.city_id || '',
+                category: venue.category_name || '',
+                categoryId: venue.category_id || '',
+                capacity: {
+                  min: venue.min_capacity || 0,
+                  max: venue.max_capacity || 0
+                },
+                pricing: {
+                  currency: venue.currency || 'SAR',
+                  startingPrice: venue.starting_price || 0,
+                  pricePerPerson: venue.price_per_person || 0
+                },
+                amenities: venue.amenities || [],
+                rating: venue.rating || 0,
+                reviews: venue.reviews_count || 0,
+                featured: venue.featured || false,
+                popular: venue.popular || false,
+                availability: venue.availability || [],
+                latitude: venue.latitude,
+                longitude: venue.longitude,
+                parking: venue.parking,
+                wifi: venue.wifi,
+                accessibilityFeatures: venue.accessibility_features || [],
+                acceptedPaymentMethods: venue.accepted_payment_methods || [],
+                openingHours: openingHoursData,
+                ownerInfo: ownerInfoData,
+                additionalServices: venue.additional_services || []
+              } as Venue;
+            });
+            
+            setSimilarVenues(transformedSimilar);
           }
+        } else {
+          navigate('/venues');
         }
       } catch (error) {
         console.error('Error fetching venue details:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load venue details',
-          variant: 'destructive'
-        });
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
     
     fetchVenueDetails();
-  }, [id, user]);
+  }, [id, navigate]);
   
-  const handleToggleFavorite = async () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
+  const renderOpeningHours = () => {
+    if (!venue?.openingHours) return null;
     
-    if (!venue) return;
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     
-    setIsTogglingFavorite(true);
-    
-    try {
-      await toggleFavoriteVenue(venue.id);
-      setIsFavorite(!isFavorite);
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    } finally {
-      setIsTogglingFavorite(false);
-    }
-  };
-  
-  const prevImage = () => {
-    if (!venue?.galleryImages) return;
-    
-    setCurrentImageIndex((prevIndex) => 
-      prevIndex === 0 ? venue.galleryImages.length - 1 : prevIndex - 1
-    );
-  };
-  
-  const nextImage = () => {
-    if (!venue?.galleryImages) return;
-    
-    setCurrentImageIndex((prevIndex) => 
-      prevIndex === venue.galleryImages.length - 1 ? 0 : prevIndex + 1
-    );
-  };
-  
-  const selectImage = (index: number) => {
-    setCurrentImageIndex(index);
-  };
-  
-  const renderAmenityIcon = (amenity: string) => {
-    switch (amenity.toLowerCase()) {
-      case 'wifi':
-        return <Wifi className="h-4 w-4" />;
-      case 'parking':
-        return <ParkingSquare className="h-4 w-4" />;
-      case 'catering':
-        return <Utensils className="h-4 w-4" />;
-      case 'sound system':
-        return <Music className="h-4 w-4" />;
-      case 'lighting':
-        return <Lightbulb className="h-4 w-4" />;
-      case 'video equipment':
-        return <MonitorPlay className="h-4 w-4" />;
-      default:
-        return <Info className="h-4 w-4" />;
-    }
-  };
-  
-  if (isLoading) {
     return (
-      <div className="min-h-screen pt-28 pb-16 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin mx-auto text-findvenue" />
-          <p className="mt-4 text-findvenue-text-muted">Loading venue details...</p>
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <Clock3 className="w-4 h-4 mr-2 text-findvenue" />
+            Opening Hours
+          </h3>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-1 gap-2">
+            {days.map(day => {
+              const hours = venue.openingHours?.[day];
+              return (
+                <div key={day} className="flex justify-between items-center py-1 border-b border-white/5 last:border-0">
+                  <span className="capitalize">{day}</span>
+                  <span>{hours ? `${hours.open} - ${hours.close}` : 'Closed'}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderPaymentMethods = () => {
+    if (!venue?.acceptedPaymentMethods?.length) return null;
+    
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <CreditCard className="w-4 h-4 mr-2 text-findvenue" />
+            Accepted Payment Methods
+          </h3>
+        </div>
+        <div className="p-4">
+          <div className="flex flex-wrap gap-2">
+            {venue.acceptedPaymentMethods.map((method, index) => (
+              <Badge key={index} variant="secondary" className="bg-findvenue-surface/50">
+                {method}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderAdditionalServices = () => {
+    if (!venue?.additionalServices?.length) return null;
+    
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <Sparkles className="w-4 h-4 mr-2 text-findvenue" />
+            Additional Services
+          </h3>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {venue.additionalServices.map((service, index) => (
+              <div key={index} className="flex items-center">
+                <Check className="w-4 h-4 mr-2 text-findvenue" />
+                <span>{service}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderOwnerInfo = () => {
+    if (!venue?.ownerInfo) return null;
+    
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold">Venue Host Information</h3>
+        </div>
+        <div className="p-4">
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm text-findvenue-text-muted mb-1">Host Name</p>
+              <p className="font-medium">{venue.ownerInfo.name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-findvenue-text-muted mb-1">Contact</p>
+              <p className="font-medium">{venue.ownerInfo.contact}</p>
+            </div>
+            <div>
+              <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
+              <p className="font-medium">{venue.ownerInfo.responseTime}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  if (loading) {
+    return (
+      <div className="pt-24 pb-16">
+        <div className="container mx-auto px-4">
+          <div className="animate-pulse">
+            <div className="h-8 bg-findvenue-surface/50 rounded w-1/3 mb-4"></div>
+            <div className="h-96 bg-findvenue-surface/50 rounded-lg mb-8"></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="md:col-span-2">
+                <div className="h-10 bg-findvenue-surface/50 rounded w-2/3 mb-6"></div>
+                <div className="h-4 bg-findvenue-surface/50 rounded w-full mb-3"></div>
+                <div className="h-4 bg-findvenue-surface/50 rounded w-full mb-3"></div>
+                <div className="h-4 bg-findvenue-surface/50 rounded w-4/5 mb-8"></div>
+              </div>
+              <div>
+                <div className="h-64 bg-findvenue-surface/50 rounded-lg"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -188,270 +328,259 @@ const VenueDetailsComponent = () => {
   
   if (!venue) {
     return (
-      <div className="min-h-screen pt-28 pb-16 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-findvenue-text-muted mb-4">Venue not found</p>
-          <Button onClick={() => navigate('/venues')}>Browse Venues</Button>
+      <div className="pt-24 pb-16">
+        <div className="container mx-auto px-4 text-center">
+          <h1 className="text-3xl font-bold mb-4">Venue Not Found</h1>
+          <p className="text-findvenue-text-muted mb-8">
+            The venue you're looking for doesn't exist or has been removed.
+          </p>
+          <Link to="/venues">
+            <Button className="bg-findvenue hover:bg-findvenue-dark">
+              Back to Venues
+            </Button>
+          </Link>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="min-h-screen pt-24 pb-16">
+    <div className="pt-24 pb-16">
       <div className="container mx-auto px-4">
-        <div className="mb-6 flex items-center text-sm text-findvenue-text-muted">
-          <Link to="/" className="hover:text-findvenue">Home</Link>
-          <span className="mx-2">/</span>
-          <Link to="/venues" className="hover:text-findvenue">Venues</Link>
-          <span className="mx-2">/</span>
-          <Link to={`/categories?id=${venue.categoryId}`} className="hover:text-findvenue">{venue.category}</Link>
-          <span className="mx-2">/</span>
-          <span className="text-findvenue-text">{venue.name}</span>
+        <div className="mb-6">
+          <Link to="/venues" className="flex items-center text-findvenue hover:text-findvenue-light transition-colors">
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back to venues
+          </Link>
         </div>
         
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold">{venue.name}</h1>
-            
-            <div className="flex items-center mt-2 space-x-4">
-              <div className="flex items-center">
-                <Star className="h-4 w-4 text-yellow-500 mr-1" />
-                <span className="mr-1">{venue.rating.toFixed(1)}</span>
-                <span className="text-findvenue-text-muted">({venue.reviews} reviews)</span>
-              </div>
-              
-              <div className="flex items-center">
-                <Map className="h-4 w-4 text-findvenue-text-muted mr-1" />
-                <span>{venue.city}</span>
-              </div>
-              
-              <div className="flex items-center">
-                <Building className="h-4 w-4 text-findvenue-text-muted mr-1" />
-                <span>{venue.category}</span>
+        <div className="mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-3">
+              <div className="relative rounded-lg overflow-hidden aspect-[16/9]">
+                <img 
+                  src={activeImage} 
+                  alt={venue?.name} 
+                  className="w-full h-full object-cover transform transition-transform duration-700 hover:scale-105"
+                />
+                {venue?.featured && (
+                  <div className="absolute top-4 left-4">
+                    <Badge className="bg-findvenue-gold text-black font-medium px-3 py-1">
+                      Featured
+                    </Badge>
+                  </div>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="absolute top-4 right-4 bg-black/30 text-white hover:bg-black/50"
+                  onClick={() => {/* Share functionality */}}
+                >
+                  <Share2 className="h-5 w-5" />
+                </Button>
               </div>
             </div>
+            <div className="grid grid-cols-4 md:grid-cols-1 gap-2">
+              {venue?.galleryImages?.slice(0, 4).map((img, index) => (
+                <div 
+                  key={index}
+                  className={`rounded-lg overflow-hidden aspect-square cursor-pointer transition-all duration-300 ${
+                    activeImage === img ? 'ring-2 ring-findvenue' : 'opacity-70 hover:opacity-100'
+                  }`}
+                  onClick={() => setActiveImage(img)}
+                >
+                  <img src={img} alt={`Gallery ${index+1}`} className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
           </div>
-          
-          <Button
-            onClick={handleToggleFavorite}
-            variant="outline"
-            size="sm"
-            disabled={isTogglingFavorite}
-            className={`mt-4 md:mt-0 border-white/10 ${
-              isFavorite ? 'bg-findvenue/10 text-findvenue' : ''
-            }`}
-          >
-            <Heart className={`mr-2 h-4 w-4 ${isFavorite ? 'fill-findvenue text-findvenue' : ''}`} />
-            {isFavorite ? 'Saved to Favorites' : 'Add to Favorites'}
-          </Button>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <div className="relative h-[400px] rounded-lg overflow-hidden">
-              <img
-                src={venue.galleryImages[currentImageIndex] || venue.imageUrl}
-                alt={venue.name}
-                className="w-full h-full object-cover"
-              />
-              
-              {venue.galleryImages.length > 1 && (
-                <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm hover:bg-black/70 transition-colors"
-                  >
-                    &#10094;
-                  </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm hover:bg-black/70 transition-colors"
-                  >
-                    &#10095;
-                  </button>
-                </>
-              )}
-              
-              {(venue.featured || venue.popular) && (
-                <div className={`absolute top-4 left-4 py-1 px-3 rounded-full font-medium text-sm ${
-                  venue.featured ? 'bg-findvenue-gold text-black' : 'bg-findvenue text-white'
-                }`}>
-                  {venue.featured ? 'Featured' : 'Popular'}
-                </div>
-              )}
+            <h1 className="text-3xl md:text-4xl font-bold mb-4">{venue?.name}</h1>
+            
+            <div className="flex flex-wrap items-center gap-4 mb-6 text-sm">
+              <div className="flex items-center">
+                <MapPin className="w-4 h-4 mr-1 text-findvenue" />
+                <span>{venue?.address}, {venue?.city}</span>
+              </div>
+              <div className="flex items-center">
+                <Users className="w-4 h-4 mr-1 text-findvenue" />
+                <span>Capacity: {venue?.capacity.min}-{venue?.capacity.max} guests</span>
+              </div>
+              <div className="flex items-center">
+                <Star className="w-4 h-4 mr-1 text-findvenue-gold fill-findvenue-gold" />
+                <span>{venue?.rating} ({venue?.reviews} reviews)</span>
+              </div>
+              <Badge className="bg-findvenue/20 text-findvenue border-0">
+                {venue?.category}
+              </Badge>
             </div>
             
-            {venue.galleryImages.length > 1 && (
-              <div className="flex overflow-x-auto mt-4 space-x-2 pb-2">
-                {venue.galleryImages.map((image, index) => (
-                  <div
-                    key={index}
-                    className={`w-24 h-16 shrink-0 rounded overflow-hidden cursor-pointer border-2 ${
-                      currentImageIndex === index ? 'border-findvenue' : 'border-transparent'
-                    }`}
-                    onClick={() => selectImage(index)}
-                  >
-                    <img src={image} alt={`${venue.name} - ${index + 1}`} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          <div className="lg:col-span-1 flex flex-col">
-            <div className="glass-card border-white/10 p-6 rounded-lg mb-4 flex-1">
-              <h3 className="text-xl font-semibold mb-4">Venue Information</h3>
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold mb-3">About this venue</h2>
+              <p className="text-findvenue-text-muted mb-4">{venue?.description}</p>
               
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-findvenue/10 flex items-center justify-center mr-4">
-                    <Users className="h-5 w-5 text-findvenue" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-findvenue-text-muted">Capacity</p>
-                    <p className="font-medium">{venue.capacity.min} - {venue.capacity.max} Guests</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-findvenue/10 flex items-center justify-center mr-4">
-                    <Calendar className="h-5 w-5 text-findvenue" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-findvenue-text-muted">Availability</p>
-                    <p className="font-medium">
-                      {venue.availability.length > 0 
-                        ? venue.availability.join(', ') 
-                        : 'Contact for availability'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-findvenue/10 flex items-center justify-center mr-4">
-                    <Building className="h-5 w-5 text-findvenue" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-findvenue-text-muted">Location</p>
-                    <p className="font-medium">{venue.address}</p>
-                    <p className="text-sm">{venue.city}</p>
-                  </div>
-                </div>
-                
-                {venue.ownerInfo && (
+              <div className="flex flex-wrap gap-4 mt-6">
+                {venue?.wifi !== undefined && (
                   <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-findvenue/10 flex items-center justify-center mr-4">
-                      <Info className="h-5 w-5 text-findvenue" />
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${venue.wifi ? 'bg-findvenue/10 text-findvenue' : 'bg-findvenue-surface/50 text-findvenue-text-muted'}`}>
+                      <Wifi className="w-4 h-4" />
                     </div>
-                    <div>
-                      <p className="text-sm text-findvenue-text-muted">Managed by</p>
-                      <p className="font-medium">{venue.ownerInfo.name}</p>
-                      <p className="text-xs text-findvenue-text-muted">
-                        Typically responds in {venue.ownerInfo.responseTime}
-                      </p>
+                    <span className="flex items-center">
+                      WiFi
+                      {venue.wifi ? 
+                        <Check className="w-4 h-4 ml-1 text-green-500" /> : 
+                        <X className="w-4 h-4 ml-1 text-red-500" />
+                      }
+                    </span>
+                  </div>
+                )}
+                
+                {venue?.parking !== undefined && (
+                  <div className="flex items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${venue.parking ? 'bg-findvenue/10 text-findvenue' : 'bg-findvenue-surface/50 text-findvenue-text-muted'}`}>
+                      <Car className="w-4 h-4" />
                     </div>
+                    <span className="flex items-center">
+                      Parking
+                      {venue.parking ? 
+                        <Check className="w-4 h-4 ml-1 text-green-500" /> : 
+                        <X className="w-4 h-4 ml-1 text-red-500" />
+                      }
+                    </span>
                   </div>
                 )}
               </div>
             </div>
             
-            <div className="glass-card border-white/10 p-6 rounded-lg">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold">Price</h3>
-                <div className="text-2xl font-bold text-findvenue">
-                  {venue.pricing.currency} {venue.pricing.startingPrice.toLocaleString()}
-                </div>
-              </div>
-              
-              <p className="text-sm text-findvenue-text-muted mb-4">
-                {venue.pricing.pricePerPerson 
-                  ? `${venue.pricing.currency} ${venue.pricing.pricePerPerson} per person`
-                  : 'Starting price for venue rental'}
-              </p>
-              
-              <Button className="w-full bg-findvenue hover:bg-findvenue-dark" onClick={() => document.getElementById('booking-section')?.scrollIntoView({ behavior: 'smooth' })}>
-                Book Now
-              </Button>
-            </div>
-          </div>
-        </div>
-        
-        <Tabs defaultValue="details" className="mb-12">
-          <TabsList className="glass-card border-white/10 p-1">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="amenities">Amenities</TabsTrigger>
-            <TabsTrigger value="location">Location</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="details" className="mt-6">
-            <div className="glass-card border-white/10 p-6 rounded-lg">
-              <h3 className="text-xl font-semibold mb-4">About This Venue</h3>
-              <p className="text-findvenue-text-muted whitespace-pre-line">{venue.description}</p>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="amenities" className="mt-6">
-            <div className="glass-card border-white/10 p-6 rounded-lg">
-              <h3 className="text-xl font-semibold mb-6">Amenities & Features</h3>
-              
-              {venue.amenities.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {venue.amenities.map((amenity) => (
-                    <div key={amenity} className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-findvenue/10 flex items-center justify-center mr-3">
-                        {renderAmenityIcon(amenity)}
-                      </div>
-                      <span>{amenity}</span>
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">Amenities</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {venue?.amenities?.map((amenity, index) => (
+                  <div key={index} className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-findvenue/10 flex items-center justify-center mr-3">
+                      {amenityIcons[amenity] || <Clock className="w-4 h-4 text-findvenue" />}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-findvenue-text-muted">No amenities information available</p>
+                    <span>{amenity}</span>
+                  </div>
+                ))}
+                
+                {venue?.accessibilityFeatures?.map((feature, index) => (
+                  <div key={`acc-${index}`} className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-findvenue/10 flex items-center justify-center mr-3">
+                      <AccessibilityIcon className="w-4 h-4 text-findvenue" />
+                    </div>
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">Availability</h2>
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                  const isAvailable = venue?.availability?.includes(day);
+                  return (
+                    <div
+                      key={day}
+                      className={`py-2 rounded-md text-center text-sm ${
+                        isAvailable ? 'bg-findvenue/20 text-findvenue' : 'bg-findvenue-surface/30 text-findvenue-text-muted'
+                      }`}
+                    >
+                      {day}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-sm text-findvenue-text-muted">
+                Available dates may vary. Contact venue for specific date availability.
+              </p>
+            </div>
+            
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold mb-4">Location</h2>
+              {venue && (
+                <VenueLocationMap 
+                  name={venue.name}
+                  address={venue.address || ''}
+                  latitude={venue.latitude}
+                  longitude={venue.longitude}
+                />
               )}
             </div>
-          </TabsContent>
-          
-          <TabsContent value="location" className="mt-6">
-            <div className="glass-card border-white/10 p-6 rounded-lg">
-              <h3 className="text-xl font-semibold mb-4">Location</h3>
-              <p className="text-findvenue-text-muted mb-4">{venue.address}, {venue.city}</p>
-              
-              <div className="h-[400px] rounded-lg overflow-hidden">
-                <VenueLocationMap 
-                  name={venue.name} 
-                  address={`${venue.address}, ${venue.city}`} 
-                />
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-        
-        <div id="booking-section" className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Book this Venue</h2>
-            <BookingForm 
-              venueId={venue.id} 
-              venueName={venue.name} 
-              pricePerHour={venue.pricing.startingPrice}
-              ownerId={(venue.owner_info as any)?.user_id || ''}
-              ownerName={venue.ownerInfo?.name || ''}
-            />
+            
+            {venue?.additionalServices && venue.additionalServices.length > 0 && renderAdditionalServices()}
+            {venue?.ownerInfo && renderOwnerInfo()}
           </div>
           
           <div>
-            <h2 className="text-2xl font-bold mb-6">Contact Venue Owner</h2>
-            <ContactVenueOwner 
-              venueId={venue.id}
-              venueName={venue.name}
-              ownerId={(venue.owner_info as any)?.user_id || ''}
-              ownerName={venue.ownerInfo?.name || ''}
-            />
+            <Card className="p-6 glass-card border-white/10 sticky top-24">
+              <div className="mb-4 pb-4 border-b border-white/10">
+                <div className="text-2xl font-bold mb-1">
+                  {venue?.pricing.currency} {venue?.pricing.startingPrice.toLocaleString()}
+                </div>
+                <div className="text-findvenue-text-muted text-sm">
+                  Starting price
+                </div>
+              </div>
+              
+              {venue?.pricing.pricePerPerson && (
+                <div className="mb-4 pb-4 border-b border-white/10">
+                  <div className="flex justify-between items-center">
+                    <span>Price per person</span>
+                    <span>{venue?.pricing.currency} {venue?.pricing.pricePerPerson}</span>
+                  </div>
+                </div>
+              )}
+              
+              <div className="mb-6">
+                <div className="flex items-center mb-4">
+                  <Calendar className="w-5 h-5 mr-2 text-findvenue" />
+                  <span className="font-medium">Check availability</span>
+                </div>
+                
+                <div className="bg-findvenue-surface/50 rounded-md p-3 text-center mb-4">
+                  Select a date to check availability
+                </div>
+              </div>
+              
+              <Button className="w-full bg-findvenue hover:bg-findvenue-dark mb-3">
+                Book This Venue
+              </Button>
+              
+              <Button variant="outline" className="w-full border-white/20 hover:bg-findvenue-surface/50">
+                Contact Host
+              </Button>
+              
+              {venue?.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && renderPaymentMethods()}
+              
+              {renderOpeningHours()}
+            </Card>
           </div>
         </div>
+        
+        {similarVenues.length > 0 && (
+          <div className="mt-16">
+            <h2 className="text-2xl font-bold mb-6">Similar Venues You Might Like</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {similarVenues.map((venue) => (
+                <div 
+                  key={venue.id} 
+                  className="h-full cursor-pointer" 
+                  onClick={() => navigate(`/venue/${venue.id}`)}
+                >
+                  <VenueCard venue={venue} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default VenueDetailsComponent;
+export default VenueDetails;
