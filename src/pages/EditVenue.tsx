@@ -58,7 +58,8 @@ const EditVenue = () => {
       if (error) throw error;
       
       // Check if the venue belongs to this owner
-      if (data.owner_info?.user_id !== user?.id) {
+      const ownerInfo = data.owner_info as any;
+      if (ownerInfo && ownerInfo.user_id !== user?.id) {
         toast({
           title: 'Access Denied',
           description: 'You do not have permission to edit this venue.',
