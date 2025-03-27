@@ -58,7 +58,7 @@ export const verifyBookingStatus = async (bookingId: string, expectedStatus: str
   }
 };
 
-// Fixed function to directly update booking status and handle PostgREST errors
+// Enhanced update function with explicit return value and longer wait times
 export const updateBookingStatusInDatabase = async (bookingId: string, status: string) => {
   try {
     console.log(`Direct database update: Setting booking ${bookingId} status to ${status}...`);
@@ -91,17 +91,31 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
       };
     }
     
-    // Fix: Use .update().eq() without using single() or maybeSingle()
-    // Important: Don't use .single() after update as it will throw PGRST116 if no rows returned
-    await supabase
+    // Update the booking with status and add returning statement to get the updated record
+    const { data: updateResult, error: updateError } = await supabase
       .from('bookings')
       .update({ status })
-      .eq('id', bookingId);
-      
-    // Wait to ensure database consistency before verification (increased time)
-    await new Promise(resolve => setTimeout(resolve, 2000));
+      .eq('id', bookingId)
+      .select()
+      .maybeSingle();
     
-    // Separate query to fetch the updated booking
+    if (updateError) {
+      console.error('Error updating booking:', updateError);
+      throw updateError;
+    }
+    
+    if (!updateResult) {
+      console.error('Update returned no data, will verify manually');
+    } else {
+      console.log('Update returned data:', updateResult);
+    }
+      
+    // Extended wait to ensure database consistency before verification (increased time)
+    console.log('Waiting for database consistency...');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Separate query to fetch the updated booking and verify the change
+    console.log('Verifying update with separate query...');
     const { data: updatedBooking, error: getError } = await supabase
       .from('bookings')
       .select('*')
@@ -114,6 +128,7 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
     }
     
     if (!updatedBooking) {
+      console.error('Could not find booking after update');
       throw new Error('Could not find booking after update');
     }
     
@@ -122,7 +137,41 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
     // Final verification - check if status was actually updated
     if (updatedBooking.status !== status) {
       console.error(`Status mismatch - expected ${status} but found ${updatedBooking.status}`);
-      throw new Error(`Failed to update status to ${status}`);
+      
+      // One last attempt to force the update
+      console.log('Making final attempt to update status...');
+      const { error: finalUpdateError } = await supabase
+        .from('bookings')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString() // Force a change to trigger update
+        })
+        .eq('id', bookingId);
+        
+      if (finalUpdateError) {
+        console.error('Final update attempt failed:', finalUpdateError);
+        throw new Error(`Failed to update status to ${status}`);
+      }
+      
+      // Wait once more and verify
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const { data: finalCheck, error: finalCheckError } = await supabase
+        .from('bookings')
+        .select('status')
+        .eq('id', bookingId)
+        .maybeSingle();
+        
+      if (finalCheckError || !finalCheck || finalCheck.status !== status) {
+        console.error('Final check failed:', finalCheck, finalCheckError);
+        throw new Error(`Failed to update status to ${status}`);
+      }
+      
+      console.log('Final update successful:', finalCheck);
+      return {
+        success: true,
+        data: finalCheck
+      };
     }
     
     return {

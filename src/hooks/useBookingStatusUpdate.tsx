@@ -44,6 +44,13 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         description: `Updating booking status to ${status}...`,
       });
       
+      // Immediately update local state to improve perceived performance
+      setBookings(prev => 
+        prev.map(b => 
+          b.id === bookingId ? { ...b, status, updating: true } : b
+        )
+      );
+      
       let updateSuccess = false;
       let error = null;
       let result = null;
@@ -97,7 +104,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       // Update local state with the verified data
       setBookings(prev => 
         prev.map(b => 
-          b.id === bookingId ? { ...b, ...result.data } : b
+          b.id === bookingId ? { ...b, ...result.data, updating: false } : b
         )
       );
       
@@ -151,7 +158,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       // Revert local state to original status
       setBookings(prev => 
         prev.map(b => 
-          b.id === bookingId ? { ...b, status: booking.status } : b
+          b.id === bookingId ? { ...b, status: booking.status, updating: false } : b
         )
       );
     } finally {
