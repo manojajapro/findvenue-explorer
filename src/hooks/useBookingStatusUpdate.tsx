@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { checkSupabaseConnection } from '@/utils/supabaseHealthCheck';
 
 export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
   const { toast } = useToast();
@@ -20,16 +21,24 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       
       console.log(`Updating booking ${bookingId} status to ${status}`);
       
+      // Check Supabase connection before attempting update
+      const isConnected = await checkSupabaseConnection();
+      if (!isConnected) {
+        throw new Error('Unable to connect to the database. Please check your connection and try again.');
+      }
+      
       // First, update the booking status in the database
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('bookings')
         .update({ status })
         .eq('id', bookingId);
         
-      if (error) {
-        console.error('Error updating booking status:', error);
-        throw error;
+      if (updateError) {
+        console.error('Error updating booking status:', updateError);
+        throw updateError;
       }
+      
+      console.log(`Database update completed for booking ${bookingId}`);
       
       // Immediately update local state to show the change
       setBookings(prev => 
@@ -38,8 +47,24 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         )
       );
       
+      // Verify the update was successful by fetching the booking
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .single();
+        
+      if (verifyError) {
+        console.error('Error verifying booking update:', verifyError);
+      } else {
+        console.log('Verified booking status in database:', verifyData.status);
+        if (verifyData.status !== status) {
+          console.error('Status mismatch after update! Database has:', verifyData.status, 'but we tried to set:', status);
+        }
+      }
+      
       // Send notification to customer
-      await supabase
+      const { error: notificationError } = await supabase
         .from('notifications')
         .insert({
           user_id: booking.user_id,
@@ -56,12 +81,16 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
           }
         });
       
+      if (notificationError) {
+        console.error('Error sending notification:', notificationError);
+      }
+      
       toast({
         title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
         description: `The booking has been ${status} successfully.`,
       });
       
-      console.log('Booking status updated successfully');
+      console.log('Booking status updated successfully, now fetching all bookings...');
       
       // Fetch bookings again to ensure data is fresh
       await fetchBookings();

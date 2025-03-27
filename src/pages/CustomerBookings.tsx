@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,8 +37,8 @@ const CustomerBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
-  const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [processingBookingIds, setProcessingBookingIds] = useState<Set<string>>(new Set());
   
   const fetchBookings = useCallback(async () => {
     if (!user) return;
@@ -177,65 +179,38 @@ const CustomerBookings = () => {
     }
   }, [user, fetchBookings]);
   
-  const updateBookingStatus = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
-    setIsBusy(true);
+  const { updateBookingStatus, isBusy } = useBookingStatusUpdate(fetchBookings);
+
+  const handleStatusUpdate = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
+    // Prevent duplicate processing of the same booking
+    if (processingBookingIds.has(bookingId)) {
+      console.log(`Already processing booking ${bookingId}, ignoring duplicate request`);
+      return;
+    }
+    
     try {
+      // Mark this booking as being processed
+      setProcessingBookingIds(prev => new Set(prev).add(bookingId));
+      
       const booking = bookings.find(b => b.id === bookingId);
-      if (!booking) throw new Error('Booking not found');
-      
-      console.log(`Updating booking ${bookingId} status to ${status}`);
-      
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status })
-        .eq('id', bookingId);
-        
-      if (error) {
-        console.error('Error updating booking status:', error);
-        throw error;
+      if (!booking) {
+        throw new Error('Booking not found');
       }
       
-      setBookings(prev => 
-        prev.map(booking => 
-          booking.id === bookingId ? { ...booking, status } : booking
-        )
-      );
+      // Process the status update
+      await updateBookingStatus(bookingId, status, booking, setBookings);
       
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: booking.user_id,
-          title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
-          message: status === 'confirmed' 
-            ? `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed.`
-            : `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been cancelled by the venue owner.`,
-          type: 'booking',
-          read: false,
-          link: '/bookings',
-          data: {
-            booking_id: bookingId,
-            venue_id: booking.venue_id
-          }
-        });
-      
-      toast({
-        title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
-        description: `The booking has been ${status} successfully.`,
-      });
-      
-      console.log('Booking status updated successfully');
-      
+      // Re-fetch to ensure we have the latest data
       await fetchBookings();
-      
-    } catch (error: any) {
-      console.error(`Error updating booking status:`, error);
-      toast({
-        title: 'Error',
-        description: error.message || `Failed to update booking status.`,
-        variant: 'destructive',
-      });
+    } catch (error) {
+      console.error(`Error handling status update for booking ${bookingId}:`, error);
     } finally {
-      setIsBusy(false);
+      // Remove this booking from processing list
+      setProcessingBookingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(bookingId);
+        return newSet;
+      });
     }
   };
 
@@ -390,15 +365,20 @@ const CustomerBookings = () => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {booking.status === 'pending' && activeTab === 'upcoming' && !isBusy && (
+                          {booking.status === 'pending' && activeTab === 'upcoming' && (
                             <div className="flex space-x-2 justify-end">
                               <Button 
                                 variant="outline"
                                 className="border-green-500 text-green-500 hover:bg-green-500/10"
                                 size="sm"
-                                onClick={() => updateBookingStatus(booking.id, 'confirmed')}
+                                onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
+                                disabled={processingBookingIds.has(booking.id) || isBusy}
                               >
-                                <CheckCircle className="h-4 w-4 mr-1" />
+                                {processingBookingIds.has(booking.id) ? (
+                                  <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full mr-1"></div>
+                                ) : (
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                )}
                                 Confirm
                               </Button>
                               
@@ -406,19 +386,19 @@ const CustomerBookings = () => {
                                 variant="outline"
                                 className="border-destructive text-destructive hover:bg-destructive/10"
                                 size="sm"
-                                onClick={() => updateBookingStatus(booking.id, 'cancelled')}
+                                onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
+                                disabled={processingBookingIds.has(booking.id) || isBusy}
                               >
-                                <XCircle className="h-4 w-4 mr-1" />
+                                {processingBookingIds.has(booking.id) ? (
+                                  <div className="animate-spin h-4 w-4 border-2 border-destructive border-t-transparent rounded-full mr-1"></div>
+                                ) : (
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                )}
                                 Cancel
                               </Button>
                             </div>
                           )}
-                          {isBusy && (
-                            <div className="flex justify-end">
-                              <div className="animate-spin h-5 w-5 border-2 border-findvenue border-t-transparent rounded-full"></div>
-                            </div>
-                          )}
-                          {!isBusy && booking.status !== 'pending' && (
+                          {!processingBookingIds.has(booking.id) && booking.status !== 'pending' && (
                             <div className="flex space-x-2 justify-end">
                               <span className="text-findvenue-text-muted text-sm mr-2">
                                 {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
