@@ -30,7 +30,7 @@ export const verifyBookingStatus = async (bookingId: string, expectedStatus: str
     console.log(`Verifying booking ${bookingId} has status ${expectedStatus}...`);
     
     // Wait a bit longer to ensure database consistency
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     const { data, error } = await supabase
       .from('bookings')
@@ -60,69 +60,45 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
   try {
     console.log(`Direct database update: Setting booking ${bookingId} status to ${status}...`);
     
-    // Execute the update with retry mechanism
-    let attempts = 0;
-    const maxAttempts = 3;
-    let success = false;
-    let data = null;
-    
-    while (attempts < maxAttempts && !success) {
-      attempts++;
-      console.log(`Attempt ${attempts} to update booking ${bookingId} status...`);
+    // Execute the update
+    const { data, error } = await supabase
+      .from('bookings')
+      .update({ status })
+      .eq('id', bookingId)
+      .select();
       
-      // Execute the update
-      const updateResult = await supabase
-        .from('bookings')
-        .update({ status })
-        .eq('id', bookingId)
-        .select();
-        
-      if (updateResult.error) {
-        console.error(`Error in direct database update (attempt ${attempts}):`, updateResult.error);
-        if (attempts === maxAttempts) throw updateResult.error;
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait before retry
-        continue;
-      }
-      
-      data = updateResult.data;
-      console.log(`Direct database update completed for attempt ${attempts}:`, data);
-      
-      // Wait to ensure consistency (increase wait time)
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Verify the update
-      const verifyResult = await supabase
-        .from('bookings')
-        .select('status')
-        .eq('id', bookingId)
-        .single();
-        
-      if (verifyResult.error) {
-        console.error(`Error verifying direct database update (attempt ${attempts}):`, verifyResult.error);
-        if (attempts === maxAttempts) throw verifyResult.error;
-        continue;
-      }
-      
-      if (verifyResult.data?.status === status) {
-        success = true;
-        console.log(`Direct database update verified successfully on attempt ${attempts}`);
-      } else {
-        console.warn(`Database verification failed on attempt ${attempts}. Expected: ${status}, Got: ${verifyResult.data?.status}`);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait before retry
-      }
+    if (error) {
+      console.error('Error in direct database update:', error);
+      throw error;
     }
     
+    console.log(`Direct database update completed:`, data);
+    
+    // Wait to ensure consistency
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Verify the update
+    const { data: verifiedData, error: verifyError } = await supabase
+      .from('bookings')
+      .select('status')
+      .eq('id', bookingId)
+      .single();
+      
+    if (verifyError) {
+      console.error('Error verifying direct database update:', verifyError);
+      throw verifyError;
+    }
+    
+    const updateSuccessful = verifiedData?.status === status;
+    
+    console.log(`Direct database update verification: success=${updateSuccessful}, status=${verifiedData?.status}`);
+    
     return {
-      success,
-      data,
-      attempts
+      success: updateSuccessful,
+      data: verifiedData
     };
   } catch (error) {
     console.error('Direct database update failed:', error);
-    return {
-      success: false,
-      error,
-      attempts: 3
-    };
+    throw error;
   }
 };
