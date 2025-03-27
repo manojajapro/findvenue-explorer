@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -39,7 +38,6 @@ const CustomerBookings = () => {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Use useCallback to memoize the fetchBookings function
   const fetchBookings = useCallback(async () => {
     if (!user) return;
     
@@ -50,7 +48,6 @@ const CustomerBookings = () => {
       console.log('Fetching bookings for user:', user.id, 'isVenueOwner:', isVenueOwner);
       
       if (isVenueOwner) {
-        // First, fetch venues owned by this user
         const { data: venuesData, error: venuesError } = await supabase
           .from('venues')
           .select('id, name, owner_info');
@@ -62,7 +59,6 @@ const CustomerBookings = () => {
         
         console.log('All venues fetched:', venuesData);
         
-        // Filter venues where owner_info->user_id matches current user.id
         const ownerVenues = venuesData?.filter(venue => {
           if (!venue.owner_info) return false;
           
@@ -90,7 +86,6 @@ const CustomerBookings = () => {
         const venueIds = ownerVenues.map(venue => venue.id);
         console.log('Owner venue IDs:', venueIds);
         
-        // Then fetch bookings for these venues - modified to avoid relationship issues
         const { data: bookingsData, error: bookingsError } = await supabase
           .from('bookings')
           .select(`
@@ -116,7 +111,6 @@ const CustomerBookings = () => {
         
         console.log('Venue owner bookings fetched:', bookingsData);
         
-        // Get user profiles separately to avoid relationship issues
         const userIds = (bookingsData || []).map(booking => booking.user_id);
         const { data: userProfiles, error: profilesError } = await supabase
           .from('user_profiles')
@@ -127,7 +121,6 @@ const CustomerBookings = () => {
           console.error('Error fetching user profiles:', profilesError);
         }
         
-        // Transform the data
         const formattedBookings = (bookingsData || []).map(booking => {
           const userProfile = userProfiles?.find(profile => profile.id === booking.user_id) || null;
           return {
@@ -150,7 +143,6 @@ const CustomerBookings = () => {
         
         setBookings(formattedBookings);
       } else {
-        // Fetch customer's bookings
         const { data, error } = await supabase
           .from('bookings')
           .select('*')
@@ -177,7 +169,6 @@ const CustomerBookings = () => {
     }
   }, [user, isVenueOwner, toast]);
   
-  // Fetch bookings when component mounts or when dependencies change
   useEffect(() => {
     if (user) {
       fetchBookings();
@@ -194,7 +185,6 @@ const CustomerBookings = () => {
       
       console.log(`Updating booking ${bookingId} status to ${status}`);
       
-      // Update the booking status in the database
       const { error } = await supabase
         .from('bookings')
         .update({ status })
@@ -205,14 +195,12 @@ const CustomerBookings = () => {
         throw error;
       }
       
-      // Immediately update local state to show the change
       setBookings(prev => 
         prev.map(booking => 
           booking.id === bookingId ? { ...booking, status } : booking
         )
       );
       
-      // Send notification to customer
       await supabase
         .from('notifications')
         .insert({
@@ -237,7 +225,6 @@ const CustomerBookings = () => {
       
       console.log('Booking status updated successfully');
       
-      // Refetch bookings to make sure we have the latest data
       await fetchBookings();
       
     } catch (error: any) {
@@ -456,7 +443,6 @@ const CustomerBookings = () => {
             </Card>
           )}
           
-          {/* Special Requests Detail Section */}
           {displayBookings.some(booking => booking.special_requests) && (
             <div className="mt-8">
               <h2 className="text-xl font-semibold mb-4">Special Requests</h2>
