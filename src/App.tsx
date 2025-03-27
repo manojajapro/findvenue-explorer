@@ -16,6 +16,7 @@ import Categories from "./pages/Categories";
 import Cities from "./pages/Cities";
 import Profile from "./pages/Profile";
 import Bookings from "./pages/Bookings";
+import CustomerBookings from "./pages/CustomerBookings";
 import Favorites from "./pages/Favorites";
 import MyVenues from "./pages/MyVenues";
 import EditVenue from "./pages/EditVenue";
@@ -113,6 +114,7 @@ const AppContent = () => {
           <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
           <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />
           <Route path="/edit-venue/:id" element={<ProtectedRoute allowedRoles={['venue-owner']}><EditVenue /></ProtectedRoute>} />
+          <Route path="/customer-bookings" element={<ProtectedRoute allowedRoles={['venue-owner']}><CustomerBookings /></ProtectedRoute>} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>
