@@ -59,77 +59,156 @@ export const verifyBookingStatus = async (bookingId: string, expectedStatus: str
 
 export const updateBookingStatusInDatabase = async (bookingId: string, status: string) => {
   try {
-    console.log(`Direct database update: Setting booking ${bookingId} status to ${status}...`);
+    console.log(`[Update] Starting direct update for booking ${bookingId} to status ${status}`);
     
-    const { data: currentBooking, error: fetchError } = await supabase
+    // First, verify the booking exists and get venue info
+    const { data: booking, error: fetchError } = await supabase
       .from('bookings')
-      .select('id, status')
+      .select(`
+        *,
+        venue:venue_id (
+          id,
+          name,
+          owner_info
+        )
+      `)
       .eq('id', bookingId)
-      .single();
+      .maybeSingle();
       
     if (fetchError) {
-      console.error('Error fetching booking:', fetchError);
+      console.error('[Update] Error fetching booking:', fetchError);
       throw fetchError;
     }
     
-    if (!currentBooking) {
-      console.error(`Booking not found: ${bookingId}`);
+    if (!booking) {
+      console.error('[Update] Booking not found:', bookingId);
       throw new Error('Booking not found');
     }
+
+    console.log('[Update] Found booking:', booking);
     
-    console.log('Current booking state:', currentBooking);
-    
-    if (currentBooking.status === status) {
-      console.log(`Booking ${bookingId} is already in ${status} state`);
+    if (booking.status === status) {
+      console.log(`[Update] Booking ${bookingId} is already in ${status} state`);
       return {
         success: true,
-        data: currentBooking
+        data: booking
       };
     }
-    
+
+    // Get the current user's ID
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      console.error('[Update] Error getting user:', userError);
+      throw userError;
+    }
+
+    if (!user) {
+      console.error('[Update] No authenticated user found');
+      throw new Error('No authenticated user found');
+    }
+
+    console.log('[Update] Current user:', user.id);
+
+    // Check if user is the venue owner
+    const venueOwnerInfo = booking.venue?.owner_info;
+    console.log('[Update] Venue owner info:', venueOwnerInfo);
+
+    const isVenueOwner = venueOwnerInfo && 
+      typeof venueOwnerInfo === 'object' && 
+      'user_id' in venueOwnerInfo && 
+      venueOwnerInfo.user_id === user.id;
+
+    console.log('[Update] Is venue owner:', isVenueOwner);
+
+    if (!isVenueOwner) {
+      console.error('[Update] User is not venue owner');
+      throw new Error('Only venue owners can update booking status');
+    }
+
+    // Perform a simple update operation
+    console.log('[Update] Performing direct update...');
     const { error: updateError } = await supabase
       .from('bookings')
-      .update({ status })
+      .update({ 
+        status: status,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', bookingId);
     
     if (updateError) {
-      console.error('Error updating booking:', updateError);
+      console.error('[Update] Error during update:', updateError);
       throw updateError;
     }
-    
-    console.log('Waiting for database consistency...');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const { data: updatedBooking, error: verifyError } = await supabase
+
+    // Fetch the updated booking to verify
+    console.log('[Update] Fetching updated booking...');
+    const { data: updatedBooking, error: fetchUpdateError } = await supabase
       .from('bookings')
-      .select('*')
+      .select(`
+        *,
+        venue:venue_id (
+          id,
+          name,
+          owner_info
+        )
+      `)
       .eq('id', bookingId)
-      .single();
-      
-    if (verifyError) {
-      console.error('Error verifying booking update:', verifyError);
-      throw verifyError;
+      .maybeSingle();
+    
+    if (fetchUpdateError) {
+      console.error('[Update] Error fetching updated booking:', fetchUpdateError);
+      throw fetchUpdateError;
     }
     
     if (!updatedBooking) {
-      console.error('Booking not found after update');
-      throw new Error('Booking not found after update');
+      console.error('[Update] Updated booking not found');
+      throw new Error('Updated booking not found');
     }
     
-    console.log('Verified booking after update:', updatedBooking);
+    console.log('[Update] Updated booking:', updatedBooking);
     
     if (updatedBooking.status !== status) {
-      console.error(`Status update failed - expected ${status} but found ${updatedBooking.status}`);
-      throw new Error(`Failed to update status to ${status}`);
+      console.error(`[Update] Status mismatch after update - expected ${status} but found ${updatedBooking.status}`);
+      throw new Error('Failed to update booking status');
     }
-    
+
+    console.log('[Update] Successfully updated booking status');
+
+    // Send notification to the customer
+    try {
+      console.log('[Update] Sending notification...');
+      const { error: notifyError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: booking.user_id,
+          title: `Booking ${status}`,
+          message: `Your booking for ${booking.venue?.name || 'the venue'} has been ${status}.`,
+          type: 'booking',
+          read: false,
+          data: {
+            booking_id: bookingId,
+            venue_id: booking.venue_id,
+            status: status
+          }
+        });
+
+      if (notifyError) {
+        console.error('[Update] Error sending notification:', notifyError);
+      } else {
+        console.log('[Update] Notification sent successfully');
+      }
+    } catch (notifyError) {
+      console.error('[Update] Failed to send notification:', notifyError);
+      // Continue even if notification fails
+    }
+
     return {
       success: true,
       data: updatedBooking
     };
     
   } catch (error) {
-    console.error('Direct database update failed:', error);
+    console.error('[Update] Update failed:', error);
     throw error;
   }
 };
