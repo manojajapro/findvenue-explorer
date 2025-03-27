@@ -19,6 +19,7 @@ import Profile from "./pages/Profile";
 import Bookings from "./pages/Bookings";
 import CustomerBookings from "./pages/CustomerBookings";
 import Favorites from "./pages/Favorites";
+import Messages from "./pages/Messages";
 import MyVenues from "./pages/MyVenues";
 import EditVenue from "./pages/EditVenue";
 import Navbar from "./components/layout/Navbar";
@@ -131,6 +132,7 @@ const AppContent = () => {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
           <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
+          <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
           
           <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
           <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />
