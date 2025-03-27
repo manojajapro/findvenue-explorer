@@ -121,15 +121,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       setMessage('');
       
       // Navigate directly to messages with the specific contact
-      if (ownerId) {
-        navigate(`/messages/${ownerId}`);
-      } else {
-        toast({
-          title: 'Warning',
-          description: 'Could not open direct messages due to missing owner information',
-          variant: 'destructive',
-        });
-      }
+      navigate(`/messages/${ownerId}`);
     } catch (error: any) {
       console.error('Error sending message:', error);
       setError(error.message || 'Failed to send message');
@@ -167,7 +159,15 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
     }
     
     // Navigate directly to the chat with this owner
-    navigate(`/messages/${ownerId}`);
+    if (ownerId) {
+      navigate(`/messages/${ownerId}`);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Owner ID is missing. Cannot start conversation.',
+        variant: 'destructive',
+      });
+    }
   };
   
   if (!user) {
@@ -223,7 +223,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
             type="button"
             variant="outline"
             onClick={handleDirectMessageClick}
-            disabled={!ownerId}
+            disabled={isSending || !ownerId}
           >
             <MessageCircle className="mr-2 h-4 w-4" />
             Direct Chat
