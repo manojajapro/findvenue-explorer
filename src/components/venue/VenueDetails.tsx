@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,7 +38,6 @@ const VenueDetailsComponent = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   
-  // Fetch venue details
   useEffect(() => {
     const fetchVenueDetails = async () => {
       if (!id) return;
@@ -56,15 +54,16 @@ const VenueDetailsComponent = () => {
         if (error) throw error;
         
         if (data) {
-          let ownerInfoData = undefined;
+          let ownerInfo = { name: 'N/A', contact: 'N/A', responseTime: 'N/A' };
           if (data.owner_info) {
-            const ownerInfo = data.owner_info as Record<string, any>;
-            ownerInfoData = {
-              name: ownerInfo.name as string,
-              contact: ownerInfo.contact as string,
-              responseTime: ownerInfo.response_time as string,
-              userId: ownerInfo.user_id as string
-            };
+            const venueOwnerInfo = data.owner_info as Record<string, any>;
+            if (typeof venueOwnerInfo === 'object') {
+              ownerInfo = {
+                name: venueOwnerInfo.name as string,
+                contact: venueOwnerInfo.contact as string,
+                responseTime: venueOwnerInfo.response_time as string
+              };
+            }
           }
           
           const transformedVenue: Venue = {
@@ -93,12 +92,11 @@ const VenueDetailsComponent = () => {
             featured: data.featured || false,
             popular: data.popular || false,
             availability: data.availability || [],
-            ownerInfo: ownerInfoData
+            ownerInfo: ownerInfo
           };
           
           setVenue(transformedVenue);
           
-          // Check if it's in user's favorites
           if (user) {
             setIsFavorite(checkIsFavorite(data.id));
           }
@@ -118,7 +116,6 @@ const VenueDetailsComponent = () => {
     fetchVenueDetails();
   }, [id, user]);
   
-  // Handle toggling favorite status
   const handleToggleFavorite = async () => {
     if (!user) {
       navigate('/login');
@@ -139,7 +136,6 @@ const VenueDetailsComponent = () => {
     }
   };
   
-  // Navigate to previous image
   const prevImage = () => {
     if (!venue?.galleryImages) return;
     
@@ -148,7 +144,6 @@ const VenueDetailsComponent = () => {
     );
   };
   
-  // Navigate to next image
   const nextImage = () => {
     if (!venue?.galleryImages) return;
     
@@ -157,12 +152,10 @@ const VenueDetailsComponent = () => {
     );
   };
   
-  // Select image by index
   const selectImage = (index: number) => {
     setCurrentImageIndex(index);
   };
   
-  // Render amenity icon based on name
   const renderAmenityIcon = (amenity: string) => {
     switch (amenity.toLowerCase()) {
       case 'wifi':
@@ -207,7 +200,6 @@ const VenueDetailsComponent = () => {
   return (
     <div className="min-h-screen pt-24 pb-16">
       <div className="container mx-auto px-4">
-        {/* Breadcrumbs */}
         <div className="mb-6 flex items-center text-sm text-findvenue-text-muted">
           <Link to="/" className="hover:text-findvenue">Home</Link>
           <span className="mx-2">/</span>
@@ -218,7 +210,6 @@ const VenueDetailsComponent = () => {
           <span className="text-findvenue-text">{venue.name}</span>
         </div>
         
-        {/* Venue Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold">{venue.name}</h1>
@@ -256,7 +247,6 @@ const VenueDetailsComponent = () => {
           </Button>
         </div>
         
-        {/* Gallery */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
           <div className="lg:col-span-2">
             <div className="relative h-[400px] rounded-lg overflow-hidden">
@@ -387,7 +377,6 @@ const VenueDetailsComponent = () => {
           </div>
         </div>
         
-        {/* Content Tabs */}
         <Tabs defaultValue="details" className="mb-12">
           <TabsList className="glass-card border-white/10 p-1">
             <TabsTrigger value="details">Details</TabsTrigger>
@@ -438,7 +427,6 @@ const VenueDetailsComponent = () => {
           </TabsContent>
         </Tabs>
         
-        {/* Booking Section */}
         <div id="booking-section" className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
           <div>
             <h2 className="text-2xl font-bold mb-6">Book this Venue</h2>
@@ -446,7 +434,7 @@ const VenueDetailsComponent = () => {
               venueId={venue.id} 
               venueName={venue.name} 
               pricePerHour={venue.pricing.startingPrice}
-              ownerId={venue.ownerInfo?.userId || ''}
+              ownerId={(venue.owner_info as any)?.user_id || ''}
               ownerName={venue.ownerInfo?.name || ''}
             />
           </div>
@@ -456,7 +444,7 @@ const VenueDetailsComponent = () => {
             <ContactVenueOwner 
               venueId={venue.id}
               venueName={venue.name}
-              ownerId={venue.ownerInfo?.userId || ''}
+              ownerId={(venue.owner_info as any)?.user_id || ''}
               ownerName={venue.ownerInfo?.name || ''}
             />
           </div>
