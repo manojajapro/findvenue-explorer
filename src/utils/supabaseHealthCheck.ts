@@ -58,7 +58,7 @@ export const verifyBookingStatus = async (bookingId: string, expectedStatus: str
   }
 };
 
-// Enhanced update function with explicit return value and longer wait times
+// Fixed update function with proper error handling and without using updated_at
 export const updateBookingStatusInDatabase = async (bookingId: string, status: string) => {
   try {
     console.log(`Direct database update: Setting booking ${bookingId} status to ${status}...`);
@@ -91,10 +91,11 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
       };
     }
     
-    // Update the booking with status and add returning statement to get the updated record
+    // Update the booking with status only
+    console.log(`Updating booking status to ${status}...`);
     const { data: updateResult, error: updateError } = await supabase
       .from('bookings')
-      .update({ status })
+      .update({ status: status })
       .eq('id', bookingId)
       .select()
       .maybeSingle();
@@ -110,7 +111,7 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
       console.log('Update returned data:', updateResult);
     }
       
-    // Extended wait to ensure database consistency before verification (increased time)
+    // Extended wait to ensure database consistency before verification
     console.log('Waiting for database consistency...');
     await new Promise(resolve => setTimeout(resolve, 3000));
     
@@ -138,14 +139,11 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
     if (updatedBooking.status !== status) {
       console.error(`Status mismatch - expected ${status} but found ${updatedBooking.status}`);
       
-      // One last attempt to force the update
+      // One last attempt to force the update - without using updated_at
       console.log('Making final attempt to update status...');
       const { error: finalUpdateError } = await supabase
         .from('bookings')
-        .update({ 
-          status,
-          updated_at: new Date().toISOString() // Force a change to trigger update
-        })
+        .update({ status: status })
         .eq('id', bookingId);
         
       if (finalUpdateError) {
