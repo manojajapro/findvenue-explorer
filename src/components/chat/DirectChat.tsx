@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type Message = {
   id: string;
@@ -21,6 +22,8 @@ type Message = {
   read: boolean;
   sender_name?: string;
   receiver_name?: string;
+  venue_id?: string;
+  venue_name?: string;
 };
 
 const DirectChat = () => {
@@ -38,12 +41,23 @@ const DirectChat = () => {
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  // Check if contactId is valid
+  useEffect(() => {
+    if (!contactId) {
+      setHasError(true);
+      setIsLoading(false);
+    } else {
+      setHasError(false);
+    }
+  }, [contactId]);
+
   // Load messages
   useEffect(() => {
-    if (!user || !contactId) return;
+    if (!user || !contactId || hasError) return;
     
     const fetchMessages = async () => {
       try {
@@ -56,11 +70,18 @@ const DirectChat = () => {
           .eq('id', contactId)
           .single();
           
-        if (contactError) throw contactError;
+        if (contactError) {
+          console.error('Error fetching contact data:', contactError);
+          setHasError(true);
+          throw contactError;
+        }
         
         if (contactData) {
           setContactName(`${contactData.first_name} ${contactData.last_name}`);
           setContactRole(contactData.user_role);
+        } else {
+          setHasError(true);
+          throw new Error('Contact not found');
         }
         
         // Get conversation
@@ -70,7 +91,10 @@ const DirectChat = () => {
             other_user_id: contactId
           });
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching conversation:', error);
+          throw error;
+        }
         
         if (data && data.length > 0) {
           setMessages(data);
@@ -101,6 +125,7 @@ const DirectChat = () => {
           description: 'Failed to load conversation. Please try again.',
           variant: 'destructive',
         });
+        setHasError(true);
       } finally {
         setIsLoading(false);
       }
@@ -109,33 +134,35 @@ const DirectChat = () => {
     fetchMessages();
     
     // Set up real-time subscription for new messages
-    const channel = supabase
-      .channel('direct_chat')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `sender_id=eq.${contactId},receiver_id=eq.${user.id}`
-      }, async (payload) => {
-        console.log('New message received:', payload);
-        
-        const newMessage = payload.new as Message;
-        
-        // Mark message as read
-        await supabase
-          .from('messages')
-          .update({ read: true })
-          .eq('id', newMessage.id);
+    if (contactId) {
+      const channel = supabase
+        .channel('direct_chat')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${contactId},receiver_id=eq.${user.id}`
+        }, async (payload) => {
+          console.log('New message received:', payload);
           
-        // Add message to state
-        setMessages(prev => [...prev, newMessage]);
-      })
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, contactId, toast]);
+          const newMessage = payload.new as Message;
+          
+          // Mark message as read
+          await supabase
+            .from('messages')
+            .update({ read: true })
+            .eq('id', newMessage.id);
+            
+          // Add message to state
+          setMessages(prev => [...prev, newMessage]);
+        })
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user, contactId, toast, hasError]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -150,7 +177,7 @@ const DirectChat = () => {
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !user || !contactId) return;
+    if (!newMessage.trim() || !user || !contactId || hasError) return;
     
     try {
       setIsSending(true);
@@ -203,6 +230,29 @@ const DirectChat = () => {
       <Card className="glass-card border-white/10 h-[600px] flex items-center justify-center">
         <CardContent>
           <p className="text-center text-findvenue-text-muted">Please log in to chat</p>
+          <div className="mt-4 text-center">
+            <Button onClick={() => navigate('/login')} className="bg-findvenue hover:bg-findvenue-dark">
+              Log In
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <Card className="glass-card border-white/10 h-[600px] flex items-center justify-center">
+        <CardContent className="text-center">
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              There was an error loading this conversation. The contact may not exist.
+            </AlertDescription>
+          </Alert>
+          <Button onClick={() => navigate('/messages')} className="bg-findvenue hover:bg-findvenue-dark">
+            Back to Messages
+          </Button>
         </CardContent>
       </Card>
     );
@@ -279,10 +329,10 @@ const DirectChat = () => {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type a message..."
-              disabled={isSending}
+              disabled={isSending || isLoading || hasError}
               className="flex-1"
             />
-            <Button type="submit" disabled={isSending || !newMessage.trim()}>
+            <Button type="submit" disabled={isSending || isLoading || hasError || !newMessage.trim()}>
               {isSending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (

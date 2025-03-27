@@ -20,6 +20,7 @@ export type Database = {
           start_time: string
           status: string
           total_price: number
+          updated_at: string | null
           user_id: string
           venue_id: string
           venue_name: string
@@ -34,6 +35,7 @@ export type Database = {
           start_time: string
           status?: string
           total_price?: number
+          updated_at?: string | null
           user_id: string
           venue_id: string
           venue_name: string
@@ -48,6 +50,7 @@ export type Database = {
           start_time?: string
           status?: string
           total_price?: number
+          updated_at?: string | null
           user_id?: string
           venue_id?: string
           venue_name?: string
@@ -341,6 +344,13 @@ export type Database = {
           venue_name: string
           role: string
         }[]
+      }
+      update_booking_status: {
+        Args: {
+          p_booking_id: string
+          p_status: string
+        }
+        Returns: Json
       }
     }
     Enums: {

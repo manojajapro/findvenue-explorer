@@ -32,6 +32,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
         description: 'Please log in to contact the venue owner',
         variant: 'destructive',
       });
+      navigate('/login');
       return;
     }
     
@@ -112,6 +113,30 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
     }
   };
   
+  const handleDirectMessageClick = () => {
+    if (!user) {
+      toast({
+        title: 'Login Required',
+        description: 'Please log in to contact the venue owner',
+        variant: 'destructive',
+      });
+      navigate('/login');
+      return;
+    }
+    
+    if (!ownerId) {
+      toast({
+        title: 'Error',
+        description: 'Unable to contact venue owner. Owner information is missing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Navigate directly to the chat with this owner
+    navigate(`/messages/${ownerId}`);
+  };
+  
   if (!user) {
     return (
       <Card className="glass-card border-white/10">
@@ -150,7 +175,16 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
             disabled={isSending}
           />
         </CardContent>
-        <CardFooter className="flex justify-end">
+        <CardFooter className="flex justify-between">
+          <Button 
+            type="button"
+            variant="outline"
+            onClick={handleDirectMessageClick}
+            disabled={!ownerId}
+          >
+            <MessageCircle className="mr-2 h-4 w-4" />
+            Direct Chat
+          </Button>
           <Button 
             type="submit"
             className="bg-findvenue hover:bg-findvenue-dark"
