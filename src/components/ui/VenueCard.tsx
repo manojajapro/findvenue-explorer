@@ -4,15 +4,43 @@ import { Link } from 'react-router-dom';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Star, Users, CalendarDays, MapPin, Tag } from 'lucide-react';
+import { Star, Users, CalendarDays, MapPin, Tag, Heart } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
 
 interface VenueCardProps {
   venue: Venue;
   featured?: boolean;
+  onFavoriteRemoved?: (venueId: string) => void;
 }
 
-const VenueCard = ({ venue, featured = false }: VenueCardProps) => {
+const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const { user, checkIsFavorite, toggleFavoriteVenue } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(user ? checkIsFavorite(venue.id) : false);
+
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!user) {
+      // Redirect to login if not logged in
+      window.location.href = "/login";
+      return;
+    }
+    
+    try {
+      await toggleFavoriteVenue(venue.id);
+      const newFavoriteState = !isFavorite;
+      setIsFavorite(newFavoriteState);
+      
+      if (!newFavoriteState && onFavoriteRemoved) {
+        onFavoriteRemoved(venue.id);
+      }
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    }
+  };
 
   return (
     <Link to={`/venue/${venue.id}`} className="block h-full">
@@ -47,6 +75,18 @@ const VenueCard = ({ venue, featured = false }: VenueCardProps) => {
                 {venue.category}
               </Badge>
             </div>
+          )}
+          {user && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm"
+              onClick={handleFavoriteClick}
+            >
+              <Heart 
+                className={`w-4 h-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-white'}`} 
+              />
+            </Button>
           )}
         </div>
         <div className="p-4">

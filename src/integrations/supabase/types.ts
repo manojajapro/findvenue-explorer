@@ -9,10 +9,64 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      bookings: {
+        Row: {
+          booking_date: string
+          created_at: string
+          end_time: string
+          guests: number
+          id: string
+          special_requests: string | null
+          start_time: string
+          status: string
+          total_price: number
+          user_id: string
+          venue_id: string
+          venue_name: string
+        }
+        Insert: {
+          booking_date: string
+          created_at?: string
+          end_time: string
+          guests?: number
+          id?: string
+          special_requests?: string | null
+          start_time: string
+          status?: string
+          total_price?: number
+          user_id: string
+          venue_id: string
+          venue_name: string
+        }
+        Update: {
+          booking_date?: string
+          created_at?: string
+          end_time?: string
+          guests?: number
+          id?: string
+          special_requests?: string | null
+          start_time?: string
+          status?: string
+          total_price?: number
+          user_id?: string
+          venue_id?: string
+          venue_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profiles: {
         Row: {
           created_at: string
           email: string
+          favorites: string[] | null
           first_name: string
           id: string
           last_name: string
@@ -24,6 +78,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email: string
+          favorites?: string[] | null
           first_name: string
           id: string
           last_name: string
@@ -35,6 +90,7 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string
+          favorites?: string[] | null
           first_name?: string
           id?: string
           last_name?: string

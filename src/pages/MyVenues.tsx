@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { MapPin, Users, Star, Edit2, Plus, Clock, Trash } from 'lucide-react';
+import { MapPin, Users, Star, Edit2, Plus, Trash } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 import {
@@ -29,6 +29,8 @@ const MyVenues = () => {
   useEffect(() => {
     if (user) {
       fetchOwnerVenues();
+    } else {
+      setIsLoading(false);
     }
   }, [user]);
   

@@ -6,14 +6,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
 const Favorites = () => {
-  const { getUserFavorites } = useAuth();
+  const { getUserFavorites, user } = useAuth();
   const { toast } = useToast();
   const [favoriteVenues, setFavoriteVenues] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    fetchFavoriteVenues();
-  }, []);
+    if (user) {
+      fetchFavoriteVenues();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user]);
   
   const fetchFavoriteVenues = async () => {
     setIsLoading(true);
@@ -86,8 +90,34 @@ const Favorites = () => {
               {favoriteVenues.map((venue) => (
                 <VenueCard
                   key={venue.id}
-                  venue={venue}
-                  onFavoriteRemoved={() => handleFavoriteRemoved(venue.id)}
+                  venue={{
+                    id: venue.id,
+                    name: venue.name,
+                    description: venue.description || '',
+                    imageUrl: venue.image_url || '',
+                    galleryImages: venue.gallery_images || [],
+                    address: venue.address || '',
+                    city: venue.city_name || '',
+                    cityId: venue.city_id || '',
+                    category: venue.category_name || '',
+                    categoryId: venue.category_id || '',
+                    capacity: {
+                      min: venue.min_capacity || 0,
+                      max: venue.max_capacity || 0
+                    },
+                    pricing: {
+                      currency: venue.currency || 'SAR',
+                      startingPrice: venue.starting_price || 0,
+                      pricePerPerson: venue.price_per_person
+                    },
+                    amenities: venue.amenities || [],
+                    rating: venue.rating || 0,
+                    reviews: venue.reviews_count || 0,
+                    featured: venue.featured || false,
+                    popular: venue.popular || false,
+                    availability: venue.availability || []
+                  }}
+                  onFavoriteRemoved={handleFavoriteRemoved}
                 />
               ))}
             </div>

@@ -1,10 +1,10 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, MapPin, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Users, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -44,7 +44,11 @@ const Bookings = () => {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   
   useEffect(() => {
-    fetchBookings();
+    if (user) {
+      fetchBookings();
+    } else {
+      setIsLoading(false);
+    }
   }, [user]);
   
   const fetchBookings = async () => {
@@ -78,7 +82,7 @@ const Bookings = () => {
         id: item.id,
         user_id: item.user_id,
         venue_id: item.venue_id,
-        venue_name: item.venues?.name || 'Unnamed Venue',
+        venue_name: item.venues?.name || item.venue_name || 'Unnamed Venue',
         venue_image: item.venues?.image_url,
         booking_date: item.booking_date,
         start_time: item.start_time,

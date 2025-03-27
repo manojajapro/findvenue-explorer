@@ -59,85 +59,78 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        console.log("Auth state changed:", event, currentSession?.user?.id);
+    const setupAuth = async () => {
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
-          try {
-            const { data: profileData, error } = await supabase
-              .from('user_profiles' as any)
-              .select('*')
-              .eq('id', currentSession.user.id)
-              .single();
-              
-            if (profileData) {
-              console.log("Profile data loaded:", profileData);
-              const userProfileData = profileData as unknown as UserProfile;
-              setProfile(userProfileData);
-              setIsVenueOwner(userProfileData.user_role === 'venue-owner');
-            } else {
-              console.error("Failed to fetch user profile:", error);
-              setProfile(null);
-              setIsVenueOwner(false);
-            }
-          } catch (error) {
-            console.error("Error fetching profile:", error);
+          const { data: profileData, error } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', currentSession.user.id)
+            .single();
+          
+          if (profileData) {
+            console.log("Initial profile data loaded:", profileData);
+            const userProfileData = profileData as unknown as UserProfile;
+            setProfile(userProfileData);
+            setIsVenueOwner(userProfileData.user_role === 'venue-owner');
+          } else {
+            console.error("Failed to fetch initial user profile:", error);
             setProfile(null);
             setIsVenueOwner(false);
           }
-        } else {
-          setProfile(null);
-          setIsVenueOwner(false);
         }
         
-        setIsLoading(false);
-      }
-    );
-
-    const getInitialSession = async () => {
-      try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        console.log("Checking for existing session:", currentSession?.user?.id);
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        if (currentSession?.user) {
-          try {
-            const { data: profileData, error } = await supabase
-              .from('user_profiles' as any)
-              .select('*')
-              .eq('id', currentSession.user.id)
-              .single();
-              
-            if (profileData) {
-              console.log("Initial profile data loaded:", profileData);
-              const userProfileData = profileData as unknown as UserProfile;
-              setProfile(userProfileData);
-              setIsVenueOwner(userProfileData.user_role === 'venue-owner');
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, currentSession) => {
+            console.log("Auth state changed:", event, currentSession?.user?.id);
+            setSession(currentSession);
+            setUser(currentSession?.user ?? null);
+            
+            if (currentSession?.user) {
+              try {
+                const { data: profileData, error } = await supabase
+                  .from('user_profiles')
+                  .select('*')
+                  .eq('id', currentSession.user.id)
+                  .single();
+                  
+                if (profileData) {
+                  console.log("Profile data loaded:", profileData);
+                  const userProfileData = profileData as unknown as UserProfile;
+                  setProfile(userProfileData);
+                  setIsVenueOwner(userProfileData.user_role === 'venue-owner');
+                } else {
+                  console.error("Failed to fetch user profile:", error);
+                  setProfile(null);
+                  setIsVenueOwner(false);
+                }
+              } catch (error) {
+                console.error("Error fetching profile:", error);
+                setProfile(null);
+                setIsVenueOwner(false);
+              }
             } else {
-              console.error("Failed to fetch initial user profile:", error);
               setProfile(null);
               setIsVenueOwner(false);
             }
-          } catch (error) {
-            console.error("Error in initial profile fetch:", error);
           }
-        }
+        );
+        
+        return () => {
+          subscription.unsubscribe();
+        };
       } catch (error) {
-        console.error("Error getting session:", error);
+        console.error("Error setting up auth:", error);
       } finally {
         setIsLoading(false);
       }
     };
-
-    getInitialSession();
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    
+    setupAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -203,7 +196,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       console.log("Signing out");
-      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      setIsVenueOwner(false);
+      
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) throw error;
       
       toast({
         title: "Signed out",
@@ -355,6 +355,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           ? "Venue removed from your favorites." 
           : "Venue added to your favorites.",
       });
+
+      return updatedFavorites;
     } catch (error: any) {
       console.error("Error toggling favorite:", error.message);
       toast({
