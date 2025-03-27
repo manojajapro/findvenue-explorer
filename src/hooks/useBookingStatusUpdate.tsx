@@ -72,7 +72,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
           // Use the direct update function that includes verification
           result = await updateBookingStatusInDatabase(bookingId, status);
           
-          if (result.success) {
+          if (result && result.success) {
             updateSuccess = true;
             console.log(`Database update successfully verified for booking ${bookingId}`);
             break;
