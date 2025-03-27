@@ -63,7 +63,7 @@ const VenueDetailsComponent = () => {
               name: ownerInfo.name as string,
               contact: ownerInfo.contact as string,
               responseTime: ownerInfo.response_time as string,
-              user_id: ownerInfo.user_id as string
+              userId: ownerInfo.user_id as string
             };
           }
           
@@ -429,7 +429,10 @@ const VenueDetailsComponent = () => {
               <p className="text-findvenue-text-muted mb-4">{venue.address}, {venue.city}</p>
               
               <div className="h-[400px] rounded-lg overflow-hidden">
-                <VenueLocationMap address={`${venue.address}, ${venue.city}`} />
+                <VenueLocationMap 
+                  name={venue.name} 
+                  address={`${venue.address}, ${venue.city}`} 
+                />
               </div>
             </div>
           </TabsContent>
@@ -443,7 +446,7 @@ const VenueDetailsComponent = () => {
               venueId={venue.id} 
               venueName={venue.name} 
               pricePerHour={venue.pricing.startingPrice}
-              ownerId={venue.ownerInfo?.user_id || ''}
+              ownerId={venue.ownerInfo?.userId || ''}
               ownerName={venue.ownerInfo?.name || ''}
             />
           </div>
@@ -453,7 +456,7 @@ const VenueDetailsComponent = () => {
             <ContactVenueOwner 
               venueId={venue.id}
               venueName={venue.name}
-              ownerId={venue.ownerInfo?.user_id || ''}
+              ownerId={venue.ownerInfo?.userId || ''}
               ownerName={venue.ownerInfo?.name || ''}
             />
           </div>
