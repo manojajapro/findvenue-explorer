@@ -273,6 +273,21 @@ const CustomerBookings = () => {
   
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
   
+  if (!user) {
+    return (
+      <div className="min-h-screen pt-28 pb-16">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-3xl font-bold mb-4">Please Sign In</h1>
+            <p className="text-findvenue-text-muted">
+              You need to be signed in to view bookings.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   if (!isVenueOwner) {
     return (
       <div className="min-h-screen pt-28 pb-16">

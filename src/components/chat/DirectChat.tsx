@@ -1,37 +1,39 @@
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Loader2, Send } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 
 type Message = {
   id: string;
-  created_at: string;
-  content: string;
   sender_id: string;
   receiver_id: string;
+  content: string;
+  created_at: string;
   read: boolean;
   sender_name?: string;
   receiver_name?: string;
 };
 
-type ChatProps = {
-  receiverId: string;
-  receiverName: string;
-  venueId?: string;
-  venueName?: string;
-};
-
-const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps) => {
+const DirectChat = () => {
+  const { contactId } = useParams();
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  const [contactName, setContactName] = useState<string>('');
+  const [contactRole, setContactRole] = useState<string>('');
+  const [venueId, setVenueId] = useState<string | null>(null);
+  const [venueName, setVenueName] = useState<string | null>(null);
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -41,140 +43,99 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
 
   // Load messages
   useEffect(() => {
-    if (!user || !receiverId) return;
+    if (!user || !contactId) return;
     
-    const loadMessages = async () => {
-      setIsLoading(true);
+    const fetchMessages = async () => {
       try {
-        console.log('Loading messages between', user.id, 'and', receiverId);
+        setIsLoading(true);
         
-        // Call the get_conversation function
+        // Get contact name
+        const { data: contactData, error: contactError } = await supabase
+          .from('user_profiles')
+          .select('first_name, last_name, user_role')
+          .eq('id', contactId)
+          .single();
+          
+        if (contactError) throw contactError;
+        
+        if (contactData) {
+          setContactName(`${contactData.first_name} ${contactData.last_name}`);
+          setContactRole(contactData.user_role);
+        }
+        
+        // Get conversation
         const { data, error } = await supabase
           .rpc('get_conversation', {
             current_user_id: user.id,
-            other_user_id: receiverId
+            other_user_id: contactId
           });
           
-        if (error) {
-          console.error('Error from get_conversation:', error);
-          throw error;
-        }
+        if (error) throw error;
         
-        if (data) {
-          console.log('Conversation data received:', data.length, 'messages');
-          setMessages(data as Message[]);
+        if (data && data.length > 0) {
+          setMessages(data);
           
-          // Mark messages as read
-          const unreadMessages = data.filter(msg => !msg.read && msg.receiver_id === user.id);
-          console.log('Number of unread messages:', unreadMessages.length);
+          // Extract venue info from the first message that has it
+          const messageWithVenue = data.find(msg => msg.venue_id);
+          if (messageWithVenue) {
+            setVenueId(messageWithVenue.venue_id);
+            setVenueName(messageWithVenue.venue_name);
+          }
           
-          if (unreadMessages.length > 0) {
-            await Promise.all(unreadMessages.map(msg => 
-              supabase
-                .from('messages')
-                .update({ read: true })
-                .eq('id', msg.id)
-            ));
+          // Mark received messages as read
+          const unreadMessageIds = data
+            .filter(msg => !msg.read && msg.sender_id === contactId)
+            .map(msg => msg.id);
             
-            // Also send a notification that a message has been read
-            await updateUnreadNotifications();
+          if (unreadMessageIds.length > 0) {
+            await supabase
+              .from('messages')
+              .update({ read: true })
+              .in('id', unreadMessageIds);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error loading messages:', error);
         toast({
           title: 'Error',
-          description: 'Failed to load messages. Please try again.',
+          description: 'Failed to load conversation. Please try again.',
           variant: 'destructive',
         });
       } finally {
         setIsLoading(false);
       }
     };
-
-    // Update unread notifications counter
-    const updateUnreadNotifications = async () => {
-      try {
+    
+    fetchMessages();
+    
+    // Set up real-time subscription for new messages
+    const channel = supabase
+      .channel('direct_chat')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `sender_id=eq.${contactId},receiver_id=eq.${user.id}`
+      }, async (payload) => {
+        console.log('New message received:', payload);
+        
+        const newMessage = payload.new as Message;
+        
+        // Mark message as read
         await supabase
-          .from('notifications')
+          .from('messages')
           .update({ read: true })
-          .eq('user_id', user.id)
-          .eq('type', 'message')
-          .eq('read', false);
-      } catch (error) {
-        console.error('Error updating notification status:', error);
-      }
-    };
-    
-    // Load messages immediately
-    loadMessages();
-    
-    // Set up real-time subscription for messages
-    console.log('Setting up real-time subscription for messages...');
-    
-    // This channel listens for new messages from the other user
-    const incomingChannel = supabase
-      .channel('incoming_messages')
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages',
-          filter: `sender_id=eq.${receiverId},receiver_id=eq.${user.id}` 
-        }, 
-        (payload) => {
-          console.log('Received new message via subscription:', payload);
-          const newMsg = payload.new as Message;
+          .eq('id', newMessage.id);
           
-          // Add to messages if not already there
-          setMessages(prev => {
-            if (prev.some(msg => msg.id === newMsg.id)) {
-              return prev;
-            }
-            return [...prev, newMsg];
-          });
-          
-          // Mark as read immediately
-          supabase
-            .from('messages')
-            .update({ read: true })
-            .eq('id', newMsg.id);
-        }
-      )
+        // Add message to state
+        setMessages(prev => [...prev, newMessage]);
+      })
       .subscribe();
-    
-    // This channel listens for messages sent by the current user
-    const outgoingChannel = supabase
-      .channel('outgoing_messages')
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages',
-          filter: `sender_id=eq.${user.id},receiver_id=eq.${receiverId}` 
-        }, 
-        (payload) => {
-          console.log('Received outgoing message via subscription:', payload);
-          const newMsg = payload.new as Message;
-          
-          // Add to messages if not already there
-          setMessages(prev => {
-            if (prev.some(msg => msg.id === newMsg.id)) {
-              return prev;
-            }
-            return [...prev, newMsg];
-          });
-        }
-      )
-      .subscribe();
-    
-    // Cleanup subscriptions on unmount
+      
     return () => {
-      console.log('Cleaning up message subscriptions');
-      supabase.removeChannel(incomingChannel);
-      supabase.removeChannel(outgoingChannel);
+      supabase.removeChannel(channel);
     };
-  }, [user, receiverId, toast]);
+  }, [user, contactId, toast]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -188,49 +149,39 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !profile) return;
     
-    setIsSending(true);
+    if (!newMessage.trim() || !user || !contactId) return;
+    
     try {
-      console.log('Sending message to:', receiverId);
+      setIsSending(true);
       
       const messageData = {
-        content: newMessage,
         sender_id: user.id,
-        receiver_id: receiverId,
-        sender_name: `${profile.first_name} ${profile.last_name}`,
-        receiver_name: receiverName,
-        venue_id: venueId,
-        venue_name: venueName,
+        receiver_id: contactId,
+        content: newMessage.trim(),
+        sender_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined,
+        receiver_name: contactName || undefined,
+        venue_id: venueId || undefined,
+        venue_name: venueName || undefined,
         read: false
       };
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
-        .insert(messageData);
+        .insert(messageData)
+        .select()
+        .single();
         
-      if (error) {
-        console.error('Error sending message:', error);
-        throw error;
+      if (error) throw error;
+      
+      // Add the new message to the state
+      if (data) {
+        setMessages(prev => [...prev, data]);
       }
       
-      // Also create a notification for the recipient
-      await supabase.from('notifications').insert({
-        user_id: receiverId,
-        title: 'New Message',
-        message: `${profile.first_name} ${profile.last_name} sent you a message: "${newMessage.substring(0, 50)}${newMessage.length > 50 ? '...' : ''}"`,
-        type: 'message',
-        read: false,
-        link: `/messages/${user.id}`,
-        data: {
-          sender_id: user.id,
-          venue_id: venueId
-        }
-      });
-      
-      console.log('Message sent successfully');
+      // Clear the input
       setNewMessage('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
       toast({
         title: 'Error',
@@ -240,6 +191,11 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
     } finally {
       setIsSending(false);
     }
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return format(date, 'h:mm a');
   };
 
   if (!user) {
@@ -257,18 +213,19 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
           <Avatar className="h-6 w-6">
-            <AvatarImage src="" />
-            <AvatarFallback>{receiverName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{contactName?.charAt(0) || '?'}</AvatarFallback>
+            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${contactName}`} />
           </Avatar>
-          <span>{receiverName}</span>
+          <span>{contactName || 'Chat'}</span>
+          {contactRole && (
+            <Badge variant="outline" className="ml-2 text-xs">
+              {contactRole === 'venue-owner' ? 'Venue Owner' : 'Customer'}
+            </Badge>
+          )}
         </CardTitle>
-        {venueName && (
-          <Badge className="bg-findvenue/80" variant="secondary">
-            {venueName}
-          </Badge>
-        )}
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+      
+      <div className="flex-1 flex flex-col min-h-0">
         {isLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-findvenue" />
@@ -281,26 +238,31 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
               </p>
             ) : (
               <div className="space-y-4">
+                {venueName && (
+                  <div className="text-center mb-4">
+                    <Badge variant="outline" className="bg-findvenue/10 text-findvenue">
+                      Conversation about {venueName}
+                    </Badge>
+                  </div>
+                )}
+                
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${
-                      message.sender_id === user.id ? 'justify-end' : 'justify-start'
-                    }`}
+                    className={`flex ${message.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                      className={`max-w-[75%] rounded-lg px-4 py-2 ${
                         message.sender_id === user.id
-                          ? 'bg-findvenue text-white rounded-br-none'
-                          : 'bg-findvenue-surface text-findvenue-text rounded-bl-none'
+                          ? 'bg-findvenue text-white'
+                          : 'bg-findvenue-card-bg border border-findvenue-border'
                       }`}
                     >
-                      <p className="break-words">{message.content}</p>
-                      <p className="text-xs opacity-70 mt-1">
-                        {new Date(message.created_at).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                      <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                      <p className={`text-xs mt-1 ${
+                        message.sender_id === user.id ? 'text-white/70' : 'text-findvenue-text-muted'
+                      }`}>
+                        {formatTime(message.created_at)}
                       </p>
                     </div>
                   </div>
@@ -316,21 +278,20 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
             <Input
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message..."
+              placeholder="Type a message..."
               disabled={isSending}
-              className="bg-findvenue-surface/50"
+              className="flex-1"
             />
-            <Button 
-              type="submit" 
-              size="icon" 
-              disabled={isSending || !newMessage.trim()} 
-              className="bg-findvenue hover:bg-findvenue-dark"
-            >
-              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            <Button type="submit" disabled={isSending || !newMessage.trim()}>
+              {isSending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </form>
-      </CardContent>
+      </div>
     </Card>
   );
 };
