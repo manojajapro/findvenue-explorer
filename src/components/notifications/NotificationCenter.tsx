@@ -50,7 +50,7 @@ const NotificationCenter = () => {
 
         if (error) throw error;
 
-        setNotifications(data as Notification[]);
+        setNotifications(data as unknown as Notification[]);
         setUnreadCount(data.filter(n => !n.read).length);
       } catch (error) {
         console.error('Error fetching notifications:', error);

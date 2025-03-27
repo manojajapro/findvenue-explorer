@@ -62,6 +62,89 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          read: boolean
+          receiver_id: string
+          receiver_name: string | null
+          sender_id: string
+          sender_name: string | null
+          venue_id: string | null
+          venue_name: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          receiver_id: string
+          receiver_name?: string | null
+          sender_id: string
+          sender_name?: string | null
+          venue_id?: string | null
+          venue_name?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          receiver_id?: string
+          receiver_name?: string | null
+          sender_id?: string
+          sender_name?: string | null
+          venue_id?: string | null
+          venue_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          data: Json | null
+          id: string
+          link: string | null
+          message: string
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          link?: string | null
+          message: string
+          read?: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          id?: string
+          link?: string | null
+          message?: string
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           created_at: string
@@ -228,7 +311,21 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      get_message_contacts: {
+        Args: {
+          current_user_id: string
+        }
+        Returns: {
+          user_id: string
+          full_name: string
+          last_message: string
+          last_message_time: string
+          unread_count: number
+          venue_id: string
+          venue_name: string
+          role: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

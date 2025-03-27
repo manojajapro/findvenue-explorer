@@ -45,13 +45,12 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
     const loadMessages = async () => {
       setIsLoading(true);
       try {
-        // Get messages where user is either sender or receiver
+        // Call the get_conversation function
         const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-          .and(`sender_id.eq.${receiverId},receiver_id.eq.${user.id}`)
-          .order('created_at', { ascending: true });
+          .rpc('get_conversation', {
+            current_user_id: user.id,
+            other_user_id: receiverId
+          });
           
         if (error) throw error;
         
@@ -60,10 +59,12 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
           // Mark messages as read
           const unreadMessages = data.filter(msg => !msg.read && msg.receiver_id === user.id);
           if (unreadMessages.length > 0) {
-            await supabase
-              .from('messages')
-              .update({ read: true })
-              .in('id', unreadMessages.map(msg => msg.id));
+            await Promise.all(unreadMessages.map(msg => 
+              supabase
+                .from('messages')
+                .update({ read: true })
+                .eq('id', msg.id)
+            ));
           }
         }
       } catch (error) {
