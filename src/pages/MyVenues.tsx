@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -43,7 +42,6 @@ const MyVenues = () => {
       if (error) throw error;
       
       if (data) {
-        // Transform data to match Venue type
         const transformedVenues = data.map(venue => {
           let ownerInfoData = undefined;
           if (venue.owner_info) {
@@ -105,12 +103,10 @@ const MyVenues = () => {
     if (!user) return;
     
     try {
-      // Get all venue IDs owned by this user
       const venueIds = venues.map(venue => venue.id);
       
       if (venueIds.length === 0) return;
       
-      // Get bookings for these venues
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select('*')
@@ -120,7 +116,6 @@ const MyVenues = () => {
       if (bookingsError) throw bookingsError;
       
       if (bookingsData) {
-        // Calculate stats
         const activeCount = bookingsData.filter(b => b.status === 'confirmed' || b.status === 'pending').length;
         const completedCount = bookingsData.filter(b => b.status === 'completed').length;
         const totalRevenue = bookingsData
@@ -134,7 +129,6 @@ const MyVenues = () => {
           revenue: totalRevenue
         });
         
-        // Set recent bookings (up to 5)
         setRecentBookings(bookingsData.slice(0, 5));
       }
     } catch (error) {
@@ -160,6 +154,14 @@ const MyVenues = () => {
 
   const handleAddVenue = () => {
     navigate('/list-venue');
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    
+    if (value === "bookings") {
+      navigate('/customer-bookings');
+    }
   };
 
   if (!isVenueOwner) {
@@ -191,7 +193,12 @@ const MyVenues = () => {
           </Button>
         </div>
 
-        <Tabs defaultValue="dashboard" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs 
+          defaultValue="dashboard" 
+          value={activeTab} 
+          onValueChange={handleTabChange} 
+          className="space-y-6"
+        >
           <TabsList className="grid grid-cols-3 w-full max-w-md mx-auto">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="venues">My Venues</TabsTrigger>
@@ -374,12 +381,10 @@ const MyVenues = () => {
             )}
           </TabsContent>
 
-          {/* Redirect to Customer Bookings */}
+          {/* Bookings Tab - Only display content when active */}
           <TabsContent value="bookings">
             <div className="text-center py-10">
-              <p className="text-findvenue-text-muted mb-4">Redirecting to Customer Bookings...</p>
-              {/* Redirect to customer bookings page after a short delay */}
-              {setTimeout(() => navigate('/customer-bookings'), 500) && null}
+              <p className="text-findvenue-text-muted mb-4">Viewing customer bookings information...</p>
             </div>
           </TabsContent>
         </Tabs>
