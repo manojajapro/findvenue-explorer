@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,13 +30,13 @@ export interface Venue {
   pricing: {
     currency: string;
     startingPrice: number;
-    pricePerPerson?: number; // Made optional to match the data/venues.ts interface
+    pricePerPerson?: number;
   };
   amenities: string[];
   rating: number;
   reviews: number;
-  featured?: boolean; // Made optional to match types in data/venues.ts
-  popular?: boolean; // Made optional to match types in data/venues.ts
+  featured?: boolean;
+  popular?: boolean;
   availability?: string[];
   // New fields
   latitude?: number;
@@ -49,7 +50,7 @@ export interface Venue {
     name: string;
     contact: string;
     responseTime: string;
-    user_id?: string; // Add user_id to the ownerInfo object
+    user_id: string;
   };
   additionalServices?: string[];
 }
@@ -137,21 +138,36 @@ export const useSupabaseVenues = () => {
       if (venuesError) throw venuesError;
       
       if (data) {
+        console.log("Raw venues data:", data);
+        
         const transformedData = data.map(venue => {
           let ownerInfoData = undefined;
-          if (venue.owner_info) {
-            const ownerInfo = venue.owner_info as Record<string, any>;
-            ownerInfoData = {
-              name: ownerInfo.name as string,
-              contact: ownerInfo.contact as string,
-              responseTime: ownerInfo.response_time as string,
-              user_id: ownerInfo.user_id as string
-            };
+          try {
+            if (venue.owner_info) {
+              const ownerInfo = typeof venue.owner_info === 'string'
+                ? JSON.parse(venue.owner_info)
+                : venue.owner_info;
+                
+              ownerInfoData = {
+                name: ownerInfo.name || '',
+                contact: ownerInfo.contact || '',
+                responseTime: ownerInfo.response_time || '',
+                user_id: ownerInfo.user_id || ''
+              };
+            }
+          } catch (e) {
+            console.error("Error parsing owner_info for venue", venue.id, e);
           }
           
           let openingHoursData = undefined;
-          if (venue.opening_hours) {
-            openingHoursData = venue.opening_hours as Record<string, {open: string, close: string}>;
+          try {
+            if (venue.opening_hours) {
+              openingHoursData = typeof venue.opening_hours === 'string'
+                ? JSON.parse(venue.opening_hours)
+                : venue.opening_hours;
+            }
+          } catch (e) {
+            console.error("Error parsing opening_hours for venue", venue.id, e);
           }
           
           return {
@@ -192,6 +208,7 @@ export const useSupabaseVenues = () => {
           } as Venue;
         });
         
+        console.log("Transformed venues:", transformedData);
         setVenues(transformedData);
         setTotalCount(count || 0);
       }

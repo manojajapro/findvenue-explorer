@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,25 +51,53 @@ const MyVenues = () => {
     
     try {
       setIsLoading(true);
+      console.log("Fetching venues for user ID:", user.id);
       
       const { data, error } = await supabase
         .from('venues')
-        .select('*')
-        .filter('owner_info->user_id', 'eq', user.id);
+        .select('*');
       
       if (error) throw error;
       
       if (data) {
-        const transformedVenues = data.map(venue => {
+        console.log("Venues data received:", data);
+        
+        // Filter venues where owner_info->user_id matches current user.id
+        const userVenues = data.filter(venue => {
+          if (!venue.owner_info) return false;
+          
+          try {
+            const ownerInfo = typeof venue.owner_info === 'string' 
+              ? JSON.parse(venue.owner_info) 
+              : venue.owner_info;
+              
+            return ownerInfo.user_id === user.id;
+          } catch (e) {
+            console.error("Error parsing owner_info", e);
+            return false;
+          }
+        });
+        
+        console.log("Filtered user venues:", userVenues);
+        
+        const transformedVenues = userVenues.map(venue => {
           let ownerInfoData = undefined;
-          if (venue.owner_info) {
-            const ownerInfo = venue.owner_info as Record<string, any>;
-            ownerInfoData = {
-              name: ownerInfo.name as string,
-              contact: ownerInfo.contact as string,
-              responseTime: ownerInfo.response_time as string,
-              user_id: ownerInfo.user_id as string
-            };
+          
+          try {
+            if (venue.owner_info) {
+              const ownerInfo = typeof venue.owner_info === 'string'
+                ? JSON.parse(venue.owner_info)
+                : venue.owner_info;
+                
+              ownerInfoData = {
+                name: ownerInfo.name || '',
+                contact: ownerInfo.contact || '',
+                responseTime: ownerInfo.response_time || '',
+                user_id: ownerInfo.user_id || ''
+              };
+            }
+          } catch (e) {
+            console.error("Error parsing owner_info for venue", venue.id, e);
           }
           
           return {
@@ -101,6 +130,7 @@ const MyVenues = () => {
           } as Venue;
         });
         
+        console.log("Transformed venues:", transformedVenues);
         setVenues(transformedVenues);
         setStats(prev => ({...prev, totalVenues: transformedVenues.length}));
       }
@@ -125,6 +155,8 @@ const MyVenues = () => {
       
       if (venueIds.length === 0) return;
       
+      console.log("Fetching bookings for venue IDs:", venueIds);
+      
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select('*')
@@ -134,6 +166,8 @@ const MyVenues = () => {
       if (bookingsError) throw bookingsError;
       
       if (bookingsData) {
+        console.log("Bookings data:", bookingsData);
+        
         const activeCount = bookingsData.filter(b => b.status === 'confirmed' || b.status === 'pending').length;
         const completedCount = bookingsData.filter(b => b.status === 'completed').length;
         const totalRevenue = bookingsData
