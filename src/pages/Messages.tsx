@@ -39,24 +39,56 @@ const Messages = () => {
     const fetchContacts = async () => {
       setLoading(true);
       try {
+        console.log('Fetching contacts for user:', user.id);
         const { data, error } = await supabase
           .rpc('get_message_contacts', {
             current_user_id: user.id
           });
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching contacts:', error);
+          throw error;
+        }
+        
+        console.log('Fetched contacts:', data);
         
         if (data) {
           setContacts(data as ContactType[]);
           
-          // If contactId is provided, select that contact
+          // If contactId is provided, select that contact or create a new contact
           if (contactId) {
+            console.log('Contact ID from URL:', contactId);
             const contact = data.find(c => c.user_id === contactId);
             if (contact) {
+              console.log('Found existing contact:', contact);
               setSelectedContact(contact);
+            } else {
+              console.log('No existing contact found, fetching user profile');
+              // Fetch user profile for the contactId to create a new contact
+              const { data: profileData, error: profileError } = await supabase
+                .from('user_profiles')
+                .select('first_name, last_name, user_role')
+                .eq('id', contactId)
+                .single();
+                
+              if (profileError) {
+                console.error('Error fetching profile:', profileError);
+              } else if (profileData) {
+                console.log('Created new contact from profile:', profileData);
+                const newContact: ContactType = {
+                  user_id: contactId,
+                  full_name: `${profileData.first_name} ${profileData.last_name}`,
+                  last_message: 'No messages yet',
+                  last_message_time: new Date().toISOString(),
+                  unread_count: 0,
+                  role: profileData.user_role
+                };
+                setSelectedContact(newContact);
+              }
             }
           } else if (data.length > 0) {
-            // Select first contact by default
+            // Select first contact by default if no contactId provided
+            console.log('No contact ID, selecting first contact');
             setSelectedContact(data[0]);
           }
         }
@@ -111,7 +143,7 @@ const Messages = () => {
                   <ScrollArea className="h-[calc(100vh-200px)]">
                     {contacts.length === 0 ? (
                       <div className="p-6 text-center text-findvenue-text-muted">
-                        No conversations yet
+                        {contactId ? "Starting a new conversation" : "No conversations yet"}
                       </div>
                     ) : (
                       <div>

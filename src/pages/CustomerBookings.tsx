@@ -58,7 +58,12 @@ const CustomerBookings = () => {
         .select('*, venues:venue_id(*), user_profiles:user_id(first_name, last_name, email)')
         .filter('venues.owner_info->user_id', 'eq', user.id);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching bookings:', error);
+        throw error;
+      }
+      
+      console.log('Fetched bookings data:', data);
       
       // Transform the data
       const formattedBookings = data.map((booking: any) => ({
@@ -79,6 +84,7 @@ const CustomerBookings = () => {
         special_requests: booking.special_requests,
       }));
       
+      console.log('Formatted bookings:', formattedBookings);
       setBookings(formattedBookings);
     } catch (error: any) {
       console.error('Error fetching bookings:', error);
@@ -97,6 +103,8 @@ const CustomerBookings = () => {
     try {
       const booking = bookings.find(b => b.id === bookingId);
       if (!booking) throw new Error('Booking not found');
+      
+      console.log(`Updating booking ${bookingId} status to ${status}`);
       
       const { error } = await supabase
         .from('bookings')
@@ -147,6 +155,7 @@ const CustomerBookings = () => {
   };
 
   const initiateChat = (userId: string) => {
+    console.log(`Initiating chat with user ${userId}`);
     navigate(`/messages/${userId}`);
   };
   

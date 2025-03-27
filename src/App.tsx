@@ -132,6 +132,7 @@ const AppContent = () => {
           <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
           <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
           <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+          <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
           
           <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
           <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />
