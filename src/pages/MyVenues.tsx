@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,10 +36,8 @@ const MyVenues = () => {
     if (tab === 'venues' || tab === 'bookings') {
       setActiveTab(tab);
     } else {
-      // Default to dashboard if no valid tab specified
       setActiveTab('dashboard');
       
-      // Update URL to reflect the default tab without causing navigation
       if (!searchParams.has('tab') || searchParams.get('tab') !== 'dashboard') {
         navigate('/my-venues?tab=dashboard', { replace: true });
       }
@@ -69,7 +66,8 @@ const MyVenues = () => {
             ownerInfoData = {
               name: ownerInfo.name as string,
               contact: ownerInfo.contact as string,
-              responseTime: ownerInfo.response_time as string
+              responseTime: ownerInfo.response_time as string,
+              user_id: ownerInfo.user_id as string
             };
           }
           
@@ -179,7 +177,6 @@ const MyVenues = () => {
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     
-    // Update URL to reflect the selected tab without full page reload
     navigate(`/my-venues?tab=${value}`, { replace: true });
     
     if (value === "bookings") {
