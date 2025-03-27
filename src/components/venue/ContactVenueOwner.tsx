@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageCircle, Loader2 } from 'lucide-react';
+import { MessageCircle, Loader2, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type ContactProps = {
   venueId: string;
@@ -22,9 +23,25 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
   const navigate = useNavigate();
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Clear error when inputs change
+  const clearError = () => {
+    if (error) setError(null);
+  };
+  
+  // Validate owner information before proceeding
+  const validateOwnerInfo = (): boolean => {
+    if (!ownerId) {
+      setError('Unable to contact venue owner. Owner information is missing.');
+      return false;
+    }
+    return true;
+  };
   
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
+    clearError();
     
     if (!user || !profile) {
       toast({
@@ -45,11 +62,11 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       return;
     }
 
-    // Check if owner ID is valid
-    if (!ownerId) {
+    // Validate owner information
+    if (!validateOwnerInfo()) {
       toast({
         title: 'Error',
-        description: 'Unable to contact venue owner. Owner information is missing.',
+        description: error || 'Unable to contact venue owner',
         variant: 'destructive',
       });
       return;
@@ -59,7 +76,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
     
     try {
       // Insert the message
-      const { error: messageError } = await supabase
+      const { error: messageError, data: messageData } = await supabase
         .from('messages')
         .insert({
           sender_id: user.id,
@@ -70,9 +87,13 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
           receiver_name: ownerName,
           venue_id: venueId,
           venue_name: venueName
-        });
+        })
+        .select()
+        .single();
       
       if (messageError) throw messageError;
+      
+      console.log('Message sent successfully:', messageData);
       
       // Create notification for the venue owner
       const { error: notificationError } = await supabase
@@ -100,12 +121,21 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       setMessage('');
       
       // Navigate directly to messages with the specific contact
-      navigate(`/messages/${ownerId}`);
-    } catch (error) {
+      if (ownerId) {
+        navigate(`/messages/${ownerId}`);
+      } else {
+        toast({
+          title: 'Warning',
+          description: 'Could not open direct messages due to missing owner information',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
       console.error('Error sending message:', error);
+      setError(error.message || 'Failed to send message');
       toast({
         title: 'Error',
-        description: 'Failed to send message',
+        description: error.message || 'Failed to send message',
         variant: 'destructive',
       });
     } finally {
@@ -114,6 +144,8 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
   };
   
   const handleDirectMessageClick = () => {
+    clearError();
+    
     if (!user) {
       toast({
         title: 'Login Required',
@@ -124,10 +156,11 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       return;
     }
     
-    if (!ownerId) {
+    // Validate owner information
+    if (!validateOwnerInfo()) {
       toast({
         title: 'Error',
-        description: 'Unable to contact venue owner. Owner information is missing.',
+        description: error || 'Unable to contact venue owner',
         variant: 'destructive',
       });
       return;
@@ -167,11 +200,21 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       </CardHeader>
       <form onSubmit={handleSendMessage}>
         <CardContent>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <Textarea
             placeholder={`Ask ${ownerName || 'the venue owner'} about ${venueName}...`}
             className="min-h-[120px] bg-findvenue-surface/20"
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              clearError();
+            }}
             disabled={isSending}
           />
         </CardContent>

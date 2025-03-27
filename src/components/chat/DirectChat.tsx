@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Send, AlertCircle } from 'lucide-react';
+import { Loader2, Send, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -27,12 +27,12 @@ type Message = {
 };
 
 const DirectChat = () => {
-  const { contactId } = useParams();
+  const { contactId } = useParams<{ contactId: string }>();
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [contactName, setContactName] = useState<string>('');
+  const [contactName, setContactName] = useState<string>('Contact');
   const [contactRole, setContactRole] = useState<string>('');
   const [venueId, setVenueId] = useState<string | null>(null);
   const [venueName, setVenueName] = useState<string | null>(null);
@@ -42,22 +42,26 @@ const DirectChat = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Check if contactId is valid
   useEffect(() => {
-    if (!contactId) {
+    if (!contactId || contactId === 'undefined') {
+      console.error('Invalid contactId:', contactId);
       setHasError(true);
+      setErrorMessage('Invalid contact ID. Please go back to messages and select a valid contact.');
       setIsLoading(false);
     } else {
       setHasError(false);
+      setErrorMessage('');
     }
   }, [contactId]);
 
   // Load messages
   useEffect(() => {
-    if (!user || !contactId || hasError) return;
+    if (!user || !contactId || hasError || contactId === 'undefined') return;
     
     const fetchMessages = async () => {
       try {
@@ -73,6 +77,7 @@ const DirectChat = () => {
         if (contactError) {
           console.error('Error fetching contact data:', contactError);
           setHasError(true);
+          setErrorMessage('Could not find the selected contact. They may no longer exist or you may not have permission to view this conversation.');
           throw contactError;
         }
         
@@ -81,6 +86,7 @@ const DirectChat = () => {
           setContactRole(contactData.user_role);
         } else {
           setHasError(true);
+          setErrorMessage('Contact not found. Please try again or select a different contact.');
           throw new Error('Contact not found');
         }
         
@@ -93,6 +99,7 @@ const DirectChat = () => {
           
         if (error) {
           console.error('Error fetching conversation:', error);
+          setErrorMessage('Error loading conversation. Please try again later.');
           throw error;
         }
         
@@ -120,12 +127,15 @@ const DirectChat = () => {
         }
       } catch (error: any) {
         console.error('Error loading messages:', error);
+        setHasError(true);
+        if (!errorMessage) {
+          setErrorMessage('Failed to load conversation. Please try again.');
+        }
         toast({
           title: 'Error',
-          description: 'Failed to load conversation. Please try again.',
+          description: errorMessage || 'Failed to load conversation. Please try again.',
           variant: 'destructive',
         });
-        setHasError(true);
       } finally {
         setIsLoading(false);
       }
@@ -134,7 +144,7 @@ const DirectChat = () => {
     fetchMessages();
     
     // Set up real-time subscription for new messages
-    if (contactId) {
+    if (contactId && contactId !== 'undefined') {
       const channel = supabase
         .channel('direct_chat')
         .on('postgres_changes', {
@@ -162,7 +172,7 @@ const DirectChat = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [user, contactId, toast, hasError]);
+  }, [user, contactId, toast, hasError, errorMessage]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -177,7 +187,7 @@ const DirectChat = () => {
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !user || !contactId || hasError) return;
+    if (!newMessage.trim() || !user || !contactId || hasError || contactId === 'undefined') return;
     
     try {
       setIsSending(true);
@@ -247,7 +257,7 @@ const DirectChat = () => {
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              There was an error loading this conversation. The contact may not exist.
+              {errorMessage || 'There was an error loading this conversation. The contact may not exist.'}
             </AlertDescription>
           </Alert>
           <Button onClick={() => navigate('/messages')} className="bg-findvenue hover:bg-findvenue-dark">
@@ -262,6 +272,14 @@ const DirectChat = () => {
     <Card className="glass-card border-white/10 h-[600px] flex flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="mr-1 p-0 h-8 w-8" 
+            onClick={() => navigate('/messages')}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <Avatar className="h-6 w-6">
             <AvatarFallback>{contactName?.charAt(0) || '?'}</AvatarFallback>
             <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${contactName}`} />
@@ -331,6 +349,12 @@ const DirectChat = () => {
               placeholder="Type a message..."
               disabled={isSending || isLoading || hasError}
               className="flex-1"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (newMessage.trim()) sendMessage(e);
+                }
+              }}
             />
             <Button type="submit" disabled={isSending || isLoading || hasError || !newMessage.trim()}>
               {isSending ? (
