@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,11 +9,22 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarIcon, Clock, Users, Loader2 } from 'lucide-react';
+import { CalendarIcon, Clock, Users, Loader2, AlertTriangle } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type BookingFormProps = {
   venueId: string;
@@ -34,12 +46,18 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   const [specialRequests, setSpecialRequests] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingBookings, setExistingBookings] = useState<any[]>([]);
+  const [userBookings, setUserBookings] = useState<any[]>([]);
+  const [isCancelling, setIsCancelling] = useState(false);
   
   useEffect(() => {
     if (venueId) {
       fetchExistingBookings();
     }
-  }, [venueId]);
+
+    if (user && venueId) {
+      fetchUserBookings();
+    }
+  }, [venueId, user]);
   
   const fetchExistingBookings = async () => {
     try {
@@ -56,6 +74,27 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       }
     } catch (error) {
       console.error('Error fetching existing bookings:', error);
+    }
+  };
+
+  const fetchUserBookings = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('venue_id', venueId)
+        .eq('user_id', user.id)
+        .or('status.eq.pending,status.eq.confirmed');
+        
+      if (error) throw error;
+      
+      if (data) {
+        setUserBookings(data);
+      }
+    } catch (error) {
+      console.error('Error fetching user bookings:', error);
     }
   };
   
@@ -220,6 +259,8 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       setGuestCount('');
       setSpecialRequests('');
       
+      fetchUserBookings();
+      
       toast({
         title: 'View Bookings',
         description: 'Go to your bookings to view the status of your request',
@@ -240,6 +281,61 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       setIsSubmitting(false);
     }
   };
+
+  const cancelBooking = async (bookingId: string) => {
+    setIsCancelling(true);
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', bookingId);
+        
+      if (error) throw error;
+      
+      // Notify venue owner
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: ownerId,
+          title: 'Booking Cancelled',
+          message: `A booking for "${venueName}" has been cancelled by the customer`,
+          type: 'booking',
+          read: false,
+          link: '/customer-bookings'
+        });
+
+      toast({
+        title: 'Booking Cancelled',
+        description: 'Your booking has been cancelled successfully',
+      });
+      
+      fetchUserBookings();
+      
+    } catch (error: any) {
+      console.error('Error cancelling booking:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to cancel booking',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const initiateChat = () => {
+    if (!user) {
+      toast({
+        title: 'Login Required',
+        description: 'Please log in to chat with the venue owner',
+        variant: 'destructive',
+      });
+      navigate('/login');
+      return;
+    }
+
+    navigate(`/messages/${ownerId}`);
+  };
   
   if (!user) {
     return (
@@ -256,6 +352,103 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
               Login to Book
             </Button>
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Display user's existing bookings for this venue
+  if (userBookings.length > 0) {
+    return (
+      <Card className="glass-card border-white/10">
+        <CardHeader>
+          <CardTitle className="text-xl">Your Booking for This Venue</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {userBookings.map(booking => (
+            <div key={booking.id} className="border border-white/10 rounded-md p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-semibold">{format(new Date(booking.booking_date), 'MMMM d, yyyy')}</h3>
+                  <p className="text-findvenue-text-muted">{booking.start_time} - {booking.end_time}</p>
+                  <p className="text-findvenue-text-muted">{booking.guests} guests</p>
+                  <div className="mt-2">
+                    <span className={`inline-block px-2 py-1 rounded-full text-xs ${
+                      booking.status === 'confirmed' ? 'bg-green-500/20 text-green-400' :
+                      booking.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                      'bg-red-500/20 text-red-400'
+                    }`}>
+                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-findvenue-text-muted text-sm">Total Price</p>
+                  <p className="font-bold">SAR {booking.total_price}</p>
+                </div>
+              </div>
+
+              {booking.special_requests && (
+                <div className="mt-3 bg-findvenue-surface/30 p-3 rounded-md">
+                  <p className="text-sm font-medium mb-1">Special Requests:</p>
+                  <p className="text-sm text-findvenue-text-muted">{booking.special_requests}</p>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center mt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={initiateChat}
+                  className="text-findvenue border-findvenue hover:bg-findvenue/10"
+                >
+                  Chat with Owner
+                </Button>
+
+                {booking.status !== 'cancelled' && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="border-destructive text-destructive hover:bg-destructive/10"
+                        disabled={isCancelling}
+                      >
+                        {isCancelling ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 mr-2" />
+                        )}
+                        Cancel Booking
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-findvenue-card-bg border-white/10">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to cancel this booking? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+                        <AlertDialogAction 
+                          className="bg-destructive hover:bg-destructive/90 text-white"
+                          onClick={() => cancelBooking(booking.id)}
+                        >
+                          Yes, Cancel
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            </div>
+          ))}
+
+          <Button 
+            onClick={() => navigate('/bookings')} 
+            className="w-full mt-4 bg-findvenue hover:bg-findvenue-dark"
+          >
+            View All Bookings
+          </Button>
         </CardContent>
       </Card>
     );
@@ -369,24 +562,33 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
               </span>
             </div>
           </div>
+
+          <div className="flex items-center justify-between">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={initiateChat}
+              className="text-findvenue border-findvenue hover:bg-findvenue/10"
+            >
+              Chat with Owner
+            </Button>
+
+            <Button 
+              type="submit" 
+              className="bg-findvenue hover:bg-findvenue-dark"
+              disabled={isSubmitting || !date || !startTime || !endTime || !guestCount}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Request Booking'
+              )}
+            </Button>
+          </div>
         </CardContent>
-        
-        <CardFooter>
-          <Button 
-            type="submit" 
-            className="w-full bg-findvenue hover:bg-findvenue-dark"
-            disabled={isSubmitting || !date || !startTime || !endTime || !guestCount}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              'Request Booking'
-            )}
-          </Button>
-        </CardFooter>
       </form>
     </Card>
   );

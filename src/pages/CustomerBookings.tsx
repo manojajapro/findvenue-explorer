@@ -4,10 +4,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, Clock, Users, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,9 +32,11 @@ import {
 const CustomerBookings = () => {
   const { user, isVenueOwner } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [isBusy, setIsBusy] = useState(false);
   
   useEffect(() => {
     if (user && isVenueOwner) {
@@ -52,7 +55,7 @@ const CustomerBookings = () => {
       // For venue owners, get bookings for their venues
       const { data, error } = await supabase
         .from('bookings')
-        .select('*, venues:venue_id(*)')
+        .select('*, venues:venue_id(*), user_profiles:user_id(first_name, last_name, email)')
         .filter('venues.owner_info->user_id', 'eq', user.id);
       
       if (error) throw error;
@@ -61,6 +64,8 @@ const CustomerBookings = () => {
       const formattedBookings = data.map((booking: any) => ({
         id: booking.id,
         user_id: booking.user_id,
+        user_name: booking.user_profiles ? `${booking.user_profiles.first_name} ${booking.user_profiles.last_name}` : 'Unknown Customer',
+        user_email: booking.user_profiles?.email,
         venue_id: booking.venue_id,
         venue_name: booking.venues?.name || booking.venue_name || 'Unnamed Venue',
         venue_image: booking.venues?.image_url,
@@ -88,7 +93,11 @@ const CustomerBookings = () => {
   };
   
   const updateBookingStatus = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
+    setIsBusy(true);
     try {
+      const booking = bookings.find(b => b.id === bookingId);
+      if (!booking) throw new Error('Booking not found');
+      
       const { error } = await supabase
         .from('bookings')
         .update({ status })
@@ -103,6 +112,24 @@ const CustomerBookings = () => {
         )
       );
       
+      // Send notification to customer
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: booking.user_id,
+          title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
+          message: status === 'confirmed' 
+            ? `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed.`
+            : `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been cancelled by the venue owner.`,
+          type: 'booking',
+          read: false,
+          link: '/bookings',
+          data: {
+            booking_id: bookingId,
+            venue_id: booking.venue_id
+          }
+        });
+      
       toast({
         title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
         description: `The booking has been ${status} successfully.`,
@@ -114,7 +141,13 @@ const CustomerBookings = () => {
         description: error.message || `Failed to update booking status.`,
         variant: 'destructive',
       });
+    } finally {
+      setIsBusy(false);
     }
+  };
+
+  const initiateChat = (userId: string) => {
+    navigate(`/messages/${userId}`);
   };
   
   const getStatusColor = (status: string) => {
@@ -202,6 +235,7 @@ const CustomerBookings = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-white/10">
+                      <TableHead>Customer</TableHead>
                       <TableHead>Venue</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Time</TableHead>
@@ -214,7 +248,8 @@ const CustomerBookings = () => {
                   <TableBody>
                     {displayBookings.map((booking) => (
                       <TableRow key={booking.id} className="border-white/10">
-                        <TableCell className="font-medium">{booking.venue_name}</TableCell>
+                        <TableCell className="font-medium">{booking.user_name}</TableCell>
+                        <TableCell>{booking.venue_name}</TableCell>
                         <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
                         <TableCell>{booking.start_time} - {booking.end_time}</TableCell>
                         <TableCell>{booking.guests}</TableCell>
@@ -225,7 +260,7 @@ const CustomerBookings = () => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {booking.status === 'pending' && activeTab === 'upcoming' && (
+                          {booking.status === 'pending' && activeTab === 'upcoming' && !isBusy && (
                             <div className="flex space-x-2 justify-end">
                               <Button 
                                 variant="outline"
@@ -248,10 +283,26 @@ const CustomerBookings = () => {
                               </Button>
                             </div>
                           )}
-                          {booking.status !== 'pending' && (
-                            <span className="text-findvenue-text-muted text-sm">
-                              {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
-                            </span>
+                          {isBusy && (
+                            <div className="flex justify-end">
+                              <div className="animate-spin h-5 w-5 border-2 border-findvenue border-t-transparent rounded-full"></div>
+                            </div>
+                          )}
+                          {!isBusy && booking.status !== 'pending' && (
+                            <div className="flex space-x-2 justify-end">
+                              <span className="text-findvenue-text-muted text-sm mr-2">
+                                {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-findvenue text-findvenue hover:bg-findvenue/10"
+                                onClick={() => initiateChat(booking.user_id)}
+                              >
+                                <MessageCircle className="h-4 w-4 mr-1" />
+                                Chat
+                              </Button>
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
@@ -271,10 +322,26 @@ const CustomerBookings = () => {
                   <Card key={`req-${booking.id}`} className="glass-card border-white/10">
                     <CardContent className="p-4">
                       <div className="flex flex-col gap-2">
-                        <h3 className="font-medium">
-                          {booking.venue_name} - {format(new Date(booking.booking_date), 'MMM d, yyyy')}
-                        </h3>
-                        <p className="text-findvenue-text-muted text-sm">{booking.special_requests}</p>
+                        <div className="flex justify-between">
+                          <h3 className="font-medium">
+                            {booking.venue_name} - {format(new Date(booking.booking_date), 'MMM d, yyyy')}
+                          </h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-findvenue hover:bg-findvenue/10"
+                            onClick={() => initiateChat(booking.user_id)}
+                          >
+                            <MessageCircle className="h-4 w-4 mr-1" />
+                            Chat with Customer
+                          </Button>
+                        </div>
+                        <p className="text-sm text-findvenue-text-muted">
+                          <span className="font-medium">{booking.user_name}</span> - {booking.guests} guests
+                        </p>
+                        <div className="bg-findvenue-surface/20 p-3 rounded-md mt-2">
+                          <p className="text-findvenue-text-muted text-sm">{booking.special_requests}</p>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

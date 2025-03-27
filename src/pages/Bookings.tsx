@@ -4,10 +4,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Users, Trash2, MessageCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,13 +35,16 @@ type Booking = {
   created_at: string;
   guests: number;
   special_requests?: string;
+  owner_id?: string;
 };
 
 const Bookings = () => {
   const { user, isVenueOwner } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   
   useEffect(() => {
@@ -63,13 +67,13 @@ const Bookings = () => {
         // For venue owners, get bookings for their venues
         query = supabase
           .from('bookings')
-          .select('*, venues:venue_id(name, image_url)')
+          .select('*, venues:venue_id(name, image_url, owner_info)')
           .filter('venues.owner_info->user_id', 'eq', user.id);
       } else {
         // For customers, get their own bookings
         query = supabase
           .from('bookings')
-          .select('*, venues:venue_id(name, image_url)')
+          .select('*, venues:venue_id(name, image_url, owner_info)')
           .eq('user_id', user.id);
       }
       
@@ -78,21 +82,37 @@ const Bookings = () => {
       if (error) throw error;
       
       // Transform the data to match our Booking type
-      const formattedBookings: Booking[] = data.map((item: any) => ({
-        id: item.id,
-        user_id: item.user_id,
-        venue_id: item.venue_id,
-        venue_name: item.venues?.name || item.venue_name || 'Unnamed Venue',
-        venue_image: item.venues?.image_url,
-        booking_date: item.booking_date,
-        start_time: item.start_time,
-        end_time: item.end_time,
-        status: item.status,
-        total_price: item.total_price,
-        created_at: item.created_at,
-        guests: item.guests,
-        special_requests: item.special_requests,
-      }));
+      const formattedBookings: Booking[] = data.map((item: any) => {
+        let ownerId = undefined;
+        if (item.venues && item.venues.owner_info) {
+          try {
+            const ownerInfo = typeof item.venues.owner_info === 'string'
+              ? JSON.parse(item.venues.owner_info)
+              : item.venues.owner_info;
+              
+            ownerId = ownerInfo.user_id;
+          } catch (e) {
+            console.error("Error parsing owner_info", e);
+          }
+        }
+        
+        return {
+          id: item.id,
+          user_id: item.user_id,
+          venue_id: item.venue_id,
+          venue_name: item.venues?.name || item.venue_name || 'Unnamed Venue',
+          venue_image: item.venues?.image_url,
+          booking_date: item.booking_date,
+          start_time: item.start_time,
+          end_time: item.end_time,
+          status: item.status,
+          total_price: item.total_price,
+          created_at: item.created_at,
+          guests: item.guests,
+          special_requests: item.special_requests,
+          owner_id: ownerId
+        };
+      });
       
       setBookings(formattedBookings);
     } catch (error: any) {
@@ -109,6 +129,10 @@ const Bookings = () => {
   
   const cancelBooking = async (bookingId: string) => {
     try {
+      setIsCancelling(true);
+      const booking = bookings.find(b => b.id === bookingId);
+      if (!booking) throw new Error('Booking not found');
+      
       const { error } = await supabase
         .from('bookings')
         .update({ status: 'cancelled' })
@@ -122,6 +146,24 @@ const Bookings = () => {
           booking.id === bookingId ? { ...booking, status: 'cancelled' } : booking
         )
       );
+
+      // Notify venue owner if owner_id exists
+      if (booking.owner_id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: booking.owner_id,
+            title: 'Booking Cancelled',
+            message: `A booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been cancelled by the customer.`,
+            type: 'booking',
+            read: false,
+            link: '/customer-bookings',
+            data: {
+              booking_id: bookingId,
+              venue_id: booking.venue_id
+            }
+          });
+      }
       
       toast({
         title: 'Booking Cancelled',
@@ -134,7 +176,21 @@ const Bookings = () => {
         description: error.message || 'Failed to cancel booking.',
         variant: 'destructive',
       });
+    } finally {
+      setIsCancelling(false);
     }
+  };
+
+  const initiateChat = (ownerId: string | undefined) => {
+    if (!ownerId) {
+      toast({
+        title: 'Cannot Chat',
+        description: 'Owner information is not available',
+        variant: 'destructive',
+      });
+      return;
+    }
+    navigate(`/messages/${ownerId}`);
   };
   
   const getStatusColor = (status: string) => {
@@ -262,36 +318,54 @@ const Bookings = () => {
                             <p className="text-xl font-bold">${booking.total_price.toFixed(2)}</p>
                           </div>
                           
-                          {booking.status === 'pending' && activeTab === 'upcoming' && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button 
-                                  variant="outline" 
-                                  className="mt-4 border-destructive text-destructive hover:bg-destructive/10"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Cancel Booking
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="bg-findvenue-card-bg border-white/10">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to cancel this booking? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Keep Booking</AlertDialogCancel>
-                                  <AlertDialogAction 
-                                    className="bg-destructive hover:bg-destructive/90 text-white"
-                                    onClick={() => cancelBooking(booking.id)}
+                          <div className="mt-4 flex flex-col gap-2">
+                            {booking.owner_id && (
+                              <Button 
+                                variant="outline" 
+                                className="w-full border-findvenue text-findvenue hover:bg-findvenue/10"
+                                onClick={() => initiateChat(booking.owner_id)}
+                              >
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                Chat with Owner
+                              </Button>
+                            )}
+
+                            {(booking.status === 'pending' || booking.status === 'confirmed') && activeTab === 'upcoming' && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button 
+                                    variant="outline" 
+                                    className="w-full border-destructive text-destructive hover:bg-destructive/10"
+                                    disabled={isCancelling}
                                   >
-                                    Yes, Cancel
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
+                                    {isCancelling ? (
+                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    ) : (
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                    )}
+                                    Cancel Booking
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="bg-findvenue-card-bg border-white/10">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to cancel this booking? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+                                    <AlertDialogAction 
+                                      className="bg-destructive hover:bg-destructive/90 text-white"
+                                      onClick={() => cancelBooking(booking.id)}
+                                    >
+                                      Yes, Cancel
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
