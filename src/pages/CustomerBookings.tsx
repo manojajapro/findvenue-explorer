@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
+import { Calendar, Clock, Users, CheckCircle, XCircle, MessageCircle, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +37,7 @@ const CustomerBookings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const [isBusy, setIsBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     if (user && isVenueOwner) {
@@ -50,44 +51,95 @@ const CustomerBookings = () => {
     if (!user || !isVenueOwner) return;
     
     setIsLoading(true);
+    setError(null);
     
     try {
+      console.log('Fetching bookings for venue owner:', user.id);
+      
       // For venue owners, get bookings for their venues
       const { data, error } = await supabase
         .from('bookings')
-        .select('*, venues:venue_id(*), user_profiles:user_id(first_name, last_name, email)')
+        .select(`
+          id,
+          user_id,
+          venue_id,
+          venue_name,
+          booking_date,
+          start_time,
+          end_time,
+          status,
+          total_price,
+          created_at,
+          guests,
+          special_requests,
+          user_profiles:user_id (first_name, last_name, email)
+        `)
         .filter('venues.owner_info->user_id', 'eq', user.id);
       
       if (error) {
-        console.error('Error fetching bookings:', error);
-        throw error;
+        console.error('Error fetching bookings with venue filter:', error);
+        
+        // Fallback: fetch the bookings directly and join with venues table
+        console.log('Trying fallback method to fetch bookings...');
+        const venuesResult = await supabase
+          .from('venues')
+          .select('id')
+          .filter('owner_info->user_id', 'eq', user.id);
+          
+        if (venuesResult.error) {
+          console.error('Error fetching venues:', venuesResult.error);
+          throw venuesResult.error;
+        }
+        
+        const venueIds = venuesResult.data.map(venue => venue.id);
+        console.log('Owner venues:', venueIds);
+        
+        if (venueIds.length === 0) {
+          console.log('No venues found for this owner');
+          setBookings([]);
+          setIsLoading(false);
+          return;
+        }
+        
+        const bookingsResult = await supabase
+          .from('bookings')
+          .select(`
+            id,
+            user_id,
+            venue_id,
+            venue_name,
+            booking_date,
+            start_time,
+            end_time,
+            status,
+            total_price,
+            created_at,
+            guests,
+            special_requests,
+            user_profiles:user_id (first_name, last_name, email)
+          `)
+          .in('venue_id', venueIds);
+          
+        if (bookingsResult.error) {
+          console.error('Error fetching bookings with venue IDs:', bookingsResult.error);
+          throw bookingsResult.error;
+        }
+        
+        console.log('Bookings fetched with fallback method:', bookingsResult.data);
+        
+        // Transform the data
+        const formattedBookings = formatBookingsData(bookingsResult.data);
+        setBookings(formattedBookings);
+      } else {
+        console.log('Bookings fetched successfully:', data);
+        
+        // Transform the data
+        const formattedBookings = formatBookingsData(data);
+        setBookings(formattedBookings);
       }
-      
-      console.log('Fetched bookings data:', data);
-      
-      // Transform the data
-      const formattedBookings = data.map((booking: any) => ({
-        id: booking.id,
-        user_id: booking.user_id,
-        user_name: booking.user_profiles ? `${booking.user_profiles.first_name} ${booking.user_profiles.last_name}` : 'Unknown Customer',
-        user_email: booking.user_profiles?.email,
-        venue_id: booking.venue_id,
-        venue_name: booking.venues?.name || booking.venue_name || 'Unnamed Venue',
-        venue_image: booking.venues?.image_url,
-        booking_date: booking.booking_date,
-        start_time: booking.start_time,
-        end_time: booking.end_time,
-        status: booking.status,
-        total_price: booking.total_price,
-        created_at: booking.created_at,
-        guests: booking.guests,
-        special_requests: booking.special_requests,
-      }));
-      
-      console.log('Formatted bookings:', formattedBookings);
-      setBookings(formattedBookings);
     } catch (error: any) {
       console.error('Error fetching bookings:', error);
+      setError(error.message || 'Failed to load customer bookings.');
       toast({
         title: 'Error',
         description: error.message || 'Failed to load customer bookings.',
@@ -96,6 +148,25 @@ const CustomerBookings = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  const formatBookingsData = (data: any[]) => {
+    return data.map((booking: any) => ({
+      id: booking.id,
+      user_id: booking.user_id,
+      user_name: booking.user_profiles ? `${booking.user_profiles.first_name} ${booking.user_profiles.last_name}` : 'Unknown Customer',
+      user_email: booking.user_profiles?.email,
+      venue_id: booking.venue_id,
+      venue_name: booking.venue_name || 'Unnamed Venue',
+      booking_date: booking.booking_date,
+      start_time: booking.start_time,
+      end_time: booking.end_time,
+      status: booking.status,
+      total_price: booking.total_price,
+      created_at: booking.created_at,
+      guests: booking.guests,
+      special_requests: booking.special_requests,
+    }));
   };
   
   const updateBookingStatus = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
@@ -111,7 +182,10 @@ const CustomerBookings = () => {
         .update({ status })
         .eq('id', bookingId);
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating booking status:', error);
+        throw error;
+      }
       
       // Update local state
       setBookings(prev => 
@@ -142,6 +216,8 @@ const CustomerBookings = () => {
         title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
         description: `The booking has been ${status} successfully.`,
       });
+      
+      console.log('Booking status updated successfully');
     } catch (error: any) {
       console.error(`Error updating booking status:`, error);
       toast({
@@ -222,6 +298,27 @@ const CustomerBookings = () => {
               Past & Cancelled ({pastBookings.length})
             </Button>
           </div>
+          
+          {error && (
+            <Card className="glass-card border-white/10 mb-6">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 text-destructive">
+                  <AlertCircle className="h-5 w-5" />
+                  <div>
+                    <p className="font-semibold">Error loading bookings</p>
+                    <p className="text-sm">{error}</p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={fetchBookings} 
+                  variant="outline" 
+                  className="mt-3"
+                >
+                  Try Again
+                </Button>
+              </CardContent>
+            </Card>
+          )}
           
           {isLoading ? (
             <div className="text-center py-12">

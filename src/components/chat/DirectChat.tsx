@@ -45,6 +45,7 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
     const loadMessages = async () => {
       setIsLoading(true);
       try {
+        console.log('Loading messages between', user.id, 'and', receiverId);
         // Call the get_conversation function
         const { data, error } = await supabase
           .rpc('get_conversation', {
@@ -52,12 +53,17 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
             other_user_id: receiverId
           });
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error from get_conversation:', error);
+          throw error;
+        }
         
         if (data) {
+          console.log('Conversation data received:', data.length, 'messages');
           setMessages(data as Message[]);
           // Mark messages as read
           const unreadMessages = data.filter(msg => !msg.read && msg.receiver_id === user.id);
+          console.log('Number of unread messages:', unreadMessages.length);
           if (unreadMessages.length > 0) {
             await Promise.all(unreadMessages.map(msg => 
               supabase
@@ -79,9 +85,11 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
       }
     };
     
+    // Load messages immediately
     loadMessages();
     
     // Subscribe to new messages
+    console.log('Setting up real-time subscription for messages...');
     const channel = supabase
       .channel('direct_messages')
       .on('postgres_changes', 
@@ -89,9 +97,10 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
           event: 'INSERT', 
           schema: 'public', 
           table: 'messages',
-          filter: `receiver_id=eq.${user.id}` 
+          filter: `sender_id=eq.${receiverId},receiver_id=eq.${user.id}` 
         }, 
         (payload) => {
+          console.log('Received new message via subscription:', payload);
           const newMsg = payload.new as Message;
           setMessages(prev => [...prev, newMsg]);
           
@@ -104,10 +113,36 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
       )
       .subscribe();
     
+    // Also subscribe to messages sent by the current user
+    const outgoingChannel = supabase
+      .channel('outgoing_messages')
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `sender_id=eq.${user.id},receiver_id=eq.${receiverId}` 
+        }, 
+        (payload) => {
+          console.log('Received outgoing message via subscription:', payload);
+          const newMsg = payload.new as Message;
+          setMessages(prev => {
+            // Check if message already exists to avoid duplicates
+            if (prev.some(msg => msg.id === newMsg.id)) {
+              return prev;
+            }
+            return [...prev, newMsg];
+          });
+        }
+      )
+      .subscribe();
+    
     return () => {
+      console.log('Cleaning up message subscriptions');
       supabase.removeChannel(channel);
+      supabase.removeChannel(outgoingChannel);
     };
-  }, [user, receiverId]);
+  }, [user, receiverId, toast]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -120,6 +155,8 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
     
     setIsSending(true);
     try {
+      console.log('Sending message to:', receiverId);
+      
       const messageData = {
         content: newMessage,
         sender_id: user.id,
@@ -131,12 +168,17 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
         read: false
       };
       
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('messages')
-        .insert(messageData);
+        .insert(messageData)
+        .select();
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error sending message:', error);
+        throw error;
+      }
       
+      console.log('Message sent successfully:', data);
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
