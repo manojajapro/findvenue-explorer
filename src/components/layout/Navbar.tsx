@@ -52,10 +52,18 @@ const Navbar = () => {
   // Navigate on logo click based on user role
   const handleLogoClick = () => {
     if (user && isVenueOwner) {
-      navigate('/my-venues');
+      navigate('/my-venues?tab=dashboard');
     } else {
       navigate('/');
     }
+  };
+
+  // Check if a path is active (for highlighting active links)
+  const isActivePath = (path: string) => {
+    if (path === '/my-venues') {
+      return location.pathname === '/my-venues';
+    }
+    return location.pathname === path;
   };
   
   return (
@@ -89,9 +97,24 @@ const Navbar = () => {
             {/* Show venue owner links only for venue owners */}
             {user && isVenueOwner && (
               <>
-                <Link to="/my-venues" className="text-white hover:text-findvenue transition-colors">Dashboard</Link>
-                <Link to="/customer-bookings" className="text-white hover:text-findvenue transition-colors">Customer Bookings</Link>
-                <Link to="/list-venue" className="text-white hover:text-findvenue transition-colors">List Venue</Link>
+                <Link 
+                  to="/my-venues?tab=dashboard" 
+                  className={`transition-colors ${isActivePath('/my-venues') ? 'text-findvenue' : 'text-white hover:text-findvenue'}`}
+                >
+                  Dashboard
+                </Link>
+                <Link 
+                  to="/customer-bookings" 
+                  className={`transition-colors ${isActivePath('/customer-bookings') ? 'text-findvenue' : 'text-white hover:text-findvenue'}`}
+                >
+                  Customer Bookings
+                </Link>
+                <Link 
+                  to="/list-venue" 
+                  className={`transition-colors ${isActivePath('/list-venue') ? 'text-findvenue' : 'text-white hover:text-findvenue'}`}
+                >
+                  List Venue
+                </Link>
               </>
             )}
           </div>
@@ -120,7 +143,7 @@ const Navbar = () => {
                   {isVenueOwner ? (
                     // Venue owner menu items
                     <>
-                      <DropdownMenuItem onClick={() => navigate('/my-venues')} className="cursor-pointer">
+                      <DropdownMenuItem onClick={() => navigate('/my-venues?tab=dashboard')} className="cursor-pointer">
                         <Building2 className="mr-2 h-4 w-4" />
                         <span>My Venues</span>
                       </DropdownMenuItem>
@@ -209,9 +232,30 @@ const Navbar = () => {
                   {/* Mobile navigation for venue owners */}
                   {user && isVenueOwner && (
                     <>
-                      <Link to="/my-venues" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">Dashboard</Link>
-                      <Link to="/customer-bookings" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">Customer Bookings</Link>
-                      <Link to="/list-venue" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">List Venue</Link>
+                      <Link 
+                        to="/my-venues?tab=dashboard" 
+                        className={`p-2 rounded-md transition-colors ${
+                          isActivePath('/my-venues') ? 'bg-findvenue-surface text-findvenue' : 'hover:bg-findvenue-surface'
+                        }`}
+                      >
+                        Dashboard
+                      </Link>
+                      <Link 
+                        to="/customer-bookings" 
+                        className={`p-2 rounded-md transition-colors ${
+                          isActivePath('/customer-bookings') ? 'bg-findvenue-surface text-findvenue' : 'hover:bg-findvenue-surface'
+                        }`}
+                      >
+                        Customer Bookings
+                      </Link>
+                      <Link 
+                        to="/list-venue" 
+                        className={`p-2 rounded-md transition-colors ${
+                          isActivePath('/list-venue') ? 'bg-findvenue-surface text-findvenue' : 'hover:bg-findvenue-surface'
+                        }`}
+                      >
+                        List Venue
+                      </Link>
                     </>
                   )}
                   
@@ -223,7 +267,7 @@ const Navbar = () => {
                       {isVenueOwner ? (
                         // Venue owner links
                         <>
-                          <Link to="/my-venues" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors flex items-center">
+                          <Link to="/my-venues?tab=dashboard" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors flex items-center">
                             <Building2 className="mr-2 h-4 w-4" />
                             <span>My Venues</span>
                           </Link>

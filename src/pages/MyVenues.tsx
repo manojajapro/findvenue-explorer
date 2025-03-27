@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 const MyVenues = () => {
   const { user, isVenueOwner } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [venues, setVenues] = useState<Venue[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +28,24 @@ const MyVenues = () => {
     revenue: 0
   });
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
+
+  // Set active tab from URL query param if present
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get('tab');
+    
+    if (tab === 'venues' || tab === 'bookings') {
+      setActiveTab(tab);
+    } else {
+      // Default to dashboard if no valid tab specified
+      setActiveTab('dashboard');
+      
+      // Update URL to reflect the default tab without causing navigation
+      if (!searchParams.has('tab') || searchParams.get('tab') !== 'dashboard') {
+        navigate('/my-venues?tab=dashboard', { replace: true });
+      }
+    }
+  }, [location.search, navigate]);
 
   // Fetch owner venues
   const fetchVenues = async () => {
@@ -158,6 +178,9 @@ const MyVenues = () => {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
+    
+    // Update URL to reflect the selected tab without full page reload
+    navigate(`/my-venues?tab=${value}`, { replace: true });
     
     if (value === "bookings") {
       navigate('/customer-bookings');

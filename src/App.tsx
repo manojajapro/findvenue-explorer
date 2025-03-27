@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -52,7 +53,7 @@ const HomeRoute = () => {
   const { user, isVenueOwner } = useAuth();
   
   if (user && isVenueOwner) {
-    return <Navigate to="/my-venues" replace />;
+    return <Navigate to="/my-venues?tab=dashboard" replace />;
   }
   
   return <Index />;
@@ -64,7 +65,7 @@ const LoginRoute = () => {
   
   if (user) {
     if (isVenueOwner) {
-      return <Navigate to="/my-venues" replace />;
+      return <Navigate to="/my-venues?tab=dashboard" replace />;
     } else {
       return <Navigate to="/" replace />;
     }
