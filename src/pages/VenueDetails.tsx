@@ -27,7 +27,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
 
-// Map amenities to icons
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
   'Parking': <Car className="w-4 h-4" />,
@@ -45,7 +44,6 @@ const VenueDetails = () => {
   const navigate = useNavigate();
   
   useEffect(() => {
-    // Scroll to top on component mount
     window.scrollTo(0, 0);
     
     const fetchVenueDetails = async () => {
@@ -54,7 +52,6 @@ const VenueDetails = () => {
       setLoading(true);
       
       try {
-        // Fetch venue details
         const { data: venueData, error } = await supabase
           .from('venues')
           .select('*')
@@ -64,7 +61,6 @@ const VenueDetails = () => {
         if (error) throw error;
         
         if (venueData) {
-          // Process owner_info from JSON
           let ownerInfoData = undefined;
           if (venueData.owner_info) {
             const ownerInfo = venueData.owner_info as Record<string, any>;
@@ -75,7 +71,6 @@ const VenueDetails = () => {
             };
           }
           
-          // Process opening_hours from JSON
           let openingHoursData = undefined;
           if (venueData.opening_hours) {
             openingHoursData = venueData.opening_hours as Record<string, {open: string, close: string}>;
@@ -107,7 +102,6 @@ const VenueDetails = () => {
             featured: venueData.featured || false,
             popular: venueData.popular || false,
             availability: venueData.availability || [],
-            // New fields
             latitude: venueData.latitude,
             longitude: venueData.longitude,
             parking: venueData.parking,
@@ -122,7 +116,6 @@ const VenueDetails = () => {
           setVenue(transformedVenue);
           setActiveImage(transformedVenue.imageUrl);
           
-          // Fetch similar venues (same category, different venue)
           const { data: similarData, error: similarError } = await supabase
             .from('venues')
             .select('*')
@@ -134,7 +127,6 @@ const VenueDetails = () => {
           
           if (similarData) {
             const transformedSimilar = similarData.map(venue => {
-              // Process owner_info from JSON for similar venues
               let ownerInfoData = undefined;
               if (venue.owner_info) {
                 const ownerInfo = venue.owner_info as Record<string, any>;
@@ -145,7 +137,6 @@ const VenueDetails = () => {
                 };
               }
               
-              // Process opening_hours from JSON for similar venues
               let openingHoursData = undefined;
               if (venue.opening_hours) {
                 openingHoursData = venue.opening_hours as Record<string, {open: string, close: string}>;
@@ -177,7 +168,6 @@ const VenueDetails = () => {
                 featured: venue.featured || false,
                 popular: venue.popular || false,
                 availability: venue.availability || [],
-                // New fields matching structure
                 latitude: venue.latitude,
                 longitude: venue.longitude,
                 parking: venue.parking,
@@ -193,7 +183,7 @@ const VenueDetails = () => {
             setSimilarVenues(transformedSimilar);
           }
         } else {
-          navigate('/venues'); // Redirect if venue not found
+          navigate('/venues');
         }
       } catch (error) {
         console.error('Error fetching venue details:', error);
@@ -357,7 +347,6 @@ const VenueDetails = () => {
   return (
     <div className="pt-24 pb-16">
       <div className="container mx-auto px-4">
-        {/* Breadcrumb */}
         <div className="mb-6">
           <Link to="/venues" className="flex items-center text-findvenue hover:text-findvenue-light transition-colors">
             <ChevronLeft className="w-4 h-4 mr-1" />
@@ -365,7 +354,6 @@ const VenueDetails = () => {
           </Link>
         </div>
         
-        {/* Gallery */}
         <div className="mb-10">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-3">
@@ -408,9 +396,7 @@ const VenueDetails = () => {
           </div>
         </div>
         
-        {/* Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2">
             <h1 className="text-3xl md:text-4xl font-bold mb-4">{venue?.name}</h1>
             
@@ -481,7 +467,6 @@ const VenueDetails = () => {
                   </div>
                 ))}
                 
-                {/* Show accessibility features if available */}
                 {venue?.accessibilityFeatures?.map((feature, index) => (
                   <div key={`acc-${index}`} className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-findvenue/10 flex items-center justify-center mr-3">
@@ -515,7 +500,6 @@ const VenueDetails = () => {
               </p>
             </div>
             
-            {/* Map */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4">Location</h2>
               {venue && (
@@ -528,12 +512,10 @@ const VenueDetails = () => {
               )}
             </div>
             
-            {/* Additional features - calling the render functions */}
             {venue?.additionalServices && venue.additionalServices.length > 0 && renderAdditionalServices()}
             {venue?.ownerInfo && renderOwnerInfo()}
           </div>
           
-          {/* Sidebar */}
           <div>
             <Card className="p-6 glass-card border-white/10 sticky top-24">
               <div className="mb-4 pb-4 border-b border-white/10">
@@ -560,7 +542,6 @@ const VenueDetails = () => {
                   <span className="font-medium">Check availability</span>
                 </div>
                 
-                {/* Date picker would go here */}
                 <div className="bg-findvenue-surface/50 rounded-md p-3 text-center mb-4">
                   Select a date to check availability
                 </div>
@@ -574,7 +555,6 @@ const VenueDetails = () => {
                 Contact Host
               </Button>
               
-              {/* Payment information */}
               {venue?.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && renderPaymentMethods()}
               
               {renderOpeningHours()}
@@ -582,7 +562,6 @@ const VenueDetails = () => {
           </div>
         </div>
         
-        {/* Similar Venues */}
         {similarVenues.length > 0 && (
           <div className="mt-16">
             <h2 className="text-2xl font-bold mb-6">Similar Venues You Might Like</h2>
