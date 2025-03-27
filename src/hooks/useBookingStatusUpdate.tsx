@@ -28,17 +28,18 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       }
       
       // First, update the booking status in the database
-      const { error: updateError } = await supabase
+      const { error: updateError, data: updateData } = await supabase
         .from('bookings')
         .update({ status })
-        .eq('id', bookingId);
+        .eq('id', bookingId)
+        .select();
         
       if (updateError) {
         console.error('Error updating booking status:', updateError);
         throw updateError;
       }
       
-      console.log(`Database update completed for booking ${bookingId}`);
+      console.log(`Database update completed for booking ${bookingId}:`, updateData);
       
       // Immediately update local state to show the change
       setBookings(prev => 
@@ -47,8 +48,28 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         )
       );
       
-      // Verify the update was successful by fetching the booking
-      const isVerified = await verifyBookingStatus(bookingId, status);
+      // Wait longer for database consistency
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Verify the update was successful by fetching the booking directly
+      const { data: verifiedBooking, error: verifyError } = await supabase
+        .from('bookings')
+        .select('status')
+        .eq('id', bookingId)
+        .single();
+      
+      if (verifyError) {
+        console.error('Error verifying booking status update:', verifyError);
+        throw new Error('Failed to verify booking status update. Please check the logs.');
+      }
+      
+      const isVerified = verifiedBooking?.status === status;
+      
+      console.log(`Booking ${bookingId} status verification:`, {
+        expectedStatus: status,
+        actualStatus: verifiedBooking?.status,
+        isVerified
+      });
       
       if (!isVerified) {
         console.error(`Update verification failed: Booking ${bookingId} status was not updated properly in the database.`);
@@ -86,7 +107,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       
       console.log('Booking status updated successfully, now fetching all bookings...');
       
-      // Fetch bookings again to ensure data is fresh
+      // Fetch bookings again to ensure data is fresh - use await here
       await fetchBookings();
       
     } catch (error: any) {

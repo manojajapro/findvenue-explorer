@@ -29,8 +29,8 @@ export const verifyBookingStatus = async (bookingId: string, expectedStatus: str
   try {
     console.log(`Verifying booking ${bookingId} has status ${expectedStatus}...`);
     
-    // Wait a short time to ensure database consistency
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait a bit longer to ensure database consistency
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     const { data, error } = await supabase
       .from('bookings')
@@ -52,5 +52,53 @@ export const verifyBookingStatus = async (bookingId: string, expectedStatus: str
   } catch (error) {
     console.error('Booking status verification failed:', error);
     return false;
+  }
+};
+
+// New function to directly update booking status and return confirmation
+export const updateBookingStatusInDatabase = async (bookingId: string, status: string) => {
+  try {
+    console.log(`Direct database update: Setting booking ${bookingId} status to ${status}...`);
+    
+    // Execute the update
+    const { data, error } = await supabase
+      .from('bookings')
+      .update({ status })
+      .eq('id', bookingId)
+      .select();
+      
+    if (error) {
+      console.error('Error in direct database update:', error);
+      throw error;
+    }
+    
+    console.log(`Direct database update completed:`, data);
+    
+    // Wait to ensure consistency
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Verify the update
+    const { data: verifiedData, error: verifyError } = await supabase
+      .from('bookings')
+      .select('status')
+      .eq('id', bookingId)
+      .single();
+      
+    if (verifyError) {
+      console.error('Error verifying direct database update:', verifyError);
+      throw verifyError;
+    }
+    
+    const updateSuccessful = verifiedData?.status === status;
+    
+    console.log(`Direct database update verification: success=${updateSuccessful}, status=${verifiedData?.status}`);
+    
+    return {
+      success: updateSuccessful,
+      data: verifiedData
+    };
+  } catch (error) {
+    console.error('Direct database update failed:', error);
+    throw error;
   }
 };
