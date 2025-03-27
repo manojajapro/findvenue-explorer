@@ -3,317 +3,277 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, X, Heart, Calendar, Settings, MapPin, Book, LayoutDashboard } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
+import { useAuth } from '@/hooks/useAuth';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
-import { useAuth } from '@/hooks/useAuth';
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Menu, X, ChevronDown, Building2, CalendarClock, Heart, LogOut, User, Settings } from 'lucide-react';
 
 const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
+  const { user, profile, signOut, isVenueOwner } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, signOut, isVenueOwner } = useAuth();
   
+  // Change navbar appearance on scroll
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      const offset = window.scrollY;
+      setScrolled(offset > 50);
     };
     
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
-  const navItems = [
-    { name: 'Home', path: '/' },
-    { name: 'Venues', path: '/venues' },
-    { name: 'Categories', path: '/categories' },
-    { name: 'Cities', path: '/cities' },
-  ];
+  // Close mobile menu when location changes
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location]);
   
-  const handleLogout = async () => {
+  const handleSignOut = async () => {
     await signOut();
-    navigate('/');
+    navigate('/login');
   };
   
-  const dropdownMenuContent = (
-    <>
-      <div className="px-2 py-1.5">
-        <p className="text-sm font-medium text-findvenue-text">{profile?.first_name} {profile?.last_name}</p>
-        <p className="text-xs text-findvenue-text-muted">
-          {isVenueOwner ? 'Venue Owner' : 'Customer'}
-        </p>
-      </div>
-      <DropdownMenuSeparator className="bg-white/10" />
-      <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
-        <Link to="/profile" className="w-full flex items-center">
-          <Settings className="mr-2 h-4 w-4" />
-          Profile Settings
-        </Link>
-      </DropdownMenuItem>
-      
-      {!isVenueOwner && (
-        <>
-          <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
-            <Link to="/bookings" className="w-full flex items-center">
-              <Calendar className="mr-2 h-4 w-4" />
-              My Bookings
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
-            <Link to="/favorites" className="w-full flex items-center">
-              <Heart className="mr-2 h-4 w-4" />
-              My Favorites
-            </Link>
-          </DropdownMenuItem>
-        </>
-      )}
-      
-      {isVenueOwner && (
-        <>
-          <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
-            <Link to="/my-venues" className="w-full flex items-center">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
-            <Link to="/customer-bookings" className="w-full flex items-center">
-              <Book className="mr-2 h-4 w-4" />
-              Customer Bookings
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
-            <Link to="/my-venues" className="w-full flex items-center">
-              <MapPin className="mr-2 h-4 w-4" />
-              My Venues
-            </Link>
-          </DropdownMenuItem>
-        </>
-      )}
-      
-      <DropdownMenuSeparator className="bg-white/10" />
-      <DropdownMenuItem className="cursor-pointer hover:bg-destructive/10 text-destructive" onClick={handleLogout}>
-        Log out
-      </DropdownMenuItem>
-    </>
-  );
+  // Get user initials for avatar fallback
+  const getUserInitials = () => {
+    if (!profile) return 'U';
+    return `${profile.first_name.charAt(0)}${profile.last_name.charAt(0)}`;
+  };
   
-  const mobileMenu = (
-    <>
-      {user && (
-        <div className="flex items-center space-x-3 mb-6 p-2">
-          <Avatar className="h-10 w-10 border border-findvenue/20">
-            <AvatarImage src={profile?.profile_image || "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png"} alt={profile?.first_name} />
-            <AvatarFallback className="bg-findvenue/10 text-findvenue">
-              {profile?.first_name?.charAt(0) || ''}{profile?.last_name?.charAt(0) || ''}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="text-sm font-medium text-findvenue-text">{profile?.first_name} {profile?.last_name}</p>
-            <p className="text-xs text-findvenue-text-muted">
-              {isVenueOwner ? 'Venue Owner' : 'Customer'}
-            </p>
-          </div>
-        </div>
-      )}
-      
-      {/* Only show navigation items to non-venue owners */}
-      {(!user || !isVenueOwner) && (
-        <div className="space-y-4 py-4">
-          {navItems.map((item) => (
-            <Link
-              key={item.name}
-              to={item.path}
-              className={`block px-2 py-2 text-lg ${
-                location.pathname === item.path ? 'text-findvenue font-medium' : 'text-findvenue-text'
-              }`}
-            >
-              {item.name}
-            </Link>
-          ))}
-        </div>
-      )}
-      
-      {/* For venue owners, show dashboard link instead */}
-      {user && isVenueOwner && (
-        <div className="space-y-4 py-4">
-          <Link
-            to="/my-venues"
-            className={`block px-2 py-2 text-lg ${
-              location.pathname === '/my-venues' ? 'text-findvenue font-medium' : 'text-findvenue-text'
-            }`}
-          >
-            Dashboard
-          </Link>
-        </div>
-      )}
-      
-      <div className="mt-auto space-y-4">
-        {user ? (
-          <>
-            <Link to="/profile" className="block">
-              <Button variant="outline" className="w-full border-findvenue text-findvenue flex items-center">
-                <Settings className="mr-2 h-4 w-4" />
-                Profile Settings
-              </Button>
-            </Link>
-            
-            {!isVenueOwner ? (
-              <>
-                <Link to="/bookings" className="block">
-                  <Button variant="outline" className="w-full border-findvenue text-findvenue flex items-center">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    My Bookings
-                  </Button>
-                </Link>
-                <Link to="/favorites" className="block">
-                  <Button variant="outline" className="w-full border-findvenue text-findvenue flex items-center">
-                    <Heart className="mr-2 h-4 w-4" />
-                    My Favorites
-                  </Button>
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link to="/customer-bookings" className="block">
-                  <Button variant="outline" className="w-full border-findvenue text-findvenue flex items-center">
-                    <Book className="mr-2 h-4 w-4" />
-                    Customer Bookings
-                  </Button>
-                </Link>
-                <Link to="/my-venues" className="block">
-                  <Button variant="outline" className="w-full border-findvenue text-findvenue flex items-center">
-                    <MapPin className="mr-2 h-4 w-4" />
-                    My Venues
-                  </Button>
-                </Link>
-              </>
-            )}
-            
-            {isVenueOwner && (
-              <Link to="/list-venue" className="block">
-                <Button className="w-full bg-findvenue hover:bg-findvenue-dark">
-                  List Your Venue
-                </Button>
-              </Link>
-            )}
-            
-            <Button 
-              variant="outline" 
-              className="w-full border-white/10 text-destructive hover:bg-destructive/10"
-              onClick={handleLogout}
-            >
-              Log out
-            </Button>
-          </>
-        ) : (
-          <>
-            <Link to="/login">
-              <Button variant="ghost" className="hover:bg-white/5">
-                Log in
-              </Button>
-            </Link>
-            <Link to="/venue-owner">
-              <Button className="bg-findvenue hover:bg-findvenue-dark">
-                List Your Venue
-              </Button>
-            </Link>
-          </>
-        )}
-      </div>
-    </>
-  );
+  // Navigate on logo click based on user role
+  const handleLogoClick = () => {
+    if (user && isVenueOwner) {
+      navigate('/my-venues');
+    } else {
+      navigate('/');
+    }
+  };
   
   return (
     <header 
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'py-3 backdrop-blur-lg bg-findvenue-dark-bg/80 shadow-md' : 'py-5 bg-transparent'
+      className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+        scrolled || location.pathname !== '/' 
+          ? 'bg-findvenue-card-bg/50 backdrop-blur-md border-b border-white/10 py-2' 
+          : 'bg-transparent py-4'
       }`}
     >
-      <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
-        <Link to={isVenueOwner ? "/my-venues" : "/"} className="flex items-center">
-          <span className="text-2xl font-bold gradient-text">FindVenue</span>
-        </Link>
-        
-        {/* Only show navigation items to non-venue owners */}
-        {(!user || !isVenueOwner) && (
-          <nav className="hidden md:flex items-center space-x-8">
-            {navItems.map((item) => (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={`text-sm font-medium transition-colors hover:text-findvenue relative ${
-                  location.pathname === item.path ? 'text-findvenue after:content-[""] after:absolute after:w-full after:h-0.5 after:bg-findvenue after:bottom-[-6px] after:left-0' : 'text-findvenue-text'
-                }`}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </nav>
-        )}
-        
-        <div className="hidden md:flex items-center space-x-4">
-          {user ? (
-            <>
-              {isVenueOwner && (
-                <Link to="/list-venue">
-                  <Button className="bg-findvenue hover:bg-findvenue-dark">
-                    List Your Venue
-                  </Button>
-                </Link>
-              )}
+      <div className="container mx-auto px-4">
+        <nav className="flex justify-between items-center">
+          {/* Logo */}
+          <div className="flex items-center cursor-pointer" onClick={handleLogoClick}>
+            <h1 className="text-lg md:text-xl font-bold text-white">FindVenue</h1>
+            <span className="text-findvenue ml-1 font-normal text-lg md:text-xl">Plus</span>
+          </div>
+          
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center space-x-8">
+            {/* Show navigation items only for customers, not for venue owners */}
+            {(!user || !isVenueOwner) && (
+              <>
+                <Link to="/" className="text-white hover:text-findvenue transition-colors">Home</Link>
+                <Link to="/venues" className="text-white hover:text-findvenue transition-colors">Venues</Link>
+                <Link to="/categories" className="text-white hover:text-findvenue transition-colors">Categories</Link>
+                <Link to="/cities" className="text-white hover:text-findvenue transition-colors">Cities</Link>
+              </>
+            )}
+            
+            {/* Show venue owner links only for venue owners */}
+            {user && isVenueOwner && (
+              <>
+                <Link to="/my-venues" className="text-white hover:text-findvenue transition-colors">Dashboard</Link>
+                <Link to="/customer-bookings" className="text-white hover:text-findvenue transition-colors">Customer Bookings</Link>
+                <Link to="/list-venue" className="text-white hover:text-findvenue transition-colors">List Venue</Link>
+              </>
+            )}
+          </div>
+          
+          {/* Auth Buttons */}
+          <div className="hidden md:flex items-center space-x-4">
+            {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <div className="flex items-center space-x-3 cursor-pointer">
-                    <Avatar className="h-9 w-9 border border-findvenue/20">
-                      <AvatarImage src={profile?.profile_image || "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png"} alt={profile?.first_name} />
-                      <AvatarFallback className="bg-findvenue/10 text-findvenue">
-                        {profile?.first_name?.charAt(0) || ''}{profile?.last_name?.charAt(0) || ''}
-                      </AvatarFallback>
+                  <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={profile?.profile_image || ''} alt={profile?.first_name || 'User'} />
+                      <AvatarFallback className="bg-findvenue text-white">{getUserInitials()}</AvatarFallback>
                     </Avatar>
-                    <span className="text-sm font-medium">{profile?.first_name} {profile?.last_name}</span>
-                  </div>
+                  </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-findvenue-card-bg border-white/10">
-                  {dropdownMenuContent}
+                <DropdownMenuContent className="w-56 bg-findvenue-card-bg border-white/10" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{profile?.first_name} {profile?.last_name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{profile?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  
+                  {isVenueOwner ? (
+                    // Venue owner menu items
+                    <>
+                      <DropdownMenuItem onClick={() => navigate('/my-venues')} className="cursor-pointer">
+                        <Building2 className="mr-2 h-4 w-4" />
+                        <span>My Venues</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/customer-bookings')} className="cursor-pointer">
+                        <CalendarClock className="mr-2 h-4 w-4" />
+                        <span>Customer Bookings</span>
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    // Customer menu items
+                    <>
+                      <DropdownMenuItem onClick={() => navigate('/bookings')} className="cursor-pointer">
+                        <CalendarClock className="mr-2 h-4 w-4" />
+                        <span>My Bookings</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/favorites')} className="cursor-pointer">
+                        <Heart className="mr-2 h-4 w-4" />
+                        <span>Favorites</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  
+                  <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </>
-          ) : (
-            <>
-              <Link to="/login">
-                <Button variant="ghost" className="hover:bg-white/5">
-                  Log in
+            ) : (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" className="text-white hover:text-findvenue hover:bg-findvenue-surface/30">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link to="/venue-owner">
+                  <Button className="bg-findvenue hover:bg-findvenue-dark">Become a Venue Owner</Button>
+                </Link>
+              </>
+            )}
+          </div>
+          
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" className="h-10 w-10 p-0">
+                  <span className="sr-only">Toggle menu</span>
+                  {isOpen ? (
+                    <X className="h-6 w-6" />
+                  ) : (
+                    <Menu className="h-6 w-6" />
+                  )}
                 </Button>
-              </Link>
-              <Link to="/venue-owner">
-                <Button className="bg-findvenue hover:bg-findvenue-dark">
-                  List Your Venue
-                </Button>
-              </Link>
-            </>
-          )}
-        </div>
-        
-        <Sheet>
-          <SheetTrigger asChild className="md:hidden">
-            <Button variant="ghost" size="icon" className="mr-2">
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Toggle menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="bg-findvenue-card-bg border-l border-white/10">
-            <div className="flex flex-col h-full">
-              {mobileMenu}
-            </div>
-          </SheetContent>
-        </Sheet>
+              </SheetTrigger>
+              <SheetContent side="right" className="bg-findvenue-card-bg border-white/10 pt-10">
+                <div className="flex flex-col space-y-4">
+                  {user ? (
+                    <div className="flex items-center p-2 mb-4">
+                      <Avatar className="h-9 w-9 mr-3">
+                        <AvatarImage src={profile?.profile_image || ''} alt={profile?.first_name || 'User'} />
+                        <AvatarFallback className="bg-findvenue text-white">{getUserInitials()}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{profile?.first_name} {profile?.last_name}</span>
+                        <span className="text-xs text-findvenue-text-muted">{isVenueOwner ? 'Venue Owner' : 'Customer'}</span>
+                      </div>
+                    </div>
+                  ) : null}
+                  
+                  {/* Mobile navigation for non-venue-owners */}
+                  {(!user || !isVenueOwner) && (
+                    <>
+                      <Link to="/" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">Home</Link>
+                      <Link to="/venues" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">Venues</Link>
+                      <Link to="/categories" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">Categories</Link>
+                      <Link to="/cities" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">Cities</Link>
+                    </>
+                  )}
+                  
+                  {/* Mobile navigation for venue owners */}
+                  {user && isVenueOwner && (
+                    <>
+                      <Link to="/my-venues" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">Dashboard</Link>
+                      <Link to="/customer-bookings" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">Customer Bookings</Link>
+                      <Link to="/list-venue" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">List Venue</Link>
+                    </>
+                  )}
+                  
+                  {user ? (
+                    // Logged in mobile options
+                    <>
+                      <div className="h-px bg-white/10 my-2"></div>
+                      
+                      {isVenueOwner ? (
+                        // Venue owner links
+                        <>
+                          <Link to="/my-venues" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors flex items-center">
+                            <Building2 className="mr-2 h-4 w-4" />
+                            <span>My Venues</span>
+                          </Link>
+                          <Link to="/customer-bookings" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors flex items-center">
+                            <CalendarClock className="mr-2 h-4 w-4" />
+                            <span>Customer Bookings</span>
+                          </Link>
+                        </>
+                      ) : (
+                        // Customer links
+                        <>
+                          <Link to="/bookings" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors flex items-center">
+                            <CalendarClock className="mr-2 h-4 w-4" />
+                            <span>My Bookings</span>
+                          </Link>
+                          <Link to="/favorites" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors flex items-center">
+                            <Heart className="mr-2 h-4 w-4" />
+                            <span>Favorites</span>
+                          </Link>
+                        </>
+                      )}
+                      
+                      <Link to="/profile" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors flex items-center">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </Link>
+                      <div className="h-px bg-white/10 my-2"></div>
+                      <button 
+                        onClick={handleSignOut} 
+                        className="p-2 hover:bg-findvenue-surface rounded-md transition-colors text-left flex items-center"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Log out</span>
+                      </button>
+                    </>
+                  ) : (
+                    // Logged out mobile options
+                    <>
+                      <div className="h-px bg-white/10 my-2"></div>
+                      <Link to="/login" className="p-2 hover:bg-findvenue-surface rounded-md transition-colors">Sign In</Link>
+                      <Link to="/venue-owner">
+                        <Button className="w-full bg-findvenue hover:bg-findvenue-dark mt-2">Become a Venue Owner</Button>
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+        </nav>
       </div>
     </header>
   );

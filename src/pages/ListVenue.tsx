@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -10,9 +11,14 @@ import { Switch } from '@/components/ui/switch';
 import { saudiCities } from '@/data/cities';
 import { categories } from '@/data/categories';
 import { Check, Upload, AlertCircle, ImageIcon } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 const ListVenue = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<string[]>(['/lovable-uploads/25610b8c-bf06-4ae3-8110-9c4e8133a31b.png']);
@@ -117,7 +123,7 @@ const ListVenue = () => {
   };
   
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate form data
@@ -132,51 +138,103 @@ const ListVenue = () => {
       return;
     }
     
+    if (!user || !profile) {
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in to add a venue',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Convert amenities object to array for Supabase
+      const amenitiesArray = Object.entries(formData.amenities)
+        .filter(([_, value]) => value)
+        .map(([key]) => {
+          // Convert camelCase to readable format
+          return key === 'wifi' ? 'WiFi' :
+                 key === 'soundSystem' ? 'Sound System' :
+                 key === 'videoEquipment' ? 'Video Equipment' :
+                 key.charAt(0).toUpperCase() + key.slice(1);
+        });
+      
+      // Convert availability object to array for Supabase
+      const availabilityArray = Object.entries(formData.availability)
+        .filter(([_, value]) => value)
+        .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
+      
+      // Find city and category names from IDs
+      const cityName = saudiCities.find(city => city.id === formData.city)?.name || '';
+      const categoryName = categories.find(cat => cat.id === formData.category)?.name || '';
+      
+      // Prepare owner info
+      const ownerInfo = {
+        user_id: user.id,
+        name: `${profile.first_name} ${profile.last_name}`,
+        contact: profile.email,
+        response_time: "24 hours"
+      };
+      
+      // Calculate starting price based on pricing type
+      const startingPrice = parseInt(formData.price);
+      
+      // Prepare venue data for Supabase
+      const venueData = {
+        name: formData.name,
+        description: formData.description,
+        address: formData.address,
+        city_id: formData.city,
+        city_name: cityName,
+        category_id: formData.category,
+        category_name: categoryName,
+        min_capacity: parseInt(formData.minCapacity),
+        max_capacity: parseInt(formData.maxCapacity),
+        starting_price: startingPrice,
+        price_per_person: formData.pricingType === 'perPerson' ? startingPrice : null,
+        image_url: uploadedImages[0],
+        gallery_images: uploadedImages,
+        amenities: amenitiesArray,
+        availability: availabilityArray,
+        wifi: formData.amenities.wifi,
+        parking: formData.amenities.parking,
+        owner_info: ownerInfo,
+        // Set approval status (venues initially need approval)
+        featured: false,
+        popular: false,
+        // Add default values
+        currency: 'SAR',
+        rating: 0,
+        reviews_count: 0
+      };
+      
+      // Submit to Supabase
+      const { data, error } = await supabase
+        .from('venues')
+        .insert(venueData)
+        .select();
+      
+      if (error) throw error;
+      
       toast({
         title: 'Venue Submitted',
-        description: 'Your venue has been submitted for review'
+        description: 'Your venue has been submitted and is pending approval'
       });
+      
+      // Navigate to my venues page
+      navigate('/my-venues');
+    } catch (error: any) {
+      console.error('Error submitting venue:', error);
+      toast({
+        title: 'Error Submitting Venue',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive'
+      });
+    } finally {
       setIsLoading(false);
-      
-      // Reset form and go back to step 1
-      setFormData({
-        name: '',
-        description: '',
-        address: '',
-        city: '',
-        category: '',
-        minCapacity: '',
-        maxCapacity: '',
-        price: '',
-        pricingType: 'flat',
-        amenities: {
-          wifi: false,
-          parking: false,
-          catering: false,
-          soundSystem: false,
-          lighting: false,
-          stage: false,
-          videoEquipment: false
-        },
-        availability: {
-          monday: false,
-          tuesday: false,
-          wednesday: false,
-          thursday: false,
-          friday: false,
-          saturday: false,
-          sunday: false
-        }
-      });
-      setStep(1);
-      setUploadedImages([]);
-      
-      // Redirect would happen here
-    }, 2000);
+    }
   };
   
   return (
