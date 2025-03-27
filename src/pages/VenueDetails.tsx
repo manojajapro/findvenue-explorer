@@ -372,10 +372,10 @@ const VenueDetails = () => {
               <div className="relative rounded-lg overflow-hidden aspect-[16/9]">
                 <img 
                   src={activeImage} 
-                  alt={venue.name} 
+                  alt={venue?.name} 
                   className="w-full h-full object-cover transform transition-transform duration-700 hover:scale-105"
                 />
-                {venue.featured && (
+                {venue?.featured && (
                   <div className="absolute top-4 left-4">
                     <Badge className="bg-findvenue-gold text-black font-medium px-3 py-1">
                       Featured
@@ -393,7 +393,7 @@ const VenueDetails = () => {
               </div>
             </div>
             <div className="grid grid-cols-4 md:grid-cols-1 gap-2">
-              {venue.galleryImages.slice(0, 4).map((img, index) => (
+              {venue?.galleryImages?.slice(0, 4).map((img, index) => (
                 <div 
                   key={index}
                   className={`rounded-lg overflow-hidden aspect-square cursor-pointer transition-all duration-300 ${
@@ -412,32 +412,32 @@ const VenueDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">{venue.name}</h1>
+            <h1 className="text-3xl md:text-4xl font-bold mb-4">{venue?.name}</h1>
             
             <div className="flex flex-wrap items-center gap-4 mb-6 text-sm">
               <div className="flex items-center">
                 <MapPin className="w-4 h-4 mr-1 text-findvenue" />
-                <span>{venue.address}, {venue.city}</span>
+                <span>{venue?.address}, {venue?.city}</span>
               </div>
               <div className="flex items-center">
                 <Users className="w-4 h-4 mr-1 text-findvenue" />
-                <span>Capacity: {venue.capacity.min}-{venue.capacity.max} guests</span>
+                <span>Capacity: {venue?.capacity.min}-{venue?.capacity.max} guests</span>
               </div>
               <div className="flex items-center">
                 <Star className="w-4 h-4 mr-1 text-findvenue-gold fill-findvenue-gold" />
-                <span>{venue.rating} ({venue.reviews} reviews)</span>
+                <span>{venue?.rating} ({venue?.reviews} reviews)</span>
               </div>
               <Badge className="bg-findvenue/20 text-findvenue border-0">
-                {venue.category}
+                {venue?.category}
               </Badge>
             </div>
             
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-3">About this venue</h2>
-              <p className="text-findvenue-text-muted mb-4">{venue.description}</p>
+              <p className="text-findvenue-text-muted mb-4">{venue?.description}</p>
               
               <div className="flex flex-wrap gap-4 mt-6">
-                {venue.wifi !== undefined && (
+                {venue?.wifi !== undefined && (
                   <div className="flex items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${venue.wifi ? 'bg-findvenue/10 text-findvenue' : 'bg-findvenue-surface/50 text-findvenue-text-muted'}`}>
                       <Wifi className="w-4 h-4" />
@@ -452,7 +452,7 @@ const VenueDetails = () => {
                   </div>
                 )}
                 
-                {venue.parking !== undefined && (
+                {venue?.parking !== undefined && (
                   <div className="flex items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-2 ${venue.parking ? 'bg-findvenue/10 text-findvenue' : 'bg-findvenue-surface/50 text-findvenue-text-muted'}`}>
                       <Car className="w-4 h-4" />
@@ -472,7 +472,7 @@ const VenueDetails = () => {
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4">Amenities</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {venue.amenities.map((amenity, index) => (
+                {venue?.amenities?.map((amenity, index) => (
                   <div key={index} className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-findvenue/10 flex items-center justify-center mr-3">
                       {amenityIcons[amenity] || <Clock className="w-4 h-4 text-findvenue" />}
@@ -482,7 +482,7 @@ const VenueDetails = () => {
                 ))}
                 
                 {/* Show accessibility features if available */}
-                {venue.accessibilityFeatures?.map((feature, index) => (
+                {venue?.accessibilityFeatures?.map((feature, index) => (
                   <div key={`acc-${index}`} className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-findvenue/10 flex items-center justify-center mr-3">
                       <AccessibilityIcon className="w-4 h-4 text-findvenue" />
@@ -497,7 +497,7 @@ const VenueDetails = () => {
               <h2 className="text-xl font-semibold mb-4">Availability</h2>
               <div className="grid grid-cols-7 gap-2 mb-4">
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
-                  const isAvailable = venue.availability?.includes(day);
+                  const isAvailable = venue?.availability?.includes(day);
                   return (
                     <div
                       key={day}
@@ -518,59 +518,19 @@ const VenueDetails = () => {
             {/* Map */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4">Location</h2>
-              <VenueLocationMap 
-                name={venue.name}
-                address={venue.address}
-                latitude={venue.latitude}
-                longitude={venue.longitude}
-              />
+              {venue && (
+                <VenueLocationMap 
+                  name={venue.name}
+                  address={venue.address || ''}
+                  latitude={venue.latitude}
+                  longitude={venue.longitude}
+                />
+              )}
             </div>
             
             {/* Additional features - calling the render functions */}
-            {venue.additionalServices && venue.additionalServices.length > 0 && (
-              <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
-                <div className="p-4 border-b border-white/10">
-                  <h3 className="font-semibold flex items-center">
-                    <Sparkles className="w-4 h-4 mr-2 text-findvenue" />
-                    Additional Services
-                  </h3>
-                </div>
-                <div className="p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {venue.additionalServices.map((service, index) => (
-                      <div key={index} className="flex items-center">
-                        <Check className="w-4 h-4 mr-2 text-findvenue" />
-                        <span>{service}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {venue.ownerInfo && (
-              <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
-                <div className="p-4 border-b border-white/10">
-                  <h3 className="font-semibold">Venue Host Information</h3>
-                </div>
-                <div className="p-4">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-findvenue-text-muted mb-1">Host Name</p>
-                      <p className="font-medium">{venue.ownerInfo.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-findvenue-text-muted mb-1">Contact</p>
-                      <p className="font-medium">{venue.ownerInfo.contact}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
-                      <p className="font-medium">{venue.ownerInfo.responseTime}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {venue?.additionalServices && venue.additionalServices.length > 0 && renderAdditionalServices()}
+            {venue?.ownerInfo && renderOwnerInfo()}
           </div>
           
           {/* Sidebar */}
@@ -578,18 +538,18 @@ const VenueDetails = () => {
             <Card className="p-6 glass-card border-white/10 sticky top-24">
               <div className="mb-4 pb-4 border-b border-white/10">
                 <div className="text-2xl font-bold mb-1">
-                  {venue.pricing.currency} {venue.pricing.startingPrice.toLocaleString()}
+                  {venue?.pricing.currency} {venue?.pricing.startingPrice.toLocaleString()}
                 </div>
                 <div className="text-findvenue-text-muted text-sm">
                   Starting price
                 </div>
               </div>
               
-              {venue.pricing.pricePerPerson && (
+              {venue?.pricing.pricePerPerson && (
                 <div className="mb-4 pb-4 border-b border-white/10">
                   <div className="flex justify-between items-center">
                     <span>Price per person</span>
-                    <span>{venue.pricing.currency} {venue.pricing.pricePerPerson}</span>
+                    <span>{venue?.pricing.currency} {venue?.pricing.pricePerPerson}</span>
                   </div>
                 </div>
               )}
@@ -615,25 +575,7 @@ const VenueDetails = () => {
               </Button>
               
               {/* Payment information */}
-              {venue.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && (
-                <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mt-6 mb-6">
-                  <div className="p-4 border-b border-white/10">
-                    <h3 className="font-semibold flex items-center">
-                      <CreditCard className="w-4 h-4 mr-2 text-findvenue" />
-                      Accepted Payment Methods
-                    </h3>
-                  </div>
-                  <div className="p-4">
-                    <div className="flex flex-wrap gap-2">
-                      {venue.acceptedPaymentMethods.map((method, index) => (
-                        <Badge key={index} variant="secondary" className="bg-findvenue-surface/50">
-                          {method}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+              {venue?.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && renderPaymentMethods()}
               
               {renderOpeningHours()}
             </Card>
