@@ -49,6 +49,7 @@ export interface Venue {
     name: string;
     contact: string;
     responseTime: string;
+    user_id?: string; // Add user_id to the ownerInfo object
   };
   additionalServices?: string[];
 }
@@ -143,7 +144,8 @@ export const useSupabaseVenues = () => {
             ownerInfoData = {
               name: ownerInfo.name as string,
               contact: ownerInfo.contact as string,
-              responseTime: ownerInfo.response_time as string
+              responseTime: ownerInfo.response_time as string,
+              user_id: ownerInfo.user_id as string
             };
           }
           
