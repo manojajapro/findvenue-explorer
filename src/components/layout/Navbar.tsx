@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, X, Heart, Calendar, Settings, MapPin, Book } from 'lucide-react';
+import { Menu, X, Heart, Calendar, Settings, MapPin, Book, LayoutDashboard } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   DropdownMenu,
@@ -76,6 +77,12 @@ const Navbar = () => {
       {isVenueOwner && (
         <>
           <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
+            <Link to="/my-venues" className="w-full flex items-center">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Dashboard
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
             <Link to="/customer-bookings" className="w-full flex items-center">
               <Book className="mr-2 h-4 w-4" />
               Customer Bookings
@@ -116,19 +123,36 @@ const Navbar = () => {
         </div>
       )}
       
-      <div className="space-y-4 py-4">
-        {navItems.map((item) => (
+      {/* Only show navigation items to non-venue owners */}
+      {(!user || !isVenueOwner) && (
+        <div className="space-y-4 py-4">
+          {navItems.map((item) => (
+            <Link
+              key={item.name}
+              to={item.path}
+              className={`block px-2 py-2 text-lg ${
+                location.pathname === item.path ? 'text-findvenue font-medium' : 'text-findvenue-text'
+              }`}
+            >
+              {item.name}
+            </Link>
+          ))}
+        </div>
+      )}
+      
+      {/* For venue owners, show dashboard link instead */}
+      {user && isVenueOwner && (
+        <div className="space-y-4 py-4">
           <Link
-            key={item.name}
-            to={item.path}
+            to="/my-venues"
             className={`block px-2 py-2 text-lg ${
-              location.pathname === item.path ? 'text-findvenue font-medium' : 'text-findvenue-text'
+              location.pathname === '/my-venues' ? 'text-findvenue font-medium' : 'text-findvenue-text'
             }`}
           >
-            {item.name}
+            Dashboard
           </Link>
-        ))}
-      </div>
+        </div>
+      )}
       
       <div className="mt-auto space-y-4">
         {user ? (
@@ -213,23 +237,26 @@ const Navbar = () => {
       }`}
     >
       <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
-        <Link to="/" className="flex items-center">
+        <Link to={isVenueOwner ? "/my-venues" : "/"} className="flex items-center">
           <span className="text-2xl font-bold gradient-text">FindVenue</span>
         </Link>
         
-        <nav className="hidden md:flex items-center space-x-8">
-          {navItems.map((item) => (
-            <Link
-              key={item.name}
-              to={item.path}
-              className={`text-sm font-medium transition-colors hover:text-findvenue relative ${
-                location.pathname === item.path ? 'text-findvenue after:content-[""] after:absolute after:w-full after:h-0.5 after:bg-findvenue after:bottom-[-6px] after:left-0' : 'text-findvenue-text'
-              }`}
-            >
-              {item.name}
-            </Link>
-          ))}
-        </nav>
+        {/* Only show navigation items to non-venue owners */}
+        {(!user || !isVenueOwner) && (
+          <nav className="hidden md:flex items-center space-x-8">
+            {navItems.map((item) => (
+              <Link
+                key={item.name}
+                to={item.path}
+                className={`text-sm font-medium transition-colors hover:text-findvenue relative ${
+                  location.pathname === item.path ? 'text-findvenue after:content-[""] after:absolute after:w-full after:h-0.5 after:bg-findvenue after:bottom-[-6px] after:left-0' : 'text-findvenue-text'
+                }`}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </nav>
+        )}
         
         <div className="hidden md:flex items-center space-x-4">
           {user ? (

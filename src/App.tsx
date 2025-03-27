@@ -51,6 +51,19 @@ const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element
   return children;
 };
 
+// Home page route with role-based redirection
+const HomeRoute = () => {
+  const { user, isVenueOwner } = useAuth();
+  
+  // If user is a venue owner, redirect to dashboard
+  if (user && isVenueOwner) {
+    return <Navigate to="/my-venues" replace />;
+  }
+  
+  // Otherwise show the regular index page
+  return <Index />;
+};
+
 // Scroll to top on route change
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -97,7 +110,7 @@ const AppContent = () => {
       <Navbar />
       <main className="min-h-screen">
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<HomeRoute />} />
           <Route path="/venue/:id" element={<VenueDetails />} />
           <Route path="/login" element={<Login />} />
           <Route path="/venues" element={<Venues />} />
