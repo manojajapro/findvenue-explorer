@@ -88,16 +88,8 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       
       setMessage('');
       
-      // Offer to navigate to messages
-      toast({
-        title: 'View Conversation',
-        description: 'Go to messages to view your conversation with the venue owner',
-        action: (
-          <Button onClick={() => navigate('/messages')} variant="outline" size="sm">
-            Go to Messages
-          </Button>
-        ),
-      });
+      // Navigate directly to messages with the specific contact
+      navigate(`/messages/${ownerId}`);
     } catch (error) {
       console.error('Error sending message:', error);
       toast({

@@ -29,6 +29,8 @@ const Messages = () => {
   const [loading, setLoading] = useState(true);
   const [selectedContact, setSelectedContact] = useState<ContactType | null>(null);
   
+  console.log('Current contactId from URL:', contactId);
+  
   // Fetch contacts
   useEffect(() => {
     if (!user) {
@@ -57,7 +59,7 @@ const Messages = () => {
           
           // If contactId is provided, select that contact or create a new contact
           if (contactId) {
-            console.log('Contact ID from URL:', contactId);
+            console.log('Looking for contact with ID:', contactId);
             const contact = data.find(c => c.user_id === contactId);
             if (contact) {
               console.log('Found existing contact:', contact);
