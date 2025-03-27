@@ -40,15 +40,15 @@ const CustomerBookings = () => {
   const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
-    if (user && isVenueOwner) {
+    if (user) {
       fetchBookings();
     } else {
       setIsLoading(false);
     }
-  }, [user, isVenueOwner]);
+  }, [user]);
   
   const fetchBookings = async () => {
-    if (!user || !isVenueOwner) return;
+    if (!user) return;
     
     setIsLoading(true);
     setError(null);
@@ -56,8 +56,29 @@ const CustomerBookings = () => {
     try {
       console.log('Fetching bookings for venue owner:', user.id);
       
-      // For venue owners, get bookings for their venues
-      const { data, error } = await supabase
+      // First, fetch venues owned by this user
+      const { data: venuesData, error: venuesError } = await supabase
+        .from('venues')
+        .select('id')
+        .filter('owner_info->user_id', 'eq', user.id);
+        
+      if (venuesError) {
+        console.error('Error fetching venues:', venuesError);
+        throw venuesError;
+      }
+      
+      if (!venuesData || venuesData.length === 0) {
+        console.log('No venues found for this owner');
+        setBookings([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      const venueIds = venuesData.map(venue => venue.id);
+      console.log('Owner venues:', venueIds);
+      
+      // Then fetch bookings for these venues
+      const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
           id,
@@ -74,69 +95,18 @@ const CustomerBookings = () => {
           special_requests,
           user_profiles:user_id (first_name, last_name, email)
         `)
-        .filter('venues.owner_info->user_id', 'eq', user.id);
-      
-      if (error) {
-        console.error('Error fetching bookings with venue filter:', error);
+        .in('venue_id', venueIds);
         
-        // Fallback: fetch the bookings directly and join with venues table
-        console.log('Trying fallback method to fetch bookings...');
-        const venuesResult = await supabase
-          .from('venues')
-          .select('id')
-          .filter('owner_info->user_id', 'eq', user.id);
-          
-        if (venuesResult.error) {
-          console.error('Error fetching venues:', venuesResult.error);
-          throw venuesResult.error;
-        }
-        
-        const venueIds = venuesResult.data.map(venue => venue.id);
-        console.log('Owner venues:', venueIds);
-        
-        if (venueIds.length === 0) {
-          console.log('No venues found for this owner');
-          setBookings([]);
-          setIsLoading(false);
-          return;
-        }
-        
-        const bookingsResult = await supabase
-          .from('bookings')
-          .select(`
-            id,
-            user_id,
-            venue_id,
-            venue_name,
-            booking_date,
-            start_time,
-            end_time,
-            status,
-            total_price,
-            created_at,
-            guests,
-            special_requests,
-            user_profiles:user_id (first_name, last_name, email)
-          `)
-          .in('venue_id', venueIds);
-          
-        if (bookingsResult.error) {
-          console.error('Error fetching bookings with venue IDs:', bookingsResult.error);
-          throw bookingsResult.error;
-        }
-        
-        console.log('Bookings fetched with fallback method:', bookingsResult.data);
-        
-        // Transform the data
-        const formattedBookings = formatBookingsData(bookingsResult.data);
-        setBookings(formattedBookings);
-      } else {
-        console.log('Bookings fetched successfully:', data);
-        
-        // Transform the data
-        const formattedBookings = formatBookingsData(data);
-        setBookings(formattedBookings);
+      if (bookingsError) {
+        console.error('Error fetching bookings with venue IDs:', bookingsError);
+        throw bookingsError;
       }
+      
+      console.log('Bookings fetched successfully:', bookingsData);
+      
+      // Transform the data
+      const formattedBookings = formatBookingsData(bookingsData || []);
+      setBookings(formattedBookings);
     } catch (error: any) {
       console.error('Error fetching bookings:', error);
       setError(error.message || 'Failed to load customer bookings.');

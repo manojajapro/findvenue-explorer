@@ -101,16 +101,49 @@ const Messages = () => {
     
     fetchContacts();
     
-    // Subscribe to new messages to update contacts list
+    // Set up real-time subscription for any new messages
+    // This will trigger a refresh of the contacts list when new messages arrive
     const channel = supabase
-      .channel('messages_updates')
+      .channel('any_messages_updates')
+      .on('postgres_changes', 
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${user.id},receiver_id=eq.${user.id}`,
+          or: `sender_id=eq.${user.id},receiver_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Message change detected, refreshing contacts:', payload);
+          fetchContacts();
+        }
+      )
+      .subscribe();
+      
+    // Also listen for any new messages where user is sender or receiver
+    const incomingChannel = supabase
+      .channel('messages_user_related')
       .on('postgres_changes', 
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'messages'
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`
         },
-        () => {
+        (payload) => {
+          console.log('New message received, refreshing contacts:', payload);
+          fetchContacts();
+        }
+      )
+      .on('postgres_changes', 
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Message sent, refreshing contacts:', payload);
           fetchContacts();
         }
       )
@@ -118,6 +151,7 @@ const Messages = () => {
       
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(incomingChannel);
     };
   }, [user, navigate, contactId]);
   

@@ -311,6 +311,22 @@ export type Database = {
       }
     }
     Functions: {
+      get_conversation: {
+        Args: {
+          current_user_id: string
+          other_user_id: string
+        }
+        Returns: {
+          id: string
+          created_at: string
+          content: string
+          sender_id: string
+          receiver_id: string
+          read: boolean
+          sender_name: string
+          receiver_name: string
+        }[]
+      }
       get_message_contacts: {
         Args: {
           current_user_id: string

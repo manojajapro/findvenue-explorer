@@ -88,10 +88,12 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
     // Load messages immediately
     loadMessages();
     
-    // Subscribe to new messages
+    // Set up real-time subscription for messages
     console.log('Setting up real-time subscription for messages...');
-    const channel = supabase
-      .channel('direct_messages')
+    
+    // This channel listens for new messages from the other user
+    const incomingChannel = supabase
+      .channel('incoming_messages')
       .on('postgres_changes', 
         { 
           event: 'INSERT', 
@@ -102,7 +104,14 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
         (payload) => {
           console.log('Received new message via subscription:', payload);
           const newMsg = payload.new as Message;
-          setMessages(prev => [...prev, newMsg]);
+          
+          // Add to messages if not already there
+          setMessages(prev => {
+            if (prev.some(msg => msg.id === newMsg.id)) {
+              return prev;
+            }
+            return [...prev, newMsg];
+          });
           
           // Mark as read immediately
           supabase
@@ -113,7 +122,7 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
       )
       .subscribe();
     
-    // Also subscribe to messages sent by the current user
+    // This channel listens for messages sent by the current user
     const outgoingChannel = supabase
       .channel('outgoing_messages')
       .on('postgres_changes', 
@@ -126,8 +135,9 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
         (payload) => {
           console.log('Received outgoing message via subscription:', payload);
           const newMsg = payload.new as Message;
+          
+          // Add to messages if not already there
           setMessages(prev => {
-            // Check if message already exists to avoid duplicates
             if (prev.some(msg => msg.id === newMsg.id)) {
               return prev;
             }
@@ -137,9 +147,10 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
       )
       .subscribe();
     
+    // Cleanup subscriptions on unmount
     return () => {
       console.log('Cleaning up message subscriptions');
-      supabase.removeChannel(channel);
+      supabase.removeChannel(incomingChannel);
       supabase.removeChannel(outgoingChannel);
     };
   }, [user, receiverId, toast]);
@@ -151,7 +162,7 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user) return;
+    if (!newMessage.trim() || !user || !profile) return;
     
     setIsSending(true);
     try {
@@ -161,24 +172,23 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
         content: newMessage,
         sender_id: user.id,
         receiver_id: receiverId,
-        sender_name: `${profile?.first_name} ${profile?.last_name}`,
+        sender_name: `${profile.first_name} ${profile.last_name}`,
         receiver_name: receiverName,
         venue_id: venueId,
         venue_name: venueName,
         read: false
       };
       
-      const { error, data } = await supabase
+      const { error } = await supabase
         .from('messages')
-        .insert(messageData)
-        .select();
+        .insert(messageData);
         
       if (error) {
         console.error('Error sending message:', error);
         throw error;
       }
       
-      console.log('Message sent successfully:', data);
+      console.log('Message sent successfully');
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
