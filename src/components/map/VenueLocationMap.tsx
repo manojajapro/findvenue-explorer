@@ -13,7 +13,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-interface VenueLocationMapProps {
+export interface VenueLocationMapProps {
   name: string;
   address: string;
   latitude?: number;
