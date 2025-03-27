@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { checkSupabaseConnection, verifyBookingStatus } from '@/utils/supabaseHealthCheck';
+import { checkSupabaseConnection, updateBookingStatusInDatabase } from '@/utils/supabaseHealthCheck';
 
 export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
   const { toast } = useToast();
@@ -27,19 +27,14 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         throw new Error('Unable to connect to the database. Please check your connection and try again.');
       }
       
-      // First, update the booking status in the database
-      const { error: updateError, data: updateData } = await supabase
-        .from('bookings')
-        .update({ status })
-        .eq('id', bookingId)
-        .select();
-        
-      if (updateError) {
-        console.error('Error updating booking status:', updateError);
-        throw updateError;
+      // Use the direct update function that includes verification
+      const result = await updateBookingStatusInDatabase(bookingId, status);
+      
+      if (!result.success) {
+        throw new Error(`Failed to update booking status to ${status}. Please try again.`);
       }
       
-      console.log(`Database update completed for booking ${bookingId}:`, updateData);
+      console.log(`Database update successfully verified for booking ${bookingId}`);
       
       // Immediately update local state to show the change
       setBookings(prev => 
@@ -47,34 +42,6 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
           b.id === bookingId ? { ...b, status } : b
         )
       );
-      
-      // Wait longer for database consistency
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Verify the update was successful by fetching the booking directly
-      const { data: verifiedBooking, error: verifyError } = await supabase
-        .from('bookings')
-        .select('status')
-        .eq('id', bookingId)
-        .single();
-      
-      if (verifyError) {
-        console.error('Error verifying booking status update:', verifyError);
-        throw new Error('Failed to verify booking status update. Please check the logs.');
-      }
-      
-      const isVerified = verifiedBooking?.status === status;
-      
-      console.log(`Booking ${bookingId} status verification:`, {
-        expectedStatus: status,
-        actualStatus: verifiedBooking?.status,
-        isVerified
-      });
-      
-      if (!isVerified) {
-        console.error(`Update verification failed: Booking ${bookingId} status was not updated properly in the database.`);
-        throw new Error('Failed to update booking status. Please try again.');
-      }
       
       console.log(`Booking ${bookingId} status verified as ${status} in the database.`);
       
