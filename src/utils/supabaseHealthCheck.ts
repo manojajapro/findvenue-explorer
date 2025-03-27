@@ -93,7 +93,8 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
       };
     }
     
-    // Execute the update - Critical fix: don't use .single() but use .select() alone
+    // Fix: Use select() without any filtering to get an array result
+    // instead of .single() which expects exactly one row or .maybeSingle() which can return null
     const { data, error: updateError } = await supabase
       .from('bookings')
       .update({ status })
@@ -105,69 +106,61 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
       throw updateError;
     }
     
-    // Handle the case where the update didn't return any rows
+    // Handle the case where no data is returned
     if (!data || data.length === 0) {
       console.error('Update returned no data for booking:', bookingId);
       
-      // Let's check if the update was actually successful despite not returning data
+      // Double-check if the update actually worked despite not returning data
       const { data: verifyData, error: verifyError } = await supabase
         .from('bookings')
         .select('*')
         .eq('id', bookingId)
-        .maybeSingle();
+        .single();
         
       if (verifyError) {
         console.error('Error verifying update:', verifyError);
         throw new Error('Failed to verify update status');
       }
       
-      if (!verifyData) {
-        throw new Error('Booking not found after update attempt');
-      }
-      
+      // If we got here, we found the booking after update
       if (verifyData.status === status) {
-        console.log('Update succeeded despite not returning data');
+        console.log('Update succeeded despite not returning data initially');
         return {
           success: true,
           data: verifyData
         };
       } else {
-        throw new Error('Update verification failed');
+        throw new Error(`Update verification failed: status is ${verifyData.status} instead of ${status}`);
       }
     }
     
     const updatedBooking = data[0];
     
-    // Add a small delay before verification to ensure database consistency
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Wait longer to ensure database consistency before verification
+    await new Promise(resolve => setTimeout(resolve, 3000));
     
-    // Verify the update with a separate query
-    const { data: verifiedBooking, error: verifyError } = await supabase
+    // Final verification to ensure the change persisted
+    const { data: finalVerification, error: finalVerifyError } = await supabase
       .from('bookings')
       .select('*')
       .eq('id', bookingId)
-      .maybeSingle();
+      .single();
       
-    if (verifyError) {
-      console.error('Error verifying booking update:', verifyError);
-      throw verifyError;
+    if (finalVerifyError) {
+      console.error('Final verification error:', finalVerifyError);
+      throw new Error('Final verification failed');
     }
     
-    if (!verifiedBooking) {
-      throw new Error('Could not verify booking update - booking not found');
-    }
+    console.log('Final verification state:', finalVerification);
     
-    console.log('Verified booking state:', verifiedBooking);
-    
-    // Final status check
-    if (verifiedBooking.status !== status) {
-      console.error(`Status mismatch - expected ${status} but found ${verifiedBooking.status}`);
-      throw new Error(`Failed to update status to ${status}`);
+    // Ensure the status matches what we intended
+    if (finalVerification.status !== status) {
+      throw new Error(`Status mismatch after final verification - expected ${status} but found ${finalVerification.status}`);
     }
     
     return {
       success: true,
-      data: verifiedBooking
+      data: finalVerification
     };
     
   } catch (error) {
