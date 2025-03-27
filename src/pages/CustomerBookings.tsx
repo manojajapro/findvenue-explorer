@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -60,24 +59,41 @@ const CustomerBookings = () => {
         // First, fetch venues owned by this user
         const { data: venuesData, error: venuesError } = await supabase
           .from('venues')
-          .select('id, name')
-          .filter('owner_info->user_id', 'eq', user.id);
+          .select('id, name, owner_info');
           
         if (venuesError) {
           console.error('Error fetching venues:', venuesError);
           throw venuesError;
         }
         
-        console.log('Owner venues fetched:', venuesData);
+        console.log('All venues fetched:', venuesData);
         
-        if (!venuesData || venuesData.length === 0) {
+        // Filter venues where owner_info->user_id matches current user.id
+        const ownerVenues = venuesData?.filter(venue => {
+          if (!venue.owner_info) return false;
+          
+          try {
+            const ownerInfo = typeof venue.owner_info === 'string' 
+              ? JSON.parse(venue.owner_info) 
+              : venue.owner_info;
+              
+            return ownerInfo.user_id === user.id;
+          } catch (e) {
+            console.error("Error parsing owner_info for venue", venue.id, e);
+            return false;
+          }
+        });
+        
+        console.log('Owner venues filtered:', ownerVenues);
+        
+        if (!ownerVenues || ownerVenues.length === 0) {
           console.log('No venues found for this owner');
           setBookings([]);
           setIsLoading(false);
           return;
         }
         
-        const venueIds = venuesData.map(venue => venue.id);
+        const venueIds = ownerVenues.map(venue => venue.id);
         console.log('Owner venue IDs:', venueIds);
         
         // Then fetch bookings for these venues
@@ -123,7 +139,7 @@ const CustomerBookings = () => {
           throw error;
         }
         
-        setBookings(data);
+        setBookings(data || []);
       }
     } catch (error: any) {
       console.error('Error fetching bookings:', error);
@@ -347,7 +363,7 @@ const CustomerBookings = () => {
                         <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
                         <TableCell>{booking.start_time} - {booking.end_time}</TableCell>
                         <TableCell>{booking.guests}</TableCell>
-                        <TableCell>${booking.total_price.toFixed(2)}</TableCell>
+                        <TableCell>SAR {booking.total_price.toFixed(2)}</TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(booking.status)}>
                             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
