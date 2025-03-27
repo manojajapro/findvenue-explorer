@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export const checkSupabaseConnection = async () => {
@@ -35,14 +36,19 @@ export const verifyBookingStatus = async (bookingId: string, expectedStatus: str
       .from('bookings')
       .select('status')
       .eq('id', bookingId)
-      .single();
+      .maybeSingle();
       
     if (error) {
       console.error('Error verifying booking status:', error);
       return false;
     }
     
-    const actualStatus = data?.status;
+    if (!data) {
+      console.error(`Booking ${bookingId} not found during verification`);
+      return false;
+    }
+    
+    const actualStatus = data.status;
     const isMatch = actualStatus === expectedStatus;
     
     console.log(`Booking ${bookingId} status verification: expected=${expectedStatus}, actual=${actualStatus}, match=${isMatch}`);
@@ -72,6 +78,7 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
     }
     
     if (!currentBooking) {
+      console.error(`Booking not found: ${bookingId}`);
       throw new Error('Booking not found');
     }
     
@@ -86,32 +93,33 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
       };
     }
     
-    // Perform the update with explicit returning
-    const { data: updatedBooking, error: updateError } = await supabase
+    // Perform the update without using single()
+    const { data: updatedData, error: updateError } = await supabase
       .from('bookings')
       .update({ status })
       .eq('id', bookingId)
-      .select()
-      .single();
+      .select();
       
     if (updateError) {
       console.error('Error updating booking:', updateError);
       throw updateError;
     }
     
-    if (!updatedBooking) {
+    if (!updatedData || updatedData.length === 0) {
       throw new Error('Update returned no data');
     }
     
-    // Add a small delay before verification to ensure database consistency
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const updatedBooking = updatedData[0];
     
-    // Verify the update
+    // Add a small delay before verification to ensure database consistency
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Verify the update - use maybeSingle() instead of single()
     const { data: verifiedBooking, error: verifyError } = await supabase
       .from('bookings')
       .select('*')
       .eq('id', bookingId)
-      .single();
+      .maybeSingle();
       
     if (verifyError) {
       console.error('Error verifying booking update:', verifyError);

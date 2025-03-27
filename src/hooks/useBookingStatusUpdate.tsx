@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
@@ -50,11 +51,16 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       while (retryCount < maxRetries && !updateSuccess) {
         try {
           // First check if the booking is already in the desired state
-          const { data: currentBooking } = await supabase
+          const { data: currentBooking, error: checkError } = await supabase
             .from('bookings')
             .select('status')
             .eq('id', bookingId)
             .maybeSingle();
+            
+          if (checkError) {
+            console.error('Error checking booking status:', checkError);
+            throw checkError;
+          }
             
           if (currentBooking?.status === status) {
             console.log(`Booking ${bookingId} is already in ${status} state`);
@@ -96,26 +102,31 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       );
       
       // Send notification to customer
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: booking.user_id,
-          title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
-          message: status === 'confirmed' 
-            ? `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed.`
-            : `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been cancelled by the venue owner.`,
-          type: 'booking',
-          read: false,
-          link: '/bookings',
-          data: {
-            booking_id: bookingId,
-            venue_id: booking.venue_id
-          }
-        });
-      
-      if (notificationError) {
-        console.error('Error sending notification:', notificationError);
-        // Don't throw here, just log the error since the main update succeeded
+      try {
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: booking.user_id,
+            title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
+            message: status === 'confirmed' 
+              ? `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed.`
+              : `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been cancelled by the venue owner.`,
+            type: 'booking',
+            read: false,
+            link: '/bookings',
+            data: {
+              booking_id: bookingId,
+              venue_id: booking.venue_id
+            }
+          });
+        
+        if (notificationError) {
+          console.error('Error sending notification:', notificationError);
+          // Don't throw here, just log the error since the main update succeeded
+        }
+      } catch (notifyError) {
+        console.error('Failed to send notification:', notifyError);
+        // Continue with success even if notification fails
       }
       
       // Dismiss the processing toast and show success
