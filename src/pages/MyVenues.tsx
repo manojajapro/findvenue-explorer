@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -206,10 +207,10 @@ const MyVenues = () => {
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     
-    navigate(`/my-venues?tab=${value}`, { replace: true });
-    
     if (value === "bookings") {
       navigate('/customer-bookings');
+    } else {
+      navigate(`/my-venues?tab=${value}`, { replace: true });
     }
   };
 
@@ -428,7 +429,7 @@ const MyVenues = () => {
 
           <TabsContent value="bookings">
             <div className="text-center py-10">
-              <p className="text-findvenue-text-muted mb-4">Viewing customer bookings information...</p>
+              <p className="text-findvenue-text-muted mb-4">Redirecting to customer bookings...</p>
             </div>
           </TabsContent>
         </Tabs>

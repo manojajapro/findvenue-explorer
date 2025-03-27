@@ -37,6 +37,7 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Load messages
   useEffect(() => {
@@ -177,7 +178,12 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      // Using a slight delay to ensure DOM has updated
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
   }, [messages]);
 
   const sendMessage = async (e: React.FormEvent) => {
@@ -238,7 +244,7 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
 
   if (!user) {
     return (
-      <Card className="glass-card border-white/10 h-[400px] flex items-center justify-center">
+      <Card className="glass-card border-white/10 h-[600px] flex items-center justify-center">
         <CardContent>
           <p className="text-center text-findvenue-text-muted">Please log in to chat</p>
         </CardContent>
@@ -247,7 +253,7 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
   }
 
   return (
-    <Card className="glass-card border-white/10 h-[400px] flex flex-col">
+    <Card className="glass-card border-white/10 h-[600px] flex flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center gap-2">
           <Avatar className="h-6 w-6">
@@ -268,7 +274,7 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
             <Loader2 className="h-6 w-6 animate-spin text-findvenue" />
           </div>
         ) : (
-          <ScrollArea className="flex-1 p-4">
+          <div className="flex-1 overflow-y-auto p-4" ref={scrollAreaRef}>
             {messages.length === 0 ? (
               <p className="text-center text-findvenue-text-muted py-4">
                 No messages yet. Start the conversation!
@@ -302,10 +308,10 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
                 <div ref={messagesEndRef} />
               </div>
             )}
-          </ScrollArea>
+          </div>
         )}
 
-        <form onSubmit={sendMessage} className="p-2 border-t border-white/10 mt-auto">
+        <form onSubmit={sendMessage} className="p-4 border-t border-white/10 mt-auto">
           <div className="flex gap-2">
             <Input
               value={newMessage}

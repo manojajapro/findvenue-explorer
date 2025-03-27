@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -181,25 +182,6 @@ const CustomerBookings = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  const formatBookingsData = (data: any[]) => {
-    return data.map((booking: any) => ({
-      id: booking.id,
-      user_id: booking.user_id,
-      user_name: booking.user_profiles ? `${booking.user_profiles.first_name} ${booking.user_profiles.last_name}` : 'Unknown Customer',
-      user_email: booking.user_profiles?.email,
-      venue_id: booking.venue_id,
-      venue_name: booking.venue_name || 'Unnamed Venue',
-      booking_date: booking.booking_date,
-      start_time: booking.start_time,
-      end_time: booking.end_time,
-      status: booking.status,
-      total_price: booking.total_price,
-      created_at: booking.created_at,
-      guests: booking.guests,
-      special_requests: booking.special_requests,
-    }));
   };
   
   const updateBookingStatus = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
