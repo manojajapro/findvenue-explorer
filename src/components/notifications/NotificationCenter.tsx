@@ -49,8 +49,9 @@ const NotificationCenter = () => {
           .limit(20);
 
         if (error) throw error;
-
-        setNotifications(data as unknown as Notification[]);
+        
+        console.log('Fetched notifications:', data);
+        setNotifications(data as Notification[]);
         setUnreadCount(data.filter(n => !n.read).length);
       } catch (error) {
         console.error('Error fetching notifications:', error);
@@ -64,23 +65,59 @@ const NotificationCenter = () => {
       .channel('notification_changes')
       .on('postgres_changes', 
         { 
-          event: 'INSERT', 
+          event: '*', 
           schema: 'public', 
           table: 'notifications',
           filter: `user_id=eq.${user.id}` 
         }, 
         (payload) => {
-          const newNotification = payload.new as Notification;
-          setNotifications(prev => [newNotification, ...prev]);
-          setUnreadCount(prev => prev + 1);
+          console.log('Notification change detected:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newNotification = payload.new as Notification;
+            setNotifications(prev => [newNotification, ...prev]);
+            if (!newNotification.read) {
+              setUnreadCount(prev => prev + 1);
+            }
+            
+            // Show a system notification
+            if (Notification.permission === 'granted') {
+              const notification = new Notification(newNotification.title, {
+                body: newNotification.message,
+                icon: '/favicon.ico'
+              });
+              
+              notification.onclick = () => {
+                window.focus();
+                if (newNotification.link) {
+                  navigate(newNotification.link);
+                }
+              };
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            // Update existing notification
+            setNotifications(prev => 
+              prev.map(n => n.id === payload.new.id ? payload.new as Notification : n)
+            );
+            // Recalculate unread count
+            setUnreadCount(prev => {
+              const newCount = notifications.filter(n => !n.read).length;
+              return newCount;
+            });
+          }
         }
       )
       .subscribe();
+      
+    // Request notification permission if not already granted
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, navigate]);
 
   const markAsRead = async (id?: string) => {
     if (!user) return;
@@ -88,28 +125,32 @@ const NotificationCenter = () => {
     try {
       if (id) {
         // Mark single notification as read
-        await supabase
+        const { error } = await supabase
           .from('notifications')
           .update({ read: true })
           .eq('id', id);
           
+        if (error) throw error;
+          
         setNotifications(prev => 
           prev.map(n => n.id === id ? { ...n, read: true } : n)
         );
+        setUnreadCount(prev => Math.max(0, prev - 1));
       } else {
         // Mark all as read
-        await supabase
+        const { error } = await supabase
           .from('notifications')
           .update({ read: true })
           .eq('user_id', user.id)
           .eq('read', false);
           
+        if (error) throw error;
+          
         setNotifications(prev => 
           prev.map(n => ({ ...n, read: true }))
         );
+        setUnreadCount(0);
       }
-      
-      setUnreadCount(0);
     } catch (error) {
       console.error('Error marking notifications as read:', error);
     }

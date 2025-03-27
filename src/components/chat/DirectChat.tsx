@@ -40,12 +40,13 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
 
   // Load messages
   useEffect(() => {
-    if (!user) return;
+    if (!user || !receiverId) return;
     
     const loadMessages = async () => {
       setIsLoading(true);
       try {
         console.log('Loading messages between', user.id, 'and', receiverId);
+        
         // Call the get_conversation function
         const { data, error } = await supabase
           .rpc('get_conversation', {
@@ -61,9 +62,11 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
         if (data) {
           console.log('Conversation data received:', data.length, 'messages');
           setMessages(data as Message[]);
+          
           // Mark messages as read
           const unreadMessages = data.filter(msg => !msg.read && msg.receiver_id === user.id);
           console.log('Number of unread messages:', unreadMessages.length);
+          
           if (unreadMessages.length > 0) {
             await Promise.all(unreadMessages.map(msg => 
               supabase
@@ -71,17 +74,34 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
                 .update({ read: true })
                 .eq('id', msg.id)
             ));
+            
+            // Also send a notification that a message has been read
+            await updateUnreadNotifications();
           }
         }
       } catch (error) {
         console.error('Error loading messages:', error);
         toast({
           title: 'Error',
-          description: 'Failed to load messages',
+          description: 'Failed to load messages. Please try again.',
           variant: 'destructive',
         });
       } finally {
         setIsLoading(false);
+      }
+    };
+
+    // Update unread notifications counter
+    const updateUnreadNotifications = async () => {
+      try {
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('user_id', user.id)
+          .eq('type', 'message')
+          .eq('read', false);
+      } catch (error) {
+        console.error('Error updating notification status:', error);
       }
     };
     
@@ -188,13 +208,27 @@ const DirectChat = ({ receiverId, receiverName, venueId, venueName }: ChatProps)
         throw error;
       }
       
+      // Also create a notification for the recipient
+      await supabase.from('notifications').insert({
+        user_id: receiverId,
+        title: 'New Message',
+        message: `${profile.first_name} ${profile.last_name} sent you a message: "${newMessage.substring(0, 50)}${newMessage.length > 50 ? '...' : ''}"`,
+        type: 'message',
+        read: false,
+        link: `/messages/${user.id}`,
+        data: {
+          sender_id: user.id,
+          venue_id: venueId
+        }
+      });
+      
       console.log('Message sent successfully');
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
         title: 'Error',
-        description: 'Failed to send message',
+        description: 'Failed to send message. Please try again.',
         variant: 'destructive',
       });
     } finally {

@@ -54,65 +54,83 @@ const CustomerBookings = () => {
     setError(null);
     
     try {
-      console.log('Fetching bookings for venue owner:', user.id);
+      console.log('Fetching bookings for user:', user.id, 'isVenueOwner:', isVenueOwner);
       
-      // First, fetch venues owned by this user
-      const { data: venuesData, error: venuesError } = await supabase
-        .from('venues')
-        .select('id')
-        .filter('owner_info->user_id', 'eq', user.id);
+      if (isVenueOwner) {
+        // First, fetch venues owned by this user
+        const { data: venuesData, error: venuesError } = await supabase
+          .from('venues')
+          .select('id, name')
+          .filter('owner_info->user_id', 'eq', user.id);
+          
+        if (venuesError) {
+          console.error('Error fetching venues:', venuesError);
+          throw venuesError;
+        }
         
-      if (venuesError) {
-        console.error('Error fetching venues:', venuesError);
-        throw venuesError;
-      }
-      
-      if (!venuesData || venuesData.length === 0) {
-        console.log('No venues found for this owner');
-        setBookings([]);
-        setIsLoading(false);
-        return;
-      }
-      
-      const venueIds = venuesData.map(venue => venue.id);
-      console.log('Owner venues:', venueIds);
-      
-      // Then fetch bookings for these venues
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('bookings')
-        .select(`
-          id,
-          user_id,
-          venue_id,
-          venue_name,
-          booking_date,
-          start_time,
-          end_time,
-          status,
-          total_price,
-          created_at,
-          guests,
-          special_requests,
-          user_profiles:user_id (first_name, last_name, email)
-        `)
-        .in('venue_id', venueIds);
+        console.log('Owner venues fetched:', venuesData);
         
-      if (bookingsError) {
-        console.error('Error fetching bookings with venue IDs:', bookingsError);
-        throw bookingsError;
+        if (!venuesData || venuesData.length === 0) {
+          console.log('No venues found for this owner');
+          setBookings([]);
+          setIsLoading(false);
+          return;
+        }
+        
+        const venueIds = venuesData.map(venue => venue.id);
+        console.log('Owner venue IDs:', venueIds);
+        
+        // Then fetch bookings for these venues
+        const { data: bookingsData, error: bookingsError } = await supabase
+          .from('bookings')
+          .select(`
+            id,
+            user_id,
+            venue_id,
+            venue_name,
+            booking_date,
+            start_time,
+            end_time,
+            status,
+            total_price,
+            created_at,
+            guests,
+            special_requests,
+            user_profiles:user_id (first_name, last_name, email)
+          `)
+          .in('venue_id', venueIds);
+          
+        if (bookingsError) {
+          console.error('Error fetching bookings with venue IDs:', bookingsError);
+          throw bookingsError;
+        }
+        
+        console.log('Venue owner bookings fetched:', bookingsData);
+        
+        // Transform the data
+        const formattedBookings = formatBookingsData(bookingsData || []);
+        setBookings(formattedBookings);
+      } else {
+        // Fetch customer's bookings
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('booking_date', { ascending: false });
+          
+        if (error) {
+          console.error('Error fetching customer bookings:', error);
+          throw error;
+        }
+        
+        setBookings(data);
       }
-      
-      console.log('Bookings fetched successfully:', bookingsData);
-      
-      // Transform the data
-      const formattedBookings = formatBookingsData(bookingsData || []);
-      setBookings(formattedBookings);
     } catch (error: any) {
       console.error('Error fetching bookings:', error);
-      setError(error.message || 'Failed to load customer bookings.');
+      setError(error.message || 'Failed to load bookings.');
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load customer bookings.',
+        description: error.message || 'Failed to load bookings.',
         variant: 'destructive',
       });
     } finally {

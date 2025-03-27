@@ -101,38 +101,50 @@ const Messages = () => {
     
     fetchContacts();
     
-    // Set up real-time subscription for any new messages
-    // This will trigger a refresh of the contacts list when new messages arrive
-    const messageUpdateChannel = supabase
-      .channel('message_updates')
+    // Set up real-time subscription for messages
+    const messageChannel = supabase
+      .channel('new_and_updated_messages')
       .on('postgres_changes', 
         {
-          event: '*',
+          event: '*', // Listen for all changes (INSERT, UPDATE, DELETE)
           schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${user.id}`
+          table: 'messages'
         },
-        () => {
-          console.log('Message sent, refreshing contacts');
-          fetchContacts();
-        }
-      )
-      .on('postgres_changes', 
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${user.id}`
-        },
-        () => {
-          console.log('Message received, refreshing contacts');
-          fetchContacts();
+        (payload) => {
+          console.log('Message change detected:', payload);
+          // Check if message involves current user
+          const message = payload.new || payload.old;
+          if (message && (message.sender_id === user.id || message.receiver_id === user.id)) {
+            console.log('Message involves current user, refreshing contacts');
+            fetchContacts();
+          }
         }
       )
       .subscribe();
       
+    // Set up real-time subscription for notifications
+    const notificationChannel = supabase
+      .channel('notifications')
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('New notification received:', payload);
+          // If it's a message notification, refresh contacts
+          if (payload.new && payload.new.type === 'message') {
+            fetchContacts();
+          }
+        }
+      )
+      .subscribe();
+    
     return () => {
-      supabase.removeChannel(messageUpdateChannel);
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(notificationChannel);
     };
   }, [user, navigate, contactId]);
   
