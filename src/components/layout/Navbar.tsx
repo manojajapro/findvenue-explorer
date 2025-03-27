@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Heart, Calendar, Settings, MapPin } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   DropdownMenu,
@@ -16,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, profile, signOut, isVenueOwner } = useAuth();
   
   // Track scroll position
@@ -38,6 +40,7 @@ const Navbar = () => {
   
   const handleLogout = async () => {
     await signOut();
+    navigate('/');
   };
   
   return (
@@ -99,16 +102,35 @@ const Navbar = () => {
                   </div>
                   <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
-                    <Link to="/profile" className="w-full">Profile</Link>
+                    <Link to="/profile" className="w-full flex items-center">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Profile Settings
+                    </Link>
                   </DropdownMenuItem>
-                  {isVenueOwner && (
+                  <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
+                    <Link to="/bookings" className="w-full flex items-center">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      My Bookings
+                    </Link>
+                  </DropdownMenuItem>
+                  {!isVenueOwner && (
                     <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
-                      <Link to="/my-venues" className="w-full">My Venues</Link>
+                      <Link to="/favorites" className="w-full flex items-center">
+                        <Heart className="mr-2 h-4 w-4" />
+                        My Favorites
+                      </Link>
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
-                    <Link to="/bookings" className="w-full">My Bookings</Link>
-                  </DropdownMenuItem>
+                  {isVenueOwner && (
+                    <>
+                      <DropdownMenuItem className="cursor-pointer hover:bg-findvenue/10">
+                        <Link to="/my-venues" className="w-full flex items-center">
+                          <MapPin className="mr-2 h-4 w-4" />
+                          My Venues
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem className="cursor-pointer hover:bg-destructive/10 text-destructive" onClick={handleLogout}>
                     Log out
@@ -178,10 +200,32 @@ const Navbar = () => {
                 {user ? (
                   <>
                     <Link to="/profile" className="block">
-                      <Button variant="outline" className="w-full border-findvenue text-findvenue">
-                        Profile
+                      <Button variant="outline" className="w-full border-findvenue text-findvenue flex items-center">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Profile Settings
                       </Button>
                     </Link>
+                    <Link to="/bookings" className="block">
+                      <Button variant="outline" className="w-full border-findvenue text-findvenue flex items-center">
+                        <Calendar className="mr-2 h-4 w-4" />
+                        My Bookings
+                      </Button>
+                    </Link>
+                    {!isVenueOwner ? (
+                      <Link to="/favorites" className="block">
+                        <Button variant="outline" className="w-full border-findvenue text-findvenue flex items-center">
+                          <Heart className="mr-2 h-4 w-4" />
+                          My Favorites
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Link to="/my-venues" className="block">
+                        <Button variant="outline" className="w-full border-findvenue text-findvenue flex items-center">
+                          <MapPin className="mr-2 h-4 w-4" />
+                          My Venues
+                        </Button>
+                      </Link>
+                    )}
                     {isVenueOwner && (
                       <Link to="/list-venue" className="block">
                         <Button className="w-full bg-findvenue hover:bg-findvenue-dark">
