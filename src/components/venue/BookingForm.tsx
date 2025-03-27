@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -34,6 +33,31 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   const [guestCount, setGuestCount] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingBookings, setExistingBookings] = useState<any[]>([]);
+  
+  useEffect(() => {
+    if (venueId) {
+      fetchExistingBookings();
+    }
+  }, [venueId]);
+  
+  const fetchExistingBookings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('booking_date, start_time, end_time')
+        .eq('venue_id', venueId)
+        .eq('status', 'confirmed');
+        
+      if (error) throw error;
+      
+      if (data) {
+        setExistingBookings(data);
+      }
+    } catch (error) {
+      console.error('Error fetching existing bookings:', error);
+    }
+  };
   
   const calculateTotalPrice = (): number => {
     if (!startTime || !endTime) return 0;
@@ -43,12 +67,10 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     
     if (!start || !end) return 0;
     
-    // Calculate hours difference
     let hours = end.getHours() - start.getHours();
     const minutesDiff = end.getMinutes() - start.getMinutes();
     hours += minutesDiff / 60;
     
-    // Handle case where end time is earlier than start time
     if (hours <= 0) return 0;
     
     return Math.round(hours * pricePerHour);
@@ -73,6 +95,11 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     datetime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
     
     return datetime.toISOString();
+  };
+  
+  const isDateBooked = (date: Date): boolean => {
+    const dateStr = date.toISOString().split('T')[0];
+    return existingBookings.some(booking => booking.booking_date === dateStr);
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,10 +135,32 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       return;
     }
     
+    const selectedDateStr = date.toISOString().split('T')[0];
+    const timeConflict = existingBookings.some(booking => {
+      if (booking.booking_date !== selectedDateStr) return false;
+      
+      const bookingStart = parseTime(booking.start_time);
+      const bookingEnd = parseTime(booking.end_time);
+      const newStart = parseTime(startTime);
+      const newEnd = parseTime(endTime);
+      
+      if (!bookingStart || !bookingEnd || !newStart || !newEnd) return false;
+      
+      return (newStart < bookingEnd && newEnd > bookingStart);
+    });
+    
+    if (timeConflict) {
+      toast({
+        title: 'Time Slot Unavailable',
+        description: 'This time slot is already booked. Please select a different time.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
-      // Create the booking
       const { data: bookingData, error: bookingError } = await supabase
         .from('bookings')
         .insert({
@@ -130,7 +179,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       
       if (bookingError) throw bookingError;
       
-      // Create notification for the venue owner
       await supabase
         .from('notifications')
         .insert({
@@ -146,7 +194,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
           }
         });
       
-      // Create notification for the customer
       await supabase
         .from('notifications')
         .insert({
@@ -167,14 +214,12 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
         description: 'Your booking request has been submitted successfully',
       });
       
-      // Reset form
       setDate(undefined);
       setStartTime('');
       setEndTime('');
       setGuestCount('');
       setSpecialRequests('');
       
-      // Offer to view bookings
       toast({
         title: 'View Bookings',
         description: 'Go to your bookings to view the status of your request',
@@ -244,7 +289,12 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
                   selected={date}
                   onSelect={setDate}
                   initialFocus
-                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today || isDateBooked(date);
+                  }}
+                  className={cn("p-3 pointer-events-auto")}
                 />
               </PopoverContent>
             </Popover>

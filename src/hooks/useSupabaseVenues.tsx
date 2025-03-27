@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,7 +37,6 @@ export interface Venue {
   featured?: boolean;
   popular?: boolean;
   availability?: string[];
-  // New fields
   latitude?: number;
   longitude?: number;
   parking?: boolean;
@@ -146,7 +144,7 @@ export const useSupabaseVenues = () => {
             if (venue.owner_info) {
               const ownerInfo = typeof venue.owner_info === 'string'
                 ? JSON.parse(venue.owner_info)
-                : venue.owner_info;
+                : (venue.owner_info as Record<string, any>);
                 
               ownerInfoData = {
                 name: ownerInfo.name || '',
@@ -164,7 +162,7 @@ export const useSupabaseVenues = () => {
             if (venue.opening_hours) {
               openingHoursData = typeof venue.opening_hours === 'string'
                 ? JSON.parse(venue.opening_hours)
-                : venue.opening_hours;
+                : (venue.opening_hours as Record<string, {open: string, close: string}>);
             }
           } catch (e) {
             console.error("Error parsing opening_hours for venue", venue.id, e);

@@ -20,12 +20,16 @@ import {
   Check,
   X,
   Clock3,
-  AccessibilityIcon
+  AccessibilityIcon,
+  MessageCircle
 } from 'lucide-react';
 import { VenueCard } from '@/components/ui';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
+import BookingForm from '@/components/venue/BookingForm';
+import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
+import { useAuth } from '@/hooks/useAuth';
 
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
@@ -42,6 +46,7 @@ const VenueDetails = () => {
   const [activeImage, setActiveImage] = useState<string>('');
   const [similarVenues, setSimilarVenues] = useState<Venue[]>([]);
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -517,48 +522,50 @@ const VenueDetails = () => {
           </div>
           
           <div>
-            <Card className="p-6 glass-card border-white/10 sticky top-24">
-              <div className="mb-4 pb-4 border-b border-white/10">
-                <div className="text-2xl font-bold mb-1">
-                  {venue?.pricing.currency} {venue?.pricing.startingPrice.toLocaleString()}
-                </div>
-                <div className="text-findvenue-text-muted text-sm">
-                  Starting price
-                </div>
-              </div>
-              
-              {venue?.pricing.pricePerPerson && (
-                <div className="mb-4 pb-4 border-b border-white/10">
-                  <div className="flex justify-between items-center">
-                    <span>Price per person</span>
-                    <span>{venue?.pricing.currency} {venue?.pricing.pricePerPerson}</span>
+            <div className="space-y-6">
+              {venue?.ownerInfo && (
+                <Card className="glass-card border-white/10 sticky top-24">
+                  <div className="mb-4 pb-4 border-b border-white/10">
+                    <div className="text-2xl font-bold mb-1">
+                      {venue?.pricing.currency} {venue?.pricing.startingPrice.toLocaleString()}
+                    </div>
+                    <div className="text-findvenue-text-muted text-sm">
+                      Starting price
+                    </div>
                   </div>
-                </div>
+                  
+                  {venue?.pricing.pricePerPerson && (
+                    <div className="mb-4 pb-4 border-b border-white/10">
+                      <div className="flex justify-between items-center">
+                        <span>Price per person</span>
+                        <span>{venue?.pricing.currency} {venue?.pricing.pricePerPerson}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <BookingForm 
+                    venueId={venue.id} 
+                    venueName={venue.name} 
+                    pricePerHour={venue.pricing.startingPrice} 
+                    ownerId={venue.ownerInfo.user_id}
+                    ownerName={venue.ownerInfo.name}
+                  />
+                  
+                  <div className="mt-4">
+                    <ContactVenueOwner 
+                      venueId={venue.id}
+                      venueName={venue.name}
+                      ownerId={venue.ownerInfo.user_id}
+                      ownerName={venue.ownerInfo.name}
+                    />
+                  </div>
+                  
+                  {venue?.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && renderPaymentMethods()}
+                  
+                  {renderOpeningHours()}
+                </Card>
               )}
-              
-              <div className="mb-6">
-                <div className="flex items-center mb-4">
-                  <Calendar className="w-5 h-5 mr-2 text-findvenue" />
-                  <span className="font-medium">Check availability</span>
-                </div>
-                
-                <div className="bg-findvenue-surface/50 rounded-md p-3 text-center mb-4">
-                  Select a date to check availability
-                </div>
-              </div>
-              
-              <Button className="w-full bg-findvenue hover:bg-findvenue-dark mb-3">
-                Book This Venue
-              </Button>
-              
-              <Button variant="outline" className="w-full border-white/20 hover:bg-findvenue-surface/50">
-                Contact Host
-              </Button>
-              
-              {venue?.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && renderPaymentMethods()}
-              
-              {renderOpeningHours()}
-            </Card>
+            </div>
           </div>
         </div>
         
