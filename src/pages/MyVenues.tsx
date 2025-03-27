@@ -125,7 +125,7 @@ const MyVenues = () => {
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <div className="flex-1 p-6">
+                    <CardContent className="flex-1 p-6">
                       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -201,10 +201,9 @@ const MyVenues = () => {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </CardContent>
                   </div>
-                </CardContent>
-              </Card>
+                </Card>
               ))}
             </div>
           )}
