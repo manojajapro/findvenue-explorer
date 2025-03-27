@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
@@ -15,7 +14,18 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     booking: any,
     setBookings: React.Dispatch<React.SetStateAction<any[]>>
   ) => {
+    if (isBusy) {
+      toast({
+        title: 'Please wait',
+        description: 'Another booking update is in progress...',
+      });
+      return;
+    }
+    
     setIsBusy(true);
+    let retryCount = 0;
+    const maxRetries = 3;
+    
     try {
       if (!booking) throw new Error('Booking not found');
       
@@ -27,23 +37,63 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         throw new Error('Unable to connect to the database. Please check your connection and try again.');
       }
       
-      // Use the direct update function that includes verification
-      const result = await updateBookingStatusInDatabase(bookingId, status);
+      // Show processing toast
+      const processingToast = toast({
+        title: 'Processing',
+        description: `Updating booking status to ${status}...`,
+      });
       
-      if (!result.success) {
-        throw new Error(`Failed to update booking status to ${status}. Please try again.`);
+      let updateSuccess = false;
+      let error = null;
+      let result = null;
+      
+      while (retryCount < maxRetries && !updateSuccess) {
+        try {
+          // First check if the booking is already in the desired state
+          const { data: currentBooking } = await supabase
+            .from('bookings')
+            .select('status')
+            .eq('id', bookingId)
+            .maybeSingle();
+            
+          if (currentBooking?.status === status) {
+            console.log(`Booking ${bookingId} is already in ${status} state`);
+            updateSuccess = true;
+            result = { success: true, data: currentBooking };
+            break;
+          }
+          
+          // Use the direct update function that includes verification
+          result = await updateBookingStatusInDatabase(bookingId, status);
+          
+          if (result.success) {
+            updateSuccess = true;
+            console.log(`Database update successfully verified for booking ${bookingId}`);
+            break;
+          } else {
+            throw new Error('Update verification failed');
+          }
+        } catch (e) {
+          error = e;
+          retryCount++;
+          console.log(`Update attempt ${retryCount} failed:`, e);
+          if (retryCount < maxRetries) {
+            console.log(`Retrying in 2 seconds...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
       }
       
-      console.log(`Database update successfully verified for booking ${bookingId}`);
+      if (!updateSuccess || !result) {
+        throw error || new Error(`Failed to update booking status after ${maxRetries} attempts`);
+      }
       
-      // Immediately update local state to show the change
+      // Update local state with the verified data
       setBookings(prev => 
         prev.map(b => 
-          b.id === bookingId ? { ...b, status } : b
+          b.id === bookingId ? { ...b, ...result.data } : b
         )
       );
-      
-      console.log(`Booking ${bookingId} status verified as ${status} in the database.`);
       
       // Send notification to customer
       const { error: notificationError } = await supabase
@@ -65,25 +115,34 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       
       if (notificationError) {
         console.error('Error sending notification:', notificationError);
+        // Don't throw here, just log the error since the main update succeeded
       }
       
+      // Dismiss the processing toast and show success
+      processingToast.dismiss();
       toast({
         title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
         description: `The booking has been ${status} successfully.`,
       });
       
-      console.log('Booking status updated successfully, now fetching all bookings...');
-      
-      // Fetch bookings again to ensure data is fresh - use await here
+      // Fetch bookings again to ensure data is fresh
       await fetchBookings();
       
     } catch (error: any) {
       console.error(`Error updating booking status:`, error);
+      
       toast({
-        title: 'Error',
+        title: 'Update Failed',
         description: error.message || `Failed to update booking status.`,
         variant: 'destructive',
       });
+      
+      // Revert local state to original status
+      setBookings(prev => 
+        prev.map(b => 
+          b.id === bookingId ? { ...b, status: booking.status } : b
+        )
+      );
     } finally {
       setIsBusy(false);
     }

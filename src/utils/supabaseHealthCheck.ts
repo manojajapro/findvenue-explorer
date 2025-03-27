@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export const checkSupabaseConnection = async () => {
@@ -60,43 +59,82 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
   try {
     console.log(`Direct database update: Setting booking ${bookingId} status to ${status}...`);
     
-    // Execute the update
-    const { data, error } = await supabase
+    // First, verify the booking exists and get its current state
+    const { data: currentBooking, error: fetchError } = await supabase
+      .from('bookings')
+      .select('id, status')
+      .eq('id', bookingId)
+      .maybeSingle();
+      
+    if (fetchError) {
+      console.error('Error fetching booking:', fetchError);
+      throw fetchError;
+    }
+    
+    if (!currentBooking) {
+      throw new Error('Booking not found');
+    }
+    
+    console.log('Current booking state:', currentBooking);
+    
+    // If already in desired state, return success
+    if (currentBooking.status === status) {
+      console.log(`Booking ${bookingId} is already in ${status} state`);
+      return {
+        success: true,
+        data: currentBooking
+      };
+    }
+    
+    // Perform the update with explicit returning
+    const { data: updatedBooking, error: updateError } = await supabase
       .from('bookings')
       .update({ status })
       .eq('id', bookingId)
-      .select();
+      .select()
+      .single();
       
-    if (error) {
-      console.error('Error in direct database update:', error);
-      throw error;
+    if (updateError) {
+      console.error('Error updating booking:', updateError);
+      throw updateError;
     }
     
-    console.log(`Direct database update completed:`, data);
+    if (!updatedBooking) {
+      throw new Error('Update returned no data');
+    }
     
-    // Wait to ensure consistency
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Add a small delay before verification to ensure database consistency
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     // Verify the update
-    const { data: verifiedData, error: verifyError } = await supabase
+    const { data: verifiedBooking, error: verifyError } = await supabase
       .from('bookings')
-      .select('status')
+      .select('*')
       .eq('id', bookingId)
       .single();
       
     if (verifyError) {
-      console.error('Error verifying direct database update:', verifyError);
+      console.error('Error verifying booking update:', verifyError);
       throw verifyError;
     }
     
-    const updateSuccessful = verifiedData?.status === status;
+    if (!verifiedBooking) {
+      throw new Error('Could not verify booking update - booking not found');
+    }
     
-    console.log(`Direct database update verification: success=${updateSuccessful}, status=${verifiedData?.status}`);
+    console.log('Verified booking state:', verifiedBooking);
+    
+    // Final status check
+    if (verifiedBooking.status !== status) {
+      console.error(`Status mismatch - expected ${status} but found ${verifiedBooking.status}`);
+      throw new Error(`Failed to update status to ${status}`);
+    }
     
     return {
-      success: updateSuccessful,
-      data: verifiedData
+      success: true,
+      data: verifiedBooking
     };
+    
   } catch (error) {
     console.error('Direct database update failed:', error);
     throw error;
