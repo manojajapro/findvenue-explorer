@@ -28,7 +28,6 @@ const MyVenues = () => {
   });
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
 
-  // Set active tab from URL query param if present
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const tab = searchParams.get('tab');
@@ -44,7 +43,6 @@ const MyVenues = () => {
     }
   }, [location.search, navigate]);
 
-  // Fetch owner venues
   const fetchVenues = async () => {
     if (!user) return;
     
@@ -61,7 +59,6 @@ const MyVenues = () => {
       if (data) {
         console.log("Venues data received:", data);
         
-        // Filter venues where owner_info->user_id matches current user.id
         const userVenues = data.filter(venue => {
           if (!venue.owner_info) return false;
           
@@ -145,7 +142,6 @@ const MyVenues = () => {
     }
   };
 
-  // Fetch booking statistics and recent bookings
   const fetchBookingStats = async () => {
     if (!user) return;
     
@@ -258,9 +254,7 @@ const MyVenues = () => {
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
           </TabsList>
 
-          {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-6">
-            {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="glass-card border-white/10">
                 <CardContent className="flex items-center p-6">
@@ -311,7 +305,6 @@ const MyVenues = () => {
               </Card>
             </div>
 
-            {/* Recent Bookings */}
             <Card className="glass-card border-white/10">
               <CardHeader>
                 <h3 className="text-xl font-bold">Recent Bookings</h3>
@@ -348,7 +341,6 @@ const MyVenues = () => {
             </Card>
           </TabsContent>
 
-          {/* Venues Tab */}
           <TabsContent value="venues">
             {isLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -434,7 +426,6 @@ const MyVenues = () => {
             )}
           </TabsContent>
 
-          {/* Bookings Tab - Only display content when active */}
           <TabsContent value="bookings">
             <div className="text-center py-10">
               <p className="text-findvenue-text-muted mb-4">Viewing customer bookings information...</p>

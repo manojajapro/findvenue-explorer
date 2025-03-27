@@ -96,12 +96,11 @@ const CustomerBookings = () => {
         const venueIds = ownerVenues.map(venue => venue.id);
         console.log('Owner venue IDs:', venueIds);
         
-        // Then fetch bookings for these venues
+        // Then fetch bookings for these venues - modified to avoid relationship issues
         const { data: bookingsData, error: bookingsError } = await supabase
           .from('bookings')
           .select(`
             id,
-            user_id,
             venue_id,
             venue_name,
             booking_date,
@@ -112,7 +111,7 @@ const CustomerBookings = () => {
             created_at,
             guests,
             special_requests,
-            user_profiles:user_id (first_name, last_name, email)
+            user_id
           `)
           .in('venue_id', venueIds);
           
@@ -123,8 +122,38 @@ const CustomerBookings = () => {
         
         console.log('Venue owner bookings fetched:', bookingsData);
         
+        // Get user profiles separately to avoid relationship issues
+        const userIds = (bookingsData || []).map(booking => booking.user_id);
+        const { data: userProfiles, error: profilesError } = await supabase
+          .from('user_profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', userIds);
+          
+        if (profilesError) {
+          console.error('Error fetching user profiles:', profilesError);
+        }
+        
         // Transform the data
-        const formattedBookings = formatBookingsData(bookingsData || []);
+        const formattedBookings = (bookingsData || []).map(booking => {
+          const userProfile = userProfiles?.find(profile => profile.id === booking.user_id) || null;
+          return {
+            id: booking.id,
+            user_id: booking.user_id,
+            user_name: userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Unknown Customer',
+            user_email: userProfile?.email,
+            venue_id: booking.venue_id,
+            venue_name: booking.venue_name || 'Unnamed Venue',
+            booking_date: booking.booking_date,
+            start_time: booking.start_time,
+            end_time: booking.end_time,
+            status: booking.status,
+            total_price: booking.total_price,
+            created_at: booking.created_at,
+            guests: booking.guests,
+            special_requests: booking.special_requests,
+          };
+        });
+        
         setBookings(formattedBookings);
       } else {
         // Fetch customer's bookings
