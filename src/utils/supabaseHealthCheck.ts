@@ -29,6 +29,9 @@ export const verifyBookingStatus = async (bookingId: string, expectedStatus: str
   try {
     console.log(`Verifying booking ${bookingId} has status ${expectedStatus}...`);
     
+    // Wait a short time to ensure database consistency
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     const { data, error } = await supabase
       .from('bookings')
       .select('status')

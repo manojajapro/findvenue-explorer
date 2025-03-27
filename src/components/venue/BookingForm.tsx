@@ -81,6 +81,8 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     if (!user) return;
     
     try {
+      console.log(`Fetching user bookings for venue ${venueId} and user ${user.id}`);
+      
       const { data, error } = await supabase
         .from('bookings')
         .select('*')
@@ -88,7 +90,12 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
         .eq('user_id', user.id)
         .or('status.eq.pending,status.eq.confirmed');
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user bookings:', error);
+        throw error;
+      }
+      
+      console.log('User bookings fetched:', data);
       
       if (data) {
         setUserBookings(data);
@@ -285,12 +292,32 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   const cancelBooking = async (bookingId: string) => {
     setIsCancelling(true);
     try {
+      console.log(`Cancelling booking ${bookingId}`);
+      
       const { error } = await supabase
         .from('bookings')
         .update({ status: 'cancelled' })
         .eq('id', bookingId);
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error cancelling booking:', error);
+        throw error;
+      }
+      
+      console.log(`Booking ${bookingId} cancelled successfully`);
+      
+      // Verify the booking was cancelled
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('bookings')
+        .select('status')
+        .eq('id', bookingId)
+        .single();
+        
+      if (verifyError) {
+        console.error('Error verifying booking cancellation:', verifyError);
+      } else {
+        console.log(`Booking ${bookingId} status verified as: ${verifyData.status}`);
+      }
       
       // Notify venue owner
       await supabase
@@ -309,7 +336,8 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
         description: 'Your booking has been cancelled successfully',
       });
       
-      fetchUserBookings();
+      // Refresh the bookings list
+      await fetchUserBookings();
       
     } catch (error: any) {
       console.error('Error cancelling booking:', error);

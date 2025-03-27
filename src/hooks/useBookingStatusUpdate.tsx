@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { checkSupabaseConnection } from '@/utils/supabaseHealthCheck';
+import { checkSupabaseConnection, verifyBookingStatus } from '@/utils/supabaseHealthCheck';
 
 export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
   const { toast } = useToast();
@@ -48,20 +48,14 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       );
       
       // Verify the update was successful by fetching the booking
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('id', bookingId)
-        .single();
-        
-      if (verifyError) {
-        console.error('Error verifying booking update:', verifyError);
-      } else {
-        console.log('Verified booking status in database:', verifyData.status);
-        if (verifyData.status !== status) {
-          console.error('Status mismatch after update! Database has:', verifyData.status, 'but we tried to set:', status);
-        }
+      const isVerified = await verifyBookingStatus(bookingId, status);
+      
+      if (!isVerified) {
+        console.error(`Update verification failed: Booking ${bookingId} status was not updated properly in the database.`);
+        throw new Error('Failed to update booking status. Please try again.');
       }
+      
+      console.log(`Booking ${bookingId} status verified as ${status} in the database.`);
       
       // Send notification to customer
       const { error: notificationError } = await supabase

@@ -1,10 +1,9 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, CheckCircle, XCircle, MessageCircle, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, Users, CheckCircle, XCircle, MessageCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -183,7 +182,7 @@ const CustomerBookings = () => {
 
   const handleStatusUpdate = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
     // Prevent duplicate processing of the same booking
-    if (processingBookingIds.has(bookingId)) {
+    if (processingBookingIds.has(bookingId) || isBusy) {
       console.log(`Already processing booking ${bookingId}, ignoring duplicate request`);
       return;
     }
@@ -202,8 +201,18 @@ const CustomerBookings = () => {
       
       // Re-fetch to ensure we have the latest data
       await fetchBookings();
-    } catch (error) {
+      
+      toast({
+        title: `Booking ${status === 'confirmed' ? 'Confirmed' : 'Cancelled'}`,
+        description: `The booking status has been updated to ${status}.`,
+      });
+    } catch (error: any) {
       console.error(`Error handling status update for booking ${bookingId}:`, error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update booking status',
+        variant: 'destructive',
+      });
     } finally {
       // Remove this booking from processing list
       setProcessingBookingIds(prev => {
