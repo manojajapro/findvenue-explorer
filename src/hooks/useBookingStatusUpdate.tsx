@@ -101,7 +101,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         )
       );
       
-      // Send notification to customer
+      // Send notification to customer - in a separate try-catch to not fail the main process
       try {
         const { error: notificationError } = await supabase
           .from('notifications')

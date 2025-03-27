@@ -24,12 +24,10 @@ export const checkSupabaseConnection = async () => {
   }
 };
 
-// This function can be used to verify if a specific booking exists and has the correct status
 export const verifyBookingStatus = async (bookingId: string, expectedStatus: string) => {
   try {
     console.log(`Verifying booking ${bookingId} has status ${expectedStatus}...`);
     
-    // Wait a bit longer to ensure database consistency
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     const { data, error } = await supabase
@@ -60,7 +58,7 @@ export const verifyBookingStatus = async (bookingId: string, expectedStatus: str
   }
 };
 
-// New function to directly update booking status and return confirmation
+// Fixed function to directly update booking status and handle PostgREST errors
 export const updateBookingStatusInDatabase = async (bookingId: string, status: string) => {
   try {
     console.log(`Direct database update: Setting booking ${bookingId} status to ${status}...`);
@@ -93,74 +91,43 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
       };
     }
     
-    // Fix: Use select() without any filtering to get an array result
-    // instead of .single() which expects exactly one row or .maybeSingle() which can return null
-    const { data, error: updateError } = await supabase
+    // Fix: Use .update().eq() without using single() or maybeSingle()
+    // Important: Don't use .single() after update as it will throw PGRST116 if no rows returned
+    await supabase
       .from('bookings')
       .update({ status })
-      .eq('id', bookingId)
-      .select();
+      .eq('id', bookingId);
       
-    if (updateError) {
-      console.error('Error updating booking:', updateError);
-      throw updateError;
-    }
+    // Wait to ensure database consistency before verification (increased time)
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Handle the case where no data is returned
-    if (!data || data.length === 0) {
-      console.error('Update returned no data for booking:', bookingId);
-      
-      // Double-check if the update actually worked despite not returning data
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('id', bookingId)
-        .single();
-        
-      if (verifyError) {
-        console.error('Error verifying update:', verifyError);
-        throw new Error('Failed to verify update status');
-      }
-      
-      // If we got here, we found the booking after update
-      if (verifyData.status === status) {
-        console.log('Update succeeded despite not returning data initially');
-        return {
-          success: true,
-          data: verifyData
-        };
-      } else {
-        throw new Error(`Update verification failed: status is ${verifyData.status} instead of ${status}`);
-      }
-    }
-    
-    const updatedBooking = data[0];
-    
-    // Wait longer to ensure database consistency before verification
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Final verification to ensure the change persisted
-    const { data: finalVerification, error: finalVerifyError } = await supabase
+    // Separate query to fetch the updated booking
+    const { data: updatedBooking, error: getError } = await supabase
       .from('bookings')
       .select('*')
       .eq('id', bookingId)
-      .single();
+      .maybeSingle();
       
-    if (finalVerifyError) {
-      console.error('Final verification error:', finalVerifyError);
-      throw new Error('Final verification failed');
+    if (getError) {
+      console.error('Error retrieving updated booking:', getError);
+      throw getError;
     }
     
-    console.log('Final verification state:', finalVerification);
+    if (!updatedBooking) {
+      throw new Error('Could not find booking after update');
+    }
     
-    // Ensure the status matches what we intended
-    if (finalVerification.status !== status) {
-      throw new Error(`Status mismatch after final verification - expected ${status} but found ${finalVerification.status}`);
+    console.log('Retrieved updated booking:', updatedBooking);
+    
+    // Final verification - check if status was actually updated
+    if (updatedBooking.status !== status) {
+      console.error(`Status mismatch - expected ${status} but found ${updatedBooking.status}`);
+      throw new Error(`Failed to update status to ${status}`);
     }
     
     return {
       success: true,
-      data: finalVerification
+      data: updatedBooking
     };
     
   } catch (error) {
