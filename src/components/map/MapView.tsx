@@ -1,13 +1,14 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X, Filter } from 'lucide-react';
+import { MapPin, Search, ZoomIn, X, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/useDebounce';
-import GoogleMap from './GoogleMap';
+import MapComponent from './MapComponent';
 
 interface MapViewProps {
   venues: Venue[];
@@ -193,56 +194,57 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   
   const createMarkerInfo = (venue: Venue) => {
     return (
-      <div dangerouslySetInnerHTML={{ __html: `
-        <div style="padding: 0; max-width: 300px; color: #000;">
-          <div style="position: relative;">
+      <div>
+        <div className="p-0 max-w-[300px]">
+          <div className="relative">
             <img 
-              src="${venue.imageUrl}" 
-              alt="${venue.name}"
-              style="width: 100%; height: 70px; object-fit: cover; border-top-left-radius: 4px; border-top-right-radius: 4px;"
+              src={venue.imageUrl} 
+              alt={venue.name}
+              className="w-full h-[70px] object-cover rounded-t"
             />
-            ${venue.featured ? `
-              <div style="position: absolute; top: 8px; right: 8px; background-color: gold; color: black; padding: 2px 6px; border-radius: 4px; font-size: 10px;">
+            {venue.featured && (
+              <div className="absolute top-2 right-2 bg-findvenue-gold text-black px-1.5 py-0.5 rounded text-[10px] font-medium">
                 Featured
               </div>
-            ` : ''}
+            )}
           </div>
-          <div style="padding: 8px;">
-            <h3 style="font-weight: bold; font-size: 14px; margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${venue.name}
+          <div className="p-2">
+            <h3 className="font-bold text-sm mb-1 truncate">
+              {venue.name}
             </h3>
-            <div style="display: flex; align-items: center; font-size: 11px; color: #666; margin-bottom: 4px;">
-              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                ${venue.address}, ${venue.city}
+            <div className="flex items-center text-xs text-gray-600 mb-1">
+              <span className="truncate">
+                {venue.address}, {venue.city}
               </span>
             </div>
-            <div style="margin-bottom: 8px;">
-              ${venue.category ? `
-                <span style="display: inline-block; border: 1px solid #ddd; border-radius: 4px; padding: 0 4px; font-size: 10px; margin-right: 4px;">
-                  ${venue.category}
+            <div className="mb-2 flex flex-wrap gap-1">
+              {venue.category && (
+                <span className="border border-gray-200 rounded px-1 text-[10px]">
+                  {venue.category}
                 </span>
-              ` : ''}
-              ${venue.rating > 0 ? `
-                <span style="display: inline-block; background-color: #f59e0b; color: black; border-radius: 4px; padding: 0 4px; font-size: 10px;">
-                  ★ ${venue.rating.toFixed(1)}
+              )}
+              {venue.rating > 0 && (
+                <span className="bg-amber-500 text-black rounded px-1 text-[10px] flex items-center">
+                  ★ {venue.rating.toFixed(1)}
                 </span>
-              ` : ''}
+              )}
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; border-top: 1px solid #eee; padding-top: 8px;">
-              <div style="font-weight: 600;">
-                ${venue.pricing.startingPrice} ${venue.pricing.currency}
-                ${venue.pricing.pricePerPerson ? ' / person' : ''}
+            <div className="flex justify-between items-center text-xs pt-2 border-t border-gray-100">
+              <div className="font-semibold">
+                {venue.pricing.startingPrice} {venue.pricing.currency}
+                {venue.pricing.pricePerPerson ? ' / person' : ''}
               </div>
-              <button 
-                onclick="window.location.href='/venue/${venue.id}'"
-                style="background-color: #6366f1; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; display: flex; align-items: center;"
+              <Button 
+                size="sm" 
+                className="h-6 text-[10px] px-2 py-1"
+                onClick={() => navigate(`/venue/${venue.id}`)}
               >
                 View
-              </button>
+              </Button>
             </div>
           </div>
         </div>
-      `}} />
+      </div>
     );
   };
   
@@ -272,7 +274,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
           </div>
         </div>
       ) : (
-        <GoogleMap
+        <MapComponent
           center={mapCenter}
           zoom={mapZoom}
           height="100%"

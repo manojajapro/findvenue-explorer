@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { MapPin } from 'lucide-react';
-import GoogleMap from './GoogleMap';
+import MapComponent from './MapComponent';
 
 export interface VenueLocationMapProps {
   name: string;
@@ -56,12 +56,12 @@ const VenueLocationMap = ({
     if (editable) return null;
     
     return (
-      <div dangerouslySetInnerHTML={{ __html: `
-        <div style="padding: 8px; max-width: 200px; color: #000;">
-          <div style="font-weight: bold; margin-bottom: 4px;">${name}</div>
-          <div style="font-size: 12px;">${address}</div>
+      <div>
+        <div className="p-2 max-w-[200px]">
+          <div className="font-bold mb-1">{name}</div>
+          <div className="text-sm">{address}</div>
         </div>
-      `}} />
+      </div>
     );
   };
 
@@ -80,7 +80,7 @@ const VenueLocationMap = ({
         </div>
       ) : (
         <div className="h-[250px] w-full relative">
-          <GoogleMap
+          <MapComponent
             center={position}
             zoom={14}
             height="250px"
