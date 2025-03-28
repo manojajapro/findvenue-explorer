@@ -27,7 +27,30 @@ export const useVenueVoiceAssistant = ({
   
   const recognition = useRef<SpeechRecognition | null>(null);
   
-  // Define processVoiceQuery function early to avoid reference error
+  // Handle speech recognition events
+  const handleSpeechStart = useCallback(() => {
+    setIsListening(true);
+    setTranscript('');
+    setError(null);
+    
+    if (onListeningChange) {
+      onListeningChange(true);
+    }
+  }, [onListeningChange]);
+  
+  const handleSpeechEnd = useCallback(() => {
+    setIsListening(false);
+    
+    if (onListeningChange) {
+      onListeningChange(false);
+    }
+    
+    if (transcript.trim() && !isProcessing) {
+      processVoiceQuery(transcript);
+    }
+  }, [transcript, isProcessing, onListeningChange]);
+  
+  // Define processVoiceQuery function
   const processVoiceQuery = useCallback(async (query: string) => {
     if (!query.trim()) {
       return;
@@ -98,10 +121,17 @@ export const useVenueVoiceAssistant = ({
     
     return () => {
       if (recognition.current) {
-        recognition.current.abort();
+        try {
+          // Fix: Check and call stop() instead of abort()
+          if (isListening) {
+            recognition.current.stop();
+          }
+        } catch (e) {
+          console.error('Error stopping speech recognition:', e);
+        }
       }
     };
-  }, []);
+  }, [isListening]);
   
   // Handle auto-restart functionality
   useEffect(() => {
@@ -115,30 +145,7 @@ export const useVenueVoiceAssistant = ({
     }
   }, [autoRestart, isListening, isProcessing]);
   
-  // Handle speech recognition events
-  const handleSpeechStart = useCallback(() => {
-    setIsListening(true);
-    setTranscript('');
-    setError(null);
-    
-    if (onListeningChange) {
-      onListeningChange(true);
-    }
-  }, [onListeningChange]);
-  
-  const handleSpeechEnd = useCallback(() => {
-    setIsListening(false);
-    
-    if (onListeningChange) {
-      onListeningChange(false);
-    }
-    
-    if (transcript.trim() && !isProcessing) {
-      processVoiceQuery(transcript);
-    }
-  }, [transcript, isProcessing, processVoiceQuery, onListeningChange]);
-  
-  // Define startListening after processVoiceQuery to avoid TS errors
+  // Define startListening
   const startListening = useCallback(() => {
     if (!recognition.current) {
       setError('Speech recognition is not supported in your browser.');
@@ -146,9 +153,10 @@ export const useVenueVoiceAssistant = ({
     }
     
     try {
-      recognition.current.onstart = handleSpeechStart;
+      // Fix: Use event listeners instead of direct property assignment
+      recognition.current.addEventListener('start', handleSpeechStart);
       
-      recognition.current.onresult = (event: SpeechRecognitionEvent) => {
+      recognition.current.addEventListener('result', (event: SpeechRecognitionEvent) => {
         const text = event.results[0][0].transcript;
         console.log('Speech recognized:', text);
         setTranscript(text);
@@ -156,9 +164,9 @@ export const useVenueVoiceAssistant = ({
         if (onTranscript) {
           onTranscript(text);
         }
-      };
+      });
       
-      recognition.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+      recognition.current.addEventListener('error', (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setError(`Speech recognition error: ${event.error}`);
         setIsListening(false);
@@ -166,9 +174,9 @@ export const useVenueVoiceAssistant = ({
         if (onListeningChange) {
           onListeningChange(false);
         }
-      };
+      });
       
-      recognition.current.onend = handleSpeechEnd;
+      recognition.current.addEventListener('end', handleSpeechEnd);
       
       recognition.current.start();
     } catch (err: any) {
@@ -184,7 +192,11 @@ export const useVenueVoiceAssistant = ({
   
   const stopListening = useCallback(() => {
     if (recognition.current) {
-      recognition.current.stop();
+      try {
+        recognition.current.stop();
+      } catch (e) {
+        console.error('Error stopping speech recognition:', e);
+      }
     }
     
     setIsListening(false);

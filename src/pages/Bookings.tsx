@@ -207,11 +207,17 @@ const Bookings = () => {
   };
   
   const now = new Date();
+  
+  // FIX: Change filter logic to include pending bookings in upcoming regardless of date
   const upcomingBookings = bookings.filter(booking => 
-    new Date(booking.booking_date) >= now && booking.status !== 'cancelled'
+    (booking.status === 'pending' || // All pending bookings go to upcoming
+    (new Date(booking.booking_date) >= now && booking.status === 'confirmed')) // Future confirmed bookings
   );
+  
+  // Past bookings only include confirmed bookings in the past or cancelled bookings
   const pastBookings = bookings.filter(booking => 
-    new Date(booking.booking_date) < now || booking.status === 'cancelled'
+    (booking.status === 'cancelled' || // All cancelled bookings 
+    (new Date(booking.booking_date) < now && booking.status === 'confirmed')) // Past confirmed bookings
   );
   
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;

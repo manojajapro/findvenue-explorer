@@ -181,14 +181,12 @@ const CustomerBookings = () => {
   const { updateBookingStatus, isBusy } = useBookingStatusUpdate(fetchBookings);
 
   const handleStatusUpdate = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
-    // Prevent duplicate processing of the same booking
     if (processingBookingIds.has(bookingId) || isBusy) {
       console.log(`Already processing booking ${bookingId}, ignoring duplicate request`);
       return;
     }
     
     try {
-      // Mark this booking as being processed
       setProcessingBookingIds(prev => new Set(prev).add(bookingId));
       
       const booking = bookings.find(b => b.id === bookingId);
@@ -196,10 +194,8 @@ const CustomerBookings = () => {
         throw new Error('Booking not found');
       }
       
-      // Process the status update
       await updateBookingStatus(bookingId, status, booking, setBookings);
       
-      // Re-fetch to ensure we have the latest data
       await fetchBookings();
       
       toast({
@@ -214,7 +210,6 @@ const CustomerBookings = () => {
         variant: 'destructive',
       });
     } finally {
-      // Remove this booking from processing list
       setProcessingBookingIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(bookingId);
@@ -242,11 +237,15 @@ const CustomerBookings = () => {
   };
   
   const now = new Date();
+  
   const upcomingBookings = bookings.filter(booking => 
-    new Date(booking.booking_date) >= now && booking.status !== 'cancelled'
+    (booking.status === 'pending' || 
+    (new Date(booking.booking_date) >= now && booking.status === 'confirmed'))
   );
+  
   const pastBookings = bookings.filter(booking => 
-    new Date(booking.booking_date) < now || booking.status === 'cancelled'
+    (booking.status === 'cancelled' || 
+    (new Date(booking.booking_date) < now && booking.status === 'confirmed'))
   );
   
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;

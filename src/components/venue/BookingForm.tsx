@@ -106,7 +106,7 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   };
   
   const calculateTotalPrice = (): number => {
-    if (!startTime || !endTime) return 0;
+    if (!startTime || !endTime || !guestCount) return 0;
     
     const start = parseTime(startTime);
     const end = parseTime(endTime);
@@ -119,7 +119,20 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     
     if (hours <= 0) return 0;
     
-    return Math.round(hours * pricePerHour);
+    const basePrice = Math.round(hours * pricePerHour);
+    
+    const guests = parseInt(guestCount);
+    if (guests <= 1) {
+      return basePrice;
+    } else if (guests <= 5) {
+      return basePrice * 1.1;
+    } else if (guests <= 10) {
+      return basePrice * 1.2;
+    } else if (guests <= 20) {
+      return basePrice * 1.3;
+    } else {
+      return basePrice * 1.5;
+    }
   };
   
   const parseTime = (timeString: string): Date | null => {
@@ -306,7 +319,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       
       console.log(`Booking ${bookingId} cancelled successfully`);
       
-      // Verify the booking was cancelled
       const { data: verifyData, error: verifyError } = await supabase
         .from('bookings')
         .select('status')
@@ -319,7 +331,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
         console.log(`Booking ${bookingId} status verified as: ${verifyData.status}`);
       }
       
-      // Notify venue owner
       await supabase
         .from('notifications')
         .insert({
@@ -336,7 +347,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
         description: 'Your booking has been cancelled successfully',
       });
       
-      // Refresh the bookings list
       await fetchUserBookings();
       
     } catch (error: any) {
@@ -375,7 +385,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       console.log("Initiating chat with owner:", ownerId);
       setIsLoading(true);
       
-      // Check if there's any existing conversation
       const { data: existingMessages, error: messagesError } = await supabase
         .from('messages')
         .select('id')
@@ -387,16 +396,13 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
         throw messagesError;
       }
       
-      // If no existing conversation, create the first message
       if (!existingMessages || existingMessages.length === 0) {
         console.log("No existing conversation found, creating initial message");
         
-        // Get the user's name from profile
         let senderName = '';
         if (profile) {
           senderName = `${profile.first_name} ${profile.last_name}`;
         } else {
-          // Fallback if profile is not available
           const { data: userData, error: userError } = await supabase
             .from('user_profiles')
             .select('first_name, last_name')
@@ -411,7 +417,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
           }
         }
         
-        // Create initial message
         const { data: messageData, error: messageError } = await supabase
           .from('messages')
           .insert({
@@ -434,7 +439,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
         
         console.log("Initial message created:", messageData);
         
-        // Create notification for the owner
         await supabase
           .from('notifications')
           .insert({
@@ -453,7 +457,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
         console.log("Existing conversation found");
       }
       
-      // Navigate to messages with owner ID
       navigate(`/messages/${ownerId}`);
       
     } catch (error: any) {
@@ -488,7 +491,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     );
   }
 
-  // Display user's existing bookings for this venue
   if (userBookings.length > 0) {
     return (
       <Card className="glass-card border-white/10">
