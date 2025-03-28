@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Send, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type Message = {
   id: string;
@@ -201,9 +202,9 @@ const DirectChat = () => {
         console.error('Error loading messages:', error);
         
         if (error.code === '42P01' && error.message.includes('conversations')) {
-          setError("The chat system is currently being set up. Please try again later.");
+          setErrorMessage("The chat system is currently being set up. Please try again later.");
         } else {
-          setError('Failed to load messages. Please try again later.');
+          setErrorMessage('Failed to load messages. Please try again later.');
         }
         
         setIsLoading(false);
