@@ -19,7 +19,7 @@ interface SpeechRecognitionInstance extends EventTarget {
   abort: () => void;
 }
 
-// Define a window interface with the webkit prefix
+// Define a window interface with the webkit prefix properly
 interface WindowWithSpeechRecognition extends Window {
   SpeechRecognition?: new () => SpeechRecognitionInstance;
   webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
@@ -36,7 +36,8 @@ export const useVenueVoiceAssistant = () => {
 
   // Initialize speech recognition
   useEffect(() => {
-    const windowWithSpeech = window as WindowWithSpeechRecognition;
+    // Use proper typing for window object with speech recognition
+    const windowWithSpeech = window as unknown as WindowWithSpeechRecognition;
     const SpeechRecognitionAPI = windowWithSpeech.SpeechRecognition || windowWithSpeech.webkitSpeechRecognition;
     
     if (SpeechRecognitionAPI) {

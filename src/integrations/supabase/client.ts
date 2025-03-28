@@ -10,4 +10,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Supabase URL and/or Anon Key are missing. Please check your environment variables.');
 }
 
+// Create the Supabase client with the available credentials
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
