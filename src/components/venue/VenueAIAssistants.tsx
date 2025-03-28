@@ -12,7 +12,7 @@ const VenueAIAssistants = () => {
     <div className="mt-8">
       <h2 className="text-xl font-semibold mb-4">AI Venue Assistants</h2>
       
-      <Tabs defaultValue="chat" value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-2 mb-4">
           <TabsTrigger value="chat" className="flex items-center">
             <MessageSquare className="w-4 h-4 mr-2" />

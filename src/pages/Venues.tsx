@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import VenuesList from '@/components/venues/VenuesList';
@@ -20,16 +19,13 @@ const Venues = () => {
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   
-  // Get filter parameters from URL
   const categoryId = searchParams.get('categoryId');
   const cityId = searchParams.get('cityId');
   const hasFilters = searchParams.toString().length > 0;
   
-  // Find category/city names for display
   const categoryName = categoryId ? categories.find(c => c.id === categoryId)?.name : '';
   const cityName = cityId ? cities.find(c => c.id === cityId)?.name : '';
   
-  // Set page title based on filters
   useEffect(() => {
     if (categoryName && cityName) {
       document.title = `${categoryName} venues in ${cityName} | FindVenue`;
@@ -42,7 +38,6 @@ const Venues = () => {
     }
   }, [categoryName, cityName]);
   
-  // Auto-search with debounced term
   useEffect(() => {
     if (debouncedSearchTerm !== searchParams.get('search')) {
       const newParams = new URLSearchParams(searchParams);
@@ -57,7 +52,6 @@ const Venues = () => {
     }
   }, [debouncedSearchTerm, searchParams, setSearchParams]);
   
-  // Update view mode in URL when it changes
   useEffect(() => {
     const currentViewInUrl = searchParams.get('view');
     if (viewMode !== currentViewInUrl && (viewMode === 'list' || viewMode === 'map')) {
@@ -67,7 +61,6 @@ const Venues = () => {
     }
   }, [viewMode, searchParams, setSearchParams]);
   
-  // Initialize view mode from URL
   useEffect(() => {
     const viewFromUrl = searchParams.get('view') as 'list' | 'map' | null;
     if (viewFromUrl && (viewFromUrl === 'list' || viewFromUrl === 'map')) {
@@ -75,7 +68,6 @@ const Venues = () => {
     }
   }, [searchParams]);
   
-  // Handle search submission
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -86,13 +78,11 @@ const Venues = () => {
     }
   };
   
-  // Clear all filters
   const clearFilters = () => {
     setSearchParams(new URLSearchParams());
     setSearchTerm('');
   };
 
-  // Mouse hover handlers for venue list items
   const handleVenueMouseEnter = useCallback((venueId: string) => {
     setHoveredVenueId(venueId);
   }, []);
@@ -117,7 +107,6 @@ const Venues = () => {
           </p>
         </div>
         
-        {/* Search and filters bar */}
         <Card className="mb-8 p-4 bg-findvenue-surface/30 border-white/10">
           <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
@@ -151,7 +140,6 @@ const Venues = () => {
             </div>
           </form>
           
-          {/* Active filters display */}
           {hasFilters && (
             <div className="mt-4 flex flex-wrap gap-2">
               {searchParams.get('search') && (
@@ -204,7 +192,6 @@ const Venues = () => {
           )}
         </Card>
         
-        {/* Results summary */}
         <div className="flex justify-between items-center mb-4">
           <div>
             <p className="text-sm text-findvenue-text-muted">
@@ -212,7 +199,6 @@ const Venues = () => {
             </p>
           </div>
           
-          {/* View toggle */}
           <Tabs 
             value={viewMode} 
             onValueChange={(value) => setViewMode(value as 'list' | 'map')}
@@ -229,7 +215,6 @@ const Venues = () => {
           </Tabs>
         </div>
         
-        {/* Use a conditional to render either the list or map view based on viewMode */}
         {viewMode === "list" ? (
           <div>
             <VenuesList 
