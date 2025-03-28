@@ -1,6 +1,21 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useVenueData } from '@/hooks/useVenueData';
+
+type SpeechRecognitionEvent = {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+        confidence: number;
+      };
+    };
+  };
+};
+
+type SpeechRecognitionErrorEvent = {
+  error: string;
+};
 
 export const useVenueVoiceAssistant = () => {
   const [isListening, setIsListening] = useState(false);
@@ -9,16 +24,24 @@ export const useVenueVoiceAssistant = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { venue, isLoading: isLoadingVenue } = useVenueData();
+  
+  // Speech recognition API
+  const [recognition, setRecognition] = useState<any>(null);
 
-  // Speech recognition setup
-  let recognition: SpeechRecognition | null = null;
-
-  if (typeof window !== 'undefined' && 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-  }
+  // Initialize speech recognition on client-side only
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || 
+                               (window as any).webkitSpeechRecognition;
+      
+      if (SpeechRecognition) {
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.continuous = false;
+        recognitionInstance.interimResults = false;
+        setRecognition(recognitionInstance);
+      }
+    }
+  }, []);
 
   const startListening = useCallback(() => {
     if (!recognition) {
@@ -102,7 +125,7 @@ export const useVenueVoiceAssistant = () => {
         setResponse(assistantResponse);
         
         // Use speech synthesis to speak the response
-        if ('speechSynthesis' in window) {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
           const speech = new SpeechSynthesisUtterance(assistantResponse);
           speech.rate = 1;
           speech.pitch = 1;

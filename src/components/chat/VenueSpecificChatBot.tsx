@@ -3,12 +3,9 @@ import { useState, useRef, useEffect } from 'react';
 import { Loader2, Send, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useChatWithVenue } from '@/hooks/useChatWithVenue';
-import MessageList from '@/components/chat/MessageList';
-import ChatHeader from '@/components/chat/ChatHeader';
 import ErrorDisplay from '@/components/chat/ErrorDisplay';
-import { type Message as ChatMessage } from '@/components/chat/types';
 
 const VenueSpecificChatBot = () => {
   const { messages, isLoading, submitMessage, clearMessages, venue } = useChatWithVenue();
@@ -30,13 +27,14 @@ const VenueSpecificChatBot = () => {
 
   return (
     <Card className="glass-card border-white/10 w-full max-w-md mx-auto">
-      {/* Fixed props to match ChatHeader component requirements */}
-      <ChatHeader>
-        <div className="flex flex-col">
-          <h3 className="text-lg font-semibold">{venue ? `About ${venue.name}` : 'Venue Assistant'}</h3>
-          <p className="text-sm text-findvenue-text-muted">Ask questions about this venue</p>
-        </div>
-      </ChatHeader>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">
+          {venue ? `About ${venue.name}` : 'Venue Assistant'}
+          <p className="text-sm font-normal text-findvenue-text-muted mt-1">
+            Ask questions about this venue
+          </p>
+        </CardTitle>
+      </CardHeader>
       
       <CardContent className="p-4 max-h-[50vh] overflow-y-auto">
         {!venue && !isLoading ? (
@@ -55,7 +53,6 @@ const VenueSpecificChatBot = () => {
             )}
           </div>
         ) : (
-          // Fixed props to match MessageList component requirements
           <div className="space-y-4">
             {messages.map((message, index) => (
               <div 
