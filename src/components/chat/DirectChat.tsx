@@ -34,6 +34,7 @@ const DirectChat = () => {
   
   const [contactName, setContactName] = useState<string>('Contact');
   const [contactRole, setContactRole] = useState<string>('');
+  const [contactImage, setContactImage] = useState<string | null>(null);
   const [venueId, setVenueId] = useState<string | null>(null);
   const [venueName, setVenueName] = useState<string | null>(null);
   
@@ -43,6 +44,7 @@ const DirectChat = () => {
   const [isSending, setIsSending] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [tableExists, setTableExists] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -60,9 +62,40 @@ const DirectChat = () => {
     }
   }, [contactId]);
 
-  // Load messages
+  // Check if conversations table exists
   useEffect(() => {
     if (!user || !contactId || hasError || contactId === 'undefined') return;
+    
+    const checkTablesExist = async () => {
+      try {
+        const { error: convTableError } = await supabase
+          .from('conversations')
+          .select('count')
+          .limit(1)
+          .maybeSingle();
+        
+        if (convTableError && convTableError.code === '42P01') {
+          console.error('Conversations table does not exist:', convTableError);
+          setTableExists(false);
+          setHasError(true);
+          setErrorMessage('The messaging system is currently unavailable. Please try again later.');
+          setIsLoading(false);
+          return false;
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error checking if tables exist:', error);
+        return false;
+      }
+    };
+    
+    checkTablesExist();
+  }, [user, contactId, hasError]);
+
+  // Load messages
+  useEffect(() => {
+    if (!user || !contactId || hasError || contactId === 'undefined' || !tableExists) return;
     
     const fetchMessages = async () => {
       try {
@@ -72,7 +105,7 @@ const DirectChat = () => {
         // Get contact name
         const { data: contactData, error: contactError } = await supabase
           .from('user_profiles')
-          .select('first_name, last_name, user_role')
+          .select('first_name, last_name, user_role, profile_image')
           .eq('id', contactId)
           .single();
           
@@ -86,6 +119,7 @@ const DirectChat = () => {
         if (contactData) {
           setContactName(`${contactData.first_name} ${contactData.last_name}`);
           setContactRole(contactData.user_role);
+          setContactImage(contactData.profile_image);
           console.log("Contact data fetched:", contactData);
         } else {
           setHasError(true);
@@ -101,7 +135,7 @@ const DirectChat = () => {
           .contains('participants', [user.id, contactId])
           .maybeSingle();
         
-        if (convError) {
+        if (convError && convError.code !== 'PGRST116') {
           console.error('Error fetching conversation:', convError);
           setErrorMessage('Error finding conversation. Please try again later.');
           throw convError;
@@ -113,7 +147,7 @@ const DirectChat = () => {
           setVenueId(conversation.venue_id);
           setVenueName(conversation.venue_name);
           
-          // Now get messages for this conversation
+          // Now get messages
           const { data: messagesData, error: messagesError } = await supabase
             .from('messages')
             .select('*')
@@ -169,6 +203,9 @@ const DirectChat = () => {
             console.log("Created new conversation:", newConversation);
             setConversationId(newConversation.id);
             setMessages([]);
+            
+            // Send welcome message
+            sendWelcomeMessage(contactData.first_name);
           }
         }
       } catch (error: any) {
@@ -189,11 +226,73 @@ const DirectChat = () => {
     
     fetchMessages();
     
-  }, [user, contactId, toast, hasError, errorMessage]);
+  }, [user, contactId, toast, hasError, errorMessage, tableExists]);
+
+  const sendWelcomeMessage = async (contactFirstName: string) => {
+    if (!user || !profile || !contactId || !conversationId) return;
+    
+    try {
+      const welcomeMessage = `Hello ${contactFirstName}! I'm interested in discussing more about your venue. Can you please provide more information?`;
+      
+      // Update conversation with welcome message
+      await supabase
+        .from('conversations')
+        .update({
+          last_message: welcomeMessage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', conversationId);
+      
+      // Send welcome message
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: user.id,
+          receiver_id: contactId,
+          content: welcomeMessage,
+          sender_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined,
+          receiver_name: contactName || undefined,
+          venue_id: venueId || undefined,
+          venue_name: venueName || undefined,
+          read: false
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error sending welcome message:", error);
+        return;
+      }
+      
+      // Add message to state
+      if (data) {
+        console.log("Welcome message sent:", data);
+        setMessages(prev => [...prev, data]);
+      }
+      
+      // Create notification for recipient
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: contactId,
+          title: 'New Message',
+          message: `${profile?.first_name || 'Someone'} started a conversation with you`,
+          type: 'message',
+          read: false,
+          link: `/messages/${user.id}`,
+          data: {
+            sender_id: user.id,
+            venue_id: venueId || null
+          }
+        });
+    } catch (error) {
+      console.error("Error sending welcome message:", error);
+    }
+  };
 
   // Set up real-time subscription for new messages
   useEffect(() => {
-    if (!user || !contactId || hasError || contactId === 'undefined') return;
+    if (!user || !contactId || hasError || contactId === 'undefined' || !tableExists) return;
     
     console.log("Setting up realtime subscription for chat between", user.id, "and", contactId);
     
@@ -224,7 +323,7 @@ const DirectChat = () => {
       console.log("Removing realtime subscription");
       supabase.removeChannel(channel);
     };
-  }, [user, contactId, hasError]);
+  }, [user, contactId, hasError, tableExists]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -239,13 +338,14 @@ const DirectChat = () => {
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !user || !contactId || hasError || contactId === 'undefined' || !conversationId) {
+    if (!newMessage.trim() || !user || !contactId || hasError || contactId === 'undefined' || !conversationId || !tableExists) {
       console.log("Cannot send message:", {
         hasMessage: !!newMessage.trim(),
         hasUser: !!user,
         hasContactId: !!contactId,
         hasError,
-        hasConversationId: !!conversationId
+        hasConversationId: !!conversationId,
+        tableExists
       });
       return;
     }
@@ -373,8 +473,10 @@ const DirectChat = () => {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <Avatar className="h-6 w-6">
-            <AvatarFallback>{contactName?.charAt(0) || '?'}</AvatarFallback>
-            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${contactName}`} />
+            <AvatarImage src={contactImage || `https://api.dicebear.com/7.x/initials/svg?seed=${contactName}`} />
+            <AvatarFallback className="bg-findvenue-surface text-findvenue">
+              {contactName?.charAt(0) || '?'}
+            </AvatarFallback>
           </Avatar>
           <span>{contactName || 'Chat'}</span>
           {contactRole && (
