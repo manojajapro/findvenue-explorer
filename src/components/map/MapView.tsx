@@ -1,18 +1,20 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { MapPin, Search, ZoomIn, X, Filter } from 'lucide-react';
+import { MapPin, Search, ZoomIn, X, Filter, Eye } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/useDebounce';
 import MapComponent from './MapComponent';
+import MapFilters from './MapFilters';
 
 interface MapViewProps {
   venues: Venue[];
   isLoading: boolean;
   highlightedVenueId?: string;
+  categories?: Array<{ id: string; name: string }>;
+  cities?: Array<{ id: string; name: string }>;
 }
 
 const MapSearch = ({ 
@@ -85,12 +87,20 @@ const MapSearch = ({
   );
 };
 
-const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
+const MapView = ({ 
+  venues, 
+  isLoading, 
+  highlightedVenueId,
+  categories = [],
+  cities = []
+}: MapViewProps) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeVenue, setActiveVenue] = useState<string | null>(null);
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const [mapSearchTerm, setMapSearchTerm] = useState('');
   const [isCompactControls, setIsCompactControls] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [mapCenter, setMapCenter] = useState({ lat: 24.774265, lng: 46.738586 });
   const [mapZoom, setMapZoom] = useState(5);
   
@@ -126,6 +136,41 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setFilteredVenues(results);
   }, [venues]);
   
+  // Apply filters from URL parameters
+  useEffect(() => {
+    const categoryId = searchParams.get('categoryId');
+    const cityId = searchParams.get('cityId');
+    const search = searchParams.get('search');
+    
+    let filtered = venues;
+    
+    // Apply filters sequentially
+    if (categoryId) {
+      filtered = filtered.filter(venue => venue.categoryId === categoryId);
+    }
+    
+    if (cityId) {
+      filtered = filtered.filter(venue => venue.cityId === cityId);
+    }
+    
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(venue => 
+        venue.name.toLowerCase().includes(searchLower) || 
+        venue.description.toLowerCase().includes(searchLower) ||
+        venue.address.toLowerCase().includes(searchLower) ||
+        venue.city.toLowerCase().includes(searchLower) ||
+        venue.category.toLowerCase().includes(searchLower) ||
+        venue.amenities.some(amenity => 
+          amenity.toLowerCase().includes(searchLower)
+        )
+      );
+      setMapSearchTerm(search);
+    }
+    
+    setFilteredVenues(filtered);
+  }, [venues, searchParams]);
+  
   // Compact view toggle based on map size
   useEffect(() => {
     const handleResize = () => {
@@ -136,15 +181,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  
-  // Update filtered venues when main venues list changes
-  useEffect(() => {
-    if (!mapSearchTerm) {
-      setFilteredVenues(venues);
-    } else {
-      handleSearch(mapSearchTerm);
-    }
-  }, [venues, mapSearchTerm, handleSearch]);
   
   // Update map center and zoom when venues change
   useEffect(() => {
@@ -199,7 +235,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
             <img 
               src={venue.imageUrl} 
               alt={venue.name}
-              className="w-full h-[70px] object-cover rounded-t"
+              className="w-full h-[120px] object-cover rounded-t"
             />
             {venue.featured && (
               <div className="absolute top-2 right-2 bg-findvenue-gold text-black px-1.5 py-0.5 rounded text-[10px] font-medium">
@@ -207,18 +243,19 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               </div>
             )}
           </div>
-          <div className="p-2">
+          <div className="p-3 bg-findvenue-surface">
             <h3 className="font-bold text-sm mb-1 truncate">
               {venue.name}
             </h3>
-            <div className="flex items-center text-xs text-gray-600 mb-1">
+            <div className="flex items-center text-xs text-findvenue-text-muted mb-2">
+              <MapPin className="h-3 w-3 mr-1 text-findvenue" />
               <span className="truncate">
                 {venue.address}, {venue.city}
               </span>
             </div>
             <div className="mb-2 flex flex-wrap gap-1">
               {venue.category && (
-                <span className="border border-gray-200 rounded px-1 text-[10px]">
+                <span className="border border-white/10 bg-findvenue-surface/50 rounded px-1 text-[10px]">
                   {venue.category}
                 </span>
               )}
@@ -228,7 +265,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                 </span>
               )}
             </div>
-            <div className="flex justify-between items-center text-xs pt-2 border-t border-gray-100">
+            <div className="flex justify-between items-center text-xs pt-2 border-t border-white/10">
               <div className="font-semibold">
                 {venue.pricing.startingPrice} {venue.pricing.currency}
                 {venue.pricing.pricePerPerson ? ' / person' : ''}
@@ -238,7 +275,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                 className="h-6 text-[10px] px-2 py-1"
                 onClick={() => navigate(`/venue/${venue.id}`)}
               >
-                View
+                <Eye className="h-3 w-3 mr-1" /> View Details
               </Button>
             </div>
           </div>
@@ -257,8 +294,36 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   
   return (
     <div className="relative h-full w-full flex flex-col">
-      <div className="absolute top-4 left-4 right-4 z-[1000]">
+      <div className="absolute top-4 left-4 right-4 z-[1000] flex flex-col gap-2">
         <MapSearch onSearch={handleSearch} venueCount={venuesWithCoordinates.length} />
+        
+        {showFilters && (
+          <MapFilters 
+            categories={categories} 
+            cities={cities}
+            onFilterChange={() => {
+              // Refocus map after filter changes
+              if (venuesWithCoordinates.length > 0) {
+                const totalLat = venuesWithCoordinates.reduce(
+                  (sum, venue) => sum + (venue.latitude || 0), 
+                  0
+                );
+                
+                const totalLng = venuesWithCoordinates.reduce(
+                  (sum, venue) => sum + (venue.longitude || 0), 
+                  0
+                );
+                
+                setMapCenter({ 
+                  lat: totalLat / venuesWithCoordinates.length, 
+                  lng: totalLng / venuesWithCoordinates.length 
+                });
+                
+                setMapZoom(venuesWithCoordinates.length === 1 ? 14 : 10);
+              }
+            }}
+          />
+        )}
       </div>
       
       {venuesWithCoordinates.length === 0 ? (
@@ -285,7 +350,10 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               },
               title: venue.name,
               id: venue.id,
-              onClick: () => setActiveVenue(venue.id),
+              onClick: () => {
+                setActiveVenue(venue.id);
+                // Don't immediately navigate on marker click now to allow popup interaction
+              },
               info: createMarkerInfo(venue)
             }))}
             highlightedMarkerId={highlightedVenueId || activeVenue || undefined}
@@ -296,7 +364,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       
       {mapSearchTerm && (
         <div className="absolute bottom-4 left-4 z-[1000] bg-findvenue-surface/80 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-lg text-xs flex items-center">
-          <Filter className="h-3 w-3 mr-1.5 text-findvenue" />
+          <Search className="h-3 w-3 mr-1.5 text-findvenue" />
           <span>Filtered: "{mapSearchTerm}"</span>
           <button onClick={() => handleSearch('')} className="ml-2 text-findvenue hover:text-findvenue-light">
             <X className="h-3 w-3" />
@@ -311,8 +379,27 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               <Button 
                 variant="outline" 
                 size="icon" 
+                className={`h-8 w-8 ${showFilters ? 'bg-findvenue text-white' : 'bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue'} shadow-md`}
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
+              <p>{showFilters ? 'Hide filters' : 'Show filters'}</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon" 
                 className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
-                onClick={() => handleSearch('')}
+                onClick={() => {
+                  // Clear search
+                  handleSearch('');
+                }}
               >
                 <X className="h-3.5 w-3.5" />
               </Button>

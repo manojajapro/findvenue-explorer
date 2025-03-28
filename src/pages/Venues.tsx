@@ -245,6 +245,8 @@ const Venues = () => {
                 venues={venues} 
                 isLoading={isLoading} 
                 highlightedVenueId={hoveredVenueId || undefined}
+                categories={categories}
+                cities={cities}
               />
             </div>
           </div>

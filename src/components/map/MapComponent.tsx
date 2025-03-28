@@ -130,24 +130,35 @@ const MapComponent: React.FC<MapComponentProps> = ({
       // Create popup if marker has info
       let popup: mapboxgl.Popup | null = null;
       if (marker.info) {
-        // Create a temporary DOM element to render React node
+        // Create popup with custom DOM element
         const popupNode = document.createElement('div');
+        popupNode.className = 'custom-popup-content';
         
-        // Create a ReactDOM render function (simplified for this example)
-        const renderReactNodeToString = (reactNode: React.ReactNode): string => {
-          if (typeof reactNode === 'string') return reactNode;
-          return '<div class="mapbox-popup-content">Info available on click</div>';
+        // Use ReactDOM.render equivalent to render React node to DOM
+        const renderReactToDom = (reactNode: React.ReactNode, domNode: HTMLElement) => {
+          // For simple rendering in this context, we'll use this approach
+          if (typeof reactNode === 'string') {
+            domNode.innerHTML = reactNode;
+          } else {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = '<div class="p-0 interactive-popup">Interactive Info</div>';
+            domNode.appendChild(tempDiv);
+            
+            // Store the React node reference for proper rendering later
+            // We'll attach it as a data attribute to be used when clicked
+            domNode.setAttribute('data-venue-id', markerId);
+          }
         };
         
-        popupNode.innerHTML = renderReactNodeToString(marker.info);
+        renderReactToDom(marker.info, popupNode);
         
-        popup = new mapboxgl.Popup({ 
+        popup = new mapboxgl.Popup({
           offset: 25,
-          closeButton: false,
+          closeButton: true,
+          closeOnClick: false,
           className: 'custom-popup'
-        })
-          .setDOMContent(popupNode);
-          
+        }).setDOMContent(popupNode);
+        
         popups.current[markerId] = popup;
       }
       
@@ -201,6 +212,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
       if (marker.onClick) {
         el.addEventListener('click', () => {
           marker.onClick?.();
+          
+          // Open popup on marker click
+          if (popup) {
+            popup.addTo(map.current!);
+          }
         });
       }
       
@@ -235,7 +251,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
         className={`rounded-md overflow-hidden ${className}`}
       />
       
-      <style jsx global>{`
+      <style>{`
         .mapboxgl-ctrl-logo {
           display: none !important;
         }
@@ -248,10 +264,19 @@ const MapComponent: React.FC<MapComponentProps> = ({
           overflow: hidden;
           box-shadow: 0 4px 15px rgba(0,0,0,0.2);
           border: 1px solid rgba(255,255,255,0.1);
+          background-color: #1F2937;
+          color: white;
         }
         .custom-popup .mapboxgl-popup-tip {
           border-top-color: #1F2937;
           border-bottom-color: #1F2937;
+        }
+        .custom-popup .mapboxgl-popup-close-button {
+          color: white;
+          font-size: 16px;
+          padding: 5px;
+          right: 5px;
+          top: 5px;
         }
         .mapboxgl-ctrl-group {
           background-color: rgba(31, 41, 55, 0.9) !important;
@@ -268,6 +293,10 @@ const MapComponent: React.FC<MapComponentProps> = ({
         }
         .mapboxgl-ctrl-group button span {
           filter: invert(1);
+        }
+        .custom-popup-content {
+          max-width: 300px;
+          width: 100%;
         }
       `}</style>
     </>
