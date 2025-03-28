@@ -1,113 +1,220 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { Venue } from './useSupabaseVenues';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-// Define interface for the SpeechRecognition Web API
-interface WindowWithSpeechRecognition extends Window {
-  SpeechRecognition?: typeof SpeechRecognition;
-  webkitSpeechRecognition?: typeof SpeechRecognition;
-}
+type VenueVoiceAssistantProps = {
+  venue?: any;
+  autoRestart?: boolean;
+  onListeningChange?: (isListening: boolean) => void;
+  onTranscript?: (text: string) => void;
+  onAnswer?: (text: string) => void;
+};
 
-// Message type for voice assistant chat
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export const useVenueVoiceAssistant = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+export const useVenueVoiceAssistant = ({
+  venue,
+  autoRestart = false,
+  onListeningChange,
+  onTranscript,
+  onAnswer
+}: VenueVoiceAssistantProps) => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
-
+  const { toast } = useToast();
+  
+  const recognition = useRef<SpeechRecognition | null>(null);
+  
+  // Handle speech recognition events
+  const handleSpeechStart = useCallback(() => {
+    setIsListening(true);
+    setTranscript('');
+    setError(null);
+    
+    if (onListeningChange) {
+      onListeningChange(true);
+    }
+  }, [onListeningChange]);
+  
+  const handleSpeechEnd = useCallback(() => {
+    setIsListening(false);
+    
+    if (onListeningChange) {
+      onListeningChange(false);
+    }
+    
+    if (transcript.trim() && !isProcessing) {
+      processVoiceQuery(transcript);
+    }
+  }, [transcript, isProcessing, onListeningChange]);
+  
+  // Define processVoiceQuery function
+  const processVoiceQuery = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      return;
+    }
+    
+    setIsProcessing(true);
+    
+    try {
+      console.log(`Processing voice query: "${query}"`);
+      
+      // Call our venue-assistant Edge Function
+      const { data, error } = await supabase.functions.invoke('venue-assistant', {
+        body: {
+          query,
+          venueId: venue?.id,
+          type: 'voice'
+        }
+      });
+      
+      if (error) {
+        console.error('Error calling venue-assistant:', error);
+        throw new Error(error.message);
+      }
+      
+      if (data && data.answer) {
+        console.log('AI response:', data.answer);
+        setAnswer(data.answer);
+        
+        if (onAnswer) {
+          onAnswer(data.answer);
+        }
+        
+        // Use Web Speech API to speak the answer
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(data.answer);
+          utterance.lang = 'en-US';
+          utterance.rate = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      } else {
+        throw new Error('No answer received from AI assistant');
+      }
+    } catch (err: any) {
+      console.error('Error processing voice query:', err);
+      setError(err.message);
+      toast({
+        variant: 'destructive',
+        title: 'Error processing your request',
+        description: err.message || 'Please try again later'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [venue?.id, toast, onAnswer]);
+  
   // Initialize speech recognition
   useEffect(() => {
-    const windowWithSpeech = window as WindowWithSpeechRecognition;
-    const SpeechRecognition = 
-      windowWithSpeech.SpeechRecognition || 
-      windowWithSpeech.webkitSpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (SpeechRecognition) {
-      const recognitionInstance = new SpeechRecognition();
-      recognitionInstance.continuous = true;
-      recognitionInstance.interimResults = true;
-      
-      recognitionInstance.onresult = (event) => {
-        let currentTranscript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            currentTranscript += event.results[i][0].transcript;
-          }
-        }
-        setTranscript(currentTranscript);
-      };
-      
-      setRecognition(recognitionInstance);
+      recognition.current = new SpeechRecognition();
+      recognition.current.continuous = false;
+      recognition.current.interimResults = false;
+      recognition.current.lang = 'en-US';
     } else {
-      console.warn('Speech recognition is not supported in this browser.');
+      setError('Speech recognition is not supported in your browser.');
     }
     
     return () => {
-      if (recognition) {
-        recognition.abort();
+      if (recognition.current) {
+        try {
+          // Fix: Check and call stop() instead of abort()
+          if (isListening) {
+            recognition.current.stop();
+          }
+        } catch (e) {
+          console.error('Error stopping speech recognition:', e);
+        }
       }
     };
-  }, []);
-
-  // Toggle listening state
-  const toggleListening = useCallback(() => {
-    if (!recognition) return;
-    
-    if (isListening) {
-      recognition.stop();
-      if (transcript) {
-        submitVoiceInput(transcript);
-        setTranscript('');
-      }
-    } else {
-      recognition.start();
-      setTranscript('');
+  }, [isListening]);
+  
+  // Handle auto-restart functionality
+  useEffect(() => {
+    if (autoRestart && !isListening && !isProcessing) {
+      const timer = setTimeout(() => {
+        console.log('Auto-restarting voice recognition...');
+        startListening();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [autoRestart, isListening, isProcessing]);
+  
+  // Define startListening
+  const startListening = useCallback(() => {
+    if (!recognition.current) {
+      setError('Speech recognition is not supported in your browser.');
+      return;
     }
     
-    setIsListening(prev => !prev);
-  }, [isListening, recognition, transcript]);
-
-  // Submit voice input for processing
-  const submitVoiceInput = useCallback((input: string) => {
-    if (!input.trim()) return;
+    try {
+      // Fix: Use event listeners instead of direct property assignment
+      recognition.current.addEventListener('start', handleSpeechStart);
+      
+      recognition.current.addEventListener('result', (event: SpeechRecognitionEvent) => {
+        const text = event.results[0][0].transcript;
+        console.log('Speech recognized:', text);
+        setTranscript(text);
+        
+        if (onTranscript) {
+          onTranscript(text);
+        }
+      });
+      
+      recognition.current.addEventListener('error', (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        setError(`Speech recognition error: ${event.error}`);
+        setIsListening(false);
+        
+        if (onListeningChange) {
+          onListeningChange(false);
+        }
+      });
+      
+      recognition.current.addEventListener('end', handleSpeechEnd);
+      
+      recognition.current.start();
+    } catch (err: any) {
+      console.error('Error starting speech recognition:', err);
+      setError(err.message);
+      setIsListening(false);
+      
+      if (onListeningChange) {
+        onListeningChange(false);
+      }
+    }
+  }, [handleSpeechStart, handleSpeechEnd, onTranscript, onListeningChange]);
+  
+  const stopListening = useCallback(() => {
+    if (recognition.current) {
+      try {
+        recognition.current.stop();
+      } catch (e) {
+        console.error('Error stopping speech recognition:', e);
+      }
+    }
     
-    // Add user message
-    setMessages(prev => [...prev, { role: 'user', content: input }]);
-    setIsProcessing(true);
+    setIsListening(false);
     
-    // For now, just echo back the input as a simple example
-    setTimeout(() => {
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: `I received your message: "${input}". This is a placeholder response.` 
-      }]);
-      setIsProcessing(false);
-    }, 1000);
-    
-    // In a real implementation, you would process the input with an AI service
-  }, []);
-
-  // Clear all messages
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-  }, []);
-
+    if (onListeningChange) {
+      onListeningChange(false);
+    }
+  }, [onListeningChange]);
+  
   return {
-    messages,
     isListening,
     transcript,
+    answer,
+    error,
     isProcessing,
-    isLoading,
-    toggleListening,
-    submitVoiceInput,
-    clearMessages
+    startListening,
+    stopListening,
+    setTranscript
   };
 };
 

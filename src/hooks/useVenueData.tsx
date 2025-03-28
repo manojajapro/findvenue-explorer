@@ -1,13 +1,11 @@
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import { toast } from 'sonner';
 
 export const useVenueData = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [venue, setVenue] = useState<Venue | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +31,6 @@ export const useVenueData = () => {
 
         if (venueError) {
           console.error("Error fetching venue:", venueError);
-          toast.error("Couldn't load venue details. Please try again.");
           throw venueError;
         }
 
@@ -119,12 +116,7 @@ export const useVenueData = () => {
     };
 
     fetchVenueData();
-  }, [id, navigate]);
+  }, [id]);
 
-  // Method to navigate to venue detail page
-  const goToVenue = (venueId: string) => {
-    navigate(`/venue/${venueId}`);
-  };
-
-  return { venue, isLoading, error, goToVenue };
+  return { venue, isLoading, error };
 };

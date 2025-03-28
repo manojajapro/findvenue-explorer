@@ -1,21 +1,103 @@
 import { useEffect, useState, useCallback } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, Search, ZoomIn, X, Filter, Eye } from 'lucide-react';
+import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X, Filter } from 'lucide-react';
+import L from 'leaflet';
+import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/useDebounce';
-import MapComponent from './MapComponent';
-import MapFilters from './MapFilters';
+
+// Fix for marker icons in React Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Custom icon for highlighted venue
+const highlightedIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+// Featured venue icon 
+const featuredIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
 interface MapViewProps {
   venues: Venue[];
   isLoading: boolean;
   highlightedVenueId?: string;
-  categories?: Array<{ id: string; name: string }>;
-  cities?: Array<{ id: string; name: string }>;
 }
+
+// Component to update map view when props change
+const MapUpdater = ({ 
+  venues, 
+  searchTerm,
+  highlightedVenueId
+}: { 
+  venues: Venue[]; 
+  searchTerm?: string;
+  highlightedVenueId?: string;
+}) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (venues.length > 0) {
+      // Get venues with coordinates
+      const venuesWithCoords = venues.filter(
+        venue => venue.latitude && venue.longitude
+      );
+      
+      if (venuesWithCoords.length > 0) {
+        // If there's a highlighted venue, center on it
+        if (highlightedVenueId) {
+          const highlightedVenue = venuesWithCoords.find(v => v.id === highlightedVenueId);
+          if (highlightedVenue && highlightedVenue.latitude && highlightedVenue.longitude) {
+            map.setView(
+              [highlightedVenue.latitude, highlightedVenue.longitude], 
+              14, 
+              { animate: true, duration: 1 }
+            );
+            return;
+          }
+        }
+        
+        // Otherwise, fit bounds to all venues
+        const bounds = L.latLngBounds(
+          venuesWithCoords.map(venue => [
+            venue.latitude || 24.774265, 
+            venue.longitude || 46.738586
+          ])
+        );
+        
+        // Fit map to these bounds
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
+      } else {
+        // Default to Saudi Arabia if no venues have coordinates
+        map.setView([24.774265, 46.738586], 5);
+      }
+    }
+  }, [venues, map, searchTerm, highlightedVenueId]);
+  
+  return null;
+};
 
 const MapSearch = ({ 
   onSearch,
@@ -39,6 +121,11 @@ const MapSearch = ({
   useEffect(() => {
     onSearch(debouncedSearchTerm);
   }, [debouncedSearchTerm, onSearch]);
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSearch(searchText);
+  };
   
   return (
     <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md">
@@ -87,27 +174,20 @@ const MapSearch = ({
   );
 };
 
-const MapView = ({ 
-  venues, 
-  isLoading, 
-  highlightedVenueId,
-  categories = [],
-  cities = []
-}: MapViewProps) => {
+const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [activeVenue, setActiveVenue] = useState<string | null>(null);
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const [mapSearchTerm, setMapSearchTerm] = useState('');
   const [isCompactControls, setIsCompactControls] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [mapCenter, setMapCenter] = useState({ lat: 24.774265, lng: 46.738586 });
-  const [mapZoom, setMapZoom] = useState(5);
   
   // Filter venues with valid coordinates
   const venuesWithCoordinates = filteredVenues.filter(
     venue => venue.latitude && venue.longitude
   );
+  
+  // Default center on Saudi Arabia
+  const defaultCenter: [number, number] = [24.774265, 46.738586];
   
   const handleVenueClick = (venueId: string) => {
     navigate(`/venue/${venueId}`);
@@ -136,41 +216,6 @@ const MapView = ({
     setFilteredVenues(results);
   }, [venues]);
   
-  // Apply filters from URL parameters
-  useEffect(() => {
-    const categoryId = searchParams.get('categoryId');
-    const cityId = searchParams.get('cityId');
-    const search = searchParams.get('search');
-    
-    let filtered = venues;
-    
-    // Apply filters sequentially
-    if (categoryId) {
-      filtered = filtered.filter(venue => venue.categoryId === categoryId);
-    }
-    
-    if (cityId) {
-      filtered = filtered.filter(venue => venue.cityId === cityId);
-    }
-    
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(venue => 
-        venue.name.toLowerCase().includes(searchLower) || 
-        venue.description.toLowerCase().includes(searchLower) ||
-        venue.address.toLowerCase().includes(searchLower) ||
-        venue.city.toLowerCase().includes(searchLower) ||
-        venue.category.toLowerCase().includes(searchLower) ||
-        venue.amenities.some(amenity => 
-          amenity.toLowerCase().includes(searchLower)
-        )
-      );
-      setMapSearchTerm(search);
-    }
-    
-    setFilteredVenues(filtered);
-  }, [venues, searchParams]);
-  
   // Compact view toggle based on map size
   useEffect(() => {
     const handleResize = () => {
@@ -182,152 +227,31 @@ const MapView = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
-  // Update map center and zoom when venues change
+  // Update filtered venues when main venues list changes
   useEffect(() => {
-    if (venuesWithCoordinates.length > 0) {
-      // If there's a highlighted venue, center on it
-      if (highlightedVenueId || activeVenue) {
-        const highlightedVenue = venuesWithCoordinates.find(
-          v => v.id === (highlightedVenueId || activeVenue)
-        );
-        
-        if (highlightedVenue && highlightedVenue.latitude && highlightedVenue.longitude) {
-          setMapCenter({ 
-            lat: highlightedVenue.latitude, 
-            lng: highlightedVenue.longitude 
-          });
-          setMapZoom(14);
-          return;
-        }
-      }
-      
-      // Otherwise calculate bounds center
-      // For simplicity, we'll just use the average of all coordinates
-      const totalLat = venuesWithCoordinates.reduce(
-        (sum, venue) => sum + (venue.latitude || 0), 
-        0
-      );
-      
-      const totalLng = venuesWithCoordinates.reduce(
-        (sum, venue) => sum + (venue.longitude || 0), 
-        0
-      );
-      
-      setMapCenter({ 
-        lat: totalLat / venuesWithCoordinates.length, 
-        lng: totalLng / venuesWithCoordinates.length 
-      });
-      
-      // Set an appropriate zoom level based on number of venues
-      setMapZoom(venuesWithCoordinates.length === 1 ? 14 : 10);
+    if (!mapSearchTerm) {
+      setFilteredVenues(venues);
     } else {
-      // Default to Saudi Arabia if no venues have coordinates
-      setMapCenter({ lat: 24.774265, lng: 46.738586 });
-      setMapZoom(5);
+      handleSearch(mapSearchTerm);
     }
-  }, [venuesWithCoordinates, highlightedVenueId, activeVenue]);
-  
-  const createMarkerInfo = (venue: Venue) => {
-    return (
-      <div>
-        <div className="p-0 max-w-[300px]">
-          <div className="relative">
-            <img 
-              src={venue.imageUrl} 
-              alt={venue.name}
-              className="w-full h-[120px] object-cover rounded-t"
-            />
-            {venue.featured && (
-              <div className="absolute top-2 right-2 bg-findvenue-gold text-black px-1.5 py-0.5 rounded text-[10px] font-medium">
-                Featured
-              </div>
-            )}
-          </div>
-          <div className="p-3 bg-findvenue-surface">
-            <h3 className="font-bold text-sm mb-1 truncate">
-              {venue.name}
-            </h3>
-            <div className="flex items-center text-xs text-findvenue-text-muted mb-2">
-              <MapPin className="h-3 w-3 mr-1 text-findvenue" />
-              <span className="truncate">
-                {venue.address}, {venue.city}
-              </span>
-            </div>
-            <div className="mb-2 flex flex-wrap gap-1">
-              {venue.category && (
-                <span className="border border-white/10 bg-findvenue-surface/50 rounded px-1 text-[10px]">
-                  {venue.category}
-                </span>
-              )}
-              {venue.rating > 0 && (
-                <span className="bg-amber-500 text-black rounded px-1 text-[10px] flex items-center">
-                  ★ {venue.rating.toFixed(1)}
-                </span>
-              )}
-            </div>
-            <div className="flex justify-between items-center text-xs pt-2 border-t border-white/10">
-              <div className="font-semibold">
-                {venue.pricing.startingPrice} {venue.pricing.currency}
-                {venue.pricing.pricePerPerson ? ' / person' : ''}
-              </div>
-              <Button 
-                size="sm" 
-                className="h-6 text-[10px] px-2 py-1"
-                onClick={() => navigate(`/venue/${venue.id}`)}
-              >
-                <Eye className="h-3 w-3 mr-1" /> View Details
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  }, [venues, mapSearchTerm, handleSearch]);
   
   if (isLoading) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-findvenue-surface/50">
+      <div className="h-full flex items-center justify-center bg-findvenue-surface/50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-findvenue"></div>
       </div>
     );
   }
   
   return (
-    <div className="relative h-full w-full flex flex-col">
-      <div className="absolute top-4 left-4 right-4 z-[1000] flex flex-col gap-2">
+    <div className="h-full flex flex-col relative">
+      <div className="absolute top-4 left-4 right-4 z-[1000]">
         <MapSearch onSearch={handleSearch} venueCount={venuesWithCoordinates.length} />
-        
-        {showFilters && (
-          <MapFilters 
-            categories={categories} 
-            cities={cities}
-            onFilterChange={() => {
-              // Refocus map after filter changes
-              if (venuesWithCoordinates.length > 0) {
-                const totalLat = venuesWithCoordinates.reduce(
-                  (sum, venue) => sum + (venue.latitude || 0), 
-                  0
-                );
-                
-                const totalLng = venuesWithCoordinates.reduce(
-                  (sum, venue) => sum + (venue.longitude || 0), 
-                  0
-                );
-                
-                setMapCenter({ 
-                  lat: totalLat / venuesWithCoordinates.length, 
-                  lng: totalLng / venuesWithCoordinates.length 
-                });
-                
-                setMapZoom(venuesWithCoordinates.length === 1 ? 14 : 10);
-              }
-            }}
-          />
-        )}
       </div>
       
       {venuesWithCoordinates.length === 0 ? (
-        <div className="h-full w-full flex items-center justify-center bg-findvenue-surface/50 p-6 text-center">
+        <div className="h-full flex items-center justify-center bg-findvenue-surface/50 p-6 text-center">
           <div>
             <MapPin className="h-12 w-12 mx-auto mb-4 text-findvenue-text-muted opacity-50" />
             <h3 className="text-xl font-medium mb-2">No Venues Found</h3>
@@ -338,33 +262,96 @@ const MapView = ({
           </div>
         </div>
       ) : (
-        <div className="absolute inset-0">
-          <MapComponent
-            center={mapCenter}
-            zoom={mapZoom}
-            height="100%"
-            markers={venuesWithCoordinates.map(venue => ({
-              position: { 
-                lat: venue.latitude || 0, 
-                lng: venue.longitude || 0 
-              },
-              title: venue.name,
-              id: venue.id,
-              onClick: () => {
-                setActiveVenue(venue.id);
-                // Don't immediately navigate on marker click now to allow popup interaction
-              },
-              info: createMarkerInfo(venue)
-            }))}
-            highlightedMarkerId={highlightedVenueId || activeVenue || undefined}
-            className="z-10"
+        <MapContainer 
+          center={defaultCenter} 
+          zoom={5} 
+          style={{ height: '100%', width: '100%' }}
+          scrollWheelZoom={true}
+          className="z-10"
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
-        </div>
+          
+          <MapUpdater 
+            venues={venuesWithCoordinates} 
+            searchTerm={mapSearchTerm} 
+            highlightedVenueId={highlightedVenueId || activeVenue}
+          />
+          
+          {venuesWithCoordinates.map((venue) => (
+            <Marker 
+              key={venue.id}
+              position={[venue.latitude || 0, venue.longitude || 0]}
+              icon={
+                venue.id === highlightedVenueId || venue.id === activeVenue 
+                  ? highlightedIcon 
+                  : venue.featured 
+                    ? featuredIcon
+                    : new L.Icon.Default()
+              }
+              eventHandlers={{
+                click: () => setActiveVenue(venue.id),
+              }}
+            >
+              <Popup minWidth={240} maxWidth={300} className="custom-popup">
+                <div className="text-black">
+                  <div className="relative">
+                    <img 
+                      src={venue.imageUrl} 
+                      alt={venue.name}
+                      className="w-full h-28 object-cover rounded-md"
+                    />
+                    {venue.featured && (
+                      <Badge className="absolute top-2 right-2 bg-findvenue-gold text-black">
+                        Featured
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="py-2">
+                    <h3 className="font-bold text-base truncate">{venue.name}</h3>
+                    <div className="flex items-center text-xs text-gray-600 mb-1">
+                      <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <p className="truncate">{venue.address}, {venue.city}</p>
+                    </div>
+                    <div className="flex gap-1 mb-2 flex-wrap">
+                      {venue.category && (
+                        <Badge variant="outline" className="text-xs py-0">
+                          {venue.category}
+                        </Badge>
+                      )}
+                      {venue.rating > 0 && (
+                        <Badge className="bg-amber-500 text-black text-xs py-0 flex items-center">
+                          <Star className="h-3 w-3 mr-1" /> {venue.rating.toFixed(1)}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2">
+                    <div>
+                      <span className="font-semibold">{venue.pricing.startingPrice} {venue.pricing.currency}</span>
+                      {venue.pricing.pricePerPerson && <span> / person</span>}
+                    </div>
+                    <Button 
+                      size="sm" 
+                      className="bg-findvenue hover:bg-findvenue-dark text-xs px-3 py-1 h-auto flex items-center"
+                      onClick={() => handleVenueClick(venue.id)}
+                    >
+                      View
+                      <ArrowRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
       )}
       
       {mapSearchTerm && (
         <div className="absolute bottom-4 left-4 z-[1000] bg-findvenue-surface/80 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-lg text-xs flex items-center">
-          <Search className="h-3 w-3 mr-1.5 text-findvenue" />
+          <Filter className="h-3 w-3 mr-1.5 text-findvenue" />
           <span>Filtered: "{mapSearchTerm}"</span>
           <button onClick={() => handleSearch('')} className="ml-2 text-findvenue hover:text-findvenue-light">
             <X className="h-3 w-3" />
@@ -373,33 +360,14 @@ const MapView = ({
       )}
       
       <TooltipProvider>
-        <div className={`absolute ${isCompactControls ? 'bottom-20 right-4' : 'top-20 right-4'} z-[1000] flex ${isCompactControls ? 'flex-row' : 'flex-col'} gap-2`}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className={`h-8 w-8 ${showFilters ? 'bg-findvenue text-white' : 'bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue'} shadow-md`}
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-              <p>{showFilters ? 'Hide filters' : 'Show filters'}</p>
-            </TooltipContent>
-          </Tooltip>
-          
+        <div className={`absolute ${isCompactControls ? 'bottom-4 right-4' : 'top-20 right-4'} z-[1000] flex ${isCompactControls ? 'flex-row' : 'flex-col'} gap-2`}>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
                 variant="outline" 
                 size="icon" 
                 className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
-                onClick={() => {
-                  // Clear search
-                  handleSearch('');
-                }}
+                onClick={() => handleSearch('')}
               >
                 <X className="h-3.5 w-3.5" />
               </Button>
@@ -416,24 +384,7 @@ const MapView = ({
                 size="icon" 
                 className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
                 onClick={() => {
-                  // Reset map zoom and center to show all venues
-                  const totalLat = venuesWithCoordinates.reduce(
-                    (sum, venue) => sum + (venue.latitude || 0), 
-                    0
-                  );
-                  
-                  const totalLng = venuesWithCoordinates.reduce(
-                    (sum, venue) => sum + (venue.longitude || 0), 
-                    0
-                  );
-                  
-                  if (venuesWithCoordinates.length > 0) {
-                    setMapCenter({ 
-                      lat: totalLat / venuesWithCoordinates.length, 
-                      lng: totalLng / venuesWithCoordinates.length 
-                    });
-                    setMapZoom(venuesWithCoordinates.length === 1 ? 14 : 10);
-                  }
+                  // This functionality would need a ref to the map
                 }}
               >
                 <ZoomIn className="h-3.5 w-3.5" />

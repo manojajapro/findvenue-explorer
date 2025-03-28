@@ -1,36 +1,39 @@
 
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import VenueSpecificChatBot from '@/components/chat/VenueSpecificChatBot';
 import VenueSpecificVoiceAssistant from '@/components/voice/VenueSpecificVoiceAssistant';
-import { Venue } from '@/hooks/useSupabaseVenues';
+import { MessageSquare, Mic } from 'lucide-react';
 
-interface VenueAIAssistantsProps {
-  venue: Venue;
-}
-
-const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
-  const [activeTab, setActiveTab] = useState("chat");
-
+const VenueAIAssistants = () => {
+  const [activeTab, setActiveTab] = useState('chat');
+  
   return (
-    <Card className="w-full">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="chat">Chat</TabsTrigger>
-          <TabsTrigger value="voice">Voice</TabsTrigger>
+    <div className="mt-8">
+      <h2 className="text-xl font-semibold mb-4">AI Venue Assistants</h2>
+      
+      <Tabs defaultValue="chat" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-2 mb-4">
+          <TabsTrigger value="chat" className="flex items-center">
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Chat Assistant
+          </TabsTrigger>
+          <TabsTrigger value="voice" className="flex items-center">
+            <Mic className="w-4 h-4 mr-2" />
+            Voice Assistant
+          </TabsTrigger>
         </TabsList>
-        <CardContent>
-          <TabsContent value="chat" className="outline-none">
-            <VenueSpecificChatBot venue={venue} />
-          </TabsContent>
-          <TabsContent value="voice" className="outline-none">
-            <VenueSpecificVoiceAssistant venue={venue} />
-          </TabsContent>
-        </CardContent>
+        
+        <TabsContent value="chat" className="pt-2">
+          <VenueSpecificChatBot />
+        </TabsContent>
+        
+        <TabsContent value="voice" className="pt-2">
+          <VenueSpecificVoiceAssistant />
+        </TabsContent>
       </Tabs>
-    </Card>
+    </div>
   );
-}
+};
 
 export default VenueAIAssistants;

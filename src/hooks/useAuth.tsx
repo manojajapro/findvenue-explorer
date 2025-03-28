@@ -1,7 +1,6 @@
-
 import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/components/ui/use-toast';
 
 type UserProfile = {
   id: string;
@@ -57,6 +56,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isVenueOwner, setIsVenueOwner] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const setupAuth = async () => {
@@ -142,11 +142,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
       
-      toast.success("Welcome back! You've successfully signed in.");
+      toast({
+        title: "Welcome back!",
+        description: "You've successfully signed in.",
+      });
       
     } catch (error: any) {
       console.error("Sign in error:", error.message);
-      toast.error("Error signing in: " + error.message);
+      toast({
+        title: "Error signing in",
+        description: error.message,
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -170,11 +177,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
       
-      toast.success("Your account has been created successfully.");
+      toast({
+        title: "Account created",
+        description: "Your account has been created successfully.",
+      });
       
     } catch (error: any) {
       console.error("Sign up error:", error.message);
-      toast.error("Error signing up: " + error.message);
+      toast({
+        title: "Error signing up",
+        description: error.message,
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -191,11 +205,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) throw error;
       
-      toast.success("You've been signed out successfully.");
+      toast({
+        title: "Signed out",
+        description: "You've been signed out successfully.",
+      });
       
     } catch (error: any) {
       console.error("Sign out error:", error.message);
-      toast.error("Error signing out: " + error.message);
+      toast({
+        title: "Error signing out",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -212,10 +233,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       setProfile(prev => prev ? { ...prev, ...updates } : null);
       
-      toast.success("Your profile has been updated successfully.");
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been updated successfully.",
+      });
     } catch (error: any) {
       console.error("Error updating profile:", error.message);
-      toast.error("Error updating profile: " + error.message);
+      toast({
+        title: "Error updating profile",
+        description: error.message,
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -228,10 +256,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) throw error;
       
-      toast.success("Your password has been changed successfully.");
+      toast({
+        title: "Password updated",
+        description: "Your password has been changed successfully.",
+      });
     } catch (error: any) {
       console.error("Error changing password:", error.message);
-      toast.error("Error changing password: " + error.message);
+      toast({
+        title: "Error changing password",
+        description: error.message,
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -253,10 +288,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) throw error;
       
-      toast.success("Your password has been changed successfully.");
+      toast({
+        title: "Password updated",
+        description: "Your password has been changed successfully.",
+      });
     } catch (error: any) {
       console.error("Error updating password:", error.message);
-      toast.error("Error updating password: " + error.message);
+      toast({
+        title: "Error updating password",
+        description: error.message,
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -276,7 +318,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return data as Booking[];
     } catch (error: any) {
       console.error("Error fetching bookings:", error.message);
-      toast.error("Error fetching bookings: " + error.message);
+      toast({
+        title: "Error fetching bookings",
+        description: error.message,
+        variant: "destructive",
+      });
       return [];
     }
   };
@@ -303,14 +349,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       setProfile(prev => prev ? { ...prev, favorites: updatedFavorites } : null);
       
-      toast.success(currentFavorites.includes(venueId) 
-        ? "Venue removed from your favorites." 
-        : "Venue added to your favorites.");
+      toast({
+        title: currentFavorites.includes(venueId) ? "Removed from favorites" : "Added to favorites",
+        description: currentFavorites.includes(venueId) 
+          ? "Venue removed from your favorites." 
+          : "Venue added to your favorites.",
+      });
 
       return updatedFavorites;
     } catch (error: any) {
       console.error("Error toggling favorite:", error.message);
-      toast.error("Error updating favorites: " + error.message);
+      toast({
+        title: "Error updating favorites",
+        description: error.message,
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -362,7 +415,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return data;
     } catch (error: any) {
       console.error("Error fetching owner venues:", error.message);
-      toast.error("Error fetching venues: " + error.message);
+      toast({
+        title: "Error fetching venues",
+        description: error.message,
+        variant: "destructive",
+      });
       return [];
     }
   };
