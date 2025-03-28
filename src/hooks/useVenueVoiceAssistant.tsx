@@ -65,6 +65,77 @@ export const useVenueVoiceAssistant = () => {
     }
   }, [autoRestart, isListening]);
 
+  // Define processVoiceQuery early
+  const processVoiceQuery = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Call the Supabase edge function with the venue context
+      const { data, error } = await supabase.functions.invoke('venue-assistant', {
+        body: {
+          query,
+          venueId: venue?.id,
+          type: 'voice'
+        }
+      });
+      
+      if (error) throw error;
+      
+      const assistantResponse = data.answer || "I'm sorry, I couldn't process your request at this time.";
+      setResponse(assistantResponse);
+      
+      // Use speech synthesis to speak the response
+      if (speechSynthesis.current) {
+        // Cancel any ongoing speech
+        speechSynthesis.current.cancel();
+        
+        const speech = new SpeechSynthesisUtterance(assistantResponse);
+        speech.rate = 1;
+        speech.pitch = 1;
+        speech.volume = 1;
+        
+        // Get available voices
+        const voices = speechSynthesis.current.getVoices();
+        const preferredVoice = voices.find(voice => 
+          voice.lang === 'en-US' && (voice.name.includes('Female') || voice.name.includes('Samantha'))
+        );
+        
+        if (preferredVoice) {
+          speech.voice = preferredVoice;
+        }
+        
+        // Set event handlers
+        speech.onstart = () => setIsSpeaking(true);
+        speech.onend = handleSpeechEnd;
+        speech.onerror = () => {
+          setIsSpeaking(false);
+          if (autoRestart) startListening();
+        };
+        
+        setIsSpeaking(true);
+        speechSynthesis.current.speak(speech);
+      }
+      
+    } catch (error: any) {
+      console.error('Error processing voice query:', error);
+      setError('Failed to process your query');
+      setResponse("I'm sorry, I encountered an error processing your request. Please try again.");
+      
+      // Speak the error message
+      if (speechSynthesis.current) {
+        const speech = new SpeechSynthesisUtterance("I'm sorry, I encountered an error processing your request. Please try again.");
+        speech.onend = handleSpeechEnd;
+        speechSynthesis.current.speak(speech);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [venue, handleSpeechEnd, autoRestart]);
+
   const startListening = useCallback(() => {
     if (!recognition.current) {
       setError('Speech recognition is not supported in your browser.');
@@ -147,75 +218,11 @@ export const useVenueVoiceAssistant = () => {
     toast.info(autoRestart ? 'Continuous listening disabled' : 'Continuous listening enabled');
   }, [autoRestart, isListening, isSpeaking, startListening]);
 
-  const processVoiceQuery = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      // Call the Supabase edge function with the venue context
-      const { data, error } = await supabase.functions.invoke('venue-assistant', {
-        body: {
-          query,
-          venueId: venue?.id,
-          type: 'voice'
-        }
-      });
-      
-      if (error) throw error;
-      
-      const assistantResponse = data.answer || "I'm sorry, I couldn't process your request at this time.";
-      setResponse(assistantResponse);
-      
-      // Use speech synthesis to speak the response
-      if (speechSynthesis.current) {
-        // Cancel any ongoing speech
-        speechSynthesis.current.cancel();
-        
-        const speech = new SpeechSynthesisUtterance(assistantResponse);
-        speech.rate = 1;
-        speech.pitch = 1;
-        speech.volume = 1;
-        
-        // Get available voices
-        const voices = speechSynthesis.current.getVoices();
-        const preferredVoice = voices.find(voice => 
-          voice.lang === 'en-US' && (voice.name.includes('Female') || voice.name.includes('Samantha'))
-        );
-        
-        if (preferredVoice) {
-          speech.voice = preferredVoice;
-        }
-        
-        // Set event handlers
-        speech.onstart = () => setIsSpeaking(true);
-        speech.onend = handleSpeechEnd;
-        speech.onerror = () => {
-          setIsSpeaking(false);
-          if (autoRestart) startListening();
-        };
-        
-        setIsSpeaking(true);
-        speechSynthesis.current.speak(speech);
-      }
-      
-    } catch (error: any) {
-      console.error('Error processing voice query:', error);
-      setError('Failed to process your query');
-      setResponse("I'm sorry, I encountered an error processing your request. Please try again.");
-      
-      // Speak the error message
-      if (speechSynthesis.current) {
-        const speech = new SpeechSynthesisUtterance("I'm sorry, I encountered an error processing your request. Please try again.");
-        speech.onend = handleSpeechEnd;
-        speechSynthesis.current.speak(speech);
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [venue, handleSpeechEnd, autoRestart, startListening]);
+  const clearConversation = useCallback(() => {
+    setTranscript('');
+    setResponse('');
+    setError(null);
+  }, []);
 
   return {
     isListening,
@@ -229,6 +236,7 @@ export const useVenueVoiceAssistant = () => {
     autoRestart,
     isSpeaking,
     venue,
-    isLoadingVenue
+    isLoadingVenue,
+    clearConversation
   };
 };

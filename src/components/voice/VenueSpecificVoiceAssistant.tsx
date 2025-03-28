@@ -23,7 +23,8 @@ const VenueSpecificVoiceAssistant = () => {
     autoRestart,
     isSpeaking,
     venue,
-    isLoadingVenue
+    isLoadingVenue,
+    clearConversation
   } = useVenueVoiceAssistant();
 
   // Hide hint after 10 seconds
@@ -159,12 +160,12 @@ const VenueSpecificVoiceAssistant = () => {
                 </Button>
               )}
               
-              {response && (
+              {(transcript || response) && (
                 <Button
                   variant="outline"
                   className="border-white/10"
                   onClick={() => {
-                    setTranscript('');
+                    clearConversation();
                     setShowHint(false);
                   }}
                 >
