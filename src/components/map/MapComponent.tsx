@@ -1,53 +1,19 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
-import L from 'leaflet';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { Loader } from 'lucide-react';
-import 'leaflet/dist/leaflet.css';
 
-// Fix the default icon issue in Leaflet
-const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+// Mapbox access token from environment variables
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
 
-L.Marker.prototype.options.icon = DefaultIcon;
+// Check if token exists
+if (!MAPBOX_TOKEN) {
+  console.warn('Mapbox token missing! Please add VITE_MAPBOX_ACCESS_TOKEN to your .env file');
+}
 
-// Component to update the map view when center/zoom props change
-const MapUpdater = ({ center, zoom }: { center: L.LatLngExpression, zoom: number }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    map.setView(center, zoom);
-  }, [map, center, zoom]);
-  
-  return null;
-};
-
-// Component to handle map click events
-const MapClickHandler = ({ onClick }: { onClick?: (lat: number, lng: number) => void }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (!onClick) return;
-    
-    const handleClick = (e: L.LeafletMouseEvent) => {
-      onClick(e.latlng.lat, e.latlng.lng);
-    };
-    
-    map.on('click', handleClick);
-    
-    return () => {
-      map.off('click', handleClick);
-    };
-  }, [map, onClick]);
-  
-  return null;
-};
+// Set access token
+mapboxgl.accessToken = MAPBOX_TOKEN;
 
 export interface MapComponentProps {
   center: { lat: number; lng: number };
@@ -79,8 +45,158 @@ const MapComponent: React.FC<MapComponentProps> = ({
   highlightedMarkerId,
   className = '',
 }) => {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const mapMarkers = useRef<{ [key: string]: mapboxgl.Marker }>({});
+  const popups = useRef<{ [key: string]: mapboxgl.Popup }>({});
   const [isLoading, setIsLoading] = useState(true);
 
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current) return;
+    
+    // Create the map instance
+    const mapInstance = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [center.lng, center.lat],
+      zoom: zoom,
+      attributionControl: false
+    });
+    
+    // Add navigation controls
+    mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.current = mapInstance;
+    
+    // Add attribution control
+    mapInstance.addControl(new mapboxgl.AttributionControl({
+      compact: true
+    }));
+    
+    // Handle map click events
+    if (onClick) {
+      mapInstance.on('click', (e) => {
+        onClick(e.lngLat.lat, e.lngLat.lng);
+      });
+    }
+    
+    // Wait for map to load
+    mapInstance.on('load', () => {
+      setIsLoading(false);
+    });
+    
+    // Cleanup on unmount
+    return () => {
+      mapInstance.remove();
+    };
+  }, []);
+  
+  // Update center and zoom when props change
+  useEffect(() => {
+    if (!map.current) return;
+    
+    map.current.setCenter([center.lng, center.lat]);
+    map.current.setZoom(zoom);
+  }, [center.lat, center.lng, zoom]);
+  
+  // Handle markers
+  useEffect(() => {
+    if (!map.current) return;
+    
+    // Clear existing markers
+    Object.values(mapMarkers.current).forEach(marker => marker.remove());
+    mapMarkers.current = {};
+    
+    // Clear existing popups
+    Object.values(popups.current).forEach(popup => popup.remove());
+    popups.current = {};
+    
+    // Add new markers
+    markers.forEach((marker, idx) => {
+      const markerId = marker.id || `marker-${idx}`;
+      const isHighlighted = marker.id === highlightedMarkerId;
+      
+      // Create popup if marker has info
+      let popup: mapboxgl.Popup | null = null;
+      if (marker.info) {
+        // Create a temporary DOM element to render React node
+        const popupNode = document.createElement('div');
+        
+        // Create a ReactDOM render function (simplified for this example)
+        const renderReactNodeToString = (reactNode: React.ReactNode): string => {
+          if (typeof reactNode === 'string') return reactNode;
+          return '<div class="mapbox-popup-content">Info available on click</div>';
+        };
+        
+        popupNode.innerHTML = renderReactNodeToString(marker.info);
+        
+        popup = new mapboxgl.Popup({ offset: 25 })
+          .setDOMContent(popupNode);
+          
+        popups.current[markerId] = popup;
+      }
+      
+      // Create marker element
+      const el = document.createElement('div');
+      el.className = 'mapbox-marker';
+      
+      if (isHighlighted) {
+        el.style.width = '20px';
+        el.style.height = '20px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = '#4285F4';
+        el.style.border = '2px solid #ffffff';
+        el.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
+      } else if (marker.icon) {
+        // Use custom icon if provided
+        el.style.backgroundImage = `url(${marker.icon})`;
+        el.style.width = '30px';
+        el.style.height = '40px';
+        el.style.backgroundSize = 'cover';
+      } else {
+        // Default marker style
+        el.style.width = '20px';
+        el.style.height = '30px';
+        el.style.backgroundImage = 'url(https://docs.mapbox.com/mapbox-gl-js/assets/pin.png)';
+        el.style.backgroundSize = 'cover';
+      }
+      
+      // Create the marker
+      const markerObj = new mapboxgl.Marker({
+        element: el,
+        draggable: editable
+      })
+        .setLngLat([marker.position.lng, marker.position.lat]);
+      
+      // Add popup if exists
+      if (popup) {
+        markerObj.setPopup(popup);
+      }
+      
+      // Add to map
+      markerObj.addTo(map.current!);
+      
+      // Add click handler
+      if (marker.onClick) {
+        el.addEventListener('click', () => {
+          marker.onClick?.();
+        });
+      }
+      
+      // Add drag end handler
+      if (editable && onMarkerDragEnd) {
+        markerObj.on('dragend', () => {
+          const { lng, lat } = markerObj.getLngLat();
+          onMarkerDragEnd(lat, lng);
+        });
+      }
+      
+      // Store marker reference
+      mapMarkers.current[markerId] = markerObj;
+    });
+    
+  }, [markers, highlightedMarkerId, editable, onMarkerDragEnd]);
+  
   return (
     <>
       {isLoading && (
@@ -92,70 +208,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
         </div>
       )}
       
-      <div style={{ height, display: isLoading ? 'none' : 'block' }} className={`w-full rounded-md overflow-hidden ${className}`}>
-        <MapContainer
-          center={[center.lat, center.lng]}
-          zoom={zoom}
-          style={{ height: '100%', width: '100%' }}
-          zoomControl={false}
-          attributionControl={false}
-          whenReady={() => setIsLoading(false)}
-        >
-          <ZoomControl position="topright" />
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          
-          <MapUpdater center={[center.lat, center.lng]} zoom={zoom} />
-          {onClick && <MapClickHandler onClick={onClick} />}
-          
-          {markers.map((marker, idx) => {
-            const isHighlighted = marker.id === highlightedMarkerId;
-            const markerIcon = isHighlighted 
-              ? L.divIcon({
-                  className: 'custom-div-icon',
-                  html: `<div style="background-color: #4285F4; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white;"></div>`,
-                  iconSize: [20, 20],
-                  iconAnchor: [10, 10]
-                })
-              : marker.icon 
-                ? L.icon({
-                    iconUrl: marker.icon,
-                    iconSize: [30, 40],
-                    iconAnchor: [15, 40],
-                    popupAnchor: [0, -40]
-                  })
-                : DefaultIcon;
-                
-            return (
-              <Marker
-                key={`marker-${idx}`}
-                position={[marker.position.lat, marker.position.lng]}
-                draggable={editable}
-                icon={markerIcon}
-                eventHandlers={{
-                  click: () => {
-                    if (marker.onClick) marker.onClick();
-                  },
-                  dragend: (e) => {
-                    if (onMarkerDragEnd) {
-                      const latLng = e.target.getLatLng();
-                      onMarkerDragEnd(latLng.lat, latLng.lng);
-                    }
-                  }
-                }}
-              >
-                {marker.info && (
-                  <Popup>
-                    {marker.info}
-                  </Popup>
-                )}
-              </Marker>
-            );
-          })}
-        </MapContainer>
-      </div>
+      <div 
+        ref={mapContainer} 
+        style={{ height, display: isLoading ? 'none' : 'block' }} 
+        className={`w-full rounded-md overflow-hidden ${className}`}
+      />
     </>
   );
 };
