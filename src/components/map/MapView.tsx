@@ -4,7 +4,6 @@ import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MapPin, Search, ZoomIn, X, Filter } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -250,20 +249,20 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center bg-findvenue-surface/50">
+      <div className="h-full w-full flex items-center justify-center bg-findvenue-surface/50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-findvenue"></div>
       </div>
     );
   }
   
   return (
-    <div className="h-full flex flex-col relative">
+    <div className="relative h-full w-full flex flex-col">
       <div className="absolute top-4 left-4 right-4 z-[1000]">
         <MapSearch onSearch={handleSearch} venueCount={venuesWithCoordinates.length} />
       </div>
       
       {venuesWithCoordinates.length === 0 ? (
-        <div className="h-full flex items-center justify-center bg-findvenue-surface/50 p-6 text-center">
+        <div className="h-full w-full flex items-center justify-center bg-findvenue-surface/50 p-6 text-center">
           <div>
             <MapPin className="h-12 w-12 mx-auto mb-4 text-findvenue-text-muted opacity-50" />
             <h3 className="text-xl font-medium mb-2">No Venues Found</h3>
@@ -274,23 +273,25 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
           </div>
         </div>
       ) : (
-        <MapComponent
-          center={mapCenter}
-          zoom={mapZoom}
-          height="100%"
-          markers={venuesWithCoordinates.map(venue => ({
-            position: { 
-              lat: venue.latitude || 0, 
-              lng: venue.longitude || 0 
-            },
-            title: venue.name,
-            id: venue.id,
-            onClick: () => setActiveVenue(venue.id),
-            info: createMarkerInfo(venue)
-          }))}
-          highlightedMarkerId={highlightedVenueId || activeVenue || undefined}
-          className="z-10"
-        />
+        <div className="absolute inset-0">
+          <MapComponent
+            center={mapCenter}
+            zoom={mapZoom}
+            height="100%"
+            markers={venuesWithCoordinates.map(venue => ({
+              position: { 
+                lat: venue.latitude || 0, 
+                lng: venue.longitude || 0 
+              },
+              title: venue.name,
+              id: venue.id,
+              onClick: () => setActiveVenue(venue.id),
+              info: createMarkerInfo(venue)
+            }))}
+            highlightedMarkerId={highlightedVenueId || activeVenue || undefined}
+            className="z-10"
+          />
+        </div>
       )}
       
       {mapSearchTerm && (
@@ -304,7 +305,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       )}
       
       <TooltipProvider>
-        <div className={`absolute ${isCompactControls ? 'bottom-4 right-4' : 'top-20 right-4'} z-[1000] flex ${isCompactControls ? 'flex-row' : 'flex-col'} gap-2`}>
+        <div className={`absolute ${isCompactControls ? 'bottom-20 right-4' : 'top-20 right-4'} z-[1000] flex ${isCompactControls ? 'flex-row' : 'flex-col'} gap-2`}>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 

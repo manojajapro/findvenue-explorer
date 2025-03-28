@@ -58,20 +58,21 @@ const MapComponent: React.FC<MapComponentProps> = ({
     // Create the map instance
     const mapInstance = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: 'mapbox://styles/mapbox/dark-v11', // Using dark theme for better UI integration
       center: [center.lng, center.lat],
       zoom: zoom,
-      attributionControl: false
+      attributionControl: false, // Disable default attribution control
+      logoPosition: 'bottom-right',
     });
     
-    // Add navigation controls
-    mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    // Add minimal navigation controls
+    const navControl = new mapboxgl.NavigationControl({
+      showCompass: false,
+      showZoom: true,
+      visualizePitch: false
+    });
+    mapInstance.addControl(navControl, 'bottom-right');
     map.current = mapInstance;
-    
-    // Add attribution control
-    mapInstance.addControl(new mapboxgl.AttributionControl({
-      compact: true
-    }));
     
     // Handle map click events
     if (onClick) {
@@ -85,8 +86,18 @@ const MapComponent: React.FC<MapComponentProps> = ({
       setIsLoading(false);
     });
     
+    // Add resize handler to ensure map fills container properly
+    const handleResize = () => {
+      if (map.current) {
+        map.current.resize();
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
     // Cleanup on unmount
     return () => {
+      window.removeEventListener('resize', handleResize);
       mapInstance.remove();
     };
   }, []);
@@ -130,7 +141,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
         
         popupNode.innerHTML = renderReactNodeToString(marker.info);
         
-        popup = new mapboxgl.Popup({ offset: 25 })
+        popup = new mapboxgl.Popup({ 
+          offset: 25,
+          closeButton: false,
+          className: 'custom-popup'
+        })
           .setDOMContent(popupNode);
           
         popups.current[markerId] = popup;
@@ -141,24 +156,30 @@ const MapComponent: React.FC<MapComponentProps> = ({
       el.className = 'mapbox-marker';
       
       if (isHighlighted) {
-        el.style.width = '20px';
-        el.style.height = '20px';
+        el.style.width = '24px';
+        el.style.height = '24px';
         el.style.borderRadius = '50%';
         el.style.backgroundColor = '#4285F4';
-        el.style.border = '2px solid #ffffff';
-        el.style.boxShadow = '0 0 10px rgba(0,0,0,0.3)';
+        el.style.border = '3px solid #ffffff';
+        el.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+        el.style.cursor = 'pointer';
+        el.style.zIndex = '10';
       } else if (marker.icon) {
         // Use custom icon if provided
         el.style.backgroundImage = `url(${marker.icon})`;
         el.style.width = '30px';
         el.style.height = '40px';
         el.style.backgroundSize = 'cover';
+        el.style.cursor = 'pointer';
       } else {
         // Default marker style
-        el.style.width = '20px';
-        el.style.height = '30px';
-        el.style.backgroundImage = 'url(https://docs.mapbox.com/mapbox-gl-js/assets/pin.png)';
-        el.style.backgroundSize = 'cover';
+        el.style.width = '16px';
+        el.style.height = '16px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = '#FF6B6B';
+        el.style.border = '2px solid #ffffff';
+        el.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+        el.style.cursor = 'pointer';
       }
       
       // Create the marker
@@ -210,9 +231,45 @@ const MapComponent: React.FC<MapComponentProps> = ({
       
       <div 
         ref={mapContainer} 
-        style={{ height, display: isLoading ? 'none' : 'block' }} 
-        className={`w-full rounded-md overflow-hidden ${className}`}
+        style={{ height, width: '100%', display: isLoading ? 'none' : 'block' }} 
+        className={`rounded-md overflow-hidden ${className}`}
       />
+      
+      <style jsx global>{`
+        .mapboxgl-ctrl-logo {
+          display: none !important;
+        }
+        .mapboxgl-ctrl-attrib {
+          display: none !important;
+        }
+        .custom-popup .mapboxgl-popup-content {
+          border-radius: 8px;
+          padding: 0;
+          overflow: hidden;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+        .custom-popup .mapboxgl-popup-tip {
+          border-top-color: #1F2937;
+          border-bottom-color: #1F2937;
+        }
+        .mapboxgl-ctrl-group {
+          background-color: rgba(31, 41, 55, 0.9) !important;
+          border: 1px solid rgba(255,255,255,0.1) !important;
+          border-radius: 8px !important;
+          overflow: hidden !important;
+        }
+        .mapboxgl-ctrl-group button {
+          background-color: transparent !important;
+          border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+        }
+        .mapboxgl-ctrl-group button:hover {
+          background-color: rgba(255,255,255,0.1) !important;
+        }
+        .mapboxgl-ctrl-group button span {
+          filter: invert(1);
+        }
+      `}</style>
     </>
   );
 };
