@@ -45,6 +45,7 @@ const DirectChat = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   // Check if contactId is valid
   useEffect(() => {
@@ -66,6 +67,7 @@ const DirectChat = () => {
     const fetchMessages = async () => {
       try {
         setIsLoading(true);
+        console.log("Fetching messages for contact:", contactId);
         
         // Get contact name
         const { data: contactData, error: contactError } = await supabase
@@ -84,76 +86,89 @@ const DirectChat = () => {
         if (contactData) {
           setContactName(`${contactData.first_name} ${contactData.last_name}`);
           setContactRole(contactData.user_role);
+          console.log("Contact data fetched:", contactData);
         } else {
           setHasError(true);
           setErrorMessage('Contact not found. Please try again or select a different contact.');
           throw new Error('Contact not found');
         }
         
-        // First, check if a conversation exists
+        // First, check if a conversation exists and get its ID
+        console.log("Checking for existing conversation between", user.id, "and", contactId);
         const { data: conversation, error: convError } = await supabase
           .from('conversations')
           .select('id, venue_id, venue_name')
           .contains('participants', [user.id, contactId])
           .maybeSingle();
         
+        if (convError) {
+          console.error('Error fetching conversation:', convError);
+          setErrorMessage('Error finding conversation. Please try again later.');
+          throw convError;
+        }
+        
         if (conversation) {
+          console.log("Found existing conversation:", conversation);
+          setConversationId(conversation.id);
           setVenueId(conversation.venue_id);
           setVenueName(conversation.venue_name);
-        }
-        
-        // Get message history
-        const { data, error } = await supabase
-          .rpc('get_conversation', {
-            current_user_id: user.id,
-            other_user_id: contactId
-          });
           
-        if (error) {
-          console.error('Error fetching conversation:', error);
-          setErrorMessage('Error loading conversation. Please try again later.');
-          throw error;
-        }
-        
-        if (data && data.length > 0) {
-          setMessages(data);
-          
-          // Extract venue info from the first message that has it
-          if (!venueId) {
-            const messageWithVenue = data.find(msg => msg.venue_id);
-            if (messageWithVenue) {
-              setVenueId(messageWithVenue.venue_id);
-              setVenueName(messageWithVenue.venue_name);
-            }
+          // Now get messages for this conversation
+          const { data: messagesData, error: messagesError } = await supabase
+            .from('messages')
+            .select('*')
+            .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+            .or(`sender_id.eq.${contactId},receiver_id.eq.${contactId}`)
+            .order('created_at', { ascending: true });
+            
+          if (messagesError) {
+            console.error('Error fetching messages:', messagesError);
+            throw messagesError;
           }
           
-          // Mark received messages as read
-          const unreadMessageIds = data
-            .filter(msg => !msg.read && msg.sender_id === contactId)
-            .map(msg => msg.id);
+          if (messagesData && messagesData.length > 0) {
+            console.log("Fetched messages:", messagesData.length);
+            setMessages(messagesData);
             
-          if (unreadMessageIds.length > 0) {
-            await supabase
-              .from('messages')
-              .update({ read: true })
-              .in('id', unreadMessageIds);
+            // Mark received messages as read
+            const unreadMessageIds = messagesData
+              .filter(msg => !msg.read && msg.sender_id === contactId && msg.receiver_id === user.id)
+              .map(msg => msg.id);
+              
+            if (unreadMessageIds.length > 0) {
+              console.log("Marking messages as read:", unreadMessageIds.length);
+              await supabase
+                .from('messages')
+                .update({ read: true })
+                .in('id', unreadMessageIds);
+            }
+          } else {
+            console.log("No messages found in conversation");
           }
         } else {
-          // No existing messages, but create a conversation entry for realtime updates
-          if (!conversation) {
-            const { error: createError } = await supabase
-              .from('conversations')
-              .insert({
-                participants: [user.id, contactId],
-                venue_id: null,
-                venue_name: null,
-                last_message: null
-              })
-              .select();
-            
-            if (createError) {
-              console.error('Error creating conversation:', createError);
-            }
+          // No existing conversation, create one
+          console.log("No existing conversation, creating new one");
+          const { data: newConversation, error: createError } = await supabase
+            .from('conversations')
+            .insert({
+              participants: [user.id, contactId],
+              venue_id: null,
+              venue_name: null,
+              last_message: null
+            })
+            .select()
+            .single();
+          
+          if (createError) {
+            console.error('Error creating conversation:', createError);
+            setErrorMessage('Error creating conversation. Please try again later.');
+            throw createError;
+          }
+          
+          if (newConversation) {
+            console.log("Created new conversation:", newConversation);
+            setConversationId(newConversation.id);
+            setMessages([]);
           }
         }
       } catch (error: any) {
@@ -174,36 +189,42 @@ const DirectChat = () => {
     
     fetchMessages();
     
-    // Set up real-time subscription for new messages
-    if (contactId && contactId !== 'undefined') {
-      const channel = supabase
-        .channel('direct_chat')
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `sender_id=eq.${contactId},receiver_id=eq.${user.id}`
-        }, async (payload) => {
-          console.log('New message received:', payload);
-          
-          const newMessage = payload.new as Message;
-          
-          // Mark message as read
-          await supabase
-            .from('messages')
-            .update({ read: true })
-            .eq('id', newMessage.id);
-            
-          // Add message to state
-          setMessages(prev => [...prev, newMessage]);
-        })
-        .subscribe();
+  }, [user, contactId, toast, hasError, errorMessage]);
+
+  // Set up real-time subscription for new messages
+  useEffect(() => {
+    if (!user || !contactId || hasError || contactId === 'undefined') return;
+    
+    console.log("Setting up realtime subscription for chat between", user.id, "and", contactId);
+    
+    const channel = supabase
+      .channel('direct_chat')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `sender_id=eq.${contactId},receiver_id=eq.${user.id}`
+      }, async (payload) => {
+        console.log('New message received:', payload);
         
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [user, contactId, toast, hasError, errorMessage, venueId]);
+        const newMessage = payload.new as Message;
+        
+        // Mark message as read
+        await supabase
+          .from('messages')
+          .update({ read: true })
+          .eq('id', newMessage.id);
+          
+        // Add message to state
+        setMessages(prev => [...prev, newMessage]);
+      })
+      .subscribe();
+      
+    return () => {
+      console.log("Removing realtime subscription");
+      supabase.removeChannel(channel);
+    };
+  }, [user, contactId, hasError]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -218,27 +239,29 @@ const DirectChat = () => {
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !user || !contactId || hasError || contactId === 'undefined') return;
+    if (!newMessage.trim() || !user || !contactId || hasError || contactId === 'undefined' || !conversationId) {
+      console.log("Cannot send message:", {
+        hasMessage: !!newMessage.trim(),
+        hasUser: !!user,
+        hasContactId: !!contactId,
+        hasError,
+        hasConversationId: !!conversationId
+      });
+      return;
+    }
     
     try {
       setIsSending(true);
+      console.log("Sending message to", contactId, "in conversation", conversationId);
       
       // Update conversation
-      const { data: conversation, error: convError } = await supabase
+      await supabase
         .from('conversations')
-        .select('id')
-        .contains('participants', [user.id, contactId])
-        .maybeSingle();
-      
-      if (conversation) {
-        await supabase
-          .from('conversations')
-          .update({
-            last_message: newMessage,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', conversation.id);
-      }
+        .update({
+          last_message: newMessage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', conversationId);
       
       // Send message
       const messageData = {
@@ -258,12 +281,32 @@ const DirectChat = () => {
         .select()
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error sending message:", error);
+        throw error;
+      }
       
       // Add the new message to the state
       if (data) {
+        console.log("Message sent successfully:", data);
         setMessages(prev => [...prev, data]);
       }
+      
+      // Create notification for recipient
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: contactId,
+          title: 'New Message',
+          message: `${profile?.first_name || 'Someone'} sent you a message`,
+          type: 'message',
+          read: false,
+          link: `/messages/${user.id}`,
+          data: {
+            sender_id: user.id,
+            venue_id: venueId || null
+          }
+        });
       
       // Clear the input
       setNewMessage('');

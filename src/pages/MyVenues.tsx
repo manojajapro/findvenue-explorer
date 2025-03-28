@@ -199,6 +199,53 @@ const MyVenues = () => {
     navigate(`/edit-venue/${venueId}`);
   };
 
+  const handleDeleteVenue = async (venueId: string, venueName: string) => {
+    if (window.confirm(`Are you sure you want to delete "${venueName}"? This action cannot be undone.`)) {
+      try {
+        // Check for active bookings first
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('id, status')
+          .eq('venue_id', venueId)
+          .neq('status', 'cancelled');
+        
+        if (bookingsError) throw bookingsError;
+        
+        if (bookings && bookings.length > 0) {
+          toast({
+            title: 'Cannot Delete Venue',
+            description: `This venue has ${bookings.length} active booking(s). Please cancel all bookings before deleting.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+        
+        // Delete the venue
+        const { error: deleteError } = await supabase
+          .from('venues')
+          .delete()
+          .eq('id', venueId);
+        
+        if (deleteError) throw deleteError;
+        
+        // Update venues list
+        setVenues(prev => prev.filter(venue => venue.id !== venueId));
+        
+        toast({
+          title: 'Venue Deleted',
+          description: `"${venueName}" has been successfully deleted.`
+        });
+      } catch (error) {
+        console.error('Error deleting venue:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to delete venue. Please try again.',
+          variant: 'destructive'
+        });
+      }
+    }
+  };
+
   const handleAddVenue = () => {
     navigate('/list-venue');
   };
@@ -387,7 +434,7 @@ const MyVenues = () => {
                         alt={venue.name} 
                         className="w-full h-48 object-cover"
                       />
-                      <div className="absolute top-2 right-2">
+                      <div className="absolute top-2 right-2 flex gap-2">
                         <Button 
                           variant="ghost" 
                           size="icon"
@@ -395,6 +442,18 @@ const MyVenues = () => {
                           onClick={() => handleEditVenue(venue.id)}
                         >
                           <Edit className="h-4 w-4 text-white" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm"
+                          onClick={() => handleDeleteVenue(venue.id, venue.name)}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                          </svg>
                         </Button>
                       </div>
                       {venue.featured ? (

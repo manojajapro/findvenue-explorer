@@ -75,6 +75,8 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
     setIsSending(true);
     
     try {
+      console.log("Starting message send process to owner:", ownerId);
+      
       // First, check if a conversation already exists
       const { data: existingConversation, error: convError } = await supabase
         .from('conversations')
@@ -88,9 +90,11 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       }
         
       let conversationId = existingConversation?.id;
+      console.log("Existing conversation:", existingConversation);
       
       // If no conversation exists, create one
       if (!conversationId) {
+        console.log("Creating new conversation between", user.id, "and", ownerId);
         const { data: newConversation, error: createError } = await supabase
           .from('conversations')
           .insert({
@@ -102,7 +106,12 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
           .select('id')
           .single();
           
-        if (createError) throw createError;
+        if (createError) {
+          console.error("Error creating conversation:", createError);
+          throw createError;
+        }
+        
+        console.log("New conversation created:", newConversation);
         conversationId = newConversation.id;
       } else {
         // Update last message in conversation
@@ -114,6 +123,8 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
           })
           .eq('id', conversationId);
       }
+      
+      console.log("Sending message in conversation:", conversationId);
       
       // Insert the message
       const { error: messageError, data: messageData } = await supabase
@@ -131,7 +142,10 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
         .select()
         .single();
       
-      if (messageError) throw messageError;
+      if (messageError) {
+        console.error("Error sending message:", messageError);
+        throw messageError;
+      }
       
       console.log('Message sent successfully:', messageData);
       
@@ -151,7 +165,10 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
           }
         });
       
-      if (notificationError) throw notificationError;
+      if (notificationError) {
+        console.error("Error creating notification:", notificationError);
+        throw notificationError;
+      }
       
       toast({
         title: 'Message Sent',
