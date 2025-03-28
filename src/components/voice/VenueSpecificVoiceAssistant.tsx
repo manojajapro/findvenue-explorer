@@ -1,117 +1,190 @@
 
-import { Mic, MicOff, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mic, MicOff, X, Volume2, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const VenueSpecificVoiceAssistant = () => {
-  const {
-    isListening,
-    transcript,
-    response,
-    isProcessing,
-    error,
-    startListening,
-    stopListening,
+  const [showHint, setShowHint] = useState(true);
+  const { 
+    isListening, 
+    transcript, 
+    response, 
+    isProcessing, 
+    error, 
+    startListening, 
+    stopListening, 
+    toggleAutoRestart,
+    autoRestart,
+    isSpeaking,
     venue,
     isLoadingVenue
   } = useVenueVoiceAssistant();
 
+  // Hide hint after 10 seconds
+  useEffect(() => {
+    if (showHint) {
+      const timer = setTimeout(() => {
+        setShowHint(false);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [showHint]);
+
   return (
-    <Card className="glass-card border-white/10 w-full max-w-md mx-auto">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-medium flex items-center">
-          <Mic className="w-5 h-5 mr-2 text-findvenue" />
-          {venue ? `Ask about ${venue.name}` : 'Voice Assistant'}
-        </CardTitle>
-      </CardHeader>
-      
-      <CardContent className="pb-2 space-y-4">
-        {error && (
-          <div className="bg-red-500/10 text-red-400 p-3 rounded-md text-sm">
-            {error}
-          </div>
-        )}
+    <Card className="overflow-hidden border border-white/10 bg-findvenue-card-bg">
+      {/* Header */}
+      <div className="bg-findvenue p-4 flex items-center justify-between">
+        <div className="flex items-center">
+          <Volume2 className="h-5 w-5 mr-2 text-white" />
+          <h3 className="font-semibold text-white">Voice Assistant</h3>
+        </div>
         
-        {!venue && !isLoadingVenue ? (
-          <div className="bg-amber-500/10 text-amber-400 p-3 rounded-md text-sm">
-            Could not load venue information.
+        <div className="flex items-center gap-2">
+          <Badge 
+            variant={autoRestart ? "default" : "outline"}
+            className={cn(
+              "cursor-pointer",
+              autoRestart ? "bg-green-600 hover:bg-green-700" : "text-findvenue-text-muted"
+            )}
+            onClick={toggleAutoRestart}
+          >
+            {autoRestart ? "Continuous" : "Manual"}
+          </Badge>
+        </div>
+      </div>
+      
+      {/* Voice assistant content */}
+      <div className="p-6 flex flex-col">
+        {isLoadingVenue ? (
+          <div className="flex flex-col items-center">
+            <Skeleton className="h-16 w-16 rounded-full mb-4" />
+            <Skeleton className="h-6 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-1/2" />
           </div>
-        ) : isLoadingVenue ? (
-          <div className="text-center py-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-findvenue" />
-            <p className="text-findvenue-text-muted mt-2">Loading venue information...</p>
-          </div>
+        ) : !venue ? (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>
+              Could not load venue information. Please try again.
+            </AlertDescription>
+          </Alert>
         ) : (
           <>
-            {isListening && (
-              <div className="animation-pulse text-center py-2">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-findvenue/20 border border-findvenue mb-2 relative">
-                  <div className="absolute inset-0 rounded-full bg-findvenue/10 animate-ping"></div>
-                  <Mic className="h-6 w-6 text-findvenue" />
+            {/* Status indicator */}
+            <div className="flex items-center justify-center mb-6">
+              <div 
+                className={cn(
+                  "w-20 h-20 rounded-full flex items-center justify-center relative",
+                  isListening ? "bg-findvenue-surface" : "bg-findvenue-dark-bg",
+                )}
+              >
+                {isListening && (
+                  <div className="absolute w-full h-full rounded-full bg-findvenue/20 animate-ping"></div>
+                )}
+                {isSpeaking ? (
+                  <div className="flex flex-col items-center justify-center">
+                    <Volume2 className="h-8 w-8 text-findvenue animate-pulse" />
+                    <span className="text-xs text-findvenue-text-muted mt-1">Speaking</span>
+                  </div>
+                ) : isProcessing ? (
+                  <Loader2 className="h-8 w-8 text-findvenue animate-spin" />
+                ) : isListening ? (
+                  <Mic className="h-8 w-8 text-findvenue" />
+                ) : (
+                  <MicOff className="h-8 w-8 text-findvenue-text-muted" />
+                )}
+              </div>
+            </div>
+            
+            {/* Transcript and Response */}
+            <div className="w-full space-y-4 mb-6">
+              {transcript && (
+                <div className="space-y-1">
+                  <p className="text-sm text-findvenue-text-muted">You said:</p>
+                  <div className="p-3 bg-findvenue-surface/50 rounded-lg text-findvenue-text">
+                    {transcript}
+                  </div>
                 </div>
-                <p className="text-findvenue-text-muted">Listening...</p>
-              </div>
-            )}
+              )}
+              
+              {response && (
+                <div className="space-y-1">
+                  <p className="text-sm text-findvenue-text-muted">Assistant:</p>
+                  <div className="p-3 bg-findvenue/10 rounded-lg text-findvenue-text">
+                    {response}
+                  </div>
+                </div>
+              )}
+              
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
+              {!transcript && !response && !error && (
+                <div className="text-center py-4">
+                  <p className="text-findvenue-text-muted">
+                    Ask me anything about {venue.name}
+                  </p>
+                </div>
+              )}
+            </div>
             
-            {transcript && (
-              <div className="bg-findvenue-surface/30 p-3 rounded-md">
-                <p className="text-sm text-findvenue-text-muted mb-1">You said:</p>
-                <p className="text-findvenue-text">{transcript}</p>
-              </div>
-            )}
-            
-            {isProcessing && (
-              <div className="flex items-center justify-center py-2">
-                <Loader2 className="h-5 w-5 animate-spin mr-2 text-findvenue" />
-                <span className="text-findvenue-text-muted">Processing your question...</span>
-              </div>
-            )}
-            
-            {response && (
-              <div className="bg-findvenue/10 p-3 rounded-md">
-                <p className="text-sm text-findvenue-text-muted mb-1">Response:</p>
-                <p className="text-findvenue-text">{response}</p>
-              </div>
-            )}
-            
-            {!isListening && !isProcessing && !response && !transcript && (
-              <div className="text-center py-4">
-                <p className="text-findvenue-text-muted mb-1">
-                  Ask me anything about {venue?.name}
-                </p>
-                <p className="text-sm text-findvenue-text-muted">
-                  Press the microphone button and speak your question
-                </p>
-              </div>
-            )}
+            {/* Controls */}
+            <div className="flex justify-center gap-4">
+              {isListening ? (
+                <Button 
+                  variant="outline" 
+                  className="border-findvenue-gold text-findvenue-gold hover:bg-findvenue-gold/10"
+                  onClick={stopListening}
+                  disabled={isProcessing}
+                >
+                  <MicOff className="h-4 w-4 mr-2" />
+                  Stop Listening
+                </Button>
+              ) : (
+                <Button 
+                  className="bg-findvenue hover:bg-findvenue-dark"
+                  onClick={startListening}
+                  disabled={isProcessing || isSpeaking}
+                >
+                  <Mic className="h-4 w-4 mr-2" />
+                  Start Speaking
+                </Button>
+              )}
+              
+              {response && (
+                <Button
+                  variant="outline"
+                  className="border-white/10"
+                  onClick={() => {
+                    setTranscript('');
+                    setShowHint(false);
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
+              )}
+            </div>
           </>
         )}
-      </CardContent>
+      </div>
       
-      <CardFooter className="pt-2 justify-center">
-        <Button
-          onClick={isListening ? stopListening : startListening}
-          disabled={isProcessing || isLoadingVenue || !venue}
-          className={`px-6 ${
-            isListening 
-              ? 'bg-destructive hover:bg-destructive/90' 
-              : 'bg-findvenue hover:bg-findvenue-dark'
-          }`}
-        >
-          {isListening ? (
-            <>
-              <MicOff className="mr-2 h-4 w-4" />
-              Stop Listening
-            </>
-          ) : (
-            <>
-              <Mic className="mr-2 h-4 w-4" />
-              {isProcessing ? 'Processing...' : 'Start Listening'}
-            </>
-          )}
-        </Button>
-      </CardFooter>
+      {/* Tips */}
+      {showHint && venue && (
+        <div className="p-4 border-t border-white/10 bg-findvenue-dark-bg/75">
+          <p className="text-xs text-findvenue-text-muted text-center">
+            Try saying: "Tell me about {venue.name}" or "What amenities does this venue offer?"
+          </p>
+        </div>
+      )}
     </Card>
   );
 };

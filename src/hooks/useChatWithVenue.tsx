@@ -1,6 +1,8 @@
 
 import { useState, useCallback } from 'react';
 import { useVenueData } from '@/hooks/useVenueData';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -12,29 +14,6 @@ export const useChatWithVenue = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { venue, isLoading: isLoadingVenue } = useVenueData();
 
-  const generateVenuePrompt = useCallback(() => {
-    if (!venue) return '';
-    
-    return `
-      You are an AI assistant for a venue booking platform. You have the following information about a specific venue:
-      
-      Venue Name: ${venue.name}
-      Description: ${venue.description}
-      Category: ${venue.category}
-      City: ${venue.city}
-      Address: ${venue.address}
-      Capacity: Minimum ${venue.capacity.min} and Maximum ${venue.capacity.max} guests
-      Starting Price: ${venue.pricing.currency} ${venue.pricing.startingPrice}
-      ${venue.pricing.pricePerPerson ? `Price Per Person: ${venue.pricing.currency} ${venue.pricing.pricePerPerson}` : ''}
-      Amenities: ${venue.amenities.join(', ')}
-      ${venue.parking ? 'Parking: Available' : 'Parking: Not available'}
-      ${venue.wifi ? 'WiFi: Available' : 'WiFi: Not available'}
-      ${venue.additionalServices?.length > 0 ? `Additional Services: ${venue.additionalServices.join(', ')}` : ''}
-      
-      When answering questions, provide specific details about this venue. If you don't know something, say you don't have that information.
-    `;
-  }, [venue]);
-
   const submitMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return;
     
@@ -45,47 +24,38 @@ export const useChatWithVenue = () => {
     setIsLoading(true);
     
     try {
-      // In a real implementation, this would call an API
-      // For now, we'll simulate a response based on venue data
-      const venuePrompt = generateVenuePrompt();
-      
-      setTimeout(() => {
-        let response = "I don't have specific information about this venue yet.";
-        
-        if (venue) {
-          // Simple keyword matching for demonstration
-          if (userMessage.toLowerCase().includes('price') || userMessage.toLowerCase().includes('cost')) {
-            response = `The starting price for ${venue.name} is ${venue.pricing.currency} ${venue.pricing.startingPrice}${venue.pricing.pricePerPerson ? ` with a per-person rate of ${venue.pricing.currency} ${venue.pricing.pricePerPerson}` : ''}.`;
-          } else if (userMessage.toLowerCase().includes('capacity') || userMessage.toLowerCase().includes('people') || userMessage.toLowerCase().includes('guests')) {
-            response = `${venue.name} can accommodate between ${venue.capacity.min} and ${venue.capacity.max} guests.`;
-          } else if (userMessage.toLowerCase().includes('amenities') || userMessage.toLowerCase().includes('facilities')) {
-            response = `${venue.name} offers the following amenities: ${venue.amenities.join(', ')}.`;
-          } else if (userMessage.toLowerCase().includes('location') || userMessage.toLowerCase().includes('address')) {
-            response = `${venue.name} is located at ${venue.address} in ${venue.city}.`;
-          } else if (userMessage.toLowerCase().includes('parking')) {
-            response = venue.parking ? `Yes, ${venue.name} has parking available.` : `No, ${venue.name} does not have dedicated parking.`;
-          } else if (userMessage.toLowerCase().includes('wifi') || userMessage.toLowerCase().includes('internet')) {
-            response = venue.wifi ? `Yes, ${venue.name} provides WiFi for guests.` : `No, ${venue.name} does not have WiFi available.`;
-          } else if (userMessage.toLowerCase().includes('describe') || userMessage.toLowerCase().includes('tell me about')) {
-            response = `${venue.name} is a ${venue.category} venue located in ${venue.city}. ${venue.description}`;
-          } else {
-            response = `${venue.name} is a ${venue.category} venue in ${venue.city} that can accommodate between ${venue.capacity.min} and ${venue.capacity.max} guests. Would you like to know specific details about pricing, amenities, or location?`;
-          }
+      // Call the Supabase edge function with the venue context
+      const { data, error } = await supabase.functions.invoke('venue-assistant', {
+        body: {
+          query: userMessage,
+          venueId: venue?.id,
+          type: 'chat'
         }
-        
-        setMessages(prev => [...prev, { role: 'assistant', content: response }]);
-        setIsLoading(false);
-      }, 1000);
+      });
       
+      if (error) throw error;
+      
+      const assistantResponse = { 
+        role: 'assistant' as const, 
+        content: data.answer || "I'm sorry, I couldn't process your request at this time." 
+      };
+      
+      setMessages(prev => [...prev, assistantResponse]);
     } catch (error) {
       console.error('Error in chat:', error);
+      
+      toast.error('Failed to get a response', {
+        description: 'Please try again in a moment',
+      });
+      
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: 'Sorry, I encountered an error processing your request.' 
+        content: 'Sorry, I encountered an error processing your request. Please try again.' 
       }]);
+    } finally {
       setIsLoading(false);
     }
-  }, [venue, isLoading, generateVenuePrompt]);
+  }, [venue, isLoading, supabase.functions]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);

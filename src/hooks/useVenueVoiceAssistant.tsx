@@ -1,6 +1,8 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useVenueData } from '@/hooks/useVenueData';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 type SpeechRecognitionEvent = {
   results: {
@@ -24,9 +26,12 @@ export const useVenueVoiceAssistant = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { venue, isLoading: isLoadingVenue } = useVenueData();
+  const [autoRestart, setAutoRestart] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   
   // Speech recognition API
-  const [recognition, setRecognition] = useState<any>(null);
+  const recognition = useRef<any>(null);
+  const speechSynthesis = useRef<SpeechSynthesis | null>(null);
 
   // Initialize speech recognition on client-side only
   useEffect(() => {
@@ -38,14 +43,36 @@ export const useVenueVoiceAssistant = () => {
         const recognitionInstance = new SpeechRecognition();
         recognitionInstance.continuous = false;
         recognitionInstance.interimResults = false;
-        setRecognition(recognitionInstance);
+        recognitionInstance.lang = 'en-US';
+        recognition.current = recognitionInstance;
+      }
+      
+      if ('speechSynthesis' in window) {
+        speechSynthesis.current = window.speechSynthesis;
       }
     }
   }, []);
 
+  // Function to handle when speech synthesis ends
+  const handleSpeechEnd = useCallback(() => {
+    setIsSpeaking(false);
+    
+    // If autoRestart is enabled, restart listening when speech ends
+    if (autoRestart && !isListening) {
+      setTimeout(() => {
+        startListening();
+      }, 500); // Small delay before starting listening again
+    }
+  }, [autoRestart, isListening]);
+
   const startListening = useCallback(() => {
-    if (!recognition) {
+    if (!recognition.current) {
       setError('Speech recognition is not supported in your browser.');
+      return;
+    }
+
+    // Don't start listening if already speaking
+    if (isSpeaking) {
       return;
     }
 
@@ -53,95 +80,142 @@ export const useVenueVoiceAssistant = () => {
     setTranscript('');
     setError(null);
 
-    recognition.onstart = () => {
+    recognition.current.onstart = () => {
       console.log('Voice recognition started');
     };
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.current.onresult = (event: SpeechRecognitionEvent) => {
       const transcript = event.results[0][0].transcript;
       setTranscript(transcript);
       processVoiceQuery(transcript);
     };
 
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    recognition.current.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error('Speech recognition error', event.error);
       setError(`Error: ${event.error}`);
       setIsListening(false);
+      
+      // If autoRestart is enabled, restart listening on non-fatal errors
+      if (autoRestart && event.error !== 'aborted' && event.error !== 'not-allowed') {
+        setTimeout(() => {
+          startListening();
+        }, 1000);
+      }
     };
 
-    recognition.onend = () => {
+    recognition.current.onend = () => {
+      console.log('Voice recognition ended');
       setIsListening(false);
+      
+      // Only auto-restart if not currently speaking and autoRestart is enabled
+      if (autoRestart && !isSpeaking && !isProcessing) {
+        setTimeout(() => {
+          startListening();
+        }, 500);
+      }
     };
 
     try {
-      recognition.start();
+      recognition.current.start();
     } catch (error) {
       console.error('Error starting speech recognition:', error);
       setError('Failed to start speech recognition');
       setIsListening(false);
     }
-  }, [recognition]);
+  }, [autoRestart, isSpeaking, isProcessing, processVoiceQuery]);
 
   const stopListening = useCallback(() => {
-    if (recognition) {
-      recognition.stop();
+    if (recognition.current) {
+      recognition.current.stop();
       setIsListening(false);
     }
-  }, [recognition]);
+    
+    // Turn off auto-restart
+    setAutoRestart(false);
+  }, []);
+
+  const toggleAutoRestart = useCallback(() => {
+    setAutoRestart(prev => !prev);
+    
+    // If turning on auto-restart and not currently listening, start listening
+    if (!autoRestart && !isListening && !isSpeaking) {
+      setTimeout(() => {
+        startListening();
+      }, 300);
+    }
+    
+    toast.info(autoRestart ? 'Continuous listening disabled' : 'Continuous listening enabled');
+  }, [autoRestart, isListening, isSpeaking, startListening]);
 
   const processVoiceQuery = useCallback(async (query: string) => {
-    if (!query.trim() || !venue) {
+    if (!query.trim()) {
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      // Simple keyword matching similar to chat
-      setTimeout(() => {
-        let assistantResponse = "I don't have specific information about this venue yet.";
-        
-        if (venue) {
-          // Simple keyword matching for demonstration
-          if (query.toLowerCase().includes('price') || query.toLowerCase().includes('cost')) {
-            assistantResponse = `The starting price for ${venue.name} is ${venue.pricing.currency} ${venue.pricing.startingPrice}${venue.pricing.pricePerPerson ? ` with a per-person rate of ${venue.pricing.currency} ${venue.pricing.pricePerPerson}` : ''}.`;
-          } else if (query.toLowerCase().includes('capacity') || query.toLowerCase().includes('people') || query.toLowerCase().includes('guests')) {
-            assistantResponse = `${venue.name} can accommodate between ${venue.capacity.min} and ${venue.capacity.max} guests.`;
-          } else if (query.toLowerCase().includes('amenities') || query.toLowerCase().includes('facilities')) {
-            assistantResponse = `${venue.name} offers the following amenities: ${venue.amenities.join(', ')}.`;
-          } else if (query.toLowerCase().includes('location') || query.toLowerCase().includes('address')) {
-            assistantResponse = `${venue.name} is located at ${venue.address} in ${venue.city}.`;
-          } else if (query.toLowerCase().includes('parking')) {
-            assistantResponse = venue.parking ? `Yes, ${venue.name} has parking available.` : `No, ${venue.name} does not have dedicated parking.`;
-          } else if (query.toLowerCase().includes('wifi') || query.toLowerCase().includes('internet')) {
-            assistantResponse = venue.wifi ? `Yes, ${venue.name} provides WiFi for guests.` : `No, ${venue.name} does not have WiFi available.`;
-          } else if (query.toLowerCase().includes('describe') || query.toLowerCase().includes('tell me about')) {
-            assistantResponse = `${venue.name} is a ${venue.category} venue located in ${venue.city}. ${venue.description}`;
-          } else {
-            assistantResponse = `${venue.name} is a ${venue.category} venue in ${venue.city} that can accommodate between ${venue.capacity.min} and ${venue.capacity.max} guests. You can ask about pricing, amenities, or location.`;
-          }
+      // Call the Supabase edge function with the venue context
+      const { data, error } = await supabase.functions.invoke('venue-assistant', {
+        body: {
+          query,
+          venueId: venue?.id,
+          type: 'voice'
         }
-        
-        setResponse(assistantResponse);
-        
-        // Use speech synthesis to speak the response
-        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-          const speech = new SpeechSynthesisUtterance(assistantResponse);
-          speech.rate = 1;
-          speech.pitch = 1;
-          speech.volume = 1;
-          window.speechSynthesis.speak(speech);
-        }
-        
-        setIsProcessing(false);
-      }, 1000);
+      });
       
-    } catch (error) {
+      if (error) throw error;
+      
+      const assistantResponse = data.answer || "I'm sorry, I couldn't process your request at this time.";
+      setResponse(assistantResponse);
+      
+      // Use speech synthesis to speak the response
+      if (speechSynthesis.current) {
+        // Cancel any ongoing speech
+        speechSynthesis.current.cancel();
+        
+        const speech = new SpeechSynthesisUtterance(assistantResponse);
+        speech.rate = 1;
+        speech.pitch = 1;
+        speech.volume = 1;
+        
+        // Get available voices
+        const voices = speechSynthesis.current.getVoices();
+        const preferredVoice = voices.find(voice => 
+          voice.lang === 'en-US' && (voice.name.includes('Female') || voice.name.includes('Samantha'))
+        );
+        
+        if (preferredVoice) {
+          speech.voice = preferredVoice;
+        }
+        
+        // Set event handlers
+        speech.onstart = () => setIsSpeaking(true);
+        speech.onend = handleSpeechEnd;
+        speech.onerror = () => {
+          setIsSpeaking(false);
+          if (autoRestart) startListening();
+        };
+        
+        setIsSpeaking(true);
+        speechSynthesis.current.speak(speech);
+      }
+      
+    } catch (error: any) {
       console.error('Error processing voice query:', error);
       setError('Failed to process your query');
+      setResponse("I'm sorry, I encountered an error processing your request. Please try again.");
+      
+      // Speak the error message
+      if (speechSynthesis.current) {
+        const speech = new SpeechSynthesisUtterance("I'm sorry, I encountered an error processing your request. Please try again.");
+        speech.onend = handleSpeechEnd;
+        speechSynthesis.current.speak(speech);
+      }
+    } finally {
       setIsProcessing(false);
     }
-  }, [venue]);
+  }, [venue, handleSpeechEnd, autoRestart, startListening]);
 
   return {
     isListening,
@@ -151,6 +225,9 @@ export const useVenueVoiceAssistant = () => {
     error,
     startListening,
     stopListening,
+    toggleAutoRestart,
+    autoRestart,
+    isSpeaking,
     venue,
     isLoadingVenue
   };
