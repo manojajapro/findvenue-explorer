@@ -93,31 +93,25 @@ const DirectChat = () => {
         const { data: messagesData, error: messagesError } = await supabase
           .from('messages')
           .select('*')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-          .or(`sender_id.eq.${contactId},receiver_id.eq.${contactId}`)
+          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${user.id})`)
           .order('created_at', { ascending: true });
             
         if (messagesError) {
           console.error('Error fetching messages:', messagesError);
           throw messagesError;
         }
-        
-        const relevantMessages = messagesData ? messagesData.filter(msg => 
-          (msg.sender_id === user.id && msg.receiver_id === contactId) || 
-          (msg.sender_id === contactId && msg.receiver_id === user.id)
-        ) : [];
-        
-        if (relevantMessages && relevantMessages.length > 0) {
-          console.log("Fetched messages:", relevantMessages.length);
-          setMessages(relevantMessages);
+
+        if (messagesData && messagesData.length > 0) {
+          console.log("Fetched messages:", messagesData.length);
+          setMessages(messagesData);
           
-          const venueMessage = relevantMessages.find(msg => msg.venue_id && msg.venue_name);
+          const venueMessage = messagesData.find(msg => msg.venue_id && msg.venue_name);
           if (venueMessage) {
             setVenueId(venueMessage.venue_id || null);
             setVenueName(venueMessage.venue_name || null);
           }
           
-          const unreadMessageIds = relevantMessages
+          const unreadMessageIds = messagesData
             .filter(msg => !msg.read && msg.sender_id === contactId && msg.receiver_id === user.id)
             .map(msg => msg.id);
             
@@ -138,6 +132,7 @@ const DirectChat = () => {
         }
       } catch (error: any) {
         console.error('Error loading messages:', error);
+        setHasError(true);
         setErrorMessage('Failed to load messages. Please try again later.');
       } finally {
         setIsLoading(false);
@@ -151,6 +146,7 @@ const DirectChat = () => {
     if (!user || !profile || !contactId) return;
     
     try {
+      console.log("Sending welcome message to", contactFirstName);
       const welcomeMessage = `Hello ${contactFirstName}! I'm interested in discussing more. Can you please provide more information?`;
       
       const { data, error } = await supabase

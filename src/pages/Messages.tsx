@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +20,11 @@ type Contact = {
   lastMessage?: string;
   lastMessageTime?: string;
   unreadCount: number;
+  venueId?: string;
+  venueData?: {
+    id: string;
+    name: string;
+  };
 };
 
 const Messages = () => {
@@ -96,7 +102,7 @@ const Messages = () => {
       if (contactIds.size > 0) {
         const { data: profiles, error: profilesError } = await supabase
           .from('user_profiles')
-          .select('id, first_name, last_name, profile_image')
+          .select('id, first_name, last_name, profile_image, user_role')
           .in('id', Array.from(contactIds));
         
         if (profilesError) {
@@ -129,13 +135,22 @@ const Messages = () => {
             
             const profile = profiles?.find(p => p.id === contactId);
             
+            // Find venue info if it exists
+            const messageWithVenue = contactMessages.find(msg => msg.venue_id && msg.venue_name);
+            const venueData = messageWithVenue ? {
+              id: messageWithVenue.venue_id as string,
+              name: messageWithVenue.venue_name as string
+            } : undefined;
+            
             contactsData.push({
               id: contactId,
               name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown User',
               avatar: profile?.profile_image,
               lastMessage: lastMessage.content,
               lastMessageTime: lastMessage.created_at,
-              unreadCount
+              unreadCount,
+              venueId: messageWithVenue?.venue_id,
+              venueData
             });
           }
         }
@@ -164,7 +179,7 @@ const Messages = () => {
       console.log("Fetching user info for:", userId);
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, first_name, last_name, profile_image')
+        .select('id, first_name, last_name, profile_image, user_role')
         .eq('id', userId)
         .single();
       

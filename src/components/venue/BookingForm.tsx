@@ -47,6 +47,7 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   const [existingBookings, setExistingBookings] = useState<any[]>([]);
   const [userBookings, setUserBookings] = useState<any[]>([]);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   useEffect(() => {
     if (venueId) {
@@ -350,7 +351,7 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     }
   };
 
-  const initiateChat = () => {
+  const initiateChat = async () => {
     if (!user) {
       toast({
         title: 'Login Required',
@@ -360,8 +361,97 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       navigate('/login');
       return;
     }
-
-    navigate(`/messages/${ownerId}`);
+    
+    if (!ownerId) {
+      toast({
+        title: 'Error',
+        description: 'Could not identify the venue owner. Please try again later.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    try {
+      console.log("Initiating chat with owner:", ownerId);
+      setIsLoading(true);
+      
+      // Check if there's any existing conversation
+      const { data: existingMessages, error: messagesError } = await supabase
+        .from('messages')
+        .select('id')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${ownerId}),and(sender_id.eq.${ownerId},receiver_id.eq.${user.id})`)
+        .limit(1);
+        
+      if (messagesError) {
+        console.error("Error checking existing messages:", messagesError);
+        throw messagesError;
+      }
+      
+      // If no existing conversation, create the first message
+      if (!existingMessages || existingMessages.length === 0) {
+        console.log("No existing conversation found, creating initial message");
+        
+        // Get the user's name from profile
+        let senderName = '';
+        if (profile) {
+          senderName = `${profile.first_name} ${profile.last_name}`;
+        }
+        
+        // Create initial message
+        const { data: messageData, error: messageError } = await supabase
+          .from('messages')
+          .insert({
+            sender_id: user.id,
+            receiver_id: ownerId,
+            content: `Hello! I'm interested in booking ${venueName}. Can you provide more information?`,
+            sender_name: senderName,
+            receiver_name: ownerName || 'Venue Owner',
+            venue_id: venueId,
+            venue_name: venueName,
+            read: false
+          })
+          .select()
+          .single();
+          
+        if (messageError) {
+          console.error("Error sending initial message:", messageError);
+          throw messageError;
+        }
+        
+        console.log("Initial message created:", messageData);
+        
+        // Create notification for the owner
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: ownerId,
+            title: 'New Message',
+            message: `${profile?.first_name || 'Someone'} started a conversation with you about ${venueName}`,
+            type: 'message',
+            read: false,
+            link: `/messages/${user.id}`,
+            data: {
+              sender_id: user.id,
+              venue_id: venueId
+            }
+          });
+      } else {
+        console.log("Existing conversation found");
+      }
+      
+      // Navigate to messages with owner ID
+      navigate(`/messages/${ownerId}`);
+      
+    } catch (error: any) {
+      console.error("Error initiating chat:", error);
+      toast({
+        title: 'Error',
+        description: 'Failed to start conversation. Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   if (!user) {
