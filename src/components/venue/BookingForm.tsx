@@ -395,6 +395,20 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
         let senderName = '';
         if (profile) {
           senderName = `${profile.first_name} ${profile.last_name}`;
+        } else {
+          // Fallback if profile is not available
+          const { data: userData, error: userError } = await supabase
+            .from('user_profiles')
+            .select('first_name, last_name')
+            .eq('id', user.id)
+            .single();
+            
+          if (!userError && userData) {
+            senderName = `${userData.first_name} ${userData.last_name}`;
+          } else {
+            senderName = 'User';
+            console.warn("Could not get user profile data:", userError);
+          }
         }
         
         // Create initial message
@@ -426,7 +440,7 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
           .insert({
             user_id: ownerId,
             title: 'New Message',
-            message: `${profile?.first_name || 'Someone'} started a conversation with you about ${venueName}`,
+            message: `${senderName} started a conversation with you about ${venueName}`,
             type: 'message',
             read: false,
             link: `/messages/${user.id}`,
