@@ -22,28 +22,42 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzZG1lbGZ6ZXN6anRibm9hamlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4ODUwMTUsImV4cCI6MjA1ODQ2MTAxNX0.1z27OZ04RuR8AYlVGaE9L8vWWYilSrMlyq422BJcX94';
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     
+    console.log(`Processing query: "${query}" for venue ID: ${venueId || 'N/A'}`);
+    
     // Fetch venue data
     let venueData = null;
     let allVenueData = null;
     
     if (venueId) {
       // Fetch specific venue data if venueId is provided
+      console.log(`Fetching data for specific venue ID: ${venueId}`);
       const { data, error } = await supabase
         .from('venues')
         .select('*')
         .eq('id', venueId)
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching venue data:', error);
+        throw error;
+      }
+      
+      console.log('Venue data retrieved:', data ? 'success' : 'no data');
       venueData = data;
     } else {
       // Fetch all venues for general queries
+      console.log('Fetching data for all venues');
       const { data, error } = await supabase
         .from('venues')
         .select('*')
         .limit(50);
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching all venues:', error);
+        throw error;
+      }
+      
+      console.log(`Retrieved ${data?.length || 0} venues`);
       allVenueData = data;
     }
     
@@ -75,8 +89,21 @@ serve(async (req) => {
         systemPrompt += `Payment Methods: ${venueData.accepted_payment_methods.join(', ')}\n`;
       }
       
+      // Owner information if available
+      if (venueData.owner_info) {
+        systemPrompt += `Contact: The venue is managed by ${venueData.owner_info.name || 'the owner'}\n`;
+        if (venueData.owner_info.response_time) {
+          systemPrompt += `Response Time: Typically responds within ${venueData.owner_info.response_time}\n`;
+        }
+      }
+      
+      // Availability information
+      if (venueData.availability && venueData.availability.length > 0) {
+        systemPrompt += `Available on: ${venueData.availability.join(', ')}\n`;
+      }
+      
       // Instructions for the AI
-      systemPrompt += "\nPlease answer any questions about this venue specifically. Be friendly and informative. If asked about something not in the data, just say you don't have that information yet but can help with booking or other inquiries.";
+      systemPrompt += "\nPlease answer any questions about this venue specifically. Be friendly, professional and informative. If asked about booking, direct users to the booking form on the venue page. If asked about something not in the data, politely say you don't have that information yet but can help with other inquiries about the venue.";
     } else if (allVenueData) {
       // For general venue queries
       systemPrompt += "You have information about multiple venues. Please provide concise answers based on the venue database. ";
@@ -87,6 +114,28 @@ serve(async (req) => {
       
       systemPrompt += `Available venue categories include: ${categories.join(', ')}. `;
       systemPrompt += `Venues are available in these cities: ${cities.join(', ')}. `;
+      
+      // Add price range information
+      const prices = allVenueData
+        .filter(v => v.starting_price)
+        .map(v => v.starting_price);
+      
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        systemPrompt += `Venues range in price from ${minPrice} to ${maxPrice} SAR. `;
+      }
+      
+      // Add capacity information
+      const capacities = allVenueData
+        .filter(v => v.max_capacity)
+        .map(v => v.max_capacity);
+      
+      if (capacities.length > 0) {
+        const minCapacity = Math.min(...capacities);
+        const maxCapacity = Math.max(...capacities);
+        systemPrompt += `Venues can accommodate from ${minCapacity} to ${maxCapacity} guests. `;
+      }
       
       // Add specific instructions
       systemPrompt += "If asked about venues in a specific city or category, provide information about available options. ";
@@ -101,6 +150,8 @@ serve(async (req) => {
         });
       }
     }
+    
+    console.log('System prompt prepared, calling OpenAI...');
     
     // Call OpenAI API
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -127,11 +178,14 @@ serve(async (req) => {
     
     if (!response.ok) {
       const errorData = await response.json();
+      console.error('OpenAI API error:', errorData);
       throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
     }
     
     const data = await response.json();
     const answer = data.choices[0].message.content;
+    
+    console.log(`Generated answer for query: "${query.substring(0, 30)}..."`);
     
     return new Response(JSON.stringify({ answer }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

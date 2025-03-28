@@ -1,80 +1,44 @@
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { useVenueData } from '@/hooks/useVenueData';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
-type SpeechRecognitionEvent = {
-  results: {
-    [index: number]: {
-      [index: number]: {
-        transcript: string;
-        confidence: number;
-      };
-    };
-  };
+type VenueVoiceAssistantProps = {
+  venue?: any;
+  autoRestart?: boolean;
+  onListeningChange?: (isListening: boolean) => void;
+  onTranscript?: (text: string) => void;
+  onAnswer?: (text: string) => void;
 };
 
-type SpeechRecognitionErrorEvent = {
-  error: string;
-};
-
-export const useVenueVoiceAssistant = () => {
+export const useVenueVoiceAssistant = ({
+  venue,
+  autoRestart = false,
+  onListeningChange,
+  onTranscript,
+  onAnswer
+}: VenueVoiceAssistantProps) => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [response, setResponse] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [answer, setAnswer] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { venue, isLoading: isLoadingVenue } = useVenueData();
-  const [autoRestart, setAutoRestart] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { toast } = useToast();
   
-  // Speech recognition API
-  const recognition = useRef<any>(null);
-  const speechSynthesis = useRef<SpeechSynthesis | null>(null);
-
-  // Initialize speech recognition on client-side only
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || 
-                               (window as any).webkitSpeechRecognition;
-      
-      if (SpeechRecognition) {
-        const recognitionInstance = new SpeechRecognition();
-        recognitionInstance.continuous = false;
-        recognitionInstance.interimResults = false;
-        recognitionInstance.lang = 'en-US';
-        recognition.current = recognitionInstance;
-      }
-      
-      if ('speechSynthesis' in window) {
-        speechSynthesis.current = window.speechSynthesis;
-      }
-    }
-  }, []);
-
-  // Function to handle when speech synthesis ends
-  const handleSpeechEnd = useCallback(() => {
-    setIsSpeaking(false);
-    
-    // If autoRestart is enabled, restart listening when speech ends
-    if (autoRestart && !isListening) {
-      setTimeout(() => {
-        startListening();
-      }, 500); // Small delay before starting listening again
-    }
-  }, [autoRestart, isListening]);
-
-  // Define processVoiceQuery function before it's used
+  const recognition = useRef<SpeechRecognition | null>(null);
+  
+  // Define processVoiceQuery function early to avoid reference error
   const processVoiceQuery = useCallback(async (query: string) => {
     if (!query.trim()) {
       return;
     }
-
+    
     setIsProcessing(true);
-
+    
     try {
-      // Call the Supabase edge function with the venue context
+      console.log(`Processing voice query: "${query}"`);
+      
+      // Call our venue-assistant Edge Function
       const { data, error } = await supabase.functions.invoke('venue-assistant', {
         body: {
           query,
@@ -83,161 +47,163 @@ export const useVenueVoiceAssistant = () => {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error calling venue-assistant:', error);
+        throw new Error(error.message);
+      }
       
-      const assistantResponse = data.answer || "I'm sorry, I couldn't process your request at this time.";
-      setResponse(assistantResponse);
-      
-      // Use speech synthesis to speak the response
-      if (speechSynthesis.current) {
-        // Cancel any ongoing speech
-        speechSynthesis.current.cancel();
+      if (data && data.answer) {
+        console.log('AI response:', data.answer);
+        setAnswer(data.answer);
         
-        const speech = new SpeechSynthesisUtterance(assistantResponse);
-        speech.rate = 1;
-        speech.pitch = 1;
-        speech.volume = 1;
-        
-        // Get available voices
-        const voices = speechSynthesis.current.getVoices();
-        const preferredVoice = voices.find(voice => 
-          voice.lang === 'en-US' && (voice.name.includes('Female') || voice.name.includes('Samantha'))
-        );
-        
-        if (preferredVoice) {
-          speech.voice = preferredVoice;
+        if (onAnswer) {
+          onAnswer(data.answer);
         }
         
-        // Set event handlers
-        speech.onstart = () => setIsSpeaking(true);
-        speech.onend = handleSpeechEnd;
-        speech.onerror = () => {
-          setIsSpeaking(false);
-          if (autoRestart) startListening();
-        };
-        
-        setIsSpeaking(true);
-        speechSynthesis.current.speak(speech);
+        // Use Web Speech API to speak the answer
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(data.answer);
+          utterance.lang = 'en-US';
+          utterance.rate = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      } else {
+        throw new Error('No answer received from AI assistant');
       }
-      
-    } catch (error: any) {
-      console.error('Error processing voice query:', error);
-      setError('Failed to process your query');
-      setResponse("I'm sorry, I encountered an error processing your request. Please try again.");
-      
-      // Speak the error message
-      if (speechSynthesis.current) {
-        const speech = new SpeechSynthesisUtterance("I'm sorry, I encountered an error processing your request. Please try again.");
-        speech.onend = handleSpeechEnd;
-        speechSynthesis.current.speak(speech);
-      }
+    } catch (err: any) {
+      console.error('Error processing voice query:', err);
+      setError(err.message);
+      toast({
+        variant: 'destructive',
+        title: 'Error processing your request',
+        description: err.message || 'Please try again later'
+      });
     } finally {
       setIsProcessing(false);
     }
-  }, [venue, handleSpeechEnd, autoRestart]);
-
-  // Define startListening after processVoiceQuery to avoid the TS error
+  }, [venue?.id, toast, onAnswer]);
+  
+  // Initialize speech recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      recognition.current = new SpeechRecognition();
+      recognition.current.continuous = false;
+      recognition.current.interimResults = false;
+      recognition.current.lang = 'en-US';
+    } else {
+      setError('Speech recognition is not supported in your browser.');
+    }
+    
+    return () => {
+      if (recognition.current) {
+        recognition.current.abort();
+      }
+    };
+  }, []);
+  
+  // Handle auto-restart functionality
+  useEffect(() => {
+    if (autoRestart && !isListening && !isProcessing) {
+      const timer = setTimeout(() => {
+        console.log('Auto-restarting voice recognition...');
+        startListening();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [autoRestart, isListening, isProcessing]);
+  
+  // Handle speech recognition events
+  const handleSpeechStart = useCallback(() => {
+    setIsListening(true);
+    setTranscript('');
+    setError(null);
+    
+    if (onListeningChange) {
+      onListeningChange(true);
+    }
+  }, [onListeningChange]);
+  
+  const handleSpeechEnd = useCallback(() => {
+    setIsListening(false);
+    
+    if (onListeningChange) {
+      onListeningChange(false);
+    }
+    
+    if (transcript.trim() && !isProcessing) {
+      processVoiceQuery(transcript);
+    }
+  }, [transcript, isProcessing, processVoiceQuery, onListeningChange]);
+  
+  // Define startListening after processVoiceQuery to avoid TS errors
   const startListening = useCallback(() => {
     if (!recognition.current) {
       setError('Speech recognition is not supported in your browser.');
       return;
     }
-
-    // Don't start listening if already speaking
-    if (isSpeaking) {
-      return;
-    }
-
-    setIsListening(true);
-    setTranscript('');
-    setError(null);
-
-    recognition.current.onstart = () => {
-      console.log('Voice recognition started');
-    };
-
-    recognition.current.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0][0].transcript;
-      setTranscript(transcript);
-      processVoiceQuery(transcript);
-    };
-
-    recognition.current.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('Speech recognition error', event.error);
-      setError(`Error: ${event.error}`);
-      setIsListening(false);
-      
-      // If autoRestart is enabled, restart listening on non-fatal errors
-      if (autoRestart && event.error !== 'aborted' && event.error !== 'not-allowed') {
-        setTimeout(() => {
-          startListening();
-        }, 1000);
-      }
-    };
-
-    recognition.current.onend = () => {
-      console.log('Voice recognition ended');
-      setIsListening(false);
-      
-      // Only auto-restart if not currently speaking and autoRestart is enabled
-      if (autoRestart && !isSpeaking && !isProcessing) {
-        setTimeout(() => {
-          startListening();
-        }, 500);
-      }
-    };
-
+    
     try {
+      recognition.current.onstart = handleSpeechStart;
+      
+      recognition.current.onresult = (event: SpeechRecognitionEvent) => {
+        const text = event.results[0][0].transcript;
+        console.log('Speech recognized:', text);
+        setTranscript(text);
+        
+        if (onTranscript) {
+          onTranscript(text);
+        }
+      };
+      
+      recognition.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        setError(`Speech recognition error: ${event.error}`);
+        setIsListening(false);
+        
+        if (onListeningChange) {
+          onListeningChange(false);
+        }
+      };
+      
+      recognition.current.onend = handleSpeechEnd;
+      
       recognition.current.start();
-    } catch (error) {
-      console.error('Error starting speech recognition:', error);
-      setError('Failed to start speech recognition');
+    } catch (err: any) {
+      console.error('Error starting speech recognition:', err);
+      setError(err.message);
       setIsListening(false);
+      
+      if (onListeningChange) {
+        onListeningChange(false);
+      }
     }
-  }, [autoRestart, isSpeaking, isProcessing, processVoiceQuery]);
-
+  }, [handleSpeechStart, handleSpeechEnd, onTranscript, onListeningChange]);
+  
   const stopListening = useCallback(() => {
     if (recognition.current) {
       recognition.current.stop();
-      setIsListening(false);
     }
     
-    // Turn off auto-restart
-    setAutoRestart(false);
-  }, []);
-
-  const toggleAutoRestart = useCallback(() => {
-    setAutoRestart(prev => !prev);
+    setIsListening(false);
     
-    // If turning on auto-restart and not currently listening, start listening
-    if (!autoRestart && !isListening && !isSpeaking) {
-      setTimeout(() => {
-        startListening();
-      }, 300);
+    if (onListeningChange) {
+      onListeningChange(false);
     }
-    
-    toast.info(autoRestart ? 'Continuous listening disabled' : 'Continuous listening enabled');
-  }, [autoRestart, isListening, isSpeaking, startListening]);
-
-  const clearConversation = useCallback(() => {
-    setTranscript('');
-    setResponse('');
-    setError(null);
-  }, []);
-
+  }, [onListeningChange]);
+  
   return {
     isListening,
     transcript,
-    response,
-    isProcessing,
+    answer,
     error,
+    isProcessing,
     startListening,
     stopListening,
-    toggleAutoRestart,
-    autoRestart,
-    isSpeaking,
-    venue,
-    isLoadingVenue,
-    clearConversation
+    setTranscript
   };
 };
+
+export default useVenueVoiceAssistant;

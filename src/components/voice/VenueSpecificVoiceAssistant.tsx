@@ -1,189 +1,192 @@
 
-import { useState, useEffect } from 'react';
-import { Mic, MicOff, X, Volume2, RefreshCw, Loader2 } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Mic, MicOff, Volume2, Play, StopCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import useVenueVoiceAssistant from '@/hooks/useVenueVoiceAssistant';
 import { Card } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
-import { Skeleton } from '@/components/ui/skeleton';
 
-const VenueSpecificVoiceAssistant = () => {
-  const [showHint, setShowHint] = useState(true);
-  const { 
-    isListening, 
-    transcript, 
-    response, 
-    isProcessing, 
-    error, 
-    startListening, 
-    stopListening, 
-    toggleAutoRestart,
-    autoRestart,
-    isSpeaking,
+interface VenueSpecificVoiceAssistantProps {
+  venue: any;
+  isFullWidth?: boolean;
+}
+
+const VenueSpecificVoiceAssistant = ({ venue, isFullWidth = false }: VenueSpecificVoiceAssistantProps) => {
+  const [continuousMode, setContinuousMode] = useState(false);
+  const [userTranscript, setUserTranscript] = useState('');
+  const [aiResponses, setAiResponses] = useState<string[]>([]);
+  const responseRef = useRef<HTMLDivElement>(null);
+  
+  const {
+    isListening,
+    transcript,
+    answer,
+    error,
+    isProcessing,
+    startListening,
+    stopListening,
+    setTranscript
+  } = useVenueVoiceAssistant({
     venue,
-    isLoadingVenue,
-    clearConversation
-  } = useVenueVoiceAssistant();
-
-  // Hide hint after 10 seconds
-  useEffect(() => {
-    if (showHint) {
-      const timer = setTimeout(() => {
-        setShowHint(false);
-      }, 10000);
-      return () => clearTimeout(timer);
+    autoRestart: continuousMode,
+    onTranscript: (text) => {
+      setUserTranscript(text);
+    },
+    onAnswer: (text) => {
+      setAiResponses(prev => [...prev, text]);
     }
-  }, [showHint]);
-
+  });
+  
+  // Scroll to bottom of responses
+  useEffect(() => {
+    if (responseRef.current) {
+      responseRef.current.scrollTop = responseRef.current.scrollHeight;
+    }
+  }, [aiResponses]);
+  
+  // Update transcript in parent component if needed
+  useEffect(() => {
+    if (transcript) {
+      setUserTranscript(transcript);
+    }
+  }, [transcript]);
+  
+  // Add new answer to responses
+  useEffect(() => {
+    if (answer && !aiResponses.includes(answer)) {
+      setAiResponses(prev => [...prev, answer]);
+    }
+  }, [answer, aiResponses]);
+  
+  // Clear transcript when starting to listen
+  useEffect(() => {
+    if (isListening) {
+      setUserTranscript('');
+    }
+  }, [isListening]);
+  
+  const handleToggleListen = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+  
+  const handleToggleContinuousMode = () => {
+    setContinuousMode(prev => !prev);
+  };
+  
+  const handleClearResponses = () => {
+    setAiResponses([]);
+    setUserTranscript('');
+    setTranscript('');
+  };
+  
+  const handleManualSubmit = () => {
+    if (userTranscript.trim()) {
+      // Use the current transcript for processing
+      setAiResponses(prev => [...prev, `You: ${userTranscript}`]);
+      
+      // This will trigger the onTranscript callback in useVenueVoiceAssistant
+      if (!isProcessing) {
+        startListening();
+        stopListening();
+      }
+    }
+  };
+  
   return (
-    <Card className="overflow-hidden border border-white/10 bg-findvenue-card-bg">
-      {/* Header */}
-      <div className="bg-findvenue p-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <Volume2 className="h-5 w-5 mr-2 text-white" />
-          <h3 className="font-semibold text-white">Voice Assistant</h3>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Badge 
-            variant={autoRestart ? "default" : "outline"}
-            className={cn(
-              "cursor-pointer",
-              autoRestart ? "bg-green-600 hover:bg-green-700" : "text-findvenue-text-muted"
-            )}
-            onClick={toggleAutoRestart}
+    <Card className={`${isFullWidth ? 'w-full' : 'w-full max-w-md'} glass-card border-white/10 p-4 rounded-xl flex flex-col`}>
+      <div className="flex justify-between items-center mb-3">
+        <h3 className="text-lg font-semibold flex items-center">
+          <Volume2 className="mr-2 h-5 w-5 text-findvenue" />
+          Voice Assistant
+        </h3>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant={continuousMode ? "default" : "outline"}
+            size="sm"
+            className={`px-3 py-1 h-8 ${continuousMode ? 'bg-findvenue hover:bg-findvenue-dark' : 'border-findvenue/30 text-findvenue hover:bg-findvenue/10'}`}
+            onClick={handleToggleContinuousMode}
           >
-            {autoRestart ? "Continuous" : "Manual"}
-          </Badge>
+            {continuousMode ? 'Continuous On' : 'Continuous Off'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-2 h-8 text-findvenue-text-muted hover:text-white"
+            onClick={handleClearResponses}
+          >
+            Clear
+          </Button>
         </div>
       </div>
       
-      {/* Voice assistant content */}
-      <div className="p-6 flex flex-col">
-        {isLoadingVenue ? (
-          <div className="flex flex-col items-center">
-            <Skeleton className="h-16 w-16 rounded-full mb-4" />
-            <Skeleton className="h-6 w-3/4 mb-2" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-        ) : !venue ? (
-          <Alert variant="destructive" className="mb-4">
-            <AlertDescription>
-              Could not load venue information. Please try again.
-            </AlertDescription>
-          </Alert>
+      <div 
+        ref={responseRef}
+        className="flex-grow bg-findvenue-surface/30 rounded-lg p-3 mb-3 overflow-y-auto"
+        style={{ maxHeight: '200px', minHeight: '140px' }}
+      >
+        {aiResponses.length === 0 ? (
+          <p className="text-findvenue-text-muted text-center mt-8">
+            Ask me anything about this venue!
+          </p>
         ) : (
-          <>
-            {/* Status indicator */}
-            <div className="flex items-center justify-center mb-6">
-              <div 
-                className={cn(
-                  "w-20 h-20 rounded-full flex items-center justify-center relative",
-                  isListening ? "bg-findvenue-surface" : "bg-findvenue-dark-bg",
-                )}
-              >
-                {isListening && (
-                  <div className="absolute w-full h-full rounded-full bg-findvenue/20 animate-ping"></div>
-                )}
-                {isSpeaking ? (
-                  <div className="flex flex-col items-center justify-center">
-                    <Volume2 className="h-8 w-8 text-findvenue animate-pulse" />
-                    <span className="text-xs text-findvenue-text-muted mt-1">Speaking</span>
-                  </div>
-                ) : isProcessing ? (
-                  <Loader2 className="h-8 w-8 text-findvenue animate-spin" />
-                ) : isListening ? (
-                  <Mic className="h-8 w-8 text-findvenue" />
-                ) : (
-                  <MicOff className="h-8 w-8 text-findvenue-text-muted" />
-                )}
+          <div className="space-y-4">
+            {aiResponses.map((response, index) => (
+              <div key={index} className={`${index % 2 === 0 && response.startsWith('You:') ? 'text-findvenue-text-muted' : 'text-white'}`}>
+                {response}
               </div>
-            </div>
-            
-            {/* Transcript and Response */}
-            <div className="w-full space-y-4 mb-6">
-              {transcript && (
-                <div className="space-y-1">
-                  <p className="text-sm text-findvenue-text-muted">You said:</p>
-                  <div className="p-3 bg-findvenue-surface/50 rounded-lg text-findvenue-text">
-                    {transcript}
-                  </div>
-                </div>
-              )}
-              
-              {response && (
-                <div className="space-y-1">
-                  <p className="text-sm text-findvenue-text-muted">Assistant:</p>
-                  <div className="p-3 bg-findvenue/10 rounded-lg text-findvenue-text">
-                    {response}
-                  </div>
-                </div>
-              )}
-              
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              
-              {!transcript && !response && !error && (
-                <div className="text-center py-4">
-                  <p className="text-findvenue-text-muted">
-                    Ask me anything about {venue.name}
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            {/* Controls */}
-            <div className="flex justify-center gap-4">
-              {isListening ? (
-                <Button 
-                  variant="outline" 
-                  className="border-findvenue-gold text-findvenue-gold hover:bg-findvenue-gold/10"
-                  onClick={stopListening}
-                  disabled={isProcessing}
-                >
-                  <MicOff className="h-4 w-4 mr-2" />
-                  Stop Listening
-                </Button>
-              ) : (
-                <Button 
-                  className="bg-findvenue hover:bg-findvenue-dark"
-                  onClick={startListening}
-                  disabled={isProcessing || isSpeaking}
-                >
-                  <Mic className="h-4 w-4 mr-2" />
-                  Start Speaking
-                </Button>
-              )}
-              
-              {(transcript || response) && (
-                <Button
-                  variant="outline"
-                  className="border-white/10"
-                  onClick={() => {
-                    clearConversation();
-                    setShowHint(false);
-                  }}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
-              )}
-            </div>
-          </>
+            ))}
+            {isProcessing && (
+              <div className="text-findvenue animate-pulse">Thinking...</div>
+            )}
+          </div>
         )}
       </div>
       
-      {/* Tips */}
-      {showHint && venue && (
-        <div className="p-4 border-t border-white/10 bg-findvenue-dark-bg/75">
-          <p className="text-xs text-findvenue-text-muted text-center">
-            Try saying: "Tell me about {venue.name}" or "What amenities does this venue offer?"
-          </p>
+      {error && (
+        <p className="text-red-500 text-sm mb-2">{error}</p>
+      )}
+      
+      <div className="flex items-center gap-2">
+        <textarea
+          value={userTranscript}
+          onChange={(e) => {
+            setUserTranscript(e.target.value);
+            setTranscript(e.target.value);
+          }}
+          placeholder="Type or speak your question..."
+          className="flex-grow bg-findvenue-surface/50 text-white border border-white/10 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-findvenue outline-none"
+          rows={1}
+        />
+        
+        <div className="flex space-x-2">
+          <Button
+            onClick={handleToggleListen}
+            variant="outline"
+            size="icon"
+            className={`${isListening ? 'bg-findvenue text-white' : 'border-findvenue/30 text-findvenue hover:bg-findvenue/10'}`}
+            disabled={isProcessing}
+          >
+            {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          </Button>
+          
+          <Button
+            onClick={handleManualSubmit}
+            variant="default"
+            size="icon"
+            className="bg-findvenue hover:bg-findvenue-dark"
+            disabled={isProcessing || !userTranscript.trim()}
+          >
+            <Play className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
+      
+      {isListening && (
+        <div className="mt-2 text-center">
+          <span className="text-findvenue text-sm animate-pulse">Listening...</span>
         </div>
       )}
     </Card>
