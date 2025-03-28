@@ -75,6 +75,41 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
     setIsSending(true);
     
     try {
+      // First, check if a conversation already exists
+      const { data: existingConversation, error: convError } = await supabase
+        .from('conversations')
+        .select('id')
+        .contains('participants', [user.id, ownerId])
+        .maybeSingle();
+        
+      let conversationId = existingConversation?.id;
+      
+      // If no conversation exists, create one
+      if (!conversationId) {
+        const { data: newConversation, error: createError } = await supabase
+          .from('conversations')
+          .insert({
+            participants: [user.id, ownerId],
+            venue_id: venueId,
+            venue_name: venueName,
+            last_message: message
+          })
+          .select('id')
+          .single();
+          
+        if (createError) throw createError;
+        conversationId = newConversation.id;
+      } else {
+        // Update last message in conversation
+        await supabase
+          .from('conversations')
+          .update({
+            last_message: message,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', conversationId);
+      }
+      
       // Insert the message
       const { error: messageError, data: messageData } = await supabase
         .from('messages')
@@ -121,7 +156,15 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       setMessage('');
       
       // Navigate directly to messages with the specific contact
-      navigate(`/messages/${ownerId}`);
+      if (ownerId) {
+        navigate(`/messages/${ownerId}`);
+      } else {
+        toast({
+          title: 'Warning',
+          description: 'Could not open direct messages due to missing owner information',
+          variant: 'destructive',
+        });
+      }
     } catch (error: any) {
       console.error('Error sending message:', error);
       setError(error.message || 'Failed to send message');

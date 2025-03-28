@@ -90,7 +90,19 @@ const DirectChat = () => {
           throw new Error('Contact not found');
         }
         
-        // Get conversation
+        // First, check if a conversation exists
+        const { data: conversation, error: convError } = await supabase
+          .from('conversations')
+          .select('id, venue_id, venue_name')
+          .contains('participants', [user.id, contactId])
+          .maybeSingle();
+        
+        if (conversation) {
+          setVenueId(conversation.venue_id);
+          setVenueName(conversation.venue_name);
+        }
+        
+        // Get message history
         const { data, error } = await supabase
           .rpc('get_conversation', {
             current_user_id: user.id,
@@ -107,10 +119,12 @@ const DirectChat = () => {
           setMessages(data);
           
           // Extract venue info from the first message that has it
-          const messageWithVenue = data.find(msg => msg.venue_id);
-          if (messageWithVenue) {
-            setVenueId(messageWithVenue.venue_id);
-            setVenueName(messageWithVenue.venue_name);
+          if (!venueId) {
+            const messageWithVenue = data.find(msg => msg.venue_id);
+            if (messageWithVenue) {
+              setVenueId(messageWithVenue.venue_id);
+              setVenueName(messageWithVenue.venue_name);
+            }
           }
           
           // Mark received messages as read
@@ -123,6 +137,23 @@ const DirectChat = () => {
               .from('messages')
               .update({ read: true })
               .in('id', unreadMessageIds);
+          }
+        } else {
+          // No existing messages, but create a conversation entry for realtime updates
+          if (!conversation) {
+            const { error: createError } = await supabase
+              .from('conversations')
+              .insert({
+                participants: [user.id, contactId],
+                venue_id: null,
+                venue_name: null,
+                last_message: null
+              })
+              .select();
+            
+            if (createError) {
+              console.error('Error creating conversation:', createError);
+            }
           }
         }
       } catch (error: any) {
@@ -172,7 +203,7 @@ const DirectChat = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [user, contactId, toast, hasError, errorMessage]);
+  }, [user, contactId, toast, hasError, errorMessage, venueId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -192,6 +223,24 @@ const DirectChat = () => {
     try {
       setIsSending(true);
       
+      // Update conversation
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .select('id')
+        .contains('participants', [user.id, contactId])
+        .maybeSingle();
+      
+      if (conversation) {
+        await supabase
+          .from('conversations')
+          .update({
+            last_message: newMessage,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', conversation.id);
+      }
+      
+      // Send message
       const messageData = {
         sender_id: user.id,
         receiver_id: contactId,

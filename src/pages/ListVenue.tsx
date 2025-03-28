@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { saudiCities } from '@/data/cities';
 import { categories } from '@/data/categories';
-import { Check, Upload, AlertCircle, ImageIcon } from 'lucide-react';
+import { Check, Upload, AlertCircle, ImageIcon, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,7 +20,10 @@ const ListVenue = () => {
   const { user, profile } = useAuth();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState<string[]>(['/lovable-uploads/25610b8c-bf06-4ae3-8110-9c4e8133a31b.png']);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
+  const [mapModalOpen, setMapModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -32,6 +34,8 @@ const ListVenue = () => {
     maxCapacity: '',
     price: '',
     pricingType: 'flat',
+    latitude: '',
+    longitude: '',
     amenities: {
       wifi: false,
       parking: false,
@@ -82,12 +86,107 @@ const ListVenue = () => {
     }));
   };
   
-  // Simulate image upload
-  const handleImageUpload = () => {
+  // Add image URL to the list
+  const handleAddImageUrl = () => {
+    if (!imageUrl.trim()) {
+      toast({
+        title: 'Empty URL',
+        description: 'Please enter a valid image URL',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (uploadedImages.includes(imageUrl)) {
+      toast({
+        title: 'Duplicate URL',
+        description: 'This image URL is already in your gallery',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    setUploadedImages(prev => [...prev, imageUrl]);
+    setImageUrl('');
     toast({
-      title: 'Image Uploaded',
-      description: 'Your venue image has been uploaded successfully'
+      title: 'Image Added',
+      description: 'Your image has been added to the gallery'
     });
+  };
+  
+  // Remove image from the list
+  const handleRemoveImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  // Handle file upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setUploadingImage(true);
+    
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Check file size (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+          toast({
+            title: 'File Too Large',
+            description: `${file.name} exceeds the 5MB limit`,
+            variant: 'destructive'
+          });
+          continue;
+        }
+        
+        // Create a unique file path
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `venues/${user?.id}/${fileName}`;
+        
+        // Upload to Supabase storage
+        const { error: uploadError, data } = await supabase.storage
+          .from('venue-images')
+          .upload(filePath, file);
+          
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast({
+            title: 'Upload Failed',
+            description: `Failed to upload ${file.name}: ${uploadError.message}`,
+            variant: 'destructive'
+          });
+          continue;
+        }
+        
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('venue-images')
+          .getPublicUrl(filePath);
+          
+        setUploadedImages(prev => [...prev, publicUrl]);
+        
+        toast({
+          title: 'Upload Successful',
+          description: `${file.name} has been uploaded`
+        });
+      }
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        title: 'Upload Error',
+        description: error.message || 'An unexpected error occurred during upload',
+        variant: 'destructive'
+      });
+    } finally {
+      setUploadingImage(false);
+      
+      // Reset the file input
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
   };
   
   // Handle next step
@@ -133,6 +232,15 @@ const ListVenue = () => {
       toast({
         title: 'Availability Required',
         description: 'Please select at least one day of availability',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (uploadedImages.length === 0) {
+      toast({
+        title: 'Images Required',
+        description: 'Please upload at least one venue image',
         variant: 'destructive'
       });
       return;
@@ -194,13 +302,15 @@ const ListVenue = () => {
         max_capacity: parseInt(formData.maxCapacity),
         starting_price: startingPrice,
         price_per_person: formData.pricingType === 'perPerson' ? startingPrice : null,
-        image_url: uploadedImages[0],
-        gallery_images: uploadedImages,
+        image_url: uploadedImages[0], // Main image is the first one
+        gallery_images: uploadedImages, // All images including the main one
         amenities: amenitiesArray,
         availability: availabilityArray,
         wifi: formData.amenities.wifi,
         parking: formData.amenities.parking,
         owner_info: ownerInfo,
+        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         // Set approval status (venues initially need approval)
         featured: false,
         popular: false,
@@ -356,65 +466,132 @@ const ListVenue = () => {
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label>Venue Photos</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="latitude">Latitude</Label>
+                      <Input
+                        id="latitude"
+                        type="text"
+                        value={formData.latitude}
+                        onChange={(e) => updateForm('latitude', e.target.value)}
+                        placeholder="e.g. 24.7136"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="longitude">Longitude</Label>
+                      <Input
+                        id="longitude"
+                        type="text"
+                        value={formData.longitude}
+                        onChange={(e) => updateForm('longitude', e.target.value)}
+                        placeholder="e.g. 46.6753"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <Label>Venue Photos <span className="text-red-500">*</span></Label>
+                    <p className="text-sm text-findvenue-text-muted">
+                      Upload high-quality images to showcase your venue (at least one image required)
+                    </p>
+                    
+                    {/* Image upload methods */}
+                    <div className="space-y-4">
+                      {/* File upload method */}
+                      <div className="border border-dashed border-white/20 rounded-md p-6">
+                        <div className="flex flex-col items-center">
+                          <Upload className="h-10 w-10 text-findvenue-text-muted mb-2" />
+                          <p className="text-findvenue-text-muted mb-2 text-center">
+                            Drag and drop photos or click to select from your device
+                          </p>
+                          <p className="text-xs text-findvenue-text-muted mb-4 text-center">
+                            Supported formats: JPG, PNG, WebP (up to 5MB each)
+                          </p>
+                          <div className="relative">
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={handleFileUpload}
+                              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                              disabled={uploadingImage}
+                            />
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              className="border-findvenue text-findvenue hover:bg-findvenue/10"
+                              disabled={uploadingImage}
+                            >
+                              {uploadingImage ? (
+                                <>
+                                  <span className="animate-spin mr-2">⟳</span>
+                                  Uploading...
+                                </>
+                              ) : (
+                                'Select Files'
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* URL input method */}
+                      <div className="mt-4">
+                        <Label htmlFor="imageUrl">Or add image URL</Label>
+                        <div className="flex mt-2 gap-2">
+                          <Input
+                            id="imageUrl"
+                            value={imageUrl}
+                            onChange={(e) => setImageUrl(e.target.value)}
+                            placeholder="https://example.com/image.jpg"
+                            className="flex-grow"
+                          />
+                          <Button 
+                            type="button" 
+                            onClick={handleAddImageUrl}
+                            className="bg-findvenue hover:bg-findvenue-dark shrink-0"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                     
                     {/* Image preview area */}
                     {uploadedImages.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-                        {uploadedImages.map((image, index) => (
-                          <div key={index} className="relative group aspect-video rounded-md overflow-hidden border border-white/10">
-                            <img 
-                              src={image} 
-                              alt={`Venue image ${index + 1}`} 
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <Button 
-                                variant="destructive" 
-                                size="sm" 
-                                className="text-xs"
-                                onClick={() => setUploadedImages(prev => prev.filter((_, i) => i !== index))}
-                              >
-                                Remove
-                              </Button>
+                      <div className="mt-6">
+                        <Label className="block mb-3">Uploaded Images ({uploadedImages.length})</Label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          {uploadedImages.map((image, index) => (
+                            <div key={index} className="relative group aspect-video rounded-md overflow-hidden border border-white/10">
+                              <img 
+                                src={image} 
+                                alt={`Venue image ${index + 1}`} 
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm" 
+                                  className="text-xs"
+                                  onClick={() => handleRemoveImage(index)}
+                                >
+                                  <X className="h-4 w-4 mr-1" />
+                                  Remove
+                                </Button>
+                              </div>
+                              {index === 0 && (
+                                <div className="absolute top-2 left-2 bg-findvenue/80 text-white text-xs px-2 py-1 rounded">
+                                  Main Image
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
-                        
-                        {/* Add more images box */}
-                        {uploadedImages.length < 10 && (
-                          <div 
-                            className="aspect-video rounded-md border border-dashed border-white/20 flex items-center justify-center bg-findvenue-surface/20 hover:bg-findvenue-surface/30 cursor-pointer transition-colors"
-                            onClick={handleImageUpload}
-                          >
-                            <div className="text-center p-4">
-                              <ImageIcon className="h-6 w-6 mx-auto text-findvenue-text-muted mb-2" />
-                              <p className="text-sm text-findvenue-text-muted">Add More</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Upload area when no images */}
-                    {uploadedImages.length === 0 && (
-                      <div className="border border-dashed border-white/20 rounded-md p-6 text-center">
-                        <div className="flex flex-col items-center">
-                          <Upload className="h-10 w-10 text-findvenue-text-muted mb-2" />
-                          <p className="text-findvenue-text-muted mb-2">Drag and drop photos or click to upload</p>
-                          <p className="text-xs text-findvenue-text-muted mb-4">
-                            Upload high-quality images (up to 10 images, max 5MB each)
-                          </p>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            className="border-findvenue text-findvenue hover:bg-findvenue/10"
-                            onClick={handleImageUpload}
-                          >
-                            Select Files
-                          </Button>
+                          ))}
                         </div>
+                        <p className="text-xs text-findvenue-text-muted mt-2">
+                          The first image will be used as the main display image for your venue.
+                          Drag to reorder images.
+                        </p>
                       </div>
                     )}
                   </div>
