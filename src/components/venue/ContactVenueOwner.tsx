@@ -40,25 +40,40 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       setIsCheckingConversation(true);
       console.log("Checking for existing conversation between", user?.id, "and", ownerId);
       
-      const { error: tableCheckError } = await supabase
-        .from('conversations')
-        .select('count')
-        .limit(1)
-        .maybeSingle();
-      
-      if (tableCheckError) {
-        if (tableCheckError.code === '42P01') {
-          console.error("Conversations table does not exist:", tableCheckError);
-          setError("The messaging system is currently unavailable. Please try again later.");
-          setIsCheckingConversation(false);
-          return;
+      // First check if the conversations table exists
+      try {
+        const { error: tableCheckError } = await supabase
+          .from('conversations')
+          .select('count')
+          .limit(1)
+          .maybeSingle();
+        
+        if (tableCheckError) {
+          if (tableCheckError.code === '42P01') {
+            console.error("Conversations table does not exist:", tableCheckError);
+            setError("The messaging system is currently unavailable. Please try again later.");
+            setIsCheckingConversation(false);
+            return;
+          }
         }
+      } catch (err) {
+        console.error("Error checking if conversations table exists:", err);
+        setError("The messaging system is currently unavailable. Please try again later.");
+        setIsCheckingConversation(false);
+        return;
       }
 
+      // If we reach here, the table exists, so we can safely query it
+      if (!user?.id || !ownerId) {
+        setError("Missing user or owner information. Cannot check conversation.");
+        setIsCheckingConversation(false);
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
-        .contains('participants', [user?.id, ownerId])
+        .contains('participants', [user.id, ownerId])
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
@@ -138,7 +153,8 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
               participants: [user.id, ownerId],
               venue_id: venueId,
               venue_name: venueName,
-              last_message: message
+              last_message: message,
+              updated_at: new Date().toISOString()
             })
             .select('id')
             .single();
@@ -159,6 +175,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
           throw err;
         }
       } else {
+        // Update the existing conversation with the new message
         await supabase
           .from('conversations')
           .update({
@@ -192,6 +209,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       
       console.log('Message sent successfully:', messageData);
       
+      // Create a notification for the owner
       const { error: notificationError } = await supabase
         .from('notifications')
         .insert({
@@ -209,7 +227,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       
       if (notificationError) {
         console.error("Error creating notification:", notificationError);
-        throw notificationError;
+        // Non-blocking error, don't throw
       }
       
       toast({

@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Send, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -124,6 +123,7 @@ const DirectChat = () => {
           throw new Error('Contact not found');
         }
         
+        // Check if conversation exists
         const { data: conversation, error: convError } = await supabase
           .from('conversations')
           .select('id, venue_id, venue_name')
@@ -142,6 +142,7 @@ const DirectChat = () => {
           setVenueId(conversation.venue_id);
           setVenueName(conversation.venue_name);
           
+          // Fetch messages for this conversation
           const { data: messagesData, error: messagesError } = await supabase
             .from('messages')
             .select('*')
@@ -158,6 +159,7 @@ const DirectChat = () => {
             console.log("Fetched messages:", messagesData.length);
             setMessages(messagesData);
             
+            // Mark unread messages as read
             const unreadMessageIds = messagesData
               .filter(msg => !msg.read && msg.sender_id === contactId && msg.receiver_id === user.id)
               .map(msg => msg.id);
@@ -173,6 +175,7 @@ const DirectChat = () => {
             console.log("No messages found in conversation");
           }
         } else {
+          // Create a new conversation if it doesn't exist
           const { data: newConversation, error: createError } = await supabase
             .from('conversations')
             .insert({
@@ -212,7 +215,7 @@ const DirectChat = () => {
     };
     
     handleMessages();
-  }, [contactId, user, toast, hasError, errorMessage, tableExists]);
+  }, [contactId, user, hasError, tableExists]);
 
   const sendWelcomeMessage = async (contactFirstName: string) => {
     if (!user || !profile || !contactId || !conversationId) return;
@@ -220,6 +223,7 @@ const DirectChat = () => {
     try {
       const welcomeMessage = `Hello ${contactFirstName}! I'm interested in discussing more about your venue. Can you please provide more information?`;
       
+      // Update the conversation
       await supabase
         .from('conversations')
         .update({
@@ -228,6 +232,7 @@ const DirectChat = () => {
         })
         .eq('id', conversationId);
       
+      // Send the welcome message
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -253,6 +258,7 @@ const DirectChat = () => {
         setMessages(prev => [...prev, data]);
       }
       
+      // Create a notification
       await supabase
         .from('notifications')
         .insert({
@@ -331,6 +337,7 @@ const DirectChat = () => {
       setIsSending(true);
       console.log("Sending message to", contactId, "in conversation", conversationId);
       
+      // Update conversation
       await supabase
         .from('conversations')
         .update({
@@ -339,6 +346,7 @@ const DirectChat = () => {
         })
         .eq('id', conversationId);
       
+      // Send message
       const messageData = {
         sender_id: user.id,
         receiver_id: contactId,
@@ -366,6 +374,7 @@ const DirectChat = () => {
         setMessages(prev => [...prev, data]);
       }
       
+      // Create notification
       await supabase
         .from('notifications')
         .insert({
