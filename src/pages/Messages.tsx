@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,7 +6,7 @@ import DirectChat from '@/components/chat/DirectChat';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MessageSquare, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,11 +46,9 @@ const Messages = () => {
       if (contact) {
         setSelectedContact(contact);
       } else {
-        // If we have a contactId but no matching contact, we need to fetch user info
         fetchUserInfo(contactId);
       }
     } else if (contacts.length > 0 && !contactId) {
-      // If no contactId is provided, select the first contact
       setSelectedContact(contacts[0]);
       navigate(`/messages/${contacts[0].id}`, { replace: true });
     }
@@ -64,7 +61,6 @@ const Messages = () => {
       setIsLoading(true);
       console.log("Fetching conversations for user:", user.id);
       
-      // First check if the conversations table exists
       const { error: tableCheckError } = await supabase
         .from('conversations')
         .select('count')
@@ -80,7 +76,6 @@ const Messages = () => {
         }
       }
       
-      // Fetch all conversations where the current user is a participant
       const { data: conversations, error: convError } = await supabase
         .from('conversations')
         .select('*')
@@ -112,7 +107,6 @@ const Messages = () => {
         return;
       }
       
-      // Extract unique contact IDs from conversations
       const contactIds = new Set<string>();
       conversations.forEach(conv => {
         conv.participants.forEach(participantId => {
@@ -124,7 +118,6 @@ const Messages = () => {
       
       console.log("Extracted contact IDs:", [...contactIds]);
       
-      // Fetch user profiles for all contacts
       if (contactIds.size > 0) {
         const { data: profiles, error: profilesError } = await supabase
           .from('user_profiles')
@@ -138,7 +131,6 @@ const Messages = () => {
         
         console.log("Fetched profiles:", profiles);
         
-        // Count unread messages for each conversation
         const contactsWithUnread = await Promise.all(
           Array.from(contactIds).map(async (contactId) => {
             const conversation = conversations.find(conv => 
@@ -174,7 +166,6 @@ const Messages = () => {
           })
         );
         
-        // Sort contacts by last message time
         const sortedContacts = contactsWithUnread.sort((a, b) => {
           if (!a.lastMessageTime) return 1;
           if (!b.lastMessageTime) return -1;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Send, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -49,7 +49,6 @@ const DirectChat = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
 
-  // Check if contactId is valid
   useEffect(() => {
     if (!contactId || contactId === 'undefined') {
       console.error('Invalid contactId:', contactId);
@@ -62,7 +61,6 @@ const DirectChat = () => {
     }
   }, [contactId]);
 
-  // Check if conversations table exists
   useEffect(() => {
     if (!user || !contactId || hasError || contactId === 'undefined') return;
     
@@ -93,16 +91,14 @@ const DirectChat = () => {
     checkTablesExist();
   }, [user, contactId, hasError]);
 
-  // Load messages
   useEffect(() => {
     if (!user || !contactId || hasError || contactId === 'undefined' || !tableExists) return;
     
-    const fetchMessages = async () => {
+    const handleMessages = async () => {
       try {
         setIsLoading(true);
         console.log("Fetching messages for contact:", contactId);
         
-        // Get contact name
         const { data: contactData, error: contactError } = await supabase
           .from('user_profiles')
           .select('first_name, last_name, user_role, profile_image')
@@ -127,8 +123,6 @@ const DirectChat = () => {
           throw new Error('Contact not found');
         }
         
-        // First, check if a conversation exists and get its ID
-        console.log("Checking for existing conversation between", user.id, "and", contactId);
         const { data: conversation, error: convError } = await supabase
           .from('conversations')
           .select('id, venue_id, venue_name')
@@ -147,7 +141,6 @@ const DirectChat = () => {
           setVenueId(conversation.venue_id);
           setVenueName(conversation.venue_name);
           
-          // Now get messages
           const { data: messagesData, error: messagesError } = await supabase
             .from('messages')
             .select('*')
@@ -164,7 +157,6 @@ const DirectChat = () => {
             console.log("Fetched messages:", messagesData.length);
             setMessages(messagesData);
             
-            // Mark received messages as read
             const unreadMessageIds = messagesData
               .filter(msg => !msg.read && msg.sender_id === contactId && msg.receiver_id === user.id)
               .map(msg => msg.id);
@@ -180,8 +172,6 @@ const DirectChat = () => {
             console.log("No messages found in conversation");
           }
         } else {
-          // No existing conversation, create one
-          console.log("No existing conversation, creating new one");
           const { data: newConversation, error: createError } = await supabase
             .from('conversations')
             .insert({
@@ -204,29 +194,24 @@ const DirectChat = () => {
             setConversationId(newConversation.id);
             setMessages([]);
             
-            // Send welcome message
             sendWelcomeMessage(contactData.first_name);
           }
         }
       } catch (error: any) {
         console.error('Error loading messages:', error);
-        setHasError(true);
-        if (!errorMessage) {
-          setErrorMessage('Failed to load conversation. Please try again.');
+        
+        if (error.code === '42P01' && error.message.includes('conversations')) {
+          setError("The chat system is currently being set up. Please try again later.");
+        } else {
+          setError('Failed to load messages. Please try again later.');
         }
-        toast({
-          title: 'Error',
-          description: errorMessage || 'Failed to load conversation. Please try again.',
-          variant: 'destructive',
-        });
-      } finally {
+        
         setIsLoading(false);
       }
     };
     
-    fetchMessages();
-    
-  }, [user, contactId, toast, hasError, errorMessage, tableExists]);
+    handleMessages();
+  }, [contactId, user, toast, hasError, errorMessage, tableExists]);
 
   const sendWelcomeMessage = async (contactFirstName: string) => {
     if (!user || !profile || !contactId || !conversationId) return;
@@ -234,7 +219,6 @@ const DirectChat = () => {
     try {
       const welcomeMessage = `Hello ${contactFirstName}! I'm interested in discussing more about your venue. Can you please provide more information?`;
       
-      // Update conversation with welcome message
       await supabase
         .from('conversations')
         .update({
@@ -243,7 +227,6 @@ const DirectChat = () => {
         })
         .eq('id', conversationId);
       
-      // Send welcome message
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -264,13 +247,11 @@ const DirectChat = () => {
         return;
       }
       
-      // Add message to state
       if (data) {
         console.log("Welcome message sent:", data);
         setMessages(prev => [...prev, data]);
       }
       
-      // Create notification for recipient
       await supabase
         .from('notifications')
         .insert({
@@ -290,7 +271,6 @@ const DirectChat = () => {
     }
   };
 
-  // Set up real-time subscription for new messages
   useEffect(() => {
     if (!user || !contactId || hasError || contactId === 'undefined' || !tableExists) return;
     
@@ -308,13 +288,11 @@ const DirectChat = () => {
         
         const newMessage = payload.new as Message;
         
-        // Mark message as read
         await supabase
           .from('messages')
           .update({ read: true })
           .eq('id', newMessage.id);
           
-        // Add message to state
         setMessages(prev => [...prev, newMessage]);
       })
       .subscribe();
@@ -325,10 +303,8 @@ const DirectChat = () => {
     };
   }, [user, contactId, hasError, tableExists]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
-      // Using a slight delay to ensure DOM has updated
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -354,7 +330,6 @@ const DirectChat = () => {
       setIsSending(true);
       console.log("Sending message to", contactId, "in conversation", conversationId);
       
-      // Update conversation
       await supabase
         .from('conversations')
         .update({
@@ -363,7 +338,6 @@ const DirectChat = () => {
         })
         .eq('id', conversationId);
       
-      // Send message
       const messageData = {
         sender_id: user.id,
         receiver_id: contactId,
@@ -386,13 +360,11 @@ const DirectChat = () => {
         throw error;
       }
       
-      // Add the new message to the state
       if (data) {
         console.log("Message sent successfully:", data);
         setMessages(prev => [...prev, data]);
       }
       
-      // Create notification for recipient
       await supabase
         .from('notifications')
         .insert({
@@ -408,7 +380,6 @@ const DirectChat = () => {
           }
         });
       
-      // Clear the input
       setNewMessage('');
     } catch (error: any) {
       console.error('Error sending message:', error);

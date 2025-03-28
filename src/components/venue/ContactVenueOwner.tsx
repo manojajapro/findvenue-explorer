@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,7 +27,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
   const [existingConversation, setExistingConversation] = useState<any>(null);
   
   useEffect(() => {
-    // When component mounts, check if conversation exists
     if (user && ownerId) {
       checkExistingConversation();
     } else {
@@ -41,7 +39,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       setIsCheckingConversation(true);
       console.log("Checking for existing conversation between", user?.id, "and", ownerId);
       
-      // First check if the conversations table exists
       const { error: tableCheckError } = await supabase
         .from('conversations')
         .select('count')
@@ -57,7 +54,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
         }
       }
 
-      // Check for existing conversation
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
@@ -81,12 +77,10 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
     }
   };
   
-  // Clear error when inputs change
   const clearError = () => {
     if (error) setError(null);
   };
   
-  // Validate owner information before proceeding
   const validateOwnerInfo = (): boolean => {
     if (!ownerId) {
       setError('Unable to contact venue owner. Owner information is missing.');
@@ -118,7 +112,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       return;
     }
 
-    // Validate owner information
     if (!validateOwnerInfo()) {
       toast({
         title: 'Error',
@@ -135,7 +128,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       
       let conversationId = existingConversation?.id;
       
-      // Create new conversation if one doesn't exist
       if (!conversationId) {
         console.log("Creating new conversation between", user.id, "and", ownerId);
         try {
@@ -159,7 +151,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
           conversationId = newConversation.id;
         } catch (err: any) {
           console.error("Failed to create conversation:", err);
-          // If the table doesn't exist, we'll handle it gracefully
           if (err.code === '42P01') {
             setError("The messaging system is currently unavailable. Please try again later.");
             throw new Error("Conversations table does not exist");
@@ -167,7 +158,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
           throw err;
         }
       } else {
-        // Update last message in conversation
         await supabase
           .from('conversations')
           .update({
@@ -179,7 +169,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       
       console.log("Sending message in conversation:", conversationId);
       
-      // Insert the message
       const { error: messageError, data: messageData } = await supabase
         .from('messages')
         .insert({
@@ -202,7 +191,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       
       console.log('Message sent successfully:', messageData);
       
-      // Create notification for the venue owner
       const { error: notificationError } = await supabase
         .from('notifications')
         .insert({
@@ -230,7 +218,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       
       setMessage('');
       
-      // Navigate directly to messages with the specific contact
       if (ownerId) {
         navigate(`/messages/${ownerId}`);
       } else {
@@ -266,7 +253,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       return;
     }
     
-    // Validate owner information
     if (!validateOwnerInfo()) {
       toast({
         title: 'Error',
@@ -276,7 +262,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
       return;
     }
     
-    // Navigate directly to the chat with this owner
     if (ownerId) {
       navigate(`/messages/${ownerId}`);
     } else {
