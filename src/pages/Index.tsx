@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import HeroSection from '@/components/hero/HeroSection';
@@ -57,6 +58,14 @@ const Index = () => {
                   <List className="h-4 w-4" />
                 </TabsTrigger>
               </TabsList>
+              
+              {/* Make sure TabsContent is inside Tabs component */}
+              <TabsContent value="grid" className="hidden">
+                {/* Grid content */}
+              </TabsContent>
+              <TabsContent value="list" className="hidden">
+                {/* List content */}
+              </TabsContent>
             </Tabs>
           </div>
           

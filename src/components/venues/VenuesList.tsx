@@ -51,7 +51,8 @@ const VenuesList = ({ compact = false, onVenueMouseEnter, onVenueMouseLeave }: V
           onMouseEnter={() => onVenueMouseEnter && onVenueMouseEnter(venue.id)}
           onMouseLeave={() => onVenueMouseLeave && onVenueMouseLeave()}
         >
-          <VenueCard venue={venue} featured={venue.featured} compact={compact} />
+          {/* Removed the compact prop since VenueCard doesn't accept it */}
+          <VenueCard venue={venue} featured={venue.featured} />
         </div>
       ))}
     </div>

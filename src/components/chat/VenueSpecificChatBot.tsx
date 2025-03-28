@@ -30,10 +30,13 @@ const VenueSpecificChatBot = () => {
 
   return (
     <Card className="glass-card border-white/10 w-full max-w-md mx-auto">
-      <ChatHeader 
-        title={venue ? `About ${venue.name}` : 'Venue Assistant'} 
-        description="Ask questions about this venue" 
-      />
+      {/* Fixed props to match ChatHeader component requirements */}
+      <ChatHeader>
+        <div className="flex flex-col">
+          <h3 className="text-lg font-semibold">{venue ? `About ${venue.name}` : 'Venue Assistant'}</h3>
+          <p className="text-sm text-findvenue-text-muted">Ask questions about this venue</p>
+        </div>
+      </ChatHeader>
       
       <CardContent className="p-4 max-h-[50vh] overflow-y-auto">
         {!venue && !isLoading ? (
@@ -52,7 +55,25 @@ const VenueSpecificChatBot = () => {
             )}
           </div>
         ) : (
-          <MessageList messages={messages as unknown as ChatMessage[]} />
+          // Fixed props to match MessageList component requirements
+          <div className="space-y-4">
+            {messages.map((message, index) => (
+              <div 
+                key={index} 
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div 
+                  className={`px-4 py-2 rounded-lg max-w-[80%] ${
+                    message.role === 'user' 
+                      ? 'bg-findvenue text-white rounded-tr-none' 
+                      : 'bg-findvenue-surface/50 text-findvenue-text rounded-tl-none'
+                  }`}
+                >
+                  {message.content}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
         <div ref={messagesEndRef} />
       </CardContent>
