@@ -82,6 +82,11 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
         .contains('participants', [user.id, ownerId])
         .maybeSingle();
         
+      if (convError) {
+        console.error("Error checking conversation:", convError);
+        throw new Error("Failed to check existing conversations");
+      }
+        
       let conversationId = existingConversation?.id;
       
       // If no conversation exists, create one
