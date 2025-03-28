@@ -1,103 +1,19 @@
 import { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X, Filter } from 'lucide-react';
-import L from 'leaflet';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/useDebounce';
-
-// Fix for marker icons in React Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-// Custom icon for highlighted venue
-const highlightedIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Featured venue icon 
-const featuredIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+import GoogleMap from './GoogleMap';
 
 interface MapViewProps {
   venues: Venue[];
   isLoading: boolean;
   highlightedVenueId?: string;
 }
-
-// Component to update map view when props change
-const MapUpdater = ({ 
-  venues, 
-  searchTerm,
-  highlightedVenueId
-}: { 
-  venues: Venue[]; 
-  searchTerm?: string;
-  highlightedVenueId?: string;
-}) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (venues.length > 0) {
-      // Get venues with coordinates
-      const venuesWithCoords = venues.filter(
-        venue => venue.latitude && venue.longitude
-      );
-      
-      if (venuesWithCoords.length > 0) {
-        // If there's a highlighted venue, center on it
-        if (highlightedVenueId) {
-          const highlightedVenue = venuesWithCoords.find(v => v.id === highlightedVenueId);
-          if (highlightedVenue && highlightedVenue.latitude && highlightedVenue.longitude) {
-            map.setView(
-              [highlightedVenue.latitude, highlightedVenue.longitude], 
-              14, 
-              { animate: true, duration: 1 }
-            );
-            return;
-          }
-        }
-        
-        // Otherwise, fit bounds to all venues
-        const bounds = L.latLngBounds(
-          venuesWithCoords.map(venue => [
-            venue.latitude || 24.774265, 
-            venue.longitude || 46.738586
-          ])
-        );
-        
-        // Fit map to these bounds
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
-      } else {
-        // Default to Saudi Arabia if no venues have coordinates
-        map.setView([24.774265, 46.738586], 5);
-      }
-    }
-  }, [venues, map, searchTerm, highlightedVenueId]);
-  
-  return null;
-};
 
 const MapSearch = ({ 
   onSearch,
@@ -121,11 +37,6 @@ const MapSearch = ({
   useEffect(() => {
     onSearch(debouncedSearchTerm);
   }, [debouncedSearchTerm, onSearch]);
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSearch(searchText);
-  };
   
   return (
     <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md">
@@ -180,14 +91,13 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const [mapSearchTerm, setMapSearchTerm] = useState('');
   const [isCompactControls, setIsCompactControls] = useState(false);
+  const [mapCenter, setMapCenter] = useState({ lat: 24.774265, lng: 46.738586 });
+  const [mapZoom, setMapZoom] = useState(5);
   
   // Filter venues with valid coordinates
   const venuesWithCoordinates = filteredVenues.filter(
     venue => venue.latitude && venue.longitude
   );
-  
-  // Default center on Saudi Arabia
-  const defaultCenter: [number, number] = [24.774265, 46.738586];
   
   const handleVenueClick = (venueId: string) => {
     navigate(`/venue/${venueId}`);
@@ -236,6 +146,106 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     }
   }, [venues, mapSearchTerm, handleSearch]);
   
+  // Update map center and zoom when venues change
+  useEffect(() => {
+    if (venuesWithCoordinates.length > 0) {
+      // If there's a highlighted venue, center on it
+      if (highlightedVenueId || activeVenue) {
+        const highlightedVenue = venuesWithCoordinates.find(
+          v => v.id === (highlightedVenueId || activeVenue)
+        );
+        
+        if (highlightedVenue && highlightedVenue.latitude && highlightedVenue.longitude) {
+          setMapCenter({ 
+            lat: highlightedVenue.latitude, 
+            lng: highlightedVenue.longitude 
+          });
+          setMapZoom(14);
+          return;
+        }
+      }
+      
+      // Otherwise calculate bounds center
+      // For simplicity, we'll just use the average of all coordinates
+      const totalLat = venuesWithCoordinates.reduce(
+        (sum, venue) => sum + (venue.latitude || 0), 
+        0
+      );
+      
+      const totalLng = venuesWithCoordinates.reduce(
+        (sum, venue) => sum + (venue.longitude || 0), 
+        0
+      );
+      
+      setMapCenter({ 
+        lat: totalLat / venuesWithCoordinates.length, 
+        lng: totalLng / venuesWithCoordinates.length 
+      });
+      
+      // Set an appropriate zoom level based on number of venues
+      setMapZoom(venuesWithCoordinates.length === 1 ? 14 : 10);
+    } else {
+      // Default to Saudi Arabia if no venues have coordinates
+      setMapCenter({ lat: 24.774265, lng: 46.738586 });
+      setMapZoom(5);
+    }
+  }, [venuesWithCoordinates, highlightedVenueId, activeVenue]);
+  
+  const createMarkerInfo = (venue: Venue) => {
+    return (
+      <div dangerouslySetInnerHTML={{ __html: `
+        <div style="padding: 0; max-width: 300px; color: #000;">
+          <div style="position: relative;">
+            <img 
+              src="${venue.imageUrl}" 
+              alt="${venue.name}"
+              style="width: 100%; height: 70px; object-fit: cover; border-top-left-radius: 4px; border-top-right-radius: 4px;"
+            />
+            ${venue.featured ? `
+              <div style="position: absolute; top: 8px; right: 8px; background-color: gold; color: black; padding: 2px 6px; border-radius: 4px; font-size: 10px;">
+                Featured
+              </div>
+            ` : ''}
+          </div>
+          <div style="padding: 8px;">
+            <h3 style="font-weight: bold; font-size: 14px; margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${venue.name}
+            </h3>
+            <div style="display: flex; align-items: center; font-size: 11px; color: #666; margin-bottom: 4px;">
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${venue.address}, ${venue.city}
+              </span>
+            </div>
+            <div style="margin-bottom: 8px;">
+              ${venue.category ? `
+                <span style="display: inline-block; border: 1px solid #ddd; border-radius: 4px; padding: 0 4px; font-size: 10px; margin-right: 4px;">
+                  ${venue.category}
+                </span>
+              ` : ''}
+              ${venue.rating > 0 ? `
+                <span style="display: inline-block; background-color: #f59e0b; color: black; border-radius: 4px; padding: 0 4px; font-size: 10px;">
+                  ★ ${venue.rating.toFixed(1)}
+                </span>
+              ` : ''}
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; border-top: 1px solid #eee; padding-top: 8px;">
+              <div style="font-weight: 600;">
+                ${venue.pricing.startingPrice} ${venue.pricing.currency}
+                ${venue.pricing.pricePerPerson ? ' / person' : ''}
+              </div>
+              <button 
+                onclick="window.location.href='/venue/${venue.id}'"
+                style="background-color: #6366f1; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; display: flex; align-items: center;"
+              >
+                View
+              </button>
+            </div>
+          </div>
+        </div>
+      `}} />
+    );
+  };
+  
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-findvenue-surface/50">
@@ -262,91 +272,23 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
           </div>
         </div>
       ) : (
-        <MapContainer 
-          center={defaultCenter} 
-          zoom={5} 
-          style={{ height: '100%', width: '100%' }}
-          scrollWheelZoom={true}
+        <GoogleMap
+          center={mapCenter}
+          zoom={mapZoom}
+          height="100%"
+          markers={venuesWithCoordinates.map(venue => ({
+            position: { 
+              lat: venue.latitude || 0, 
+              lng: venue.longitude || 0 
+            },
+            title: venue.name,
+            id: venue.id,
+            onClick: () => setActiveVenue(venue.id),
+            info: createMarkerInfo(venue)
+          }))}
+          highlightedMarkerId={highlightedVenueId || activeVenue || undefined}
           className="z-10"
-        >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-          
-          <MapUpdater 
-            venues={venuesWithCoordinates} 
-            searchTerm={mapSearchTerm} 
-            highlightedVenueId={highlightedVenueId || activeVenue}
-          />
-          
-          {venuesWithCoordinates.map((venue) => (
-            <Marker 
-              key={venue.id}
-              position={[venue.latitude || 0, venue.longitude || 0]}
-              icon={
-                venue.id === highlightedVenueId || venue.id === activeVenue 
-                  ? highlightedIcon 
-                  : venue.featured 
-                    ? featuredIcon
-                    : new L.Icon.Default()
-              }
-              eventHandlers={{
-                click: () => setActiveVenue(venue.id),
-              }}
-            >
-              <Popup minWidth={240} maxWidth={300} className="custom-popup">
-                <div className="text-black">
-                  <div className="relative">
-                    <img 
-                      src={venue.imageUrl} 
-                      alt={venue.name}
-                      className="w-full h-28 object-cover rounded-md"
-                    />
-                    {venue.featured && (
-                      <Badge className="absolute top-2 right-2 bg-findvenue-gold text-black">
-                        Featured
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="py-2">
-                    <h3 className="font-bold text-base truncate">{venue.name}</h3>
-                    <div className="flex items-center text-xs text-gray-600 mb-1">
-                      <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                      <p className="truncate">{venue.address}, {venue.city}</p>
-                    </div>
-                    <div className="flex gap-1 mb-2 flex-wrap">
-                      {venue.category && (
-                        <Badge variant="outline" className="text-xs py-0">
-                          {venue.category}
-                        </Badge>
-                      )}
-                      {venue.rating > 0 && (
-                        <Badge className="bg-amber-500 text-black text-xs py-0 flex items-center">
-                          <Star className="h-3 w-3 mr-1" /> {venue.rating.toFixed(1)}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2">
-                    <div>
-                      <span className="font-semibold">{venue.pricing.startingPrice} {venue.pricing.currency}</span>
-                      {venue.pricing.pricePerPerson && <span> / person</span>}
-                    </div>
-                    <Button 
-                      size="sm" 
-                      className="bg-findvenue hover:bg-findvenue-dark text-xs px-3 py-1 h-auto flex items-center"
-                      onClick={() => handleVenueClick(venue.id)}
-                    >
-                      View
-                      <ArrowRight className="h-3 w-3 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
+        />
       )}
       
       {mapSearchTerm && (
@@ -384,7 +326,24 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                 size="icon" 
                 className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
                 onClick={() => {
-                  // This functionality would need a ref to the map
+                  // Reset map zoom and center to show all venues
+                  const totalLat = venuesWithCoordinates.reduce(
+                    (sum, venue) => sum + (venue.latitude || 0), 
+                    0
+                  );
+                  
+                  const totalLng = venuesWithCoordinates.reduce(
+                    (sum, venue) => sum + (venue.longitude || 0), 
+                    0
+                  );
+                  
+                  if (venuesWithCoordinates.length > 0) {
+                    setMapCenter({ 
+                      lat: totalLat / venuesWithCoordinates.length, 
+                      lng: totalLng / venuesWithCoordinates.length 
+                    });
+                    setMapZoom(venuesWithCoordinates.length === 1 ? 14 : 10);
+                  }
                 }}
               >
                 <ZoomIn className="h-3.5 w-3.5" />

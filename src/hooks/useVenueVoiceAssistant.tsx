@@ -1,221 +1,156 @@
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
-type VenueVoiceAssistantProps = {
-  venue?: any;
-  autoRestart?: boolean;
-  onListeningChange?: (isListening: boolean) => void;
-  onTranscript?: (text: string) => void;
-  onAnswer?: (text: string) => void;
-};
+export interface VoiceAssistantHookProps {
+  onSubmit: (message: string) => void;
+}
 
-export const useVenueVoiceAssistant = ({
-  venue,
-  autoRestart = false,
-  onListeningChange,
-  onTranscript,
-  onAnswer
-}: VenueVoiceAssistantProps) => {
+export const useVenueVoiceAssistant = ({ onSubmit }: VoiceAssistantHookProps) => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSupported, setIsSupported] = useState(true);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const { toast } = useToast();
-  
-  const recognition = useRef<SpeechRecognition | null>(null);
-  
-  // Handle speech recognition events
-  const handleSpeechStart = useCallback(() => {
-    setIsListening(true);
-    setTranscript('');
-    setError(null);
+
+  // Check for browser support
+  useEffect(() => {
+    const isRecognitionSupported = 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+    setIsSupported(isRecognitionSupported);
     
-    if (onListeningChange) {
-      onListeningChange(true);
+    if (!isRecognitionSupported) {
+      console.warn('Speech recognition is not supported in this browser.');
     }
-  }, [onListeningChange]);
-  
-  const handleSpeechEnd = useCallback(() => {
-    setIsListening(false);
-    
-    if (onListeningChange) {
-      onListeningChange(false);
-    }
-    
-    if (transcript.trim() && !isProcessing) {
-      processVoiceQuery(transcript);
-    }
-  }, [transcript, isProcessing, onListeningChange]);
-  
-  // Define processVoiceQuery function
-  const processVoiceQuery = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      return;
-    }
-    
-    setIsProcessing(true);
-    
-    try {
-      console.log(`Processing voice query: "${query}"`);
-      
-      // Call our venue-assistant Edge Function
-      const { data, error } = await supabase.functions.invoke('venue-assistant', {
-        body: {
-          query,
-          venueId: venue?.id,
-          type: 'voice'
-        }
-      });
-      
-      if (error) {
-        console.error('Error calling venue-assistant:', error);
-        throw new Error(error.message);
-      }
-      
-      if (data && data.answer) {
-        console.log('AI response:', data.answer);
-        setAnswer(data.answer);
-        
-        if (onAnswer) {
-          onAnswer(data.answer);
-        }
-        
-        // Use Web Speech API to speak the answer
-        if ('speechSynthesis' in window) {
-          const utterance = new SpeechSynthesisUtterance(data.answer);
-          utterance.lang = 'en-US';
-          utterance.rate = 1.0;
-          window.speechSynthesis.speak(utterance);
-        }
-      } else {
-        throw new Error('No answer received from AI assistant');
-      }
-    } catch (err: any) {
-      console.error('Error processing voice query:', err);
-      setError(err.message);
-      toast({
-        variant: 'destructive',
-        title: 'Error processing your request',
-        description: err.message || 'Please try again later'
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [venue?.id, toast, onAnswer]);
-  
+  }, []);
+
   // Initialize speech recognition
   useEffect(() => {
+    if (!isSupported) return;
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
     
-    if (SpeechRecognition) {
-      recognition.current = new SpeechRecognition();
-      recognition.current.continuous = false;
-      recognition.current.interimResults = false;
-      recognition.current.lang = 'en-US';
-    } else {
-      setError('Speech recognition is not supported in your browser.');
+    if (recognitionRef.current) {
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
     }
     
     return () => {
-      if (recognition.current) {
+      if (recognitionRef.current) {
+        stopListening();
+      }
+    };
+  }, [isSupported]);
+
+  // Handle speech recognition results
+  useEffect(() => {
+    if (!isSupported || !recognitionRef.current) return;
+    
+    const handleResult = (event: SpeechRecognitionEvent) => {
+      const result = Array.from(event.results)
+        .map(result => result[0])
+        .map(result => result.transcript)
+        .join('');
+      
+      setTranscript(result);
+    };
+    
+    const handleEnd = () => {
+      if (isListening && recognitionRef.current) {
         try {
-          // Fix: Check and call stop() instead of abort()
-          if (isListening) {
-            recognition.current.stop();
-          }
-        } catch (e) {
-          console.error('Error stopping speech recognition:', e);
+          recognitionRef.current.start();
+        } catch (error) {
+          console.error('Error restarting speech recognition:', error);
         }
       }
     };
-  }, [isListening]);
-  
-  // Handle auto-restart functionality
-  useEffect(() => {
-    if (autoRestart && !isListening && !isProcessing) {
-      const timer = setTimeout(() => {
-        console.log('Auto-restarting voice recognition...');
-        startListening();
-      }, 1000);
+    
+    const handleError = (event: SpeechRecognitionErrorEvent) => {
+      console.error('Speech recognition error:', event.error);
       
-      return () => clearTimeout(timer);
+      if (event.error === 'not-allowed') {
+        toast({
+          title: 'Microphone access denied',
+          description: 'Please allow microphone access to use the voice assistant.',
+          variant: 'destructive',
+        });
+        setIsListening(false);
+      }
+    };
+    
+    // Add event listeners
+    if (recognitionRef.current) {
+      recognitionRef.current.onresult = handleResult;
+      recognitionRef.current.onend = handleEnd;
+      recognitionRef.current.onerror = handleError;
     }
-  }, [autoRestart, isListening, isProcessing]);
-  
-  // Define startListening
+    
+    return () => {
+      if (recognitionRef.current) {
+        // Remove event listeners
+        // TypeScript doesn't like null assignments for these event handlers,
+        // so we use empty functions instead
+        recognitionRef.current.onresult = () => {};
+        recognitionRef.current.onend = () => {};
+        recognitionRef.current.onerror = () => {};
+      }
+    };
+  }, [isListening, isSupported, toast]);
+
   const startListening = useCallback(() => {
-    if (!recognition.current) {
-      setError('Speech recognition is not supported in your browser.');
+    if (!isSupported) {
+      toast({
+        title: 'Not supported',
+        description: 'Speech recognition is not supported in your browser.',
+        variant: 'destructive',
+      });
       return;
     }
     
-    try {
-      // Fix: Use event listeners instead of direct property assignment
-      recognition.current.addEventListener('start', handleSpeechStart);
-      
-      recognition.current.addEventListener('result', (event: SpeechRecognitionEvent) => {
-        const text = event.results[0][0].transcript;
-        console.log('Speech recognized:', text);
-        setTranscript(text);
-        
-        if (onTranscript) {
-          onTranscript(text);
-        }
-      });
-      
-      recognition.current.addEventListener('error', (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
-        setError(`Speech recognition error: ${event.error}`);
-        setIsListening(false);
-        
-        if (onListeningChange) {
-          onListeningChange(false);
-        }
-      });
-      
-      recognition.current.addEventListener('end', handleSpeechEnd);
-      
-      recognition.current.start();
-    } catch (err: any) {
-      console.error('Error starting speech recognition:', err);
-      setError(err.message);
-      setIsListening(false);
-      
-      if (onListeningChange) {
-        onListeningChange(false);
-      }
-    }
-  }, [handleSpeechStart, handleSpeechEnd, onTranscript, onListeningChange]);
-  
-  const stopListening = useCallback(() => {
-    if (recognition.current) {
-      try {
-        recognition.current.stop();
-      } catch (e) {
-        console.error('Error stopping speech recognition:', e);
-      }
-    }
+    setTranscript('');
+    setIsListening(true);
     
+    try {
+      recognitionRef.current?.start();
+    } catch (error) {
+      console.error('Error starting speech recognition:', error);
+    }
+  }, [isSupported, toast]);
+
+  const stopListening = useCallback(() => {
     setIsListening(false);
     
-    if (onListeningChange) {
-      onListeningChange(false);
+    try {
+      recognitionRef.current?.stop();
+    } catch (error) {
+      console.error('Error stopping speech recognition:', error);
     }
-  }, [onListeningChange]);
-  
+    
+    // Submit the transcript if it's not empty
+    if (transcript.trim()) {
+      onSubmit(transcript);
+    }
+  }, [transcript, onSubmit]);
+
+  const resetTranscript = useCallback(() => {
+    setTranscript('');
+  }, []);
+
   return {
     isListening,
     transcript,
-    answer,
-    error,
-    isProcessing,
+    isSupported,
     startListening,
     stopListening,
-    setTranscript
+    resetTranscript,
   };
 };
 
-export default useVenueVoiceAssistant;
+// Add missing types
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
