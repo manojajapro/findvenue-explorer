@@ -1,199 +1,214 @@
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
+import { MessageSquare, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { MessageCircle, X, Send, Bot, User } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input'; 
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
 
-interface Message {
+type Message = {
+  role: 'user' | 'assistant';
   content: string;
-  isBot: boolean;
-  timestamp: Date;
-}
+};
 
-const initialMessages: Message[] = [
-  {
-    content: 'Hello! I\'m your FindVenue assistant. How can I help you find the perfect venue today?',
-    isBot: true,
-    timestamp: new Date()
-  }
-];
-
-const ChatBot = () => {
+const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState<Message[]>([
+    { role: 'assistant', content: 'Hi! I\'m FindVenue Assistant. How can I help you today?' },
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // Auto scroll to bottom of messages
+  const location = useLocation();
+  const { id } = useParams<{ id?: string }>();
+  const [venueInfo, setVenueInfo] = useState<any | null>(null);
+
+  // Fetch venue details if we're on a venue details page
   useEffect(() => {
+    const fetchVenueInfo = async () => {
+      if (id && location.pathname.includes('/venue/')) {
+        try {
+          console.log("Fetching venue info for assistant:", id);
+          const { data, error } = await supabase
+            .from('venues')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+          if (error) {
+            console.error("Error fetching venue data:", error);
+            return;
+          }
+
+          if (data) {
+            console.log("Venue data fetched for assistant:", data.name);
+            setVenueInfo(data);
+            
+            // Update initial message to be venue-specific
+            setMessages([
+              { 
+                role: 'assistant', 
+                content: `Hi! I'm FindVenue Assistant. I can help you with information about ${data.name}. Feel free to ask about pricing, capacity, amenities, or booking this venue!` 
+              },
+            ]);
+          }
+        } catch (err) {
+          console.error("Error in venue fetch:", err);
+        }
+      }
+    };
+
+    fetchVenueInfo();
+  }, [id, location.pathname]);
+
+  useEffect(() => {
+    // Scroll to bottom whenever messages change
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-  
-  const handleSendMessage = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    if (!inputMessage.trim()) return;
+    if (!message.trim()) return;
     
-    // Add user message
-    const userMessage: Message = {
-      content: inputMessage,
-      isBot: false,
-      timestamp: new Date()
-    };
+    const userMessage = message;
+    setMessage('');
     
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
-    setIsTyping(true);
+    // Add user message to chat
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     
-    // Simulate bot response after delay
-    setTimeout(() => {
-      const botMessage: Message = {
-        content: getBotResponse(inputMessage),
-        isBot: true,
-        timestamp: new Date()
-      };
+    // Simulate AI response
+    setIsLoading(true);
+    
+    try {
+      // Here we would normally call an AI API
+      // For this demo, we'll generate responses based on user input and venue context
       
-      setMessages(prev => [...prev, botMessage]);
-      setIsTyping(false);
-    }, 1000);
-  };
-  
-  // Simple response logic - in a real app, this would be connected to an AI service
-  const getBotResponse = (message: string): string => {
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('venue') || lowerMessage.includes('space') || lowerMessage.includes('location')) {
-      return 'We have many beautiful venues across Saudi Arabia. You can search by city, event type, or guest count using our search feature. Is there a specific type of venue you\'re looking for?';
-    } else if (lowerMessage.includes('wedding')) {
-      return 'For weddings, I recommend checking out our luxury ballrooms in Riyadh or beachfront venues in Jeddah. These are very popular for wedding celebrations.';
-    } else if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('budget')) {
-      return 'Venue prices vary based on location, size, and amenities. Our venues start from 10,000 SAR. You can filter by price range in our search to find options within your budget.';
-    } else if (lowerMessage.includes('riyadh')) {
-      return 'Riyadh has over 200 premium venues ranging from luxury ballrooms to corporate conference centers. The Four Seasons Ballroom and Waldorf Grand Hall are among our most popular options.';
-    } else if (lowerMessage.includes('jeddah')) {
-      return 'Jeddah offers beautiful beachfront venues with Red Sea views, as well as modern event spaces in the city center. The Marsa Beach Venue is especially popular for outdoor events.';
-    } else if (lowerMessage.includes('book') || lowerMessage.includes('reserve')) {
-      return 'To book a venue, you can browse our listings, select your preferred venue, and click the "Book Now" button on the venue details page. You\'ll need to create an account to complete your booking.';
-    } else if (lowerMessage.includes('thank')) {
-      return 'You\'re welcome! I\'m glad I could help. Feel free to ask if you have any other questions about finding the perfect venue.';
-    } else if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
-      return 'Hello! How can I help you find the perfect venue today?';
-    } else {
-      return 'I can help you find and book venues across Saudi Arabia. You can ask about specific cities, venue types, or booking procedures. How can I assist you today?';
+      setTimeout(() => {
+        let response = '';
+        const lowerCaseMessage = userMessage.toLowerCase();
+        
+        if (venueInfo) {
+          // Venue-specific responses
+          if (lowerCaseMessage.includes('price') || lowerCaseMessage.includes('cost') || lowerCaseMessage.includes('fee')) {
+            response = `${venueInfo.name} pricing starts at ${venueInfo.currency} ${venueInfo.starting_price.toLocaleString()} per booking.`;
+            if (venueInfo.price_per_person > 0) {
+              response += ` There's also a price per person of ${venueInfo.currency} ${venueInfo.price_per_person}.`;
+            }
+          } else if (lowerCaseMessage.includes('capacity') || lowerCaseMessage.includes('people') || lowerCaseMessage.includes('guests')) {
+            response = `${venueInfo.name} can accommodate between ${venueInfo.min_capacity} and ${venueInfo.max_capacity} guests.`;
+          } else if (lowerCaseMessage.includes('amenities') || lowerCaseMessage.includes('facilities') || lowerCaseMessage.includes('features')) {
+            const amenitiesList = venueInfo.amenities.join(', ');
+            response = `${venueInfo.name} offers these amenities: ${amenitiesList}.`;
+            if (venueInfo.wifi) response += " WiFi is available.";
+            if (venueInfo.parking) response += " Parking facilities are available.";
+          } else if (lowerCaseMessage.includes('location') || lowerCaseMessage.includes('address') || lowerCaseMessage.includes('where')) {
+            response = `${venueInfo.name} is located at ${venueInfo.address} in ${venueInfo.city_name}.`;
+          } else if (lowerCaseMessage.includes('book') || lowerCaseMessage.includes('reserve') || lowerCaseMessage.includes('availability')) {
+            response = `To book ${venueInfo.name}, you can use the booking form on this page. Available days include: ${venueInfo.availability.join(', ')}. You can also message the venue host directly.`;
+          } else if (lowerCaseMessage.includes('contact') || lowerCaseMessage.includes('owner') || lowerCaseMessage.includes('host')) {
+            response = `You can contact the venue host directly by clicking the "Message Venue Host" button on this page. They'll respond to your inquiries about ${venueInfo.name}.`;
+          } else {
+            response = `${venueInfo.name} is a ${venueInfo.category_name} venue located in ${venueInfo.city_name}. Is there something specific you'd like to know about this venue?`;
+          }
+        } else {
+          // General responses
+          if (lowerCaseMessage.includes('venue')) {
+            response = 'FindVenue helps you discover and book the perfect venue for your events. You can browse venues by city or category, and filter by capacity and price.';
+          } else if (lowerCaseMessage.includes('book') || lowerCaseMessage.includes('reservation')) {
+            response = 'To book a venue, navigate to the venue details page and use the booking form. You can select your preferred date and time, and provide details about your event.';
+          } else if (lowerCaseMessage.includes('hello') || lowerCaseMessage.includes('hi') || lowerCaseMessage.includes('hey')) {
+            response = 'Hello! How can I assist you with FindVenue today?';
+          } else if (lowerCaseMessage.includes('thank')) {
+            response = "You're welcome! Let me know if you need anything else.";
+          } else {
+            response = "I'm here to help you find and book venues. You can ask about specific venues, booking process, or browse available options by city or category.";
+          }
+        }
+        
+        setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+        setIsLoading(false);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error generating response:', error);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again later.' }]);
+      setIsLoading(false);
     }
   };
-  
-  const formatTime = (date: Date): string => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-  
+
   return (
     <>
-      {/* Chat button */}
-      <div className="fixed bottom-6 right-6 z-50">
+      {!isOpen ? (
         <Button
-          className={cn(
-            "h-14 w-14 rounded-full shadow-lg transition-all duration-300",
-            isOpen ? "bg-findvenue-dark" : "bg-findvenue"
-          )}
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-6 right-6 rounded-full h-14 w-14 bg-findvenue hover:bg-findvenue-dark shadow-lg p-0"
         >
-          {isOpen ? (
-            <X className="h-6 w-6" />
-          ) : (
-            <MessageCircle className="h-6 w-6" />
-          )}
+          <MessageSquare size={24} />
         </Button>
-      </div>
-      
-      {/* Chat panel */}
-      <div
-        className={cn(
-          "fixed bottom-24 right-6 z-50 w-full max-w-md transition-all duration-500 transform",
-          isOpen ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0 pointer-events-none"
-        )}
-      >
-        <Card className="overflow-hidden border border-white/10 shadow-xl bg-findvenue-card-bg">
-          {/* Header */}
-          <div className="bg-findvenue p-4 flex items-center justify-between">
+      ) : (
+        <Card className="fixed bottom-6 right-6 w-80 sm:w-96 h-[500px] shadow-lg border border-white/10 glass-card flex flex-col">
+          <div className="bg-findvenue p-3 flex justify-between items-center rounded-t-lg">
             <div className="flex items-center">
-              <Bot className="h-5 w-5 mr-2 text-white" />
-              <h3 className="font-semibold text-white">FindVenue Assistant</h3>
+              <Avatar className="h-8 w-8 mr-2">
+                <AvatarImage src="/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png" alt="FindVenue Assistant" />
+                <AvatarFallback>AI</AvatarFallback>
+              </Avatar>
+              <span className="font-medium text-white">FindVenue Assistant</span>
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white hover:bg-findvenue-dark"
-              onClick={() => setIsOpen(false)}
-            >
-              <X className="h-5 w-5" />
+            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-white hover:bg-findvenue-dark">
+              <X size={18} />
             </Button>
           </div>
           
-          {/* Messages area */}
-          <div className="p-4 h-96 overflow-y-auto flex flex-col gap-4 bg-findvenue-dark-bg/50">
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "flex flex-col max-w-[80%] animate-fade-in",
-                  msg.isBot ? "self-start" : "self-end"
-                )}
-              >
+          <CardContent className="flex-1 overflow-y-auto p-3">
+            <div className="space-y-4">
+              {messages.map((msg, i) => (
                 <div
-                  className={cn(
-                    "p-3 rounded-lg",
-                    msg.isBot 
-                      ? "bg-findvenue-surface text-findvenue-text rounded-tl-none" 
-                      : "bg-findvenue text-white rounded-tr-none"
-                  )}
+                  key={i}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {msg.content}
-                </div>
-                <span className="text-xs text-findvenue-text-muted mt-1">
-                  {msg.isBot ? 'Bot' : 'You'} • {formatTime(msg.timestamp)}
-                </span>
-              </div>
-            ))}
-            
-            {isTyping && (
-              <div className="self-start flex flex-col max-w-[80%] animate-fade-in">
-                <div className="p-3 rounded-lg bg-findvenue-surface text-findvenue-text rounded-tl-none">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 rounded-full bg-findvenue-text-muted animate-pulse" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 rounded-full bg-findvenue-text-muted animate-pulse" style={{ animationDelay: '200ms' }}></div>
-                    <div className="w-2 h-2 rounded-full bg-findvenue-text-muted animate-pulse" style={{ animationDelay: '400ms' }}></div>
+                  <div
+                    className={`max-w-[80%] rounded-lg p-3 ${
+                      msg.role === 'user'
+                        ? 'bg-findvenue text-white'
+                        : 'bg-findvenue-surface/30 border border-white/10'
+                    }`}
+                  >
+                    {msg.content}
                   </div>
                 </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </div>
-          
-          {/* Input area */}
-          <form onSubmit={handleSendMessage} className="p-4 border-t border-white/10 bg-findvenue-dark-bg/75">
-            <div className="flex gap-2">
-              <Input
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Type your message..."
-                className="bg-findvenue-surface border-white/10"
-              />
-              <Button 
-                type="submit" 
-                className="bg-findvenue hover:bg-findvenue-dark"
-                disabled={!inputMessage.trim()}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%] rounded-lg p-3 bg-findvenue-surface/30 border border-white/10">
+                    <Loader2 className="h-5 w-5 animate-spin text-findvenue" />
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
             </div>
-          </form>
+          </CardContent>
+          
+          <CardFooter className="p-3 pt-0">
+            <form onSubmit={handleSendMessage} className="w-full flex gap-2">
+              <Input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1"
+                disabled={isLoading}
+              />
+              <Button type="submit" size="icon" className="bg-findvenue hover:bg-findvenue-dark" disabled={!message.trim() || isLoading}>
+                <Send size={18} />
+              </Button>
+            </form>
+          </CardFooter>
         </Card>
-      </div>
+      )}
     </>
   );
 };

@@ -1,328 +1,197 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageCircle, Loader2, AlertCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
-type ContactProps = {
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { MessageCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+
+type ContactVenueOwnerProps = {
   venueId: string;
   venueName: string;
   ownerId: string;
   ownerName: string;
 };
 
-const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactProps) => {
+const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVenueOwnerProps) => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [message, setMessage] = useState('');
-  const [isSending, setIsSending] = useState(false);
+  
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isInitiating, setIsInitiating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isCheckingConversation, setIsCheckingConversation] = useState(true);
-  const [existingMessages, setExistingMessages] = useState<any[]>([]);
-  
-  useEffect(() => {
-    if (user && ownerId) {
-      checkExistingMessages();
-    } else {
-      setIsCheckingConversation(false);
-    }
-  }, [user, ownerId]);
 
-  const checkExistingMessages = async () => {
-    try {
-      setIsCheckingConversation(true);
-      console.log("Checking for existing messages between", user?.id, "and", ownerId);
-      
-      if (!user?.id || !ownerId) {
-        setError("Missing user or owner information. Cannot check messages.");
-        setIsCheckingConversation(false);
-        return;
-      }
-      
-      // Check if messages table exists by trying to fetch one message
-      try {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-          .or(`sender_id.eq.${ownerId},receiver_id.eq.${ownerId}`)
-          .limit(5);
-
-        if (error) {
-          console.error("Error checking messages:", error);
-          throw new Error("Failed to check existing messages");
-        }
-
-        if (data && data.length > 0) {
-          console.log("Existing messages found:", data.length);
-          setExistingMessages(data);
-        }
-      } catch (err: any) {
-        console.error("Error checking messages:", err);
-        setError("Failed to check message status. Please try again later.");
-      }
-    } catch (error: any) {
-      console.error("Error checking messages:", error);
-      setError("Failed to check message status. Please try again later.");
-    } finally {
-      setIsCheckingConversation(false);
-    }
-  };
-  
-  const clearError = () => {
-    if (error) setError(null);
-  };
-  
-  const validateOwnerInfo = (): boolean => {
-    if (!ownerId) {
-      setError('Unable to contact venue owner. Owner information is missing.');
-      return false;
-    }
-    return true;
-  };
-  
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    clearError();
-    
-    if (!user || !profile) {
-      toast({
-        title: 'Login Required',
-        description: 'Please log in to contact the venue owner',
-        variant: 'destructive',
-      });
-      navigate('/login');
-      return;
-    }
-    
-    if (!message.trim()) {
-      toast({
-        title: 'Empty Message',
-        description: 'Please enter a message',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!validateOwnerInfo()) {
-      toast({
-        title: 'Error',
-        description: error || 'Unable to contact venue owner',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    setIsSending(true);
-    
-    try {
-      console.log("Starting message send process to owner:", ownerId);
-      
-      // Send message directly to the messages table
-      const { error: messageError, data: messageData } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user.id,
-          receiver_id: ownerId,
-          content: message,
-          read: false,
-          sender_name: `${profile.first_name} ${profile.last_name}`,
-          receiver_name: ownerName,
-          venue_id: venueId,
-          venue_name: venueName
-        })
-        .select()
-        .single();
-      
-      if (messageError) {
-        console.error("Error sending message:", messageError);
-        throw messageError;
-      }
-      
-      console.log('Message sent successfully:', messageData);
-      
-      // Create a notification for the owner
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: ownerId,
-          title: 'New Message',
-          message: `${profile.first_name} ${profile.last_name} sent you a message about "${venueName}"`,
-          type: 'message',
-          read: false,
-          link: '/messages',
-          data: {
-            sender_id: user.id,
-            venue_id: venueId
-          }
-        });
-      
-      if (notificationError) {
-        console.error("Error creating notification:", notificationError);
-        // Non-blocking error, don't throw
-      }
-      
-      toast({
-        title: 'Message Sent',
-        description: 'Your message has been sent to the venue owner',
-      });
-      
-      setMessage('');
-      
-      if (ownerId) {
-        navigate(`/messages/${ownerId}`);
-      } else {
-        toast({
-          title: 'Warning',
-          description: 'Could not open direct messages due to missing owner information',
-          variant: 'destructive',
-        });
-      }
-    } catch (error: any) {
-      console.error('Error sending message:', error);
-      setError(error.message || 'Failed to send message');
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to send message',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSending(false);
-    }
-  };
-  
-  const handleDirectMessageClick = () => {
-    clearError();
-    
+  const initiateChat = async () => {
     if (!user) {
-      toast({
-        title: 'Login Required',
-        description: 'Please log in to contact the venue owner',
-        variant: 'destructive',
-      });
       navigate('/login');
       return;
     }
     
-    if (!validateOwnerInfo()) {
-      toast({
-        title: 'Error',
-        description: error || 'Unable to contact venue owner',
-        variant: 'destructive',
+    try {
+      setIsInitiating(true);
+      setError(null);
+      
+      console.log("Initiating chat with venue owner:", {
+        venueId,
+        venueName,
+        ownerId,
+        ownerName,
+        currentUser: user.id
       });
-      return;
-    }
-    
-    if (ownerId) {
+      
+      if (!ownerId) {
+        throw new Error("Could not identify venue owner");
+      }
+
+      // Get user profile if not available in context
+      let senderName = '';
+      if (profile) {
+        senderName = `${profile.first_name} ${profile.last_name}`;
+      } else {
+        // Fallback if profile is not available
+        const { data: userData, error: userError } = await supabase
+          .from('user_profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .maybeSingle();
+          
+        if (!userError && userData) {
+          senderName = `${userData.first_name} ${userData.last_name}`;
+        } else {
+          senderName = 'User';
+          console.warn("Could not get user profile data:", userError);
+        }
+      }
+      
+      // Check if a conversation already exists
+      const { data: existingMessages, error: checkError } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${ownerId}),and(sender_id.eq.${ownerId},receiver_id.eq.${user.id})`)
+        .limit(1);
+      
+      if (checkError) {
+        console.error("Error checking existing conversation:", checkError);
+        throw new Error("Failed to check existing conversation");
+      }
+      
+      if (!existingMessages || existingMessages.length === 0) {
+        // Create initial message
+        const message = `Hello! I'm interested in your venue "${venueName}". Can you provide more information?`;
+        
+        const { data: messageData, error: messageError } = await supabase
+          .from('messages')
+          .insert({
+            sender_id: user.id,
+            receiver_id: ownerId,
+            content: message,
+            sender_name: senderName,
+            receiver_name: ownerName,
+            venue_id: venueId,
+            venue_name: venueName,
+            read: false
+          })
+          .select()
+          .single();
+        
+        if (messageError) {
+          console.error("Error creating initial message:", messageError);
+          throw new Error("Failed to send initial message");
+        }
+        
+        // Create notification for venue owner
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: ownerId,
+            title: 'New Message',
+            message: `${senderName} started a conversation with you about ${venueName}`,
+            type: 'message',
+            read: false,
+            link: `/messages/${user.id}`,
+            data: {
+              sender_id: user.id,
+              venue_id: venueId
+            }
+          });
+      }
+      
+      // Navigate to messages
       navigate(`/messages/${ownerId}`);
-    } else {
-      toast({
-        title: 'Error',
-        description: 'Owner ID is missing. Cannot start conversation.',
-        variant: 'destructive',
-      });
+      
+    } catch (error: any) {
+      console.error('Error initiating chat:', error);
+      setError(error.message || 'Failed to start conversation. Please try again.');
+    } finally {
+      setIsInitiating(false);
     }
   };
   
-  if (!user) {
-    return (
-      <Card className="glass-card border-white/10">
-        <CardContent className="pt-6">
-          <div className="text-center">
-            <p className="text-findvenue-text-muted mb-4">
-              Please log in to contact the venue owner
-            </p>
-            <Button 
-              onClick={() => navigate('/login')}
-              className="bg-findvenue hover:bg-findvenue-dark"
-            >
-              Login to Contact
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  if (isCheckingConversation) {
-    return (
-      <Card className="glass-card border-white/10">
-        <CardContent className="pt-6">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto text-findvenue" />
-            <p className="text-findvenue-text-muted mt-4">
-              Checking conversation status...
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card className="glass-card border-white/10">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <MessageCircle className="h-5 w-5" />
-          <span>Contact {ownerName || 'Venue Owner'}</span>
-        </CardTitle>
-      </CardHeader>
-      <form onSubmit={handleSendMessage}>
-        <CardContent>
-          {error && (
+    <>
+      <Button 
+        variant="outline" 
+        className="w-full mt-2 border-white/20 hover:bg-findvenue/10 transition-colors"
+        onClick={() => setIsDialogOpen(true)}
+      >
+        <MessageCircle className="mr-2 h-4 w-4" />
+        Message Venue Host
+      </Button>
+      
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Contact Venue Host</DialogTitle>
+          </DialogHeader>
+          
+          {error ? (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
+          ) : (
+            <div className="py-6">
+              <p className="mb-4">
+                Start a conversation with <strong>{ownerName}</strong>, the host of <strong>{venueName}</strong>.
+              </p>
+              <p className="text-sm text-findvenue-text-muted mb-6">
+                You'll be able to discuss details, ask questions, and negotiate terms directly.
+              </p>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  className="bg-findvenue hover:bg-findvenue-dark"
+                  onClick={initiateChat}
+                  disabled={isInitiating}
+                >
+                  {isInitiating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Starting...
+                    </>
+                  ) : (
+                    <>
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Start Conversation
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           )}
-          
-          <Textarea
-            placeholder={`Ask ${ownerName || 'the venue owner'} about ${venueName}...`}
-            className="min-h-[120px] bg-findvenue-surface/20"
-            value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-              clearError();
-            }}
-            disabled={isSending}
-          />
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button 
-            type="button"
-            variant="outline"
-            onClick={handleDirectMessageClick}
-            disabled={isSending || !ownerId}
-          >
-            <MessageCircle className="mr-2 h-4 w-4" />
-            Direct Chat
-          </Button>
-          <Button 
-            type="submit"
-            className="bg-findvenue hover:bg-findvenue-dark"
-            disabled={isSending || !message.trim() || !ownerId}
-          >
-            {isSending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <MessageCircle className="mr-2 h-4 w-4" />
-                Send Message
-              </>
-            )}
-          </Button>
-        </CardFooter>
-      </form>
-    </Card>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
