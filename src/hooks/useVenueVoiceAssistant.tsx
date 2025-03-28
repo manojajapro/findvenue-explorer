@@ -65,7 +65,7 @@ export const useVenueVoiceAssistant = () => {
     }
   }, [autoRestart, isListening]);
 
-  // Define processVoiceQuery early
+  // Define processVoiceQuery function before it's used
   const processVoiceQuery = useCallback(async (query: string) => {
     if (!query.trim()) {
       return;
@@ -136,6 +136,7 @@ export const useVenueVoiceAssistant = () => {
     }
   }, [venue, handleSpeechEnd, autoRestart]);
 
+  // Define startListening after processVoiceQuery to avoid the TS error
   const startListening = useCallback(() => {
     if (!recognition.current) {
       setError('Speech recognition is not supported in your browser.');

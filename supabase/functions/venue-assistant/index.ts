@@ -61,10 +61,45 @@ serve(async (req) => {
       systemPrompt += `Amenities: ${venueData.amenities?.join(', ') || 'None listed'}\n`;
       systemPrompt += `WiFi: ${venueData.wifi ? 'Available' : 'Not available'}\n`;
       systemPrompt += `Parking: ${venueData.parking ? 'Available' : 'Not available'}\n`;
+      
+      // Additional venue information
+      if (venueData.opening_hours) {
+        systemPrompt += `Opening Hours: ${JSON.stringify(venueData.opening_hours)}\n`;
+      }
+      
+      if (venueData.additional_services && venueData.additional_services.length > 0) {
+        systemPrompt += `Additional Services: ${venueData.additional_services.join(', ')}\n`;
+      }
+      
+      if (venueData.accepted_payment_methods && venueData.accepted_payment_methods.length > 0) {
+        systemPrompt += `Payment Methods: ${venueData.accepted_payment_methods.join(', ')}\n`;
+      }
+      
+      // Instructions for the AI
+      systemPrompt += "\nPlease answer any questions about this venue specifically. Be friendly and informative. If asked about something not in the data, just say you don't have that information yet but can help with booking or other inquiries.";
     } else if (allVenueData) {
       // For general venue queries
       systemPrompt += "You have information about multiple venues. Please provide concise answers based on the venue database. ";
+      
+      // Include general venue categories and cities
+      const categories = [...new Set(allVenueData.map(v => v.category_name).filter(Boolean))];
+      const cities = [...new Set(allVenueData.map(v => v.city_name).filter(Boolean))];
+      
+      systemPrompt += `Available venue categories include: ${categories.join(', ')}. `;
+      systemPrompt += `Venues are available in these cities: ${cities.join(', ')}. `;
+      
+      // Add specific instructions
+      systemPrompt += "If asked about venues in a specific city or category, provide information about available options. ";
       systemPrompt += "If asked about specific details of a venue that isn't explicitly mentioned in your data, suggest that the user view that specific venue page for more information.";
+      
+      // Add example venues
+      const featuredVenues = allVenueData.filter(v => v.featured).slice(0, 5);
+      if (featuredVenues.length > 0) {
+        systemPrompt += "\n\nFeatured venues include: \n";
+        featuredVenues.forEach(venue => {
+          systemPrompt += `- ${venue.name} (${venue.category_name || 'Various events'}) in ${venue.city_name || 'Unknown location'}, capacity up to ${venue.max_capacity || 'unknown'} guests\n`;
+        });
+      }
     }
     
     // Call OpenAI API
