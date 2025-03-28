@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin } from 'lucide-react';
+import VenueLocationMap from '@/components/map/VenueLocationMap';
 
 const EditVenue = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,7 +31,9 @@ const EditVenue = () => {
     image_url: '',
     gallery_images: [],
     wifi: false,
-    parking: false
+    parking: false,
+    latitude: null,
+    longitude: null
   });
   
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +52,7 @@ const EditVenue = () => {
     if (!id) return;
     
     try {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from('venues')
         .select('*')
@@ -58,7 +62,10 @@ const EditVenue = () => {
       if (error) throw error;
       
       // Check if the venue belongs to this owner
-      const ownerInfo = data.owner_info as any;
+      const ownerInfo = typeof data.owner_info === 'string' 
+        ? JSON.parse(data.owner_info) 
+        : data.owner_info;
+        
       if (ownerInfo && ownerInfo.user_id !== user?.id) {
         toast({
           title: 'Access Denied',
@@ -69,6 +76,7 @@ const EditVenue = () => {
         return;
       }
       
+      console.log("Venue data:", data);
       setVenue(data);
     } catch (error: any) {
       console.error('Error fetching venue details:', error);
@@ -101,6 +109,14 @@ const EditVenue = () => {
     setVenue(prev => ({ ...prev, [name]: checked }));
   };
   
+  const handleLocationChange = (lat: number, lng: number) => {
+    setVenue(prev => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng
+    }));
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -116,6 +132,14 @@ const EditVenue = () => {
     setIsSaving(true);
     
     try {
+      // Convert gallery_images to array if it's a string or not present
+      let galleryImages = venue.gallery_images;
+      if (!Array.isArray(galleryImages)) {
+        galleryImages = typeof galleryImages === 'string' 
+          ? galleryImages.split('\n').filter(url => url.trim())
+          : [];
+      }
+      
       const { error } = await supabase
         .from('venues')
         .update({
@@ -128,10 +152,12 @@ const EditVenue = () => {
           max_capacity: venue.max_capacity,
           starting_price: venue.starting_price,
           image_url: venue.image_url,
-          gallery_images: venue.gallery_images,
+          gallery_images: galleryImages,
           wifi: venue.wifi,
           parking: venue.parking,
           updated_at: new Date().toISOString(),
+          latitude: venue.latitude,
+          longitude: venue.longitude
         })
         .eq('id', id);
         
@@ -233,6 +259,22 @@ const EditVenue = () => {
                       required
                     />
                   </div>
+                  
+                  {/* Location Map */}
+                  <div className="space-y-2 mt-4">
+                    <Label>Venue Location on Map</Label>
+                    <VenueLocationMap
+                      name={venue.name}
+                      address={venue.address || ""}
+                      latitude={venue.latitude}
+                      longitude={venue.longitude}
+                      editable={true}
+                      onLocationChange={handleLocationChange}
+                    />
+                    <p className="text-sm text-findvenue-text-muted">
+                      Set the exact location of your venue by clicking on the map or dragging the marker.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
               
@@ -268,7 +310,7 @@ const EditVenue = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="starting_price">Starting Price ($)</Label>
+                    <Label htmlFor="starting_price">Starting Price (SAR)</Label>
                     <Input
                       id="starting_price"
                       name="starting_price"

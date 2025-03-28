@@ -1,9 +1,10 @@
 
 import { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin } from 'lucide-react';
 import L from 'leaflet';
+import { Button } from '@/components/ui/button';
 
 // Fix for marker icons in React Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -18,9 +19,53 @@ export interface VenueLocationMapProps {
   address: string;
   latitude?: number;
   longitude?: number;
+  editable?: boolean;
+  onLocationChange?: (lat: number, lng: number) => void;
 }
 
-const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationMapProps) => {
+// Component to handle map clicks for editable maps
+const LocationMarker = ({ 
+  position, 
+  setPosition, 
+  editable 
+}: { 
+  position: [number, number], 
+  setPosition: (pos: [number, number]) => void,
+  editable: boolean
+}) => {
+  const map = useMapEvents({
+    click(e) {
+      if (editable) {
+        setPosition([e.latlng.lat, e.latlng.lng]);
+      }
+    },
+  });
+
+  useEffect(() => {
+    map.setView(position, map.getZoom());
+  }, [position, map]);
+
+  return (
+    <Marker position={position} draggable={editable} 
+      eventHandlers={{
+        dragend: (e) => {
+          const marker = e.target;
+          const position = marker.getLatLng();
+          setPosition([position.lat, position.lng]);
+        },
+      }}
+    />
+  );
+};
+
+const VenueLocationMap = ({ 
+  name, 
+  address, 
+  latitude, 
+  longitude, 
+  editable = false,
+  onLocationChange 
+}: VenueLocationMapProps) => {
   const [mapReady, setMapReady] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -28,10 +73,10 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
   const defaultLat = 24.774265;
   const defaultLng = 46.738586;
   
-  const position: [number, number] = [
+  const [position, setPosition] = useState<[number, number]>([
     latitude || defaultLat,
     longitude || defaultLng
-  ];
+  ]);
 
   useEffect(() => {
     // This ensures the map is properly sized after it's rendered
@@ -46,6 +91,20 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
     return () => clearTimeout(timeout);
   }, [position]);
 
+  // Update position when props change
+  useEffect(() => {
+    if (latitude && longitude) {
+      setPosition([latitude, longitude]);
+    }
+  }, [latitude, longitude]);
+
+  // When position changes in editable mode, notify parent
+  useEffect(() => {
+    if (editable && onLocationChange) {
+      onLocationChange(position[0], position[1]);
+    }
+  }, [position, editable, onLocationChange]);
+
   // Function to handle map ready event
   const handleMapReady = () => {
     // We'll use the ref to access the map instance later
@@ -54,6 +113,13 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
         mapRef.current.setView(position, 14);
       }
     }, 100);
+  };
+
+  const handleMarkerPositionChange = (newPosition: [number, number]) => {
+    setPosition(newPosition);
+    if (onLocationChange) {
+      onLocationChange(newPosition[0], newPosition[1]);
+    }
   };
 
   return (
@@ -65,7 +131,7 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
         </h3>
       </div>
       
-      {!latitude || !longitude ? (
+      {!latitude && !longitude && !editable ? (
         <div className="p-6 text-center text-findvenue-text-muted">
           <p>Exact location will be provided after booking.</p>
         </div>
@@ -84,19 +150,45 @@ const VenueLocationMap = ({ name, address, latitude, longitude }: VenueLocationM
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
-              <Marker position={position}>
-                <Popup>
-                  <div className="text-black">
-                    <strong>{name}</strong><br/>
-                    {address}
-                  </div>
-                </Popup>
-              </Marker>
+              
+              <LocationMarker 
+                position={position} 
+                setPosition={handleMarkerPositionChange}
+                editable={editable} 
+              />
+              
+              {!editable && (
+                <Marker position={position}>
+                  <Popup>
+                    <div className="text-black">
+                      <strong>{name}</strong><br/>
+                      {address}
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
             </MapContainer>
           )}
           
           <div className="p-3 bg-findvenue-card-bg/70 backdrop-blur-sm absolute bottom-0 left-0 right-0 text-sm z-[400]">
-            {address}
+            {editable ? (
+              <div className="flex justify-between items-center">
+                <span>Lat: {position[0].toFixed(6)}, Lng: {position[1].toFixed(6)}</span>
+                <span className="text-xs text-findvenue-text-muted">
+                  {editable ? 'Click on map or drag marker to set location' : address}
+                </span>
+              </div>
+            ) : (
+              address
+            )}
+          </div>
+        </div>
+      )}
+      
+      {editable && (
+        <div className="p-3 border-t border-white/10">
+          <div className="text-sm text-findvenue-text-muted mb-2">
+            Set the exact location of your venue by clicking on the map or dragging the marker.
           </div>
         </div>
       )}

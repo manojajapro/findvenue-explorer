@@ -2,16 +2,19 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import VenuesList from '@/components/venues/VenuesList';
+import MapView from '@/components/map/MapView';
 import { useSupabaseVenues } from '@/hooks/useSupabaseVenues';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
+import { Search, MapPin } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Venues = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { categories, cities } = useSupabaseVenues();
+  const { venues, categories, cities, isLoading, totalCount } = useSupabaseVenues();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   
   // Get filter parameters from URL
@@ -108,7 +111,34 @@ const Venues = () => {
           </form>
         </div>
         
-        <VenuesList />
+        {/* View toggle */}
+        <div className="mb-4">
+          <Tabs 
+            value={viewMode} 
+            onValueChange={(value) => setViewMode(value as 'list' | 'map')}
+            className="w-full"
+          >
+            <TabsList className="grid w-[200px] grid-cols-2 mb-4">
+              <TabsTrigger value="list">List View</TabsTrigger>
+              <TabsTrigger value="map">Map View</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="list" className="mt-0">
+              <VenuesList />
+            </TabsContent>
+            
+            <TabsContent value="map" className="mt-0">
+              <div className="flex flex-col lg:flex-row gap-6">
+                <div className="w-full lg:w-1/3">
+                  <VenuesList compact={true} />
+                </div>
+                <div className="w-full lg:w-2/3 h-[600px] rounded-lg overflow-hidden border border-white/10">
+                  <MapView venues={venues} isLoading={isLoading} />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );

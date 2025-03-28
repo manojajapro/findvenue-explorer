@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -9,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { saudiCities } from '@/data/cities';
 import { categories } from '@/data/categories';
-import { Check, Upload, AlertCircle, ImageIcon, X } from 'lucide-react';
+import { Check, Upload, AlertCircle, ImageIcon, X, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import VenueLocationMap from '@/components/map/VenueLocationMap';
 
 const ListVenue = () => {
   const { toast } = useToast();
@@ -61,6 +63,15 @@ const ListVenue = () => {
     setFormData(prev => ({
       ...prev,
       [field]: value
+    }));
+  };
+  
+  // Update map location
+  const handleLocationChange = (lat: number, lng: number) => {
+    setFormData(prev => ({
+      ...prev,
+      latitude: lat.toString(),
+      longitude: lng.toString()
     }));
   };
   
@@ -466,27 +477,20 @@ const ListVenue = () => {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="latitude">Latitude</Label>
-                      <Input
-                        id="latitude"
-                        type="text"
-                        value={formData.latitude}
-                        onChange={(e) => updateForm('latitude', e.target.value)}
-                        placeholder="e.g. 24.7136"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="longitude">Longitude</Label>
-                      <Input
-                        id="longitude"
-                        type="text"
-                        value={formData.longitude}
-                        onChange={(e) => updateForm('longitude', e.target.value)}
-                        placeholder="e.g. 46.6753"
-                      />
-                    </div>
+                  {/* Location Map */}
+                  <div className="space-y-2 mt-4">
+                    <Label>Venue Location on Map</Label>
+                    <VenueLocationMap
+                      name={formData.name || "Your Venue"}
+                      address={formData.address || "Address will appear here"}
+                      latitude={formData.latitude ? parseFloat(formData.latitude) : undefined}
+                      longitude={formData.longitude ? parseFloat(formData.longitude) : undefined}
+                      editable={true}
+                      onLocationChange={handleLocationChange}
+                    />
+                    <p className="text-sm text-findvenue-text-muted">
+                      Set the exact location of your venue by clicking on the map or dragging the marker.
+                    </p>
                   </div>
                   
                   <div className="space-y-4">
