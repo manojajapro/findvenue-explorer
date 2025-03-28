@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,69 +24,52 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingConversation, setIsCheckingConversation] = useState(true);
-  const [existingConversation, setExistingConversation] = useState<any>(null);
+  const [existingMessages, setExistingMessages] = useState<any[]>([]);
   
   useEffect(() => {
     if (user && ownerId) {
-      checkExistingConversation();
+      checkExistingMessages();
     } else {
       setIsCheckingConversation(false);
     }
   }, [user, ownerId]);
 
-  const checkExistingConversation = async () => {
+  const checkExistingMessages = async () => {
     try {
       setIsCheckingConversation(true);
-      console.log("Checking for existing conversation between", user?.id, "and", ownerId);
+      console.log("Checking for existing messages between", user?.id, "and", ownerId);
       
-      // First check if the conversations table exists
-      try {
-        const { error: tableCheckError } = await supabase
-          .from('conversations')
-          .select('count')
-          .limit(1)
-          .maybeSingle();
-        
-        if (tableCheckError) {
-          if (tableCheckError.code === '42P01') {
-            console.error("Conversations table does not exist:", tableCheckError);
-            setError("The messaging system is currently unavailable. Please try again later.");
-            setIsCheckingConversation(false);
-            return;
-          }
-        }
-      } catch (err) {
-        console.error("Error checking if conversations table exists:", err);
-        setError("The messaging system is currently unavailable. Please try again later.");
-        setIsCheckingConversation(false);
-        return;
-      }
-
-      // If we reach here, the table exists, so we can safely query it
       if (!user?.id || !ownerId) {
-        setError("Missing user or owner information. Cannot check conversation.");
+        setError("Missing user or owner information. Cannot check messages.");
         setIsCheckingConversation(false);
         return;
       }
       
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .contains('participants', [user.id, ownerId])
-        .maybeSingle();
+      // Check if messages table exists by trying to fetch one message
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .or(`sender_id.eq.${ownerId},receiver_id.eq.${ownerId}`)
+          .limit(5);
 
-      if (error && error.code !== 'PGRST116') {
-        console.error("Error checking conversation:", error);
-        throw new Error("Failed to check existing conversations");
-      }
+        if (error) {
+          console.error("Error checking messages:", error);
+          throw new Error("Failed to check existing messages");
+        }
 
-      if (data) {
-        console.log("Existing conversation found:", data);
-        setExistingConversation(data);
+        if (data && data.length > 0) {
+          console.log("Existing messages found:", data.length);
+          setExistingMessages(data);
+        }
+      } catch (err: any) {
+        console.error("Error checking messages:", err);
+        setError("Failed to check message status. Please try again later.");
       }
     } catch (error: any) {
-      console.error("Error checking conversation:", error);
-      setError("Failed to check conversation status. Please try again later.");
+      console.error("Error checking messages:", error);
+      setError("Failed to check message status. Please try again later.");
     } finally {
       setIsCheckingConversation(false);
     }
@@ -142,51 +124,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactPr
     try {
       console.log("Starting message send process to owner:", ownerId);
       
-      let conversationId = existingConversation?.id;
-      
-      if (!conversationId) {
-        console.log("Creating new conversation between", user.id, "and", ownerId);
-        try {
-          const { data: newConversation, error: createError } = await supabase
-            .from('conversations')
-            .insert({
-              participants: [user.id, ownerId],
-              venue_id: venueId,
-              venue_name: venueName,
-              last_message: message,
-              updated_at: new Date().toISOString()
-            })
-            .select('id')
-            .single();
-            
-          if (createError) {
-            console.error("Error creating conversation:", createError);
-            throw createError;
-          }
-          
-          console.log("New conversation created:", newConversation);
-          conversationId = newConversation.id;
-        } catch (err: any) {
-          console.error("Failed to create conversation:", err);
-          if (err.code === '42P01') {
-            setError("The messaging system is currently unavailable. Please try again later.");
-            throw new Error("Conversations table does not exist");
-          }
-          throw err;
-        }
-      } else {
-        // Update the existing conversation with the new message
-        await supabase
-          .from('conversations')
-          .update({
-            last_message: message,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', conversationId);
-      }
-      
-      console.log("Sending message in conversation:", conversationId);
-      
+      // Send message directly to the messages table
       const { error: messageError, data: messageData } = await supabase
         .from('messages')
         .insert({

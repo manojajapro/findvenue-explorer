@@ -19,7 +19,6 @@ type Contact = {
   lastMessage?: string;
   lastMessageTime?: string;
   unreadCount: number;
-  conversationId?: string;
 };
 
 const Messages = () => {
@@ -30,7 +29,7 @@ const Messages = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [tableError, setTableError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     if (user) {
@@ -59,61 +58,37 @@ const Messages = () => {
     
     try {
       setIsLoading(true);
-      console.log("Fetching conversations for user:", user.id);
+      console.log("Fetching message contacts for user:", user.id);
       
-      const { error: tableCheckError } = await supabase
-        .from('conversations')
-        .select('count')
-        .limit(1)
-        .maybeSingle();
-      
-      if (tableCheckError) {
-        if (tableCheckError.code === '42P01') {
-          console.error("Conversations table does not exist:", tableCheckError);
-          setTableError("The messaging system is currently unavailable. Please try again later.");
-          setIsLoading(false);
-          return;
-        }
-      }
-      
-      const { data: conversations, error: convError } = await supabase
-        .from('conversations')
+      const { data: messages, error: messagesError } = await supabase
+        .from('messages')
         .select('*')
-        .contains('participants', [user.id])
-        .order('updated_at', { ascending: false });
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
       
-      if (convError) {
-        if (convError.code === '42P01') {
-          console.error("Conversations table does not exist:", convError);
-          setTableError("The messaging system is currently unavailable. Please try again later.");
-          setIsLoading(false);
-          return;
-        } else {
-          console.error("Error fetching conversations:", convError);
-          toast({
-            title: 'Error',
-            description: 'Failed to load conversations',
-            variant: 'destructive'
-          });
-          return;
-        }
+      if (messagesError) {
+        console.error("Error fetching messages:", messagesError);
+        setError("Failed to load message history. Please try again later.");
+        setIsLoading(false);
+        return;
       }
       
-      console.log("Fetched conversations:", conversations);
-      
-      if (!conversations || conversations.length === 0) {
+      if (!messages || messages.length === 0) {
+        console.log("No messages found");
         setContacts([]);
         setIsLoading(false);
         return;
       }
       
+      console.log("Fetched messages:", messages.length);
+      
       const contactIds = new Set<string>();
-      conversations.forEach(conv => {
-        conv.participants.forEach(participantId => {
-          if (participantId !== user.id) {
-            contactIds.add(participantId);
-          }
-        });
+      messages.forEach(msg => {
+        if (msg.sender_id === user.id) {
+          contactIds.add(msg.receiver_id);
+        } else if (msg.receiver_id === user.id) {
+          contactIds.add(msg.sender_id);
+        }
       });
       
       console.log("Extracted contact IDs:", [...contactIds]);
@@ -129,59 +104,54 @@ const Messages = () => {
           throw profilesError;
         }
         
-        console.log("Fetched profiles:", profiles);
+        console.log("Fetched profiles:", profiles?.length);
         
-        const contactsWithUnread = await Promise.all(
-          Array.from(contactIds).map(async (contactId) => {
-            const conversation = conversations.find(conv => 
-              conv.participants.includes(contactId) && conv.participants.includes(user.id)
+        const contactsData: Contact[] = [];
+        
+        for (const contactId of contactIds) {
+          const contactMessages = messages.filter(msg => 
+            (msg.sender_id === user.id && msg.receiver_id === contactId) || 
+            (msg.sender_id === contactId && msg.receiver_id === user.id)
+          );
+          
+          if (contactMessages.length > 0) {
+            contactMessages.sort((a, b) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             );
             
-            let unreadCount = 0;
+            const lastMessage = contactMessages[0];
             
-            if (conversation) {
-              const { count, error: countError } = await supabase
-                .from('messages')
-                .select('*', { count: 'exact', head: true })
-                .eq('sender_id', contactId)
-                .eq('receiver_id', user.id)
-                .eq('read', false);
-              
-              if (!countError && count !== null) {
-                unreadCount = count;
-              }
-            }
+            const unreadCount = contactMessages.filter(msg => 
+              msg.sender_id === contactId && 
+              msg.receiver_id === user.id && 
+              !msg.read
+            ).length;
             
             const profile = profiles?.find(p => p.id === contactId);
             
-            return {
+            contactsData.push({
               id: contactId,
               name: profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown User',
               avatar: profile?.profile_image,
-              lastMessage: conversation?.last_message || '',
-              lastMessageTime: conversation?.updated_at,
-              unreadCount,
-              conversationId: conversation?.id
-            };
-          })
-        );
+              lastMessage: lastMessage.content,
+              lastMessageTime: lastMessage.created_at,
+              unreadCount
+            });
+          }
+        }
         
-        const sortedContacts = contactsWithUnread.sort((a, b) => {
+        contactsData.sort((a, b) => {
           if (!a.lastMessageTime) return 1;
           if (!b.lastMessageTime) return -1;
           return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
         });
         
-        console.log("Processed contacts:", sortedContacts);
-        setContacts(sortedContacts);
+        console.log("Processed contacts:", contactsData);
+        setContacts(contactsData);
       }
     } catch (error) {
       console.error('Error fetching contacts:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load contacts',
-        variant: 'destructive'
-      });
+      setError('Failed to load contacts. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -289,22 +259,25 @@ const Messages = () => {
           <h1 className="text-3xl font-bold mt-2">Messages</h1>
         </div>
         
-        {tableError ? (
+        {error ? (
           <Card className="glass-card border-white/10 overflow-hidden">
             <CardContent className="p-6">
               <Alert variant="destructive" className="mb-4">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>System Error</AlertTitle>
+                <AlertTitle>Error</AlertTitle>
                 <AlertDescription>
-                  {tableError}
+                  {error}
                 </AlertDescription>
               </Alert>
               <div className="text-center mt-4">
                 <Button 
-                  onClick={() => navigate('/')} 
+                  onClick={() => {
+                    setError(null);
+                    fetchContacts();
+                  }} 
                   className="bg-findvenue hover:bg-findvenue-dark"
                 >
-                  Return to Home
+                  Try Again
                 </Button>
               </div>
             </CardContent>

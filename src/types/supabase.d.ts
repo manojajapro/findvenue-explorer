@@ -1,3 +1,4 @@
+
 interface Message {
   id: string;
   sender_id: string;
@@ -57,7 +58,6 @@ declare module '@supabase/supabase-js' {
             guests: number
             id: string
             special_requests: string | null
-            start_time: string
             status: string
             total_price: number
             user_id: string
