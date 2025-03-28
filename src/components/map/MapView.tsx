@@ -5,7 +5,7 @@ import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X } from 'lucide-react';
+import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X, Filter } from 'lucide-react';
 import L from 'leaflet';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -100,9 +100,11 @@ const MapUpdater = ({
 };
 
 const MapSearch = ({ 
-  onSearch 
+  onSearch,
+  venueCount
 }: { 
-  onSearch: (term: string) => void 
+  onSearch: (term: string) => void;
+  venueCount: number;
 }) => {
   const [searchText, setSearchText] = useState('');
   const [searchParams] = useSearchParams();
@@ -126,28 +128,49 @@ const MapSearch = ({
   };
   
   return (
-    <form onSubmit={handleSubmit} className="relative mb-4">
-      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
-      <Input
-        type="text"
-        placeholder="Search venues on map..."
-        className="pl-10 bg-white/5 backdrop-blur-md w-full py-2"
-        value={searchText}
-        onChange={(e) => setSearchText(e.target.value)}
-      />
-      {searchText && (
-        <button
-          type="button"
-          className="absolute right-3 top-1/2 transform -translate-y-1/2"
-          onClick={() => {
-            setSearchText('');
-            onSearch('');
-          }}
-        >
-          <X className="h-4 w-4 text-findvenue-text-muted hover:text-white" />
-        </button>
-      )}
-    </form>
+    <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+        <span className="text-sm font-medium flex items-center">
+          <MapPin className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
+          {venueCount > 0 ? `${venueCount} venues on map` : 'No venues found'}
+        </span>
+        {searchText && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => {
+              setSearchText('');
+              onSearch('');
+            }}
+          >
+            Clear <X className="h-3 w-3 ml-1" />
+          </Button>
+        )}
+      </div>
+      <form onSubmit={(e) => { e.preventDefault(); onSearch(searchText); }} className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
+        <Input
+          type="text"
+          placeholder="Search venues on map..."
+          className="pl-10 pr-8 py-2 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+        />
+        {searchText && (
+          <button
+            type="button"
+            className="absolute right-3 top-1/2 transform -translate-y-1/2"
+            onClick={() => {
+              setSearchText('');
+              onSearch('');
+            }}
+          >
+            <X className="h-4 w-4 text-findvenue-text-muted hover:text-white" />
+          </button>
+        )}
+      </form>
+    </div>
   );
 };
 
@@ -156,6 +179,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const [activeVenue, setActiveVenue] = useState<string | null>(null);
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const [mapSearchTerm, setMapSearchTerm] = useState('');
+  const [isCompactControls, setIsCompactControls] = useState(false);
   
   // Filter venues with valid coordinates
   const venuesWithCoordinates = filteredVenues.filter(
@@ -192,6 +216,17 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setFilteredVenues(results);
   }, [venues]);
   
+  // Compact view toggle based on map size
+  useEffect(() => {
+    const handleResize = () => {
+      setIsCompactControls(window.innerWidth < 768);
+    };
+    
+    handleResize(); // Set initial state
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   // Update filtered venues when main venues list changes
   useEffect(() => {
     if (!mapSearchTerm) {
@@ -211,8 +246,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   
   return (
     <div className="h-full flex flex-col relative">
-      <div className="absolute top-4 left-4 right-4 z-[1000] rounded-md overflow-hidden shadow-lg">
-        <MapSearch onSearch={handleSearch} />
+      <div className="absolute top-4 left-4 right-4 z-[1000]">
+        <MapSearch onSearch={handleSearch} venueCount={venuesWithCoordinates.length} />
       </div>
       
       {venuesWithCoordinates.length === 0 ? (
@@ -260,25 +295,27 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                 click: () => setActiveVenue(venue.id),
               }}
             >
-              <Popup minWidth={240} maxWidth={320} className="custom-popup">
+              <Popup minWidth={240} maxWidth={300} className="custom-popup">
                 <div className="text-black">
-                  <div className="mb-2 relative">
+                  <div className="relative">
                     <img 
                       src={venue.imageUrl} 
                       alt={venue.name}
-                      className="w-full h-32 object-cover rounded-md mb-2"
+                      className="w-full h-28 object-cover rounded-md"
                     />
                     {venue.featured && (
                       <Badge className="absolute top-2 right-2 bg-findvenue-gold text-black">
                         Featured
                       </Badge>
                     )}
-                    <h3 className="font-bold text-base">{venue.name}</h3>
-                    <div className="flex items-center text-sm text-gray-600 mb-1">
-                      <MapPin className="h-3 w-3 mr-1" />
+                  </div>
+                  <div className="py-2">
+                    <h3 className="font-bold text-base truncate">{venue.name}</h3>
+                    <div className="flex items-center text-xs text-gray-600 mb-1">
+                      <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
                       <p className="truncate">{venue.address}, {venue.city}</p>
                     </div>
-                    <div className="flex gap-1 mb-2">
+                    <div className="flex gap-1 mb-2 flex-wrap">
                       {venue.category && (
                         <Badge variant="outline" className="text-xs py-0">
                           {venue.category}
@@ -291,17 +328,17 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                       )}
                     </div>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-xs border-t border-gray-100 pt-2">
                     <div>
                       <span className="font-semibold">{venue.pricing.startingPrice} {venue.pricing.currency}</span>
                       {venue.pricing.pricePerPerson && <span> / person</span>}
                     </div>
                     <Button 
                       size="sm" 
-                      className="bg-findvenue hover:bg-findvenue-dark text-xs px-3 py-1.5 h-auto flex items-center"
+                      className="bg-findvenue hover:bg-findvenue-dark text-xs px-3 py-1 h-auto flex items-center"
                       onClick={() => handleVenueClick(venue.id)}
                     >
-                      View Details
+                      View
                       <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>
                   </div>
@@ -312,28 +349,30 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         </MapContainer>
       )}
       
-      {mapSearchTerm && venuesWithCoordinates.length > 0 && (
-        <div className="absolute bottom-4 left-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md shadow-lg">
-          <p className="text-sm text-findvenue-text">
-            Showing {venuesWithCoordinates.length} {venuesWithCoordinates.length === 1 ? 'result' : 'results'} for "{mapSearchTerm}"
-          </p>
+      {mapSearchTerm && (
+        <div className="absolute bottom-4 left-4 z-[1000] bg-findvenue-surface/80 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-lg text-xs flex items-center">
+          <Filter className="h-3 w-3 mr-1.5 text-findvenue" />
+          <span>Filtered: "{mapSearchTerm}"</span>
+          <button onClick={() => handleSearch('')} className="ml-2 text-findvenue hover:text-findvenue-light">
+            <X className="h-3 w-3" />
+          </button>
         </div>
       )}
       
       <TooltipProvider>
-        <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
+        <div className={`absolute ${isCompactControls ? 'bottom-4 right-4' : 'top-20 right-4'} z-[1000] flex ${isCompactControls ? 'flex-row' : 'flex-col'} gap-2`}>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue-surface"
+                className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
                 onClick={() => handleSearch('')}
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="left">
+            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
               <p>Clear search</p>
             </TooltipContent>
           </Tooltip>
@@ -343,16 +382,15 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue-surface"
+                className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
                 onClick={() => {
-                  // TODO: Implement zoom in functionality
-                  // This would need to use the map reference
+                  // This functionality would need a ref to the map
                 }}
               >
-                <ZoomIn className="h-4 w-4" />
+                <ZoomIn className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="left">
+            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
               <p>Zoom to all venues</p>
             </TooltipContent>
           </Tooltip>

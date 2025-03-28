@@ -223,15 +223,15 @@ const Venues = () => {
             />
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="w-full lg:w-1/3">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="w-full lg:w-1/3 h-auto lg:max-h-[650px] lg:overflow-y-auto">
               <VenuesList 
                 compact={true} 
                 onVenueMouseEnter={handleVenueMouseEnter}
                 onVenueMouseLeave={handleVenueMouseLeave}
               />
             </div>
-            <div className="w-full lg:w-2/3 h-[650px] rounded-lg overflow-hidden border border-white/10 shadow-lg">
+            <div className="w-full lg:w-2/3 h-[550px] md:h-[600px] lg:h-[650px] rounded-lg overflow-hidden border border-white/10 shadow-lg">
               <MapView 
                 venues={venues} 
                 isLoading={isLoading} 
