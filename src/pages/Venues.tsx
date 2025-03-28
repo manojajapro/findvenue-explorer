@@ -229,14 +229,15 @@ const Venues = () => {
           </Tabs>
         </div>
         
-        <TabsContent value="list" className="mt-0">
-          <VenuesList 
-            onVenueMouseEnter={handleVenueMouseEnter}
-            onVenueMouseLeave={handleVenueMouseLeave}
-          />
-        </TabsContent>
-        
-        <TabsContent value="map" className="mt-0">
+        {/* Use a conditional to render either the list or map view based on viewMode */}
+        {viewMode === "list" ? (
+          <div>
+            <VenuesList 
+              onVenueMouseEnter={handleVenueMouseEnter}
+              onVenueMouseLeave={handleVenueMouseLeave}
+            />
+          </div>
+        ) : (
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="w-full lg:w-1/3">
               <VenuesList 
@@ -253,7 +254,7 @@ const Venues = () => {
               />
             </div>
           </div>
-        </TabsContent>
+        )}
       </div>
     </div>
   );
