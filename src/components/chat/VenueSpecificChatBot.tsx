@@ -3,11 +3,12 @@ import { useState, useRef, useEffect } from 'react';
 import { Loader2, Send, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { useChatWithVenue } from '@/hooks/useChatWithVenue';
 import MessageList from '@/components/chat/MessageList';
 import ChatHeader from '@/components/chat/ChatHeader';
 import ErrorDisplay from '@/components/chat/ErrorDisplay';
+import { type Message as ChatMessage } from '@/components/chat/types';
 
 const VenueSpecificChatBot = () => {
   const { messages, isLoading, submitMessage, clearMessages, venue } = useChatWithVenue();
@@ -29,9 +30,9 @@ const VenueSpecificChatBot = () => {
 
   return (
     <Card className="glass-card border-white/10 w-full max-w-md mx-auto">
-      <ChatHeader
-        title={venue ? `About ${venue.name}` : 'Venue Assistant'}
-        description="Ask questions about this venue"
+      <ChatHeader 
+        title={venue ? `About ${venue.name}` : 'Venue Assistant'} 
+        description="Ask questions about this venue" 
       />
       
       <CardContent className="p-4 max-h-[50vh] overflow-y-auto">
@@ -51,7 +52,7 @@ const VenueSpecificChatBot = () => {
             )}
           </div>
         ) : (
-          <MessageList messages={messages} />
+          <MessageList messages={messages as unknown as ChatMessage[]} />
         )}
         <div ref={messagesEndRef} />
       </CardContent>
