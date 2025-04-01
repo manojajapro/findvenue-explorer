@@ -85,7 +85,7 @@ const EnhancedMapSearch = ({
           <Slider
             value={[radiusInKm]}
             min={0.1}
-            max={5}
+            max={10}
             step={0.1}
             onValueChange={(values) => onRadiusChange(values[0])}
             className="py-1"

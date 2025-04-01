@@ -1,5 +1,5 @@
 
-import { Locate, MapIcon, Navigation, ZoomIn, X } from 'lucide-react';
+import { Locate, MapIcon, Navigation, ZoomIn, X, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
