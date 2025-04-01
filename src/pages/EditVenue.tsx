@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -90,12 +89,8 @@ const EditVenue = () => {
           ownerInfoObj = {};
         }
         
-        // Check if owner_info exists, has a user_id property, and if that property has a value
-        // that doesn't match the current user's ID
-        if (ownerInfoObj && 
-            'user_id' in ownerInfoObj && 
-            ownerInfoObj.user_id && 
-            ownerInfoObj.user_id !== user?.id) {
+        const ownerUserId = ownerInfoObj && typeof ownerInfoObj === 'object' ? ownerInfoObj.user_id : null;
+        if (ownerUserId && user && ownerUserId !== user.id) {
           toast({
             title: 'Access Denied',
             description: 'You do not have permission to edit this venue.',
