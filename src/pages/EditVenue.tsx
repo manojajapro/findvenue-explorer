@@ -1,7 +1,5 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSessionContext } from '@supabase/auth-helpers-react';
 import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -110,17 +108,27 @@ type VenueValues = z.infer<typeof venueSchema>
 const EditVenue = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { supabaseClient } = useSessionContext();
   const { toast } = useToast();
 
   const [venue, setVenue] = useState<Database['public']['Tables']['venues']['Row'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-	const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [user, setUser] = useState<{ id: string } | null>(null);
 
-  const form = useForm<VenueValues>({
+  // Get the current user on mount
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    };
+    
+    getUser();
+  }, []);
+
+  const form = useForm<z.infer<typeof venueSchema>>({
     resolver: zodResolver(venueSchema),
     defaultValues: {
       name: "",
@@ -136,7 +144,7 @@ const EditVenue = () => {
       parking: false,
     },
     mode: "onChange",
-  })
+  });
 
   const fetchVenue = useCallback(async () => {
     if (!id) {
@@ -149,7 +157,7 @@ const EditVenue = () => {
     setError(null);
 
     try {
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from('venues')
         .select('*')
         .eq('id', id)
@@ -185,16 +193,12 @@ const EditVenue = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, supabaseClient, form]);
-
-  useEffect(() => {
-    fetchVenue();
-  }, [fetchVenue]);
+  }, [id, form]);
 
   useEffect(() => {
 		const fetchCategories = async () => {
 			try {
-				const { data, error } = await supabaseClient
+				const { data, error } = await supabase
 					.from('category_groups')
 					.select('category_id, category_name')
 					.order('category_name');
@@ -217,12 +221,12 @@ const EditVenue = () => {
 		};
 
 		fetchCategories();
-	}, [supabaseClient]);
+	}, [supabase]);
 
 	useEffect(() => {
 		const fetchCities = async () => {
 			try {
-				const { data, error } = await supabaseClient
+				const { data, error } = await supabase
 					.from('city_groups')
 					.select('city_id, city_name')
 					.order('city_name');
@@ -245,14 +249,14 @@ const EditVenue = () => {
 		};
 
 		fetchCities();
-	}, [supabaseClient]);
+	}, [supabase]);
 
-  const onSubmit = async (values: VenueValues) => {
+  const onSubmit = async (values: z.infer<typeof venueSchema>) => {
     setLoading(true);
     setError(null);
 
     try {
-      const { error } = await supabaseClient
+      const { error } = await supabase
         .from('venues')
         .update(values)
         .eq('id', id);
@@ -284,7 +288,7 @@ const EditVenue = () => {
     setError(null);
 
     try {
-      const { error } = await supabaseClient
+      const { error } = await supabase
         .from('venues')
         .delete()
         .eq('id', id);
@@ -311,9 +315,6 @@ const EditVenue = () => {
       setIsDeleteAlertOpen(false);
     }
   };
-
-  const { session } = useSessionContext();
-  const user = session?.user;
 
   // New code to safely check the user ID:
   const ownerInfoObj = typeof venue?.owner_info === 'object'
