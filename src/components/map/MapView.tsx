@@ -1,16 +1,15 @@
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X, Filter, Locate, Ruler, Navigation, MapIcon } from 'lucide-react';
+import { MapPin, ArrowRight, Star, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Input } from '@/components/ui/input';
-import { useDebounce } from '@/hooks/useDebounce';
-import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
+import EnhancedMapSearch from './EnhancedMapSearch';
+import MapControls from './MapControls';
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Radius of the earth in km
@@ -30,116 +29,6 @@ interface MapViewProps {
   highlightedVenueId?: string;
 }
 
-const MapSearch = ({ 
-  onSearch,
-  venueCount,
-  onRadiusChange,
-  radiusInKm,
-  isRadiusActive,
-  onManualLocation
-}: { 
-  onSearch: (term: string) => void;
-  venueCount: number;
-  onRadiusChange: (value: number) => void;
-  radiusInKm: number;
-  isRadiusActive: boolean;
-  onManualLocation: () => void;
-}) => {
-  const [searchText, setSearchText] = useState('');
-  const [searchParams] = useSearchParams();
-  const debouncedSearchTerm = useDebounce(searchText, 500);
-  
-  useEffect(() => {
-    const searchFromUrl = searchParams.get('search');
-    if (searchFromUrl) {
-      setSearchText(searchFromUrl);
-    }
-  }, [searchParams]);
-  
-  useEffect(() => {
-    onSearch(debouncedSearchTerm);
-  }, [debouncedSearchTerm, onSearch]);
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSearch(searchText);
-  };
-  
-  return (
-    <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
-        <span className="text-sm font-medium flex items-center">
-          <MapPin className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
-          {venueCount > 0 ? `${venueCount} venues on map` : 'No venues found'}
-        </span>
-        {searchText && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={() => {
-              setSearchText('');
-              onSearch('');
-            }}
-          >
-            Clear <X className="h-3 w-3 ml-1" />
-          </Button>
-        )}
-      </div>
-      <form onSubmit={handleSubmit} className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
-        <Input
-          type="text"
-          placeholder="Search venues on map..."
-          className="pl-10 pr-8 py-2 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-        />
-        {searchText && (
-          <button
-            type="button"
-            className="absolute right-3 top-1/2 transform -translate-y-1/2"
-            onClick={() => {
-              setSearchText('');
-              onSearch('');
-            }}
-          >
-            <X className="h-4 w-4 text-findvenue-text-muted hover:text-white" />
-          </button>
-        )}
-      </form>
-      
-      {isRadiusActive && (
-        <div className="px-3 py-2 border-t border-white/10">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center">
-              <Ruler className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
-              <span className="text-xs font-medium">Radius search: {radiusInKm.toFixed(1)} km</span>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-6 px-2 text-xs"
-              onClick={onManualLocation}
-            >
-              <MapIcon className="h-3 w-3 mr-1" />
-              Set Location
-            </Button>
-          </div>
-          <Slider
-            value={[radiusInKm]}
-            min={0.1}
-            max={5}
-            step={0.1}
-            onValueChange={(values) => onRadiusChange(values[0])}
-            className="py-1"
-          />
-        </div>
-      )}
-    </div>
-  );
-};
-
 const containerStyle = {
   width: '100%',
   height: '100%'
@@ -157,13 +46,14 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const [mapSearchTerm, setMapSearchTerm] = useState('');
   const [isCompactControls, setIsCompactControls] = useState(false);
-  const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | undefined>(DEFAULT_LOCATION);
+  const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [isRadiusActive, setIsRadiusActive] = useState(false);
   const [radiusInKm, setRadiusInKm] = useState(1.0);
   const [venuesInRadius, setVenuesInRadius] = useState<Venue[]>([]);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [isSettingManualLocation, setIsSettingManualLocation] = useState(false);
   const [searchParams] = useSearchParams();
+  const [locationAddress, setLocationAddress] = useState<string>("Custom Location");
   
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -178,7 +68,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     // Check for mapTools parameter
     if (searchParams.get('mapTools') === 'radius') {
       setIsRadiusActive(true);
-      // Always set to default location first
+      // Set default location
       setUserLocation(DEFAULT_LOCATION);
       
       // Show a toast with instructions
@@ -218,62 +108,28 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setFilteredVenues(results);
   }, [venues]);
   
-  const getUserLocation = useCallback(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation({
-            lat: latitude,
-            lng: longitude
-          });
-          setIsRadiusActive(true);
-          
-          // Center map on user location
-          if (mapRef.current) {
-            mapRef.current.panTo({ lat: latitude, lng: longitude });
-            mapRef.current.setZoom(14);
-          }
-          
-          toast.success("Location detected successfully");
-        },
-        (error) => {
-          console.error("Error getting user location:", error);
-          toast.error("Could not get your location. Using default location (11461).");
-          
-          // Use default location if geolocation fails
-          setUserLocation(DEFAULT_LOCATION);
-          setIsRadiusActive(true);
-          
-          // Center map on default location
-          if (mapRef.current) {
-            mapRef.current.panTo(DEFAULT_LOCATION);
-            mapRef.current.setZoom(14);
-          }
-        }
-      );
-    } else {
-      console.error("Geolocation is not supported by this browser.");
-      toast.error("Your browser doesn't support location services. Using default location (11461).");
-      
-      // Use default location if geolocation is not supported
-      setUserLocation(DEFAULT_LOCATION);
-      setIsRadiusActive(true);
-      
-      // Center map on default location
-      if (mapRef.current) {
-        mapRef.current.panTo(DEFAULT_LOCATION);
-        mapRef.current.setZoom(14);
-      }
+  const handleLocationSelect = useCallback((lat: number, lng: number, address: string) => {
+    const newLocation = { lat, lng };
+    setUserLocation(newLocation);
+    setLocationAddress(address);
+    setIsRadiusActive(true);
+    
+    // Center map on new location
+    if (mapRef.current) {
+      mapRef.current.panTo(newLocation);
+      mapRef.current.setZoom(14);
     }
+    
+    toast.success(`Location set to: ${address}`);
   }, []);
   
   const handleManualLocationSetting = useCallback(() => {
     setIsSettingManualLocation(true);
     
-    // Always ensure userLocation is set (to default if not already set)
+    // Ensure userLocation is set (to default if not already set)
     if (!userLocation) {
       setUserLocation(DEFAULT_LOCATION);
+      setLocationAddress("Default Location (Riyadh)");
     }
     
     toast.info("Click on the map to set your location", {
@@ -293,12 +149,26 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         lng: e.latLng.lng()
       };
       setUserLocation(newLocation);
+      setLocationAddress("Custom Location");
       setIsRadiusActive(true);
       setIsSettingManualLocation(false);
       
-      toast.success("Custom location set successfully");
+      // Try to reverse geocode the location for better display
+      if (window.google && window.google.maps) {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: newLocation }, (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            setLocationAddress(results[0].formatted_address);
+            toast.success(`Location set to: ${results[0].formatted_address}`);
+          } else {
+            toast.success("Custom location set successfully");
+          }
+        });
+      } else {
+        toast.success("Custom location set successfully");
+      }
       
-      // If map ref exists, center on the new location and zoom in
+      // Center on the new location and zoom in
       if (mapRef.current) {
         mapRef.current.panTo(newLocation);
         mapRef.current.setZoom(14);
@@ -306,24 +176,40 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     }
   }, [isSettingManualLocation]);
   
+  const resetToDefaultLocation = useCallback(() => {
+    // Use default location
+    setUserLocation(DEFAULT_LOCATION);
+    setLocationAddress("Default Location (Riyadh)");
+    setIsRadiusActive(true);
+    
+    // Center map on default location
+    if (mapRef.current) {
+      mapRef.current.panTo(DEFAULT_LOCATION);
+      mapRef.current.setZoom(14);
+    }
+    
+    toast.success("Reset to default location (Riyadh)");
+  }, []);
+  
   const toggleRadiusSearch = useCallback(() => {
     if (isRadiusActive) {
       setIsRadiusActive(false);
     } else {
-      // Always set default location first
-      setUserLocation(DEFAULT_LOCATION);
-      setIsRadiusActive(true);
-      
-      // Center map on default location
-      if (mapRef.current) {
-        mapRef.current.panTo(DEFAULT_LOCATION);
-        mapRef.current.setZoom(14);
+      // Set default location if no location is set
+      if (!userLocation) {
+        setUserLocation(DEFAULT_LOCATION);
+        setLocationAddress("Default Location (Riyadh)");
       }
       
-      // Show manual location setting toast
-      handleManualLocationSetting();
+      setIsRadiusActive(true);
+      
+      // Center map on current location
+      if (mapRef.current && userLocation) {
+        mapRef.current.panTo(userLocation);
+        mapRef.current.setZoom(14);
+      }
     }
-  }, [isRadiusActive, handleManualLocationSetting]);
+  }, [isRadiusActive, userLocation]);
   
   useEffect(() => {
     if (userLocation && isRadiusActive) {
@@ -387,6 +273,15 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     }
     
     mapRef.current.fitBounds(bounds, 50); // 50px padding
+    
+    // If there's only one marker, zoom out a bit
+    if (displayVenues.length === 1 || (displayVenues.length === 0 && userLocation)) {
+      setTimeout(() => {
+        if (mapRef.current && mapRef.current.getZoom() > 15) {
+          mapRef.current.setZoom(15);
+        }
+      }, 100);
+    }
   }, [venuesInRadius, venuesWithCoordinates, isRadiusActive, userLocation]);
 
   const handleMapLoad = useCallback((map: google.maps.Map) => {
@@ -398,6 +293,52 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setActiveVenue(venue.id);
     setSelectedVenue(venue);
   }, []);
+  
+  // Extract any applied filters from search params
+  const getAppliedFilters = useCallback(() => {
+    const filters: string[] = [];
+    
+    if (searchParams.has('search')) {
+      filters.push(`Search: ${searchParams.get('search')}`);
+    }
+    
+    if (searchParams.has('categoryId')) {
+      const categoryId = searchParams.get('categoryId');
+      // You might want to look up the category name here
+      filters.push(`Category: ${categoryId}`);
+    }
+    
+    if (searchParams.has('cityId')) {
+      const cityId = searchParams.get('cityId');
+      // You might want to look up the city name here
+      filters.push(`City: ${cityId}`);
+    }
+    
+    return filters;
+  }, [searchParams]);
+  
+  const appliedFilters = getAppliedFilters();
+  
+  const handleClearFilter = useCallback((filter: string) => {
+    const filterType = filter.split(':')[0].trim().toLowerCase();
+    const newParams = new URLSearchParams(searchParams);
+    
+    if (filterType === 'search') {
+      newParams.delete('search');
+      setMapSearchTerm('');
+    } else if (filterType === 'category') {
+      newParams.delete('categoryId');
+    } else if (filterType === 'city') {
+      newParams.delete('cityId');
+    }
+    
+    // Use history.replaceState to update URL without navigation
+    const newUrl = `${window.location.pathname}?${newParams.toString()}`;
+    window.history.replaceState(null, '', newUrl);
+    
+    // Refresh the map if needed
+    handleSearch('');
+  }, [searchParams, handleSearch]);
   
   if (isLoading) {
     return (
@@ -428,29 +369,35 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   return (
     <div className="h-full flex flex-col relative">
       <div className="absolute top-4 left-4 right-4 z-[1000]">
-        <MapSearch 
-          onSearch={handleSearch} 
-          venueCount={displayVenues.length}
+        <EnhancedMapSearch 
+          onSearch={handleSearch}
+          onLocationSelect={handleLocationSelect}
           onRadiusChange={handleRadiusChange}
+          onManualLocation={handleManualLocationSetting}
+          venueCount={displayVenues.length}
           radiusInKm={radiusInKm}
           isRadiusActive={isRadiusActive}
-          onManualLocation={handleManualLocationSetting}
+          searchText={mapSearchTerm}
+          setSearchText={setMapSearchTerm}
+          appliedFilters={appliedFilters}
+          onClearFilter={handleClearFilter}
         />
       </div>
       
       {isSettingManualLocation && (
         <div className="absolute top-20 left-4 right-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md text-center">
           <p className="text-sm font-medium">Click anywhere on the map to set your location</p>
-          <p className="text-xs text-findvenue-text-muted mb-2">Default location: Pin code 11461 (Riyadh)</p>
+          <p className="text-xs text-findvenue-text-muted mb-2">Default location: Riyadh, Saudi Arabia</p>
           <Button
             variant="outline"
             size="sm"
             className="mt-1 border-white/10"
             onClick={() => {
               setIsSettingManualLocation(false);
-              // Set to default location if user cancels
+              // Set to default location if user cancels and no location is set
               if (!userLocation) {
                 setUserLocation(DEFAULT_LOCATION);
+                setLocationAddress("Default Location (Riyadh)");
                 if (mapRef.current) {
                   mapRef.current.panTo(DEFAULT_LOCATION);
                   mapRef.current.setZoom(14);
@@ -479,7 +426,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                 className="mt-3"
                 onClick={() => setRadiusInKm(Math.min(radiusInKm + 1, 5))}
               >
-                <Ruler className="h-4 w-4 mr-2" />
                 Increase radius to {Math.min(radiusInKm + 1, 5).toFixed(1)} km
               </Button>
             )}
@@ -531,7 +477,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                     onCloseClick={() => setSelectedVenue(null)}
                   >
                     <div className="text-black text-sm p-1">
-                      <h3 className="font-bold text-base mb-1">Your Location</h3>
+                      <h3 className="font-bold text-base mb-1">{locationAddress}</h3>
                       <p className="text-xs text-gray-600">
                         Showing venues within {radiusInKm.toFixed(1)} km
                       </p>
@@ -574,7 +520,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                         className="w-full h-28 object-cover rounded-md"
                       />
                       {venue.featured && (
-                        <Badge className="absolute top-2 right-2 bg-findvenue-gold text-black">
+                        <Badge className="absolute top-2 right-2 bg-amber-400 text-black">
                           Featured
                         </Badge>
                       )}
@@ -633,124 +579,15 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         </GoogleMap>
       )}
       
-      {mapSearchTerm && (
-        <div className="absolute bottom-4 left-4 z-[1000] bg-findvenue-surface/80 backdrop-blur-sm px-3 py-1.5 rounded-md shadow-lg text-xs flex items-center">
-          <Filter className="h-3 w-3 mr-1.5 text-findvenue" />
-          <span>Filtered: "{mapSearchTerm}"</span>
-          <button onClick={() => handleSearch('')} className="ml-2 text-findvenue hover:text-findvenue-light">
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      )}
-      
-      {isSettingManualLocation && (
-        <div className="absolute bottom-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-auto z-[1000] bg-findvenue-surface/80 backdrop-blur-sm px-4 py-3 rounded-md shadow-lg flex items-center justify-between">
-          <span className="text-sm font-medium">Click on map to set location</span>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="ml-4 border-white/10"
-            onClick={() => setIsSettingManualLocation(false)}
-          >
-            Cancel
-          </Button>
-        </div>
-      )}
-      
-      <TooltipProvider>
-        <div className={`absolute ${isCompactControls ? 'bottom-4 right-4' : 'top-20 right-4'} z-[1000] flex ${isCompactControls ? 'flex-row' : 'flex-col'} gap-2`}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className={`h-8 w-8 ${isRadiusActive ? 'bg-findvenue text-white' : 'bg-findvenue-surface/80'} backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md`}
-                onClick={toggleRadiusSearch}
-              >
-                <Locate className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-              <p>{isRadiusActive ? 'Disable radius search' : 'Enable radius search'}</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          {isRadiusActive && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
-                  onClick={handleManualLocationSetting}
-                >
-                  <MapIcon className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-                <p>Set location manually</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
-                onClick={() => {
-                  // Reset to default location
-                  setUserLocation(DEFAULT_LOCATION);
-                  setIsRadiusActive(true);
-                  if (mapRef.current) {
-                    mapRef.current.panTo(DEFAULT_LOCATION);
-                    mapRef.current.setZoom(14);
-                  }
-                  toast.success("Reset to default location (11461)");
-                }}
-              >
-                <Navigation className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-              <p>Use default location (11461)</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
-                onClick={() => handleSearch('')}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-              <p>Clear filters</p>
-            </TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
-                onClick={fitBoundsToMarkers}
-              >
-                <ZoomIn className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-              <p>Zoom to fit</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </TooltipProvider>
+      <MapControls
+        isCompactControls={isCompactControls}
+        isRadiusActive={isRadiusActive}
+        toggleRadiusSearch={toggleRadiusSearch}
+        handleManualLocationSetting={handleManualLocationSetting}
+        handleClearSearch={() => handleSearch('')}
+        fitBoundsToMarkers={fitBoundsToMarkers}
+        resetToDefaultLocation={resetToDefaultLocation}
+      />
     </div>
   );
 };
