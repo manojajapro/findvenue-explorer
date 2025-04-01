@@ -89,7 +89,12 @@ const EditVenue = () => {
           ownerInfoObj = {};
         }
         
-        const ownerUserId = ownerInfoObj && typeof ownerInfoObj === 'object' ? ownerInfoObj.user_id : null;
+        const ownerUserId = ownerInfoObj && 
+                          typeof ownerInfoObj === 'object' && 
+                          ownerInfoObj.user_id ? 
+                          ownerInfoObj.user_id : 
+                          null;
+                          
         if (ownerUserId && user && ownerUserId !== user.id) {
           toast({
             title: 'Access Denied',
