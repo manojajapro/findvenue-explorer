@@ -1,35 +1,12 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Users, Calendar, MapPin, ChevronDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-
-const eventTypes = [
-  'Wedding',
-  'Corporate Event',
-  'Birthday Party',
-  'Conference',
-  'Exhibition',
-  'Workshop',
-  'Gala',
-  'Product Launch',
-  'Seminar',
-  'Retreat'
-];
-
-const cities = [
-  'Riyadh',
-  'Jeddah',
-  'Dammam',
-  'Mecca',
-  'Medina',
-  'Khobar',
-  'Abha',
-  'Tabuk'
-];
+import { supabase } from '@/integrations/supabase/client';
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -37,16 +14,69 @@ const HeroSection = () => {
   const [guests, setGuests] = useState('');
   const [location, setLocation] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
+  const [cities, setCities] = useState<{id: string, name: string}[]>([]);
+  
+  // Fetch categories from Supabase
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data } = await supabase
+          .from('category_groups')
+          .select('category_id, category_name')
+          .order('category_name');
+        
+        if (data) {
+          const formattedCategories = data.map(cat => ({
+            id: cat.category_id || '',
+            name: cat.category_name || ''
+          })).filter(cat => cat.id && cat.name);
+          
+          setCategories(formattedCategories);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
+  
+  // Fetch cities from Supabase
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const { data } = await supabase
+          .from('city_groups')
+          .select('city_id, city_name')
+          .order('city_name');
+        
+        if (data) {
+          const formattedCities = data.map(city => ({
+            id: city.city_id || '',
+            name: city.city_name || ''
+          })).filter(city => city.id && city.name);
+          
+          setCities(formattedCities);
+        }
+      } catch (error) {
+        console.error('Error fetching cities:', error);
+      }
+    };
+    
+    fetchCities();
+  }, []);
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
     
-    if (eventType) params.append('eventType', eventType);
+    if (eventType) params.append('categoryId', eventType);
     if (guests) params.append('guests', guests);
-    if (location) params.append('location', location);
+    if (location) params.append('cityId', location);
     
-    navigate(`/?${params.toString()}`);
+    // Navigate to venues page with map view
+    navigate(`/venues?view=map&${params.toString()}`);
   };
   
   const clearForm = () => {
@@ -91,7 +121,7 @@ const HeroSection = () => {
           className="bg-findvenue-card-bg/80 backdrop-blur-xl p-4 md:p-6 rounded-lg border border-white/10 max-w-5xl mx-auto shadow-xl"
         >
           <div className="flex flex-col md:flex-row gap-4">
-            {/* Event Type */}
+            {/* Event Type / Category */}
             <div className="flex-1 min-w-0">
               <Popover>
                 <PopoverTrigger asChild>
@@ -102,24 +132,24 @@ const HeroSection = () => {
                   >
                     <div className="flex items-center">
                       <Calendar className="mr-2 h-4 w-4" />
-                      {eventType || 'Event Type'}
+                      {categories.find(cat => cat.id === eventType)?.name || 'Event Type'}
                     </div>
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-0 max-h-[300px] overflow-y-auto bg-findvenue-card-bg border-white/10">
                   <div className="grid gap-1 p-2">
-                    {eventTypes.map((type) => (
+                    {categories.map((category) => (
                       <Button
-                        key={type}
+                        key={category.id}
                         variant="ghost"
                         className="justify-start text-findvenue-text hover:text-white hover:bg-findvenue-surface"
                         onClick={() => {
-                          setEventType(type);
+                          setEventType(category.id);
                           document.body.click(); // Close popover
                         }}
                       >
-                        {type}
+                        {category.name}
                       </Button>
                     ))}
                   </div>
@@ -141,7 +171,7 @@ const HeroSection = () => {
               </div>
             </div>
             
-            {/* Location */}
+            {/* Location / City */}
             <div className="flex-1 min-w-0">
               <Popover>
                 <PopoverTrigger asChild>
@@ -152,7 +182,7 @@ const HeroSection = () => {
                   >
                     <div className="flex items-center">
                       <MapPin className="mr-2 h-4 w-4" />
-                      {location || 'Location'}
+                      {cities.find(city => city.id === location)?.name || 'Location'}
                     </div>
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -161,15 +191,15 @@ const HeroSection = () => {
                   <div className="grid gap-1 p-2">
                     {cities.map((city) => (
                       <Button
-                        key={city}
+                        key={city.id}
                         variant="ghost"
                         className="justify-start text-findvenue-text hover:text-white hover:bg-findvenue-surface"
                         onClick={() => {
-                          setLocation(city);
+                          setLocation(city.id);
                           document.body.click(); // Close popover
                         }}
                       >
-                        {city}
+                        {city.name}
                       </Button>
                     ))}
                   </div>
