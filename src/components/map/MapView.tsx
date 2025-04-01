@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { Venue } from '@/hooks/useSupabaseVenues';
@@ -39,7 +38,6 @@ const DEFAULT_LOCATION = {
   lng: 46.738586
 };
 
-// Dark map style
 const DARK_MAP_STYLE = [
   { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
@@ -126,7 +124,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const mapRef = useRef<google.maps.Map | null>(null);
   const [activeVenue, setActiveVenue] = useState<string | null>(null);
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
-  const [mapSearchTerm, setMapSearchTerm] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [mapSearchTerm, setMapSearchTerm] = useState(searchParams.get('search') || '');
   const [isCompactControls, setIsCompactControls] = useState(false);
   const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [isRadiusActive, setIsRadiusActive] = useState(false);
@@ -134,7 +133,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const [venuesInRadius, setVenuesInRadius] = useState<Venue[]>([]);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [isSettingManualLocation, setIsSettingManualLocation] = useState(false);
-  const [searchParams] = useSearchParams();
   const [locationAddress, setLocationAddress] = useState<string>("Custom Location");
   const [mapCursor, setMapCursor] = useState<string>('default');
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -149,13 +147,18 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   );
   
   useEffect(() => {
-    // Check for mapTools parameter
+    const searchParam = searchParams.get('search');
+    if (searchParam && searchParam !== mapSearchTerm) {
+      setMapSearchTerm(searchParam);
+      handleSearch(searchParam);
+    }
+  }, [searchParams]);
+  
+  useEffect(() => {
     if (searchParams.get('mapTools') === 'radius') {
       setIsRadiusActive(true);
-      // Set default location
       setUserLocation(DEFAULT_LOCATION);
       
-      // Show a toast with instructions
       setTimeout(() => {
         toast.info("Click anywhere on the map to set your location for radius search", {
           duration: 5000,
@@ -171,6 +174,14 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   
   const handleSearch = useCallback((term: string) => {
     setMapSearchTerm(term);
+    
+    const newParams = new URLSearchParams(searchParams);
+    if (term.trim()) {
+      newParams.set('search', term.trim());
+    } else {
+      newParams.delete('search');
+    }
+    setSearchParams(newParams, { replace: true });
     
     if (!term.trim()) {
       setFilteredVenues(venues);
@@ -190,7 +201,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     );
     
     setFilteredVenues(results);
-  }, [venues]);
+  }, [venues, searchParams, setSearchParams]);
   
   const handleLocationSelect = useCallback((lat: number, lng: number, address: string) => {
     const newLocation = { lat, lng };
@@ -198,7 +209,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setLocationAddress(address);
     setIsRadiusActive(true);
     
-    // Center map on new location with animation
     if (mapRef.current) {
       mapRef.current.panTo(newLocation);
       mapRef.current.setZoom(14);
@@ -211,7 +221,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setIsSettingManualLocation(true);
     setMapCursor('crosshair');
     
-    // Ensure userLocation is set (to default if not already set)
     if (!userLocation) {
       setUserLocation(DEFAULT_LOCATION);
       setLocationAddress("Default Location (Riyadh)");
@@ -223,7 +232,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       duration: 5000
     });
     
-    // Make sure radius search is active
     setIsRadiusActive(true);
   }, [userLocation]);
   
@@ -239,7 +247,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       setIsSettingManualLocation(false);
       setMapCursor('default');
       
-      // Try to reverse geocode the location for better display
       if (window.google && window.google.maps) {
         const geocoder = new google.maps.Geocoder();
         geocoder.geocode({ location: newLocation }, (results, status) => {
@@ -254,7 +261,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         toast.success("Custom location set successfully");
       }
       
-      // Center on the new location and zoom in with animation
       if (mapRef.current) {
         mapRef.current.panTo(newLocation);
         mapRef.current.setZoom(15);
@@ -264,8 +270,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   
   const handleMapMove = useCallback((e: google.maps.MapMouseEvent) => {
     if (isSettingManualLocation && mapRef.current && e.latLng) {
-      // Preview the potential circle location by updating userLocation
-      // This creates a "follow cursor" effect for the circle
       const previewLocation = {
         lat: e.latLng.lat(),
         lng: e.latLng.lng()
@@ -275,12 +279,10 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   }, [isSettingManualLocation]);
   
   const resetToDefaultLocation = useCallback(() => {
-    // Use default location
     setUserLocation(DEFAULT_LOCATION);
     setLocationAddress("Default Location (Riyadh)");
     setIsRadiusActive(true);
     
-    // Center map on default location with animation
     if (mapRef.current) {
       mapRef.current.panTo(DEFAULT_LOCATION);
       mapRef.current.setZoom(14);
@@ -293,7 +295,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     if (isRadiusActive) {
       setIsRadiusActive(false);
     } else {
-      // Set default location if no location is set
       if (!userLocation) {
         setUserLocation(DEFAULT_LOCATION);
         setLocationAddress("Default Location (Riyadh)");
@@ -301,7 +302,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       
       setIsRadiusActive(true);
       
-      // Center map on current location with animation
       if (mapRef.current && userLocation) {
         mapRef.current.panTo(userLocation);
         mapRef.current.setZoom(14);
@@ -335,7 +335,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       setIsCompactControls(window.innerWidth < 768);
     };
     
-    handleResize(); // Set initial state
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -370,10 +370,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       bounds.extend(userLocation);
     }
     
-    // Add animation by using smooth zoom
-    mapRef.current.fitBounds(bounds, 50); // 50px padding
+    mapRef.current.fitBounds(bounds, 50);
     
-    // If there's only one marker, zoom out a bit
     if (displayVenues.length === 1 || (displayVenues.length === 0 && userLocation)) {
       setTimeout(() => {
         if (mapRef.current && mapRef.current.getZoom() > 15) {
@@ -396,7 +394,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setSelectedVenue(venue);
   }, []);
   
-  // Extract any applied filters from search params
   const getAppliedFilters = useCallback(() => {
     const filters: string[] = [];
     
@@ -406,13 +403,11 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     
     if (searchParams.has('categoryId')) {
       const categoryId = searchParams.get('categoryId');
-      // You might want to look up the category name here
       filters.push(`Category: ${categoryId}`);
     }
     
     if (searchParams.has('cityId')) {
       const cityId = searchParams.get('cityId');
-      // You might want to look up the city name here
       filters.push(`City: ${cityId}`);
     }
     
@@ -434,18 +429,22 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       newParams.delete('cityId');
     }
     
-    // Use history.replaceState to update URL without navigation
-    const newUrl = `${window.location.pathname}?${newParams.toString()}`;
-    window.history.replaceState(null, '', newUrl);
+    setSearchParams(newParams, { replace: true });
     
-    // Refresh the map if needed
-    handleSearch('');
-  }, [searchParams, handleSearch]);
+    if (filterType === 'search') {
+      handleSearch('');
+    }
+  }, [searchParams, handleSearch, setSearchParams]);
   
   const handleClearSearch = useCallback(() => {
     setMapSearchTerm('');
+    
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('search');
+    setSearchParams(newParams, { replace: true });
+    
     handleSearch('');
-  }, [handleSearch]);
+  }, [handleSearch, searchParams, setSearchParams]);
   
   if (isLoading) {
     return (
@@ -502,7 +501,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
             onClick={() => {
               setIsSettingManualLocation(false);
               setMapCursor('default');
-              // Set to default location if user cancels and no location is set
               if (!userLocation) {
                 setUserLocation(DEFAULT_LOCATION);
                 setLocationAddress("Default Location (Riyadh)");

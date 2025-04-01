@@ -9,10 +9,6 @@ import TopVenues from '@/components/venues/TopVenues';
 import GlobalVenues from '@/components/global/GlobalVenues';
 import AdviceSection from '@/components/advice/AdviceSection';
 import { useSearch } from '@/hooks/useSearch';
-import { VenueCard } from '@/components/ui';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GridIcon, List, MapIcon } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -34,7 +30,15 @@ const Index = () => {
   useEffect(() => {
     if (hasFilters) {
       const currentParams = new URLSearchParams(searchParams);
+      
+      // If there's a search term, ensure it's included as 'search' parameter
+      if (currentParams.has('eventType') && !currentParams.has('search')) {
+        currentParams.set('search', currentParams.get('eventType') || '');
+      }
+      
+      // Set the view to map
       currentParams.set('view', 'map');
+      
       navigate(`/venues?${currentParams.toString()}`);
     }
   }, [hasFilters, searchParams, navigate]);

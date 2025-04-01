@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Search, X, MapPin, History, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
