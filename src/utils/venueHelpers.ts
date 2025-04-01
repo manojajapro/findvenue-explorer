@@ -1,5 +1,6 @@
 
 import { Venue } from '@/hooks/useSupabaseVenues';
+import { Json } from '@/integrations/supabase/types';
 
 /**
  * Extract owner user ID from venue owner_info
@@ -17,6 +18,7 @@ export const getVenueOwnerId = (venue: any): string | null => {
       if (Array.isArray(venue.owner_info)) {
         return null; // Handle array case (should not happen in practice)
       }
+      // Need to access user_id safely from Json type
       return venue.owner_info.user_id || null;
     }
   } catch (err) {

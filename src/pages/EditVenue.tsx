@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Database } from '@/integrations/supabase/types';
+import { Database, Json } from '@/integrations/supabase/types';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +41,7 @@ import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { isVenueOwner } from '@/utils/venueHelpers';
+import { isVenueOwner, getVenueOwnerId } from '@/utils/venueHelpers';
 
 // Define the venue schema for form validation
 const venueSchema = z.object({
@@ -169,8 +169,25 @@ const EditVenue = () => {
       }
 
       if (data) {
+        console.log("Fetched venue data:", data);
         setVenue(data);
-        // Set default values for the form
+        
+        // Parse amenities from the database
+        let amenitiesArray = data.amenities || [];
+        
+        // Parse owner_info if it's a string
+        let ownerInfo = null;
+        if (data.owner_info) {
+          try {
+            ownerInfo = typeof data.owner_info === 'string' 
+              ? JSON.parse(data.owner_info) 
+              : data.owner_info;
+          } catch (err) {
+            console.error("Error parsing owner_info:", err);
+          }
+        }
+        
+        // Set default values for the form with all venue attributes
         form.reset({
           name: data.name,
           description: data.description || "",
@@ -180,10 +197,28 @@ const EditVenue = () => {
           min_capacity: data.min_capacity || 1,
           max_capacity: data.max_capacity || 1,
           starting_price: data.starting_price || 0,
-          price_per_person: data.price_per_person,
-          amenities: data.amenities || [],
+          price_per_person: data.price_per_person || 0,
+          amenities: amenitiesArray,
           wifi: data.wifi || false,
           parking: data.parking || false,
+          // Additional fields
+          accepted_payment_methods: data.accepted_payment_methods || [],
+          accessibility_features: data.accessibility_features || [],
+          additional_services: data.additional_services || [],
+          gallery_images: data.gallery_images || [],
+          image_url: data.image_url || "",
+          featured: data.featured || false,
+          popular: data.popular || false,
+          currency: data.currency || "SAR",
+          // These fields might be treated as read-only or computed
+          rating: data.rating,
+          reviews_count: data.reviews_count,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          // Include opening_hours if available
+          opening_hours: data.opening_hours as any,
+          // Include owner_info if available
+          owner_info: ownerInfo
         });
       } else {
         setError('Venue not found.');
@@ -196,65 +231,64 @@ const EditVenue = () => {
     }
   }, [id, form]);
 
-  useEffect(() => {
-		const fetchCategories = async () => {
-			try {
-				const { data, error } = await supabase
-					.from('category_groups')
-					.select('category_id, category_name')
-					.order('category_name');
+  const fetchCategories = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('category_groups')
+        .select('category_id, category_name')
+        .order('category_name');
 
-				if (error) {
-					throw error;
-				}
+      if (error) {
+        throw error;
+      }
 
-				if (data) {
-					const formattedCategories = data.map(cat => ({
-						id: cat.category_id || '',
-						name: cat.category_name || ''
-					})).filter(cat => cat.id && cat.name);
+      if (data) {
+        const formattedCategories = data.map(cat => ({
+          id: cat.category_id || '',
+          name: cat.category_name || ''
+        })).filter(cat => cat.id && cat.name);
 
-					setCategories(formattedCategories);
-				}
-			} catch (error) {
-				console.error('Error fetching categories:', error);
-			}
-		};
+        setCategories(formattedCategories);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  }, [supabase]);
 
-		fetchCategories();
-	}, [supabase]);
+  const fetchCities = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('city_groups')
+        .select('city_id, city_name')
+        .order('city_name');
 
-	useEffect(() => {
-		const fetchCities = async () => {
-			try {
-				const { data, error } = await supabase
-					.from('city_groups')
-					.select('city_id, city_name')
-					.order('city_name');
+      if (error) {
+        throw error;
+      }
 
-				if (error) {
-					throw error;
-				}
+      if (data) {
+        const formattedCities = data.map(city => ({
+          id: city.city_id || '',
+          name: city.city_name || ''
+        })).filter(city => city.id && city.name);
 
-				if (data) {
-					const formattedCities = data.map(city => ({
-						id: city.city_id || '',
-						name: city.city_name || ''
-					})).filter(city => city.id && city.name);
-
-					setCities(formattedCities);
-				}
-			} catch (error) {
-				console.error('Error fetching cities:', error);
-			}
-		};
-
-		fetchCities();
-	}, [supabase]);
+        setCities(formattedCities);
+      }
+    } catch (error) {
+      console.error('Error fetching cities:', error);
+    }
+  }, [supabase]);
 
   const onSubmit = async (values: z.infer<typeof venueSchema>) => {
     setLoading(true);
     setError(null);
+    
+    // Preserve the original owner_info when updating
+    if (venue && venue.owner_info && !values.owner_info) {
+      values.owner_info = venue.owner_info;
+    }
+
+    console.log("Submitting venue update with values:", values);
 
     try {
       const { error } = await supabase
@@ -270,13 +304,13 @@ const EditVenue = () => {
         title: "Venue updated successfully!",
         description: "Your venue details have been updated.",
       });
-      navigate('/venues');
+      navigate(`/venue/${id}`);
     } catch (err: any) {
       setError(err.message);
       toast({
         variant: "destructive",
         title: "Update failed!",
-        description: "Something went wrong. Please try again.",
+        description: err.message || "Something went wrong. Please try again.",
       });
       console.error('Failed to update venue:', err);
     } finally {
@@ -317,33 +351,19 @@ const EditVenue = () => {
     }
   };
 
-  // New code to safely check the user ID:
-  const isOwner = useCallback(() => {
+  const checkIsOwner = useCallback(() => {
     if (!user || !venue) return false;
-    
-    let ownerUserId = null;
-    
-    // Handle owner_info regardless if it's a string or an object
-    if (venue.owner_info) {
-      try {
-        if (typeof venue.owner_info === 'string') {
-          const parsedOwnerInfo = JSON.parse(venue.owner_info);
-          ownerUserId = parsedOwnerInfo.user_id;
-        } else if (typeof venue.owner_info === 'object') {
-          ownerUserId = venue.owner_info.user_id;
-        }
-      } catch (err) {
-        console.error("Error parsing owner_info:", err);
-        return false;
-      }
-    }
-    
-    return ownerUserId === user.id;
+    return isVenueOwner(venue, user.id);
   }, [user, venue]);
 
   useEffect(() => {
     fetchVenue();
   }, [fetchVenue]);
+
+  useEffect(() => {
+    fetchCategories();
+    fetchCities();
+  }, [supabase]);
 
   if (loading) {
     return <div className="container mx-auto py-10 text-center">Loading venue data...</div>;
@@ -357,7 +377,7 @@ const EditVenue = () => {
     return <div className="container mx-auto py-10 text-center">Venue not found.</div>;
   }
 
-  if (!isOwner()) {
+  if (!checkIsOwner()) {
     return (
       <div className="container mx-auto py-10 text-center">
         <h1 className="text-2xl font-bold mb-4">Not Authorized</h1>
@@ -375,307 +395,519 @@ const EditVenue = () => {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Venue Name */}
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Venue Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Venue Name" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    This is the name of your venue.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <Card>
+            <CardHeader>
+              <CardTitle>Basic Information</CardTitle>
+              <CardDescription>Edit the basic details of your venue</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Venue Name */}
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Venue Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Venue Name" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        This is the name of your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {/* Venue Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Description"
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Describe your venue.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                {/* Venue Description */}
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1 md:col-span-2">
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Description"
+                          className="resize-none h-24"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Describe your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {/* Venue Address */}
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Address</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Address" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    The physical address of the venue.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                {/* Venue Address */}
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Address" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The physical address of the venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {/* City Select */}
-						<FormField
-							control={form.control}
-							name="city_id"
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>City</FormLabel>
-									<Select onValueChange={field.onChange} defaultValue={field.value}>
-										<FormControl>
-											<SelectTrigger>
-												<SelectValue placeholder="Select a city" />
-											</SelectTrigger>
-										</FormControl>
-										<SelectContent>
-											{cities.map((city) => (
-												<SelectItem key={city.id} value={city.id}>
-													{city.name}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-									<FormDescription>
-										The city where the venue is located.
-									</FormDescription>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
+                {/* City Select */}
+                <FormField
+                  control={form.control}
+                  name="city_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a city" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {cities.map((city) => (
+                            <SelectItem key={city.id} value={city.id}>
+                              {city.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        The city where the venue is located.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {/* Category Select */}
-						<FormField
-							control={form.control}
-							name="category_id"
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>Category</FormLabel>
-									<Select onValueChange={field.onChange} defaultValue={field.value}>
-										<FormControl>
-											<SelectTrigger>
-												<SelectValue placeholder="Select a category" />
-											</SelectTrigger>
-										</FormControl>
-										<SelectContent>
-											{categories.map((category) => (
-												<SelectItem key={category.id} value={category.id}>
-													{category.name}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-									<FormDescription>
-										The category of the venue.
-									</FormDescription>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
+                {/* Category Select */}
+                <FormField
+                  control={form.control}
+                  name="category_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        The category of the venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {/* Minimum Capacity */}
-            <FormField
-              control={form.control}
-              name="min_capacity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Minimum Capacity</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Minimum Capacity"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    The minimum capacity of the venue.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                {/* Image URL */}
+                <FormField
+                  control={form.control}
+                  name="image_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Main Image URL</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Image URL" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        URL to the main image of your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Maximum Capacity */}
-            <FormField
-              control={form.control}
-              name="max_capacity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Maximum Capacity</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Maximum Capacity"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    The maximum capacity of the venue.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <Card>
+            <CardHeader>
+              <CardTitle>Capacity and Pricing</CardTitle>
+              <CardDescription>Set capacity limits and pricing options</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Minimum Capacity */}
+                <FormField
+                  control={form.control}
+                  name="min_capacity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Minimum Capacity</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Minimum Capacity"
+                          {...field}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        The minimum capacity of the venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {/* Starting Price */}
-            <FormField
-              control={form.control}
-              name="starting_price"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Starting Price</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Starting Price"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    The starting price of the venue.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+                {/* Maximum Capacity */}
+                <FormField
+                  control={form.control}
+                  name="max_capacity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Maximum Capacity</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Maximum Capacity"
+                          {...field}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        The maximum capacity of the venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          {/* Amenities */}
-          <FormField
-            control={form.control}
-            name="amenities"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Amenities</FormLabel>
-                <div className="flex flex-wrap gap-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="wifi"
-                      checked={field.value?.includes("wifi")}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          field.onChange([...(field.value || []), "wifi"])
-                        } else {
-                          field.onChange(field.value?.filter((value) => value !== "wifi"))
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor="wifi"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      WiFi
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="parking"
-                      checked={field.value?.includes("parking")}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          field.onChange([...(field.value || []), "parking"])
-                        } else {
-                          field.onChange(field.value?.filter((value) => value !== "parking"))
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor="parking"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      Parking
-                    </label>
-                  </div>
-                  {/* Add more amenities here */}
-                </div>
-                <FormDescription>
-                  Select the amenities that your venue offers.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                {/* Starting Price */}
+                <FormField
+                  control={form.control}
+                  name="starting_price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Starting Price</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Starting Price"
+                          {...field}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        The starting price of the venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          {/* Opening Hours */}
-          <FormField
-            control={form.control}
-            name="opening_hours"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Opening Hours</FormLabel>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="open">Open</Label>
-                    <Input
-                      type="time"
-                      id="open"
-                      defaultValue="09:00"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="close">Close</Label>
-                    <Input
-                      type="time"
-                      id="close"
-                      defaultValue="17:00"
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-                <FormDescription>
-                  Set the opening hours for your venue.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                {/* Price Per Person */}
+                <FormField
+                  control={form.control}
+                  name="price_per_person"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price Per Person</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Price Per Person"
+                          {...field}
+                          value={field.value || ''}
+                          onChange={(e) => field.onChange(Number(e.target.value) || undefined)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        The price per person (if applicable).
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Currency */}
+                <FormField
+                  control={form.control}
+                  name="currency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Currency</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || 'SAR'}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a currency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="SAR">SAR (Saudi Riyal)</SelectItem>
+                          <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                          <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        The currency for your venue pricing.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Amenities and Features</CardTitle>
+              <CardDescription>Select the amenities and features your venue offers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* WiFi */}
+              <FormField
+                control={form.control}
+                name="wifi"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 mb-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">WiFi</FormLabel>
+                      <FormDescription>
+                        Does your venue offer WiFi?
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {/* Parking */}
+              <FormField
+                control={form.control}
+                name="parking"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 mb-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Parking</FormLabel>
+                      <FormDescription>
+                        Does your venue offer parking?
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {/* More Amenities as checkboxes */}
+              <FormField
+                control={form.control}
+                name="amenities"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Additional Amenities</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                      {['air_conditioning', 'catering', 'sound_system', 'projector', 'stage', 'security'].map((amenity) => (
+                        <div key={amenity} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={amenity}
+                            checked={field.value?.includes(amenity)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                field.onChange([...(field.value || []), amenity]);
+                              } else {
+                                field.onChange(field.value?.filter((value) => value !== amenity));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={amenity}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {amenity.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <FormDescription>
+                      Select the amenities that your venue offers.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Accessibility Features */}
+              <FormField
+                control={form.control}
+                name="accessibility_features"
+                render={({ field }) => (
+                  <FormItem className="mt-4">
+                    <FormLabel>Accessibility Features</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                      {['wheelchair_access', 'elevator', 'accessible_restroom', 'accessible_parking'].map((feature) => (
+                        <div key={feature} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={feature}
+                            checked={field.value?.includes(feature)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                field.onChange([...(field.value || []), feature]);
+                              } else {
+                                field.onChange(field.value?.filter((value) => value !== feature));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={feature}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {feature.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <FormDescription>
+                      Select the accessibility features that your venue offers.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Payment Methods */}
+              <FormField
+                control={form.control}
+                name="accepted_payment_methods"
+                render={({ field }) => (
+                  <FormItem className="mt-4">
+                    <FormLabel>Accepted Payment Methods</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                      {['Credit Card', 'Cash', 'Bank Transfer', 'Mobile Payment'].map((method) => (
+                        <div key={method} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={method.replace(' ', '_').toLowerCase()}
+                            checked={field.value?.includes(method)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                field.onChange([...(field.value || []), method]);
+                              } else {
+                                field.onChange(field.value?.filter((value) => value !== method));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={method.replace(' ', '_').toLowerCase()}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {method}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <FormDescription>
+                      Select the payment methods you accept.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Additional Services</CardTitle>
+              <CardDescription>Add any additional services your venue offers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FormField
+                control={form.control}
+                name="additional_services"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Additional Services</FormLabel>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                      {['catering', 'decoration', 'entertainment', 'photography', 'cleaning', 'valet_parking'].map((service) => (
+                        <div key={service} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`service-${service}`}
+                            checked={field.value?.includes(service)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                field.onChange([...(field.value || []), service]);
+                              } else {
+                                field.onChange(field.value?.filter((value) => value !== service));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`service-${service}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {service.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <FormDescription>
+                      Select additional services you provide with the venue.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
 
           {/* Submit Button */}
-          <Button type="submit" disabled={loading}>
-            {loading ? "Updating..." : "Update Venue"}
-          </Button>
+          <div className="flex gap-4">
+            <Button type="submit" disabled={loading}>
+              {loading ? "Updating..." : "Update Venue"}
+            </Button>
+
+            {/* Delete Venue */}
+            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">Delete Venue</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete your venue
+                    and remove your data from our servers.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setIsDeleteAlertOpen(false)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </form>
       </Form>
-
-      {/* Delete Venue */}
-      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-        <AlertDialogTrigger asChild>
-          <Button variant="destructive" className="mt-5">Delete Venue</Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your venue
-              and remove your data from our servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsDeleteAlertOpen(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

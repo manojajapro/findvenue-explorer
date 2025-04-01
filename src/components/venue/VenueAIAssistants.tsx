@@ -9,6 +9,8 @@ type VenueAIAssistantsProps = {
 };
 
 const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
+  if (!venue) return null;
+  
   return (
     <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
