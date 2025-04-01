@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,13 +48,11 @@ const EditVenue = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [pricingType, setPricingType] = useState<'flat' | 'perPerson' | 'hourly'>('flat');
   
-  // New state for dynamic arrays
   const [newService, setNewService] = useState('');
   const [newFeature, setNewFeature] = useState('');
   const [newPaymentMethod, setNewPaymentMethod] = useState('');
   const [newAmenity, setNewAmenity] = useState('');
   
-  // Days for opening hours
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   
   useEffect(() => {
@@ -65,7 +62,7 @@ const EditVenue = () => {
     }
     
     fetchVenueDetails();
-  }, [id, user, isVenueOwner]);
+  }, [id, user, isVenueOwner, navigate]);
   
   const fetchVenueDetails = async () => {
     if (!id) return;
@@ -80,12 +77,14 @@ const EditVenue = () => {
         
       if (error) throw error;
       
-      // Check if the venue belongs to this owner
-      const ownerInfo = typeof data.owner_info === 'string' 
-        ? JSON.parse(data.owner_info) 
-        : data.owner_info;
+      let ownerInfoObj;
+      if (data.owner_info) {
+        ownerInfoObj = typeof data.owner_info === 'string' 
+          ? JSON.parse(data.owner_info) 
+          : data.owner_info;
+      }
         
-      if (ownerInfo && ownerInfo.user_id !== user?.id) {
+      if (ownerInfoObj && ownerInfoObj.user_id !== user?.id) {
         toast({
           title: 'Access Denied',
           description: 'You do not have permission to edit this venue.',
@@ -97,7 +96,6 @@ const EditVenue = () => {
       
       console.log("Venue data:", data);
       
-      // Determine pricing type based on available data
       if (data.price_per_person) {
         setPricingType('perPerson');
       } else if (data.hourly_rate) {
@@ -106,7 +104,6 @@ const EditVenue = () => {
         setPricingType('flat');
       }
       
-      // If opening_hours is a string, parse it
       let openingHoursData = data.opening_hours;
       if (typeof openingHoursData === 'string') {
         try {
@@ -117,7 +114,6 @@ const EditVenue = () => {
         }
       }
       
-      // Ensure arrays are properly initialized
       const venueData = {
         ...data,
         opening_hours: openingHoursData || {},
@@ -176,7 +172,6 @@ const EditVenue = () => {
     const type = value as 'flat' | 'perPerson' | 'hourly';
     setPricingType(type);
     
-    // Reset the other pricing fields
     if (type === 'flat') {
       setVenue(prev => ({ ...prev, price_per_person: null, hourly_rate: null }));
     } else if (type === 'perPerson') {
@@ -197,7 +192,6 @@ const EditVenue = () => {
     });
   };
   
-  // Functions to add items to arrays
   const addArrayItem = (field: string, value: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
     if (!value.trim()) return;
     
@@ -209,7 +203,7 @@ const EditVenue = () => {
       return prev;
     });
     
-    setter(''); // Clear the input
+    setter('');
   };
   
   const removeArrayItem = (field: string, index: number) => {
@@ -235,7 +229,6 @@ const EditVenue = () => {
     setIsSaving(true);
     
     try {
-      // Convert gallery_images to array if it's a string or not present
       let galleryImages = venue.gallery_images;
       if (!Array.isArray(galleryImages)) {
         galleryImages = typeof galleryImages === 'string' 
@@ -243,7 +236,6 @@ const EditVenue = () => {
           : [];
       }
       
-      // Prepare pricing data based on pricing type
       const pricingData: any = {
         starting_price: venue.starting_price,
         price_per_person: null,
@@ -324,7 +316,6 @@ const EditVenue = () => {
           
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
-              {/* Basic Information Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Basic Information</CardTitle>
@@ -403,7 +394,6 @@ const EditVenue = () => {
                     </Select>
                   </div>
                   
-                  {/* Location Map */}
                   <div className="space-y-2 mt-4">
                     <Label>Venue Location on Map</Label>
                     <VenueLocationMap
@@ -421,7 +411,6 @@ const EditVenue = () => {
                 </CardContent>
               </Card>
               
-              {/* Capacity & Pricing Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Capacity & Pricing</CardTitle>
@@ -514,7 +503,6 @@ const EditVenue = () => {
                 </CardContent>
               </Card>
               
-              {/* Opening Hours Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Opening Hours</CardTitle>
@@ -552,7 +540,6 @@ const EditVenue = () => {
                 </CardContent>
               </Card>
               
-              {/* Images Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Images</CardTitle>
@@ -581,7 +568,6 @@ const EditVenue = () => {
                 </CardContent>
               </Card>
               
-              {/* Amenities Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Amenities</CardTitle>
@@ -612,7 +598,6 @@ const EditVenue = () => {
                     </div>
                   </div>
                   
-                  {/* Custom Amenities */}
                   <div className="space-y-2 mt-4">
                     <Label>Custom Amenities</Label>
                     <div className="flex space-x-2">
@@ -650,7 +635,6 @@ const EditVenue = () => {
                 </CardContent>
               </Card>
               
-              {/* Additional Services Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Additional Services</CardTitle>
@@ -691,7 +675,6 @@ const EditVenue = () => {
                 </CardContent>
               </Card>
               
-              {/* Accessibility Features Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Accessibility Features</CardTitle>
@@ -732,7 +715,6 @@ const EditVenue = () => {
                 </CardContent>
               </Card>
               
-              {/* Payment Methods Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Payment Methods</CardTitle>
