@@ -84,6 +84,9 @@ const EditVenue = () => {
           ownerInfoObj = typeof data.owner_info === 'string' 
             ? JSON.parse(data.owner_info) 
             : data.owner_info;
+        } catch (parseError) {
+          console.error("Error parsing owner info:", parseError);
+          ownerInfoObj = {};
         }
         
         if (ownerInfoObj && 
