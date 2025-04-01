@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { PlusCircle, Edit, BarChart3, Calendar, DollarSign, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 
 const MyVenues = () => {
   const { user, isVenueOwner, profile } = useAuth();
@@ -373,6 +375,9 @@ const MyVenues = () => {
                 </CardContent>
               </Card>
             </div>
+            
+            {/* Add Bookings Calendar */}
+            <OwnerBookingsCalendar />
 
             <Card className="glass-card border-white/10">
               <CardHeader>
