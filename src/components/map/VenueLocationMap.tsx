@@ -1,18 +1,8 @@
 
-import { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
-import L from 'leaflet';
 import { Button } from '@/components/ui/button';
-
-// Fix for marker icons in React Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
 
 export interface VenueLocationMapProps {
   name: string;
@@ -23,39 +13,9 @@ export interface VenueLocationMapProps {
   onLocationChange?: (lat: number, lng: number) => void;
 }
 
-// Component to handle map clicks for editable maps
-const LocationMarker = ({ 
-  position, 
-  setPosition, 
-  editable 
-}: { 
-  position: [number, number], 
-  setPosition: (pos: [number, number]) => void,
-  editable: boolean
-}) => {
-  const map = useMapEvents({
-    click(e) {
-      if (editable) {
-        setPosition([e.latlng.lat, e.latlng.lng]);
-      }
-    },
-  });
-
-  useEffect(() => {
-    map.setView(position, map.getZoom());
-  }, [position, map]);
-
-  return (
-    <Marker position={position} draggable={editable} 
-      eventHandlers={{
-        dragend: (e) => {
-          const marker = e.target;
-          const position = marker.getLatLng();
-          setPosition([position.lat, position.lng]);
-        },
-      }}
-    />
-  );
+const containerStyle = {
+  width: '100%',
+  height: '250px'
 };
 
 const VenueLocationMap = ({ 
@@ -66,61 +26,114 @@ const VenueLocationMap = ({
   editable = false,
   onLocationChange 
 }: VenueLocationMapProps) => {
-  const [mapReady, setMapReady] = useState(false);
-  const mapRef = useRef<L.Map | null>(null);
-
   // Default to Riyadh coordinates if venue doesn't have coordinates
   const defaultLat = 24.774265;
   const defaultLng = 46.738586;
   
-  const [position, setPosition] = useState<[number, number]>([
-    latitude || defaultLat,
-    longitude || defaultLng
-  ]);
+  const [position, setPosition] = useState<google.maps.LatLngLiteral>({
+    lat: latitude || defaultLat,
+    lng: longitude || defaultLng
+  });
 
-  useEffect(() => {
-    // This ensures the map is properly sized after it's rendered
-    const timeout = setTimeout(() => {
-      setMapReady(true);
-      // Update the map view if we have a map instance
-      if (mapRef.current) {
-        mapRef.current.setView(position, 14);
-      }
-    }, 100);
-    
-    return () => clearTimeout(timeout);
-  }, [position]);
+  const [infoWindowOpen, setInfoWindowOpen] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const mapRef = useRef<google.maps.Map | null>(null);
+
+  // Load the Google Maps JS API
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: process.env.VITE_GOOGLE_MAPS_API_KEY || "", // Replace with your API key
+    id: 'google-map-script'
+  });
 
   // Update position when props change
   useEffect(() => {
     if (latitude && longitude) {
-      setPosition([latitude, longitude]);
+      setPosition({
+        lat: latitude,
+        lng: longitude
+      });
     }
   }, [latitude, longitude]);
 
   // When position changes in editable mode, notify parent
   useEffect(() => {
-    if (editable && onLocationChange) {
-      onLocationChange(position[0], position[1]);
+    if (editable && onLocationChange && mapLoaded) {
+      onLocationChange(position.lat, position.lng);
     }
-  }, [position, editable, onLocationChange]);
+  }, [position, editable, onLocationChange, mapLoaded]);
 
-  // Function to handle map ready event
-  const handleMapReady = () => {
-    // We'll use the ref to access the map instance later
-    setTimeout(() => {
-      if (mapRef.current) {
-        mapRef.current.setView(position, 14);
-      }
-    }, 100);
-  };
+  const onMapLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+    setMapLoaded(true);
+  }, []);
 
-  const handleMarkerPositionChange = (newPosition: [number, number]) => {
-    setPosition(newPosition);
-    if (onLocationChange) {
-      onLocationChange(newPosition[0], newPosition[1]);
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (editable && e.latLng) {
+      const newPosition = {
+        lat: e.latLng.lat(),
+        lng: e.latLng.lng()
+      };
+      setPosition(newPosition);
     }
-  };
+  }, [editable]);
+
+  const handleMarkerDragEnd = useCallback((e: google.maps.MapMouseEvent) => {
+    if (editable && e.latLng) {
+      const newPosition = {
+        lat: e.latLng.lat(),
+        lng: e.latLng.lng()
+      };
+      setPosition(newPosition);
+    }
+  }, [editable]);
+
+  if (loadError) {
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <MapPin className="w-4 h-4 mr-2 text-findvenue" />
+            Location
+          </h3>
+        </div>
+        <div className="p-6 text-center text-findvenue-text-muted">
+          <p>Error loading maps: {loadError.message}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <MapPin className="w-4 h-4 mr-2 text-findvenue" />
+            Location
+          </h3>
+        </div>
+        <div className="p-6 text-center text-findvenue-text-muted">
+          <p>Loading maps...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!latitude && !longitude && !editable) {
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <MapPin className="w-4 h-4 mr-2 text-findvenue" />
+            Location
+          </h3>
+        </div>
+        <div className="p-6 text-center text-findvenue-text-muted">
+          <p>Exact location will be provided after booking.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
@@ -131,59 +144,61 @@ const VenueLocationMap = ({
         </h3>
       </div>
       
-      {!latitude && !longitude && !editable ? (
-        <div className="p-6 text-center text-findvenue-text-muted">
-          <p>Exact location will be provided after booking.</p>
-        </div>
-      ) : (
-        <div className="h-[250px] w-full relative">
-          {mapReady && (
-            <MapContainer 
-              style={{ height: '100%', width: '100%', background: '#1e2734' }}
-              className="z-10"
-              center={position}
-              zoom={14}
-              ref={mapRef}
-              whenReady={handleMapReady}
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              />
-              
-              <LocationMarker 
-                position={position} 
-                setPosition={handleMarkerPositionChange}
-                editable={editable} 
-              />
-              
-              {!editable && (
-                <Marker position={position}>
-                  <Popup>
-                    <div className="text-black">
-                      <strong>{name}</strong><br/>
-                      {address}
-                    </div>
-                  </Popup>
-                </Marker>
-              )}
-            </MapContainer>
-          )}
-          
-          <div className="p-3 bg-findvenue-card-bg/70 backdrop-blur-sm absolute bottom-0 left-0 right-0 text-sm z-[400]">
-            {editable ? (
-              <div className="flex justify-between items-center">
-                <span>Lat: {position[0].toFixed(6)}, Lng: {position[1].toFixed(6)}</span>
-                <span className="text-xs text-findvenue-text-muted">
-                  {editable ? 'Click on map or drag marker to set location' : address}
-                </span>
-              </div>
-            ) : (
-              address
+      <div className="h-[250px] w-full relative">
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={position}
+          zoom={14}
+          onClick={handleMapClick}
+          onLoad={onMapLoad}
+          options={{
+            streetViewControl: false,
+            mapTypeControl: false,
+            fullscreenControl: false,
+            styles: [
+              {
+                featureType: "all",
+                elementType: "all",
+                stylers: [
+                  { saturation: -100 }
+                ]
+              }
+            ]
+          }}
+        >
+          <Marker
+            position={position}
+            draggable={editable}
+            onDragEnd={handleMarkerDragEnd}
+            onClick={() => setInfoWindowOpen(true)}
+          >
+            {!editable && infoWindowOpen && (
+              <InfoWindow
+                position={position}
+                onCloseClick={() => setInfoWindowOpen(false)}
+              >
+                <div className="text-black p-1">
+                  <strong>{name}</strong><br/>
+                  {address}
+                </div>
+              </InfoWindow>
             )}
-          </div>
+          </Marker>
+        </GoogleMap>
+        
+        <div className="p-3 bg-findvenue-card-bg/70 backdrop-blur-sm absolute bottom-0 left-0 right-0 text-sm z-[400]">
+          {editable ? (
+            <div className="flex justify-between items-center">
+              <span>Lat: {position.lat.toFixed(6)}, Lng: {position.lng.toFixed(6)}</span>
+              <span className="text-xs text-findvenue-text-muted">
+                {editable ? 'Click on map or drag marker to set location' : address}
+              </span>
+            </div>
+          ) : (
+            address
+          )}
         </div>
-      )}
+      </div>
       
       {editable && (
         <div className="p-3 border-t border-white/10">
