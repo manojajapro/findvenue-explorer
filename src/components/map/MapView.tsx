@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { Venue } from '@/hooks/useSupabaseVenues';
@@ -72,7 +71,7 @@ const DARK_MAP_STYLE = [
   {
     featureType: "road",
     elementType: "geometry.stroke",
-    stylers: [{ color: "#212a37" }]
+    stylers: [{ color: "#212835" }]
   },
   {
     featureType: "road",
@@ -550,6 +549,18 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
             cursor: mapCursor
           }}
         >
+          <div 
+            style={{ 
+              position: 'absolute', 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0, 
+              zIndex: -1, 
+              cursor: mapCursor 
+            }} 
+          />
+          
           {userLocation && isRadiusActive && (
             <>
               <Circle 

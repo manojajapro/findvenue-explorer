@@ -84,7 +84,10 @@ const EditVenue = () => {
           : data.owner_info;
       }
         
-      if (ownerInfoObj && ownerInfoObj.user_id !== user?.id) {
+      if (ownerInfoObj && 
+          'user_id' in ownerInfoObj && 
+          ownerInfoObj.user_id && 
+          ownerInfoObj.user_id !== user?.id) {
         toast({
           title: 'Access Denied',
           description: 'You do not have permission to edit this venue.',
