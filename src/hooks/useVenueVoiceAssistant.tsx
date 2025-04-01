@@ -153,10 +153,10 @@ export const useVenueVoiceAssistant = ({
     }
     
     try {
-      // Fix: Use event listeners instead of direct property assignment
-      recognition.current.addEventListener('start', handleSpeechStart);
+      // Fix: Use proper event handlers for SpeechRecognition
+      recognition.current.onstart = handleSpeechStart;
       
-      recognition.current.addEventListener('result', (event: SpeechRecognitionEvent) => {
+      recognition.current.onresult = (event: SpeechRecognitionEvent) => {
         const text = event.results[0][0].transcript;
         console.log('Speech recognized:', text);
         setTranscript(text);
@@ -164,9 +164,9 @@ export const useVenueVoiceAssistant = ({
         if (onTranscript) {
           onTranscript(text);
         }
-      });
+      };
       
-      recognition.current.addEventListener('error', (event: SpeechRecognitionErrorEvent) => {
+      recognition.current.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setError(`Speech recognition error: ${event.error}`);
         setIsListening(false);
@@ -174,9 +174,9 @@ export const useVenueVoiceAssistant = ({
         if (onListeningChange) {
           onListeningChange(false);
         }
-      });
+      };
       
-      recognition.current.addEventListener('end', handleSpeechEnd);
+      recognition.current.onend = handleSpeechEnd;
       
       recognition.current.start();
     } catch (err: any) {

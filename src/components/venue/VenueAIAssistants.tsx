@@ -29,11 +29,11 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
         </TabsList>
         
         <TabsContent value="chat" className="pt-2">
-          <VenueSpecificChatBot venue={venue} />
+          {venue && <VenueSpecificChatBot />}
         </TabsContent>
         
         <TabsContent value="voice" className="pt-2">
-          <VenueSpecificVoiceAssistant venue={venue} />
+          {venue && <VenueSpecificVoiceAssistant venue={venue} />}
         </TabsContent>
       </Tabs>
     </div>
