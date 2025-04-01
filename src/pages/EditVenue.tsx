@@ -15,7 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
+} from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch"
 import {
   AlertDialog,
@@ -41,6 +41,7 @@ import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { isVenueOwner } from '@/utils/venueHelpers';
 
 // Define the venue schema for form validation
 const venueSchema = z.object({

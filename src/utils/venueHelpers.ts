@@ -14,6 +14,9 @@ export const getVenueOwnerId = (venue: any): string | null => {
       const parsedOwnerInfo = JSON.parse(venue.owner_info);
       return parsedOwnerInfo.user_id || null;
     } else if (typeof venue.owner_info === 'object') {
+      if (Array.isArray(venue.owner_info)) {
+        return null; // Handle array case (should not happen in practice)
+      }
       return venue.owner_info.user_id || null;
     }
   } catch (err) {

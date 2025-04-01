@@ -32,6 +32,7 @@ import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
 import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import VenueRating from '@/components/venue/VenueRating';
+import { getVenueOwnerId } from '@/utils/venueHelpers';
 
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
@@ -529,7 +530,7 @@ const VenueDetails = () => {
               )}
             </div>
             
-            {venue && <VenueAIAssistants venue={venue} />}
+            <VenueAIAssistants venue={venue} />
             
             {venue?.additionalServices && venue.additionalServices.length > 0 && renderAdditionalServices()}
             {venue?.ownerInfo && renderOwnerInfo()}
@@ -559,13 +560,19 @@ const VenueDetails = () => {
                 venueId={venue?.id || ''} 
                 venueName={venue?.name || ''} 
                 pricePerHour={venue?.pricing.startingPrice || 0} 
+                ownerId={getVenueOwnerId(venue) || ''}
+                ownerName={venue?.ownerInfo?.name || 'Venue Host'}
               />
               
               <div className="mt-4">
-                <ContactVenueOwner 
-                  venueId={venue?.id || ''}
-                  venueName={venue?.name || ''}
-                />
+                {venue?.ownerInfo && (
+                  <ContactVenueOwner 
+                    venueId={venue.id}
+                    venueName={venue.name}
+                    ownerId={getVenueOwnerId(venue) || ''}
+                    ownerName={venue.ownerInfo.name || 'Venue Host'}
+                  />
+                )}
               </div>
               
               <div className="mt-6">
