@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { MapPin, Search, Ruler, Locate, Navigation, MapIcon } from 'lucide-react';
@@ -199,35 +198,46 @@ const VenueLocationMap = ({
 
   const handleManualLocationSetting = useCallback(() => {
     setIsSettingManualLocation(true);
+    
+    // Always ensure userLocation is set (to default if not already set)
+    if (!userLocation) {
+      setUserLocation(DEFAULT_LOCATION);
+      
+      // Center map on default location
+      if (mapRef.current) {
+        mapRef.current.panTo(DEFAULT_LOCATION);
+        mapRef.current.setZoom(14); 
+      }
+    }
+    
     toast.info("Click on the map to set your location", {
       description: "Click anywhere on the map to set your location for radius search",
       position: "top-center",
       duration: 5000
     });
-  }, []);
+    
+    // Make sure radius search is active
+    setIsRadiusActive(true);
+  }, [userLocation]);
 
   const toggleRadiusSearch = useCallback(() => {
     if (isRadiusActive) {
       setIsRadiusActive(false);
     } else {
-      if (!userLocation) {
-        // Instead of immediately getting user location, set to default and enable manual setting
-        setUserLocation(DEFAULT_LOCATION);
-        setIsRadiusActive(true);
-        
-        // Center map on default location
-        if (mapRef.current) {
-          mapRef.current.panTo(DEFAULT_LOCATION);
-          mapRef.current.setZoom(14);
-        }
-        
-        // Prompt user to set location manually
-        handleManualLocationSetting();
-      } else {
-        setIsRadiusActive(true);
+      // Always set default location first
+      setUserLocation(DEFAULT_LOCATION);
+      setIsRadiusActive(true);
+      
+      // Center map on default location
+      if (mapRef.current) {
+        mapRef.current.panTo(DEFAULT_LOCATION);
+        mapRef.current.setZoom(14);
       }
+      
+      // Show manual location setting toast
+      handleManualLocationSetting();
     }
-  }, [isRadiusActive, userLocation, handleManualLocationSetting]);
+  }, [isRadiusActive, handleManualLocationSetting]);
 
   if (loadError) {
     return (

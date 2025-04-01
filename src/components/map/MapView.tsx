@@ -178,16 +178,17 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     // Check for mapTools parameter
     if (searchParams.get('mapTools') === 'radius') {
       setIsRadiusActive(true);
-      if (!userLocation) {
-        getUserLocation();
-      }
+      // Always set to default location first
+      setUserLocation(DEFAULT_LOCATION);
+      
+      // Show a toast with instructions
+      setTimeout(() => {
+        toast.info("Click anywhere on the map to set your location for radius search", {
+          duration: 5000,
+          id: "map-instruction",
+        });
+      }, 500);
     }
-    
-    // Show a toast when the page loads to instruct users
-    toast.info("Click anywhere on the map to set your location for radius search", {
-      duration: 5000,
-      id: "map-instruction",
-    });
   }, [searchParams]);
   
   const handleVenueClick = (venueId: string) => {
@@ -269,12 +270,21 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   
   const handleManualLocationSetting = useCallback(() => {
     setIsSettingManualLocation(true);
+    
+    // Always ensure userLocation is set (to default if not already set)
+    if (!userLocation) {
+      setUserLocation(DEFAULT_LOCATION);
+    }
+    
     toast.info("Click on the map to set your location", {
       description: "Click anywhere on the map to set your location for radius search",
       position: "top-center",
       duration: 5000
     });
-  }, []);
+    
+    // Make sure radius search is active
+    setIsRadiusActive(true);
+  }, [userLocation]);
   
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (isSettingManualLocation && e.latLng) {
@@ -300,13 +310,20 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     if (isRadiusActive) {
       setIsRadiusActive(false);
     } else {
-      if (!userLocation) {
-        getUserLocation();
-      } else {
-        setIsRadiusActive(true);
+      // Always set default location first
+      setUserLocation(DEFAULT_LOCATION);
+      setIsRadiusActive(true);
+      
+      // Center map on default location
+      if (mapRef.current) {
+        mapRef.current.panTo(DEFAULT_LOCATION);
+        mapRef.current.setZoom(14);
       }
+      
+      // Show manual location setting toast
+      handleManualLocationSetting();
     }
-  }, [isRadiusActive, userLocation, getUserLocation]);
+  }, [isRadiusActive, handleManualLocationSetting]);
   
   useEffect(() => {
     if (userLocation && isRadiusActive) {
