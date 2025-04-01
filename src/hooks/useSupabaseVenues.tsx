@@ -30,6 +30,7 @@ export interface Venue {
     currency: string;
     startingPrice: number;
     pricePerPerson?: number;
+    hourlyRate?: number;
   };
   amenities: string[];
   rating: number;
@@ -186,7 +187,8 @@ export const useSupabaseVenues = () => {
             pricing: {
               currency: venue.currency || 'SAR',
               startingPrice: venue.starting_price || 0,
-              pricePerPerson: venue.price_per_person
+              pricePerPerson: venue.price_per_person,
+              hourlyRate: venue.hourly_rate
             },
             amenities: venue.amenities || [],
             rating: venue.rating || 0,

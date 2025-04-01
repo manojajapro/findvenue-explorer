@@ -10,8 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, MapPin } from 'lucide-react';
+import { Loader2, MapPin, Clock, Calendar, Plus, Minus, X } from 'lucide-react';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 const EditVenue = () => {
   const { id } = useParams<{ id: string }>();
@@ -28,16 +30,33 @@ const EditVenue = () => {
     min_capacity: 0,
     max_capacity: 0,
     starting_price: 0,
+    price_per_person: null,
     image_url: '',
     gallery_images: [],
     wifi: false,
     parking: false,
     latitude: null,
-    longitude: null
+    longitude: null,
+    opening_hours: {},
+    accessibility_features: [],
+    additional_services: [],
+    accepted_payment_methods: [],
+    currency: 'SAR',
+    amenities: []
   });
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [pricingType, setPricingType] = useState<'flat' | 'perPerson' | 'hourly'>('flat');
+  
+  // New state for dynamic arrays
+  const [newService, setNewService] = useState('');
+  const [newFeature, setNewFeature] = useState('');
+  const [newPaymentMethod, setNewPaymentMethod] = useState('');
+  const [newAmenity, setNewAmenity] = useState('');
+  
+  // Days for opening hours
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   
   useEffect(() => {
     if (!isVenueOwner || !user) {
@@ -77,7 +96,38 @@ const EditVenue = () => {
       }
       
       console.log("Venue data:", data);
-      setVenue(data);
+      
+      // Determine pricing type based on available data
+      if (data.price_per_person) {
+        setPricingType('perPerson');
+      } else if (data.hourly_rate) {
+        setPricingType('hourly');
+      } else {
+        setPricingType('flat');
+      }
+      
+      // If opening_hours is a string, parse it
+      let openingHoursData = data.opening_hours;
+      if (typeof openingHoursData === 'string') {
+        try {
+          openingHoursData = JSON.parse(openingHoursData);
+        } catch (e) {
+          console.error("Error parsing opening hours", e);
+          openingHoursData = {};
+        }
+      }
+      
+      // Ensure arrays are properly initialized
+      const venueData = {
+        ...data,
+        opening_hours: openingHoursData || {},
+        accessibility_features: data.accessibility_features || [],
+        additional_services: data.additional_services || [],
+        accepted_payment_methods: data.accepted_payment_methods || ['Credit Card', 'Cash'],
+        amenities: data.amenities || []
+      };
+      
+      setVenue(venueData);
     } catch (error: any) {
       console.error('Error fetching venue details:', error);
       toast({
@@ -100,6 +150,11 @@ const EditVenue = () => {
     setVenue(prev => ({ ...prev, [name]: value === '' ? '' : parseInt(value, 10) }));
   };
   
+  const handleFloatNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setVenue(prev => ({ ...prev, [name]: value === '' ? '' : parseFloat(value) }));
+  };
+  
   const handleGalleryImagesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const imagesArray = e.target.value.split('\n').filter(url => url.trim() !== '');
     setVenue(prev => ({ ...prev, gallery_images: imagesArray }));
@@ -115,6 +170,54 @@ const EditVenue = () => {
       latitude: lat,
       longitude: lng
     }));
+  };
+  
+  const handlePricingTypeChange = (value: string) => {
+    const type = value as 'flat' | 'perPerson' | 'hourly';
+    setPricingType(type);
+    
+    // Reset the other pricing fields
+    if (type === 'flat') {
+      setVenue(prev => ({ ...prev, price_per_person: null, hourly_rate: null }));
+    } else if (type === 'perPerson') {
+      setVenue(prev => ({ ...prev, hourly_rate: null }));
+    } else if (type === 'hourly') {
+      setVenue(prev => ({ ...prev, price_per_person: null }));
+    }
+  };
+  
+  const handleOpeningHoursChange = (day: string, type: 'open' | 'close', value: string) => {
+    setVenue(prev => {
+      const updatedHours = { ...prev.opening_hours } || {};
+      if (!updatedHours[day]) {
+        updatedHours[day] = { open: '09:00', close: '17:00' };
+      }
+      updatedHours[day][type] = value;
+      return { ...prev, opening_hours: updatedHours };
+    });
+  };
+  
+  // Functions to add items to arrays
+  const addArrayItem = (field: string, value: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
+    if (!value.trim()) return;
+    
+    setVenue(prev => {
+      const currentArray = Array.isArray(prev[field]) ? [...prev[field]] : [];
+      if (!currentArray.includes(value)) {
+        return { ...prev, [field]: [...currentArray, value] };
+      }
+      return prev;
+    });
+    
+    setter(''); // Clear the input
+  };
+  
+  const removeArrayItem = (field: string, index: number) => {
+    setVenue(prev => {
+      const currentArray = [...prev[field]];
+      currentArray.splice(index, 1);
+      return { ...prev, [field]: currentArray };
+    });
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,8 +239,21 @@ const EditVenue = () => {
       let galleryImages = venue.gallery_images;
       if (!Array.isArray(galleryImages)) {
         galleryImages = typeof galleryImages === 'string' 
-          ? galleryImages.split('\n').filter(url => url.trim())
+          ? galleryImages.split('\n').filter((url: string) => url.trim())
           : [];
+      }
+      
+      // Prepare pricing data based on pricing type
+      const pricingData: any = {
+        starting_price: venue.starting_price,
+        price_per_person: null,
+        hourly_rate: null
+      };
+      
+      if (pricingType === 'perPerson') {
+        pricingData.price_per_person = venue.price_per_person || venue.starting_price;
+      } else if (pricingType === 'hourly') {
+        pricingData.hourly_rate = venue.hourly_rate || venue.starting_price;
       }
       
       const { error } = await supabase
@@ -151,13 +267,21 @@ const EditVenue = () => {
           min_capacity: venue.min_capacity,
           max_capacity: venue.max_capacity,
           starting_price: venue.starting_price,
+          price_per_person: pricingData.price_per_person,
+          hourly_rate: pricingData.hourly_rate,
           image_url: venue.image_url,
           gallery_images: galleryImages,
           wifi: venue.wifi,
           parking: venue.parking,
           updated_at: new Date().toISOString(),
           latitude: venue.latitude,
-          longitude: venue.longitude
+          longitude: venue.longitude,
+          opening_hours: venue.opening_hours,
+          accessibility_features: venue.accessibility_features,
+          additional_services: venue.additional_services,
+          accepted_payment_methods: venue.accepted_payment_methods,
+          amenities: venue.amenities,
+          currency: venue.currency
         })
         .eq('id', id);
         
@@ -200,6 +324,7 @@ const EditVenue = () => {
           
           <form onSubmit={handleSubmit}>
             <div className="space-y-6">
+              {/* Basic Information Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Basic Information</CardTitle>
@@ -260,6 +385,24 @@ const EditVenue = () => {
                     />
                   </div>
                   
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select 
+                      value={venue.currency || 'SAR'} 
+                      onValueChange={(value) => setVenue(prev => ({ ...prev, currency: value }))}
+                    >
+                      <SelectTrigger id="currency">
+                        <SelectValue placeholder="Select Currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SAR">Saudi Riyal (SAR)</SelectItem>
+                        <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                        <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                        <SelectItem value="GBP">British Pound (GBP)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
                   {/* Location Map */}
                   <div className="space-y-2 mt-4">
                     <Label>Venue Location on Map</Label>
@@ -278,6 +421,7 @@ const EditVenue = () => {
                 </CardContent>
               </Card>
               
+              {/* Capacity & Pricing Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Capacity & Pricing</CardTitle>
@@ -310,19 +454,105 @@ const EditVenue = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="starting_price">Starting Price (SAR)</Label>
-                    <Input
-                      id="starting_price"
-                      name="starting_price"
-                      type="number"
-                      min="0"
-                      value={venue.starting_price || 0}
-                      onChange={handleNumberChange}
-                    />
+                    <Label htmlFor="pricingType">Pricing Type</Label>
+                    <Select value={pricingType} onValueChange={handlePricingTypeChange}>
+                      <SelectTrigger id="pricingType">
+                        <SelectValue placeholder="Select pricing type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="flat">Flat Rate</SelectItem>
+                        <SelectItem value="perPerson">Per Person</SelectItem>
+                        <SelectItem value="hourly">Hourly Rate</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+                  
+                  {pricingType === 'flat' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="starting_price">Base Price ({venue.currency})</Label>
+                      <Input
+                        id="starting_price"
+                        name="starting_price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={venue.starting_price || 0}
+                        onChange={handleFloatNumberChange}
+                      />
+                    </div>
+                  )}
+                  
+                  {pricingType === 'perPerson' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="price_per_person">Price Per Person ({venue.currency})</Label>
+                      <Input
+                        id="price_per_person"
+                        name="price_per_person"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={venue.price_per_person || 0}
+                        onChange={handleFloatNumberChange}
+                      />
+                    </div>
+                  )}
+                  
+                  {pricingType === 'hourly' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="hourly_rate">Hourly Rate ({venue.currency})</Label>
+                      <Input
+                        id="hourly_rate"
+                        name="hourly_rate"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={venue.hourly_rate || 0}
+                        onChange={handleFloatNumberChange}
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               
+              {/* Opening Hours Card */}
+              <Card className="glass-card border-white/10">
+                <CardHeader>
+                  <CardTitle>Opening Hours</CardTitle>
+                  <CardDescription>Set your venue's operating hours</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {days.map((day) => (
+                    <div key={day} className="flex items-center space-x-4">
+                      <div className="w-24">
+                        <Label>{day}</Label>
+                      </div>
+                      <div className="flex flex-1 items-center space-x-2">
+                        <div className="flex items-center space-x-2">
+                          <Clock className="h-4 w-4 text-findvenue-text-muted" />
+                          <Input
+                            type="time"
+                            value={venue.opening_hours?.[day]?.open || '09:00'}
+                            onChange={(e) => handleOpeningHoursChange(day, 'open', e.target.value)}
+                            className="w-32"
+                          />
+                        </div>
+                        <span>to</span>
+                        <div className="flex items-center space-x-2">
+                          <Clock className="h-4 w-4 text-findvenue-text-muted" />
+                          <Input
+                            type="time"
+                            value={venue.opening_hours?.[day]?.close || '17:00'}
+                            onChange={(e) => handleOpeningHoursChange(day, 'close', e.target.value)}
+                            className="w-32"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+              
+              {/* Images Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Images</CardTitle>
@@ -351,32 +581,194 @@ const EditVenue = () => {
                 </CardContent>
               </Card>
               
+              {/* Amenities Card */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Amenities</CardTitle>
                   <CardDescription>Update available amenities</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="wifi"
-                      checked={venue.wifi || false}
-                      onCheckedChange={(checked) => 
-                        handleCheckboxChange('wifi', checked as boolean)
-                      }
-                    />
-                    <Label htmlFor="wifi">Wi-Fi Available</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="wifi"
+                        checked={venue.wifi || false}
+                        onCheckedChange={(checked) => 
+                          handleCheckboxChange('wifi', checked as boolean)
+                        }
+                      />
+                      <Label htmlFor="wifi">Wi-Fi Available</Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="parking"
+                        checked={venue.parking || false}
+                        onCheckedChange={(checked) => 
+                          handleCheckboxChange('parking', checked as boolean)
+                        }
+                      />
+                      <Label htmlFor="parking">Parking Available</Label>
+                    </div>
                   </div>
                   
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="parking"
-                      checked={venue.parking || false}
-                      onCheckedChange={(checked) => 
-                        handleCheckboxChange('parking', checked as boolean)
-                      }
+                  {/* Custom Amenities */}
+                  <div className="space-y-2 mt-4">
+                    <Label>Custom Amenities</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        placeholder="Add amenity (e.g. Sound System)"
+                        value={newAmenity}
+                        onChange={(e) => setNewAmenity(e.target.value)}
+                      />
+                      <Button 
+                        type="button" 
+                        onClick={() => addArrayItem('amenities', newAmenity, setNewAmenity)}
+                        className="shrink-0"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                      {venue.amenities?.map((amenity: string, index: number) => (
+                        <div key={index} className="flex items-center justify-between bg-findvenue-surface/30 px-3 py-2 rounded-md">
+                          <span className="text-sm">{amenity}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeArrayItem('amenities', index)}
+                            className="h-6 w-6 p-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Additional Services Card */}
+              <Card className="glass-card border-white/10">
+                <CardHeader>
+                  <CardTitle>Additional Services</CardTitle>
+                  <CardDescription>Add extra services you offer</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Add service (e.g. Catering, Decoration)"
+                      value={newService}
+                      onChange={(e) => setNewService(e.target.value)}
                     />
-                    <Label htmlFor="parking">Parking Available</Label>
+                    <Button 
+                      type="button" 
+                      onClick={() => addArrayItem('additional_services', newService, setNewService)}
+                      className="shrink-0"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {venue.additional_services?.map((service: string, index: number) => (
+                      <div key={index} className="flex items-center justify-between bg-findvenue-surface/30 px-3 py-2 rounded-md">
+                        <span className="text-sm">{service}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeArrayItem('additional_services', index)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Accessibility Features Card */}
+              <Card className="glass-card border-white/10">
+                <CardHeader>
+                  <CardTitle>Accessibility Features</CardTitle>
+                  <CardDescription>Update accessibility options</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Add feature (e.g. Wheelchair Access)"
+                      value={newFeature}
+                      onChange={(e) => setNewFeature(e.target.value)}
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={() => addArrayItem('accessibility_features', newFeature, setNewFeature)}
+                      className="shrink-0"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {venue.accessibility_features?.map((feature: string, index: number) => (
+                      <div key={index} className="flex items-center justify-between bg-findvenue-surface/30 px-3 py-2 rounded-md">
+                        <span className="text-sm">{feature}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeArrayItem('accessibility_features', index)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Payment Methods Card */}
+              <Card className="glass-card border-white/10">
+                <CardHeader>
+                  <CardTitle>Payment Methods</CardTitle>
+                  <CardDescription>Update accepted payment methods</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Add payment method (e.g. Bank Transfer)"
+                      value={newPaymentMethod}
+                      onChange={(e) => setNewPaymentMethod(e.target.value)}
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={() => addArrayItem('accepted_payment_methods', newPaymentMethod, setNewPaymentMethod)}
+                      className="shrink-0"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {venue.accepted_payment_methods?.map((method: string, index: number) => (
+                      <div key={index} className="flex items-center justify-between bg-findvenue-surface/30 px-3 py-2 rounded-md">
+                        <span className="text-sm">{method}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeArrayItem('accepted_payment_methods', index)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>

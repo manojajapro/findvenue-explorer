@@ -85,7 +85,8 @@ export const useVenueData = () => {
             pricing: {
               currency: data.currency || 'SAR',
               startingPrice: data.starting_price || 0,
-              pricePerPerson: data.price_per_person
+              pricePerPerson: data.price_per_person,
+              hourlyRate: data.hourly_rate
             },
             amenities: data.amenities || [],
             rating: data.rating || 0,
