@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X } from 'lucide-react';
+import { Search, X, MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -68,6 +68,17 @@ const NavbarSearchButton = () => {
           >
             <Search className="h-4 w-4 mr-2" />
             View all venues on map
+          </Button>
+          <Button 
+            variant="ghost" 
+            className="mt-1 text-findvenue w-full justify-start px-2"
+            onClick={() => {
+              navigate('/venues?view=map&mapTools=radius');
+              setIsOpen(false);
+            }}
+          >
+            <MapIcon className="h-4 w-4 mr-2" />
+            Search venues by radius
           </Button>
         </div>
       </PopoverContent>

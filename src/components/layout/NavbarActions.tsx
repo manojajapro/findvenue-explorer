@@ -2,7 +2,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { NotificationCenter } from '@/components/notifications/NotificationCenter';
+import NotificationCenter from '@/components/notifications/NotificationCenter';
 import UserMenu from './UserMenu';
 import NavbarSearchButton from './NavbarSearchButton';
 

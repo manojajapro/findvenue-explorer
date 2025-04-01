@@ -1,15 +1,17 @@
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X, Filter, Locate, Ruler, Navigation } from 'lucide-react';
+import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X, Filter, Locate, Ruler, Navigation, MapIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Slider } from '@/components/ui/slider';
+import { toast } from 'sonner';
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Radius of the earth in km
@@ -34,13 +36,15 @@ const MapSearch = ({
   venueCount,
   onRadiusChange,
   radiusInKm,
-  isRadiusActive
+  isRadiusActive,
+  onManualLocation
 }: { 
   onSearch: (term: string) => void;
   venueCount: number;
   onRadiusChange: (value: number) => void;
   radiusInKm: number;
   isRadiusActive: boolean;
+  onManualLocation: () => void;
 }) => {
   const [searchText, setSearchText] = useState('');
   const [searchParams] = useSearchParams();
@@ -108,9 +112,20 @@ const MapSearch = ({
       
       {isRadiusActive && (
         <div className="px-3 py-2 border-t border-white/10">
-          <div className="flex items-center mb-1">
-            <Ruler className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
-            <span className="text-xs font-medium">Radius search: {radiusInKm.toFixed(1)} km</span>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center">
+              <Ruler className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
+              <span className="text-xs font-medium">Radius search: {radiusInKm.toFixed(1)} km</span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 px-2 text-xs"
+              onClick={onManualLocation}
+            >
+              <MapIcon className="h-3 w-3 mr-1" />
+              Set Location
+            </Button>
           </div>
           <Slider
             value={[radiusInKm]}
@@ -143,6 +158,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const [radiusInKm, setRadiusInKm] = useState(1.0);
   const [venuesInRadius, setVenuesInRadius] = useState<Venue[]>([]);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
+  const [isSettingManualLocation, setIsSettingManualLocation] = useState(false);
+  const [searchParams] = useSearchParams();
   
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -157,6 +174,16 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     lat: 24.774265,
     lng: 46.738586
   };
+  
+  useEffect(() => {
+    // Check for mapTools parameter
+    if (searchParams.get('mapTools') === 'radius') {
+      setIsRadiusActive(true);
+      if (!userLocation) {
+        getUserLocation();
+      }
+    }
+  }, [searchParams]);
   
   const handleVenueClick = (venueId: string) => {
     navigate(`/venue/${venueId}`);
@@ -195,15 +222,68 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
             lng: longitude
           });
           setIsRadiusActive(true);
+          
+          // Center map on user location
+          if (mapRef.current) {
+            mapRef.current.panTo({ lat: latitude, lng: longitude });
+            mapRef.current.setZoom(14);
+          }
+          
+          toast.success("Location detected successfully");
         },
         (error) => {
           console.error("Error getting user location:", error);
+          toast.error("Could not get your location. Try setting it manually.");
+          setIsSettingManualLocation(true);
         }
       );
     } else {
       console.error("Geolocation is not supported by this browser.");
+      toast.error("Your browser doesn't support location services. Try setting it manually.");
+      setIsSettingManualLocation(true);
     }
   }, []);
+  
+  const handleManualLocationSetting = useCallback(() => {
+    setIsSettingManualLocation(true);
+    toast.info("Click on the map to set your location", {
+      description: "Click anywhere on the map to set your location for radius search",
+      position: "top-center",
+      duration: 5000
+    });
+  }, []);
+  
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (isSettingManualLocation && e.latLng) {
+      const newLocation = {
+        lat: e.latLng.lat(),
+        lng: e.latLng.lng()
+      };
+      setUserLocation(newLocation);
+      setIsRadiusActive(true);
+      setIsSettingManualLocation(false);
+      
+      toast.success("Location set successfully");
+      
+      // If map ref exists, center on the new location and zoom in
+      if (mapRef.current) {
+        mapRef.current.panTo(newLocation);
+        mapRef.current.setZoom(14);
+      }
+    }
+  }, [isSettingManualLocation]);
+  
+  const toggleRadiusSearch = useCallback(() => {
+    if (isRadiusActive) {
+      setIsRadiusActive(false);
+    } else {
+      if (!userLocation) {
+        getUserLocation();
+      } else {
+        setIsRadiusActive(true);
+      }
+    }
+  }, [isRadiusActive, userLocation, getUserLocation]);
   
   useEffect(() => {
     if (userLocation && isRadiusActive) {
@@ -248,18 +328,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setRadiusInKm(value);
   }, []);
   
-  const toggleRadiusSearch = useCallback(() => {
-    if (isRadiusActive) {
-      setIsRadiusActive(false);
-    } else {
-      if (!userLocation) {
-        getUserLocation();
-      } else {
-        setIsRadiusActive(true);
-      }
-    }
-  }, [isRadiusActive, userLocation, getUserLocation]);
-
   const fitBoundsToMarkers = useCallback(() => {
     if (!mapRef.current) return;
     
@@ -326,8 +394,23 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
           onRadiusChange={handleRadiusChange}
           radiusInKm={radiusInKm}
           isRadiusActive={isRadiusActive}
+          onManualLocation={handleManualLocationSetting}
         />
       </div>
+      
+      {isSettingManualLocation && (
+        <div className="absolute top-20 left-4 right-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md text-center">
+          <p className="text-sm">Click anywhere on the map to set your location</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2 border-white/10"
+            onClick={() => setIsSettingManualLocation(false)}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
       
       {displayVenues.length === 0 ? (
         <div className="h-full flex items-center justify-center bg-findvenue-surface/50 p-6 text-center">
@@ -357,7 +440,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
           center={defaultCenter}
           zoom={5}
           onLoad={handleMapLoad}
-          onClick={() => setSelectedVenue(null)}
+          onClick={handleMapClick}
           options={{
             streetViewControl: false,
             mapTypeControl: false,
@@ -509,6 +592,20 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         </div>
       )}
       
+      {isSettingManualLocation && (
+        <div className="absolute bottom-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-auto z-[1000] bg-findvenue-surface/80 backdrop-blur-sm px-4 py-3 rounded-md shadow-lg flex items-center justify-between">
+          <span className="text-sm font-medium">Click on map to set location</span>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="ml-4 border-white/10"
+            onClick={() => setIsSettingManualLocation(false)}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+      
       <TooltipProvider>
         <div className={`absolute ${isCompactControls ? 'bottom-4 right-4' : 'top-20 right-4'} z-[1000] flex ${isCompactControls ? 'flex-row' : 'flex-col'} gap-2`}>
           <Tooltip>
@@ -526,6 +623,24 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               <p>{isRadiusActive ? 'Disable radius search' : 'Enable radius search'}</p>
             </TooltipContent>
           </Tooltip>
+          
+          {isRadiusActive && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
+                  onClick={handleManualLocationSetting}
+                >
+                  <MapIcon className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
+                <p>Set location manually</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
           
           <Tooltip>
             <TooltipTrigger asChild>
