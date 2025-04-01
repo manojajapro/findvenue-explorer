@@ -1,194 +1,148 @@
 
-import { useEffect, useState, useRef } from 'react';
-import { Mic, MicOff, Volume2, Play, StopCircle } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Mic, MicOff, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import useVenueVoiceAssistant from '@/hooks/useVenueVoiceAssistant';
-import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
-interface VenueSpecificVoiceAssistantProps {
+type VenueSpecificVoiceAssistantProps = {
   venue: any;
-  isFullWidth?: boolean;
-}
+};
 
-const VenueSpecificVoiceAssistant = ({ venue, isFullWidth = false }: VenueSpecificVoiceAssistantProps) => {
-  const [continuousMode, setContinuousMode] = useState(false);
-  const [userTranscript, setUserTranscript] = useState('');
-  const [aiResponses, setAiResponses] = useState<string[]>([]);
-  const responseRef = useRef<HTMLDivElement>(null);
+const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
+  const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const {
     isListening,
+    isProcessing,
     transcript,
     answer,
-    error,
-    isProcessing,
     startListening,
     stopListening,
-    setTranscript
+    error,
   } = useVenueVoiceAssistant({
     venue,
-    autoRestart: continuousMode,
     onTranscript: (text) => {
-      setUserTranscript(text);
+      if (text.trim()) {
+        setTranscriptHistory(prev => [...prev, { text, isUser: true }]);
+      }
     },
     onAnswer: (text) => {
-      setAiResponses(prev => [...prev, text]);
-    }
-  });
-  
-  // Scroll to bottom of responses
-  useEffect(() => {
-    if (responseRef.current) {
-      responseRef.current.scrollTop = responseRef.current.scrollHeight;
-    }
-  }, [aiResponses]);
-  
-  // Update transcript in parent component if needed
-  useEffect(() => {
-    if (transcript) {
-      setUserTranscript(transcript);
-    }
-  }, [transcript]);
-  
-  // Add new answer to responses
-  useEffect(() => {
-    if (answer && !aiResponses.includes(answer)) {
-      setAiResponses(prev => [...prev, answer]);
-    }
-  }, [answer, aiResponses]);
-  
-  // Clear transcript when starting to listen
-  useEffect(() => {
-    if (isListening) {
-      setUserTranscript('');
-    }
-  }, [isListening]);
-  
-  const handleToggleListen = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  };
-  
-  const handleToggleContinuousMode = () => {
-    setContinuousMode(prev => !prev);
-  };
-  
-  const handleClearResponses = () => {
-    setAiResponses([]);
-    setUserTranscript('');
-    setTranscript('');
-  };
-  
-  const handleManualSubmit = () => {
-    if (userTranscript.trim()) {
-      // Use the current transcript for processing
-      setAiResponses(prev => [...prev, `You: ${userTranscript}`]);
-      
-      // This will trigger the onTranscript callback in useVenueVoiceAssistant
-      if (!isProcessing) {
-        startListening();
-        stopListening();
+      if (text.trim()) {
+        setTranscriptHistory(prev => [...prev, { text, isUser: false }]);
       }
     }
+  });
+
+  const clearHistory = () => {
+    setTranscriptHistory([]);
   };
-  
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [transcriptHistory]);
+
   return (
-    <Card className={`${isFullWidth ? 'w-full' : 'w-full max-w-md'} glass-card border-white/10 p-4 rounded-xl flex flex-col`}>
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-lg font-semibold flex items-center">
-          <Volume2 className="mr-2 h-5 w-5 text-findvenue" />
-          Voice Assistant
-        </h3>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant={continuousMode ? "default" : "outline"}
-            size="sm"
-            className={`px-3 py-1 h-8 ${continuousMode ? 'bg-findvenue hover:bg-findvenue-dark' : 'border-findvenue/30 text-findvenue hover:bg-findvenue/10'}`}
-            onClick={handleToggleContinuousMode}
-          >
-            {continuousMode ? 'Continuous On' : 'Continuous Off'}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="px-2 h-8 text-findvenue-text-muted hover:text-white"
-            onClick={handleClearResponses}
-          >
-            Clear
-          </Button>
-        </div>
-      </div>
+    <Card className="glass-card border-white/10 w-full max-w-md mx-auto">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex justify-between items-center">
+          <div>
+            Voice Assistant
+            <p className="text-sm font-normal text-findvenue-text-muted mt-1">
+              Speak to get information about {venue.name}
+            </p>
+          </div>
+          {isListening && (
+            <Badge className="bg-green-500 text-white animate-pulse">
+              Listening...
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
       
-      <div 
-        ref={responseRef}
-        className="flex-grow bg-findvenue-surface/30 rounded-lg p-3 mb-3 overflow-y-auto"
-        style={{ maxHeight: '200px', minHeight: '140px' }}
-      >
-        {aiResponses.length === 0 ? (
-          <p className="text-findvenue-text-muted text-center mt-8">
-            Ask me anything about this venue!
-          </p>
+      <CardContent className="p-4 max-h-[50vh] overflow-y-auto">
+        {transcriptHistory.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-findvenue-text-muted mb-2">
+              Click the microphone button and ask a question about {venue.name}
+            </p>
+            <p className="text-sm text-findvenue-text-muted">
+              Try asking: "What are the amenities?", "How many people can it host?", or "Tell me about the venue"
+            </p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {aiResponses.map((response, index) => (
-              <div key={index} className={`${index % 2 === 0 && response.startsWith('You:') ? 'text-findvenue-text-muted' : 'text-white'}`}>
-                {response}
+            {transcriptHistory.map((item, index) => (
+              <div 
+                key={index} 
+                className={`flex ${item.isUser ? 'justify-end' : 'justify-start'}`}
+              >
+                <div 
+                  className={`px-4 py-2 rounded-lg max-w-[85%] ${
+                    item.isUser 
+                      ? 'bg-findvenue text-white rounded-tr-none' 
+                      : 'bg-findvenue-surface/50 text-findvenue-text rounded-tl-none'
+                  }`}
+                >
+                  {item.text}
+                </div>
               </div>
             ))}
             {isProcessing && (
-              <div className="text-findvenue animate-pulse">Thinking...</div>
+              <div className="flex justify-start">
+                <div className="px-4 py-2 rounded-lg bg-findvenue-surface/50 text-findvenue-text rounded-tl-none">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              </div>
             )}
           </div>
         )}
-      </div>
-      
-      {error && (
-        <p className="text-red-500 text-sm mb-2">{error}</p>
-      )}
-      
-      <div className="flex items-center gap-2">
-        <textarea
-          value={userTranscript}
-          onChange={(e) => {
-            setUserTranscript(e.target.value);
-            setTranscript(e.target.value);
-          }}
-          placeholder="Type or speak your question..."
-          className="flex-grow bg-findvenue-surface/50 text-white border border-white/10 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-findvenue outline-none"
-          rows={1}
-        />
+        {error && (
+          <div className="mt-2 p-2 bg-red-500/10 text-red-500 rounded text-sm">
+            Error: {error}
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </CardContent>
+
+      <CardFooter className="p-4 pt-2 border-t border-white/10 flex justify-between">
+        <div className="flex gap-2">
+          {transcriptHistory.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={clearHistory}
+              disabled={isProcessing}
+              title="Clear conversation"
+              className="border-white/10 bg-findvenue-surface/50 hover:bg-findvenue-surface"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
         
-        <div className="flex space-x-2">
-          <Button
-            onClick={handleToggleListen}
-            variant="outline"
-            size="icon"
-            className={`${isListening ? 'bg-findvenue text-white' : 'border-findvenue/30 text-findvenue hover:bg-findvenue/10'}`}
-            disabled={isProcessing}
-          >
-            {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-          </Button>
-          
-          <Button
-            onClick={handleManualSubmit}
-            variant="default"
-            size="icon"
-            className="bg-findvenue hover:bg-findvenue-dark"
-            disabled={isProcessing || !userTranscript.trim()}
-          >
-            <Play className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
-      
-      {isListening && (
-        <div className="mt-2 text-center">
-          <span className="text-findvenue text-sm animate-pulse">Listening...</span>
-        </div>
-      )}
+        <Button
+          onClick={isListening ? stopListening : startListening}
+          disabled={isProcessing}
+          className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-findvenue hover:bg-findvenue-dark"}
+          size="lg"
+        >
+          {isListening ? (
+            <>
+              <MicOff className="mr-2 h-5 w-5" />
+              Stop Listening
+            </>
+          ) : (
+            <>
+              <Mic className="mr-2 h-5 w-5" />
+              Start Listening
+            </>
+          )}
+        </Button>
+      </CardFooter>
     </Card>
   );
 };

@@ -1,5 +1,6 @@
+
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 type VenueVoiceAssistantProps = {
@@ -22,9 +23,24 @@ export const useVenueVoiceAssistant = ({
   const [answer, setAnswer] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { toast } = useToast();
   
   const recognition = useRef<SpeechRecognition | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Initialize audio element for playing responses
+  useEffect(() => {
+    audioRef.current = new Audio();
+    audioRef.current.onended = () => {
+      console.log('Audio playback ended');
+    };
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
   
   const handleSpeechStart = useCallback(() => {
     setIsListening(true);
@@ -58,6 +74,7 @@ export const useVenueVoiceAssistant = ({
     try {
       console.log(`Processing voice query: "${query}"`);
       
+      // 1. Call venue-assistant to get text response
       const { data, error } = await supabase.functions.invoke('venue-assistant', {
         body: {
           query,
@@ -79,11 +96,42 @@ export const useVenueVoiceAssistant = ({
           onAnswer(data.answer);
         }
         
-        if ('speechSynthesis' in window) {
-          const utterance = new SpeechSynthesisUtterance(data.answer);
-          utterance.lang = 'en-US';
-          utterance.rate = 1.0;
-          window.speechSynthesis.speak(utterance);
+        // 2. Call text-to-speech to convert response to audio
+        try {
+          const response = await supabase.functions.invoke('text-to-speech', {
+            body: {
+              text: data.answer,
+              voice: 'alloy' // You can customize the voice here
+            },
+            responseType: 'arraybuffer'
+          });
+          
+          if (response.error) {
+            throw new Error(response.error.message);
+          }
+          
+          // Create blob from array buffer
+          const blob = new Blob([response.data], { type: 'audio/mpeg' });
+          const url = URL.createObjectURL(blob);
+          
+          if (audioRef.current) {
+            audioRef.current.src = url;
+            audioRef.current.play().catch(e => console.error('Error playing audio:', e));
+            
+            // Clean up blob URL when audio is done
+            audioRef.current.onended = () => {
+              URL.revokeObjectURL(url);
+            };
+          }
+        } catch (speechError) {
+          console.error('Error generating speech:', speechError);
+          // Fallback to browser's speech synthesis if available
+          if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(data.answer);
+            utterance.lang = 'en-US';
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+          }
         }
       } else {
         throw new Error('No answer received from AI assistant');
@@ -91,15 +139,13 @@ export const useVenueVoiceAssistant = ({
     } catch (err: any) {
       console.error('Error processing voice query:', err);
       setError(err.message);
-      toast({
-        variant: 'destructive',
-        title: 'Error processing your request',
+      toast.error('Error processing your request', {
         description: err.message || 'Please try again later'
       });
     } finally {
       setIsProcessing(false);
     }
-  }, [venue?.id, toast, onAnswer]);
+  }, [venue?.id, onAnswer]);
   
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;

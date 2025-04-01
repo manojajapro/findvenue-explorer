@@ -30,6 +30,8 @@ import VenueLocationMap from '@/components/map/VenueLocationMap';
 import BookingForm from '@/components/venue/BookingForm';
 import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
 import { useAuth } from '@/hooks/useAuth';
+import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
+import VenueRating from '@/components/venue/VenueRating';
 
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
@@ -199,6 +201,16 @@ const VenueDetails = () => {
     
     fetchVenueDetails();
   }, [id, navigate]);
+  
+  const updateVenueRating = (newRating: number, newCount: number) => {
+    if (venue) {
+      setVenue({
+        ...venue,
+        rating: newRating,
+        reviews: newCount
+      });
+    }
+  };
   
   const renderOpeningHours = () => {
     if (!venue?.openingHours) return null;
@@ -517,55 +529,58 @@ const VenueDetails = () => {
               )}
             </div>
             
+            {venue && <VenueAIAssistants venue={venue} />}
+            
             {venue?.additionalServices && venue.additionalServices.length > 0 && renderAdditionalServices()}
             {venue?.ownerInfo && renderOwnerInfo()}
           </div>
           
           <div>
-            <div className="space-y-6">
-              {venue?.ownerInfo && (
-                <Card className="glass-card border-white/10 sticky top-24">
-                  <div className="mb-4 pb-4 border-b border-white/10">
-                    <div className="text-2xl font-bold mb-1">
-                      {venue?.pricing.currency} {venue?.pricing.startingPrice.toLocaleString()}
-                    </div>
-                    <div className="text-findvenue-text-muted text-sm">
-                      Starting price
-                    </div>
+            <Card className="p-6 glass-card border-white/10 sticky top-24">
+              <div className="mb-4 pb-4 border-b border-white/10">
+                <div className="text-2xl font-bold mb-1">
+                  {venue?.pricing.currency} {venue?.pricing.startingPrice.toLocaleString()}
+                </div>
+                <div className="text-findvenue-text-muted text-sm">
+                  Starting price
+                </div>
+              </div>
+              
+              {venue?.pricing.pricePerPerson && (
+                <div className="mb-4 pb-4 border-b border-white/10">
+                  <div className="flex justify-between items-center">
+                    <span>Price per person</span>
+                    <span>{venue?.pricing.currency} {venue?.pricing.pricePerPerson}</span>
                   </div>
-                  
-                  {venue?.pricing.pricePerPerson && (
-                    <div className="mb-4 pb-4 border-b border-white/10">
-                      <div className="flex justify-between items-center">
-                        <span>Price per person</span>
-                        <span>{venue?.pricing.currency} {venue?.pricing.pricePerPerson}</span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <BookingForm 
-                    venueId={venue.id} 
-                    venueName={venue.name} 
-                    pricePerHour={venue.pricing.startingPrice} 
-                    ownerId={venue.ownerInfo.user_id}
-                    ownerName={venue.ownerInfo.name}
-                  />
-                  
-                  <div className="mt-4">
-                    <ContactVenueOwner 
-                      venueId={venue.id}
-                      venueName={venue.name}
-                      ownerId={venue.ownerInfo.user_id}
-                      ownerName={venue.ownerInfo.name}
-                    />
-                  </div>
-                  
-                  {venue?.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && renderPaymentMethods()}
-                  
-                  {renderOpeningHours()}
-                </Card>
+                </div>
               )}
-            </div>
+              
+              <BookingForm 
+                venueId={venue?.id || ''} 
+                venueName={venue?.name || ''} 
+                pricePerHour={venue?.pricing.startingPrice || 0} 
+              />
+              
+              <div className="mt-4">
+                <ContactVenueOwner 
+                  venueId={venue?.id || ''}
+                  venueName={venue?.name || ''}
+                />
+              </div>
+              
+              <div className="mt-6">
+                <VenueRating 
+                  venueId={venue?.id || ''} 
+                  initialRating={venue?.rating || 0} 
+                  reviewsCount={venue?.reviews || 0}
+                  onRatingUpdated={updateVenueRating}
+                />
+              </div>
+              
+              {venue?.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && renderPaymentMethods()}
+              
+              {renderOpeningHours()}
+            </Card>
           </div>
         </div>
         

@@ -75,6 +75,7 @@ serve(async (req) => {
       systemPrompt += `Amenities: ${venueData.amenities?.join(', ') || 'None listed'}\n`;
       systemPrompt += `WiFi: ${venueData.wifi ? 'Available' : 'Not available'}\n`;
       systemPrompt += `Parking: ${venueData.parking ? 'Available' : 'Not available'}\n`;
+      systemPrompt += `Rating: ${venueData.rating || 0} stars from ${venueData.reviews_count || 0} reviews\n`;
       
       // Additional venue information
       if (venueData.opening_hours) {
