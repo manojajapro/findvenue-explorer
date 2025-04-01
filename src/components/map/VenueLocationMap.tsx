@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { MapPin, Search, Ruler, Locate } from 'lucide-react';
@@ -31,6 +30,11 @@ const containerStyle = {
   height: '250px'
 };
 
+const DEFAULT_LOCATION = {
+  lat: 24.774265,
+  lng: 46.738586
+};
+
 const VenueLocationMap = ({ 
   name, 
   address, 
@@ -41,12 +45,9 @@ const VenueLocationMap = ({
   nearbyVenues = [],
   highlightedVenueId
 }: VenueLocationMapProps) => {
-  const defaultLat = 24.774265;
-  const defaultLng = 46.738586;
-  
   const [position, setPosition] = useState<google.maps.LatLngLiteral>({
-    lat: latitude || defaultLat,
-    lng: longitude || defaultLng
+    lat: latitude || DEFAULT_LOCATION.lat,
+    lng: longitude || DEFAULT_LOCATION.lng
   });
 
   const [infoWindowOpen, setInfoWindowOpen] = useState(false);
@@ -146,10 +147,28 @@ const VenueLocationMap = ({
         },
         (error) => {
           console.error("Error getting user location:", error);
+          // Use default location if geolocation fails
+          setUserLocation(DEFAULT_LOCATION);
+          setIsRadiusActive(true);
+          
+          // Center map on default location
+          if (mapRef.current) {
+            mapRef.current.panTo(DEFAULT_LOCATION);
+            mapRef.current.setZoom(14);
+          }
         }
       );
     } else {
       console.error("Geolocation is not supported by this browser.");
+      // Use default location if geolocation is not supported
+      setUserLocation(DEFAULT_LOCATION);
+      setIsRadiusActive(true);
+      
+      // Center map on default location
+      if (mapRef.current) {
+        mapRef.current.panTo(DEFAULT_LOCATION);
+        mapRef.current.setZoom(14);
+      }
     }
   }, []);
 
@@ -218,7 +237,7 @@ const VenueLocationMap = ({
       <div className="p-4 border-b border-white/10">
         <h3 className="font-semibold flex items-center">
           <MapPin className="w-4 h-4 mr-2 text-findvenue" />
-          Location
+          Location {editable && <span className="text-xs text-findvenue-text-muted ml-2">(Click anywhere to set location)</span>}
         </h3>
       </div>
       
@@ -244,7 +263,6 @@ const VenueLocationMap = ({
             ]
           }}
         >
-          {/* Main venue marker */}
           <Marker
             position={position}
             draggable={editable}
@@ -268,7 +286,6 @@ const VenueLocationMap = ({
             )}
           </Marker>
 
-          {/* Nearby venues markers */}
           {nearbyVenues.length > 0 && nearbyVenues.map(venue => (
             <Marker
               key={venue.id}
@@ -312,7 +329,6 @@ const VenueLocationMap = ({
             </Marker>
           ))}
 
-          {/* User location marker and radius circle */}
           {userLocation && isRadiusActive && (
             <>
               <Circle 

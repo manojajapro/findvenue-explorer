@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { Venue } from '@/hooks/useSupabaseVenues';
@@ -146,6 +145,11 @@ const containerStyle = {
   height: '100%'
 };
 
+const DEFAULT_LOCATION = {
+  lat: 24.774265,
+  lng: 46.738586
+};
+
 const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const navigate = useNavigate();
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -153,7 +157,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const [mapSearchTerm, setMapSearchTerm] = useState('');
   const [isCompactControls, setIsCompactControls] = useState(false);
-  const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | undefined>(undefined);
+  const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | undefined>(DEFAULT_LOCATION);
   const [isRadiusActive, setIsRadiusActive] = useState(false);
   const [radiusInKm, setRadiusInKm] = useState(1.0);
   const [venuesInRadius, setVenuesInRadius] = useState<Venue[]>([]);
@@ -170,11 +174,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     venue => venue.latitude && venue.longitude
   );
   
-  const defaultCenter = {
-    lat: 24.774265,
-    lng: 46.738586
-  };
-  
   useEffect(() => {
     // Check for mapTools parameter
     if (searchParams.get('mapTools') === 'radius') {
@@ -183,6 +182,12 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         getUserLocation();
       }
     }
+    
+    // Show a toast when the page loads to instruct users
+    toast.info("Click anywhere on the map to set your location for radius search", {
+      duration: 5000,
+      id: "map-instruction",
+    });
   }, [searchParams]);
   
   const handleVenueClick = (venueId: string) => {
@@ -233,14 +238,32 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         },
         (error) => {
           console.error("Error getting user location:", error);
-          toast.error("Could not get your location. Try setting it manually.");
-          setIsSettingManualLocation(true);
+          toast.error("Could not get your location. Using default location (11461).");
+          
+          // Use default location if geolocation fails
+          setUserLocation(DEFAULT_LOCATION);
+          setIsRadiusActive(true);
+          
+          // Center map on default location
+          if (mapRef.current) {
+            mapRef.current.panTo(DEFAULT_LOCATION);
+            mapRef.current.setZoom(14);
+          }
         }
       );
     } else {
       console.error("Geolocation is not supported by this browser.");
-      toast.error("Your browser doesn't support location services. Try setting it manually.");
-      setIsSettingManualLocation(true);
+      toast.error("Your browser doesn't support location services. Using default location (11461).");
+      
+      // Use default location if geolocation is not supported
+      setUserLocation(DEFAULT_LOCATION);
+      setIsRadiusActive(true);
+      
+      // Center map on default location
+      if (mapRef.current) {
+        mapRef.current.panTo(DEFAULT_LOCATION);
+        mapRef.current.setZoom(14);
+      }
     }
   }, []);
   
@@ -263,7 +286,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       setIsRadiusActive(true);
       setIsSettingManualLocation(false);
       
-      toast.success("Location set successfully");
+      toast.success("Custom location set successfully");
       
       // If map ref exists, center on the new location and zoom in
       if (mapRef.current) {
@@ -400,12 +423,23 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       
       {isSettingManualLocation && (
         <div className="absolute top-20 left-4 right-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md text-center">
-          <p className="text-sm">Click anywhere on the map to set your location</p>
+          <p className="text-sm font-medium">Click anywhere on the map to set your location</p>
+          <p className="text-xs text-findvenue-text-muted mb-2">Default location: Pin code 11461 (Riyadh)</p>
           <Button
             variant="outline"
             size="sm"
-            className="mt-2 border-white/10"
-            onClick={() => setIsSettingManualLocation(false)}
+            className="mt-1 border-white/10"
+            onClick={() => {
+              setIsSettingManualLocation(false);
+              // Set to default location if user cancels
+              if (!userLocation) {
+                setUserLocation(DEFAULT_LOCATION);
+                if (mapRef.current) {
+                  mapRef.current.panTo(DEFAULT_LOCATION);
+                  mapRef.current.setZoom(14);
+                }
+              }
+            }}
           >
             Cancel
           </Button>
@@ -437,8 +471,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       ) : (
         <GoogleMap
           mapContainerStyle={containerStyle}
-          center={defaultCenter}
-          zoom={5}
+          center={userLocation || DEFAULT_LOCATION}
+          zoom={14}
           onLoad={handleMapLoad}
           onClick={handleMapClick}
           options={{
@@ -641,6 +675,31 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               </TooltipContent>
             </Tooltip>
           )}
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
+                onClick={() => {
+                  // Reset to default location
+                  setUserLocation(DEFAULT_LOCATION);
+                  setIsRadiusActive(true);
+                  if (mapRef.current) {
+                    mapRef.current.panTo(DEFAULT_LOCATION);
+                    mapRef.current.setZoom(14);
+                  }
+                  toast.success("Reset to default location (11461)");
+                }}
+              >
+                <Navigation className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
+              <p>Use default location (11461)</p>
+            </TooltipContent>
+          </Tooltip>
           
           <Tooltip>
             <TooltipTrigger asChild>
