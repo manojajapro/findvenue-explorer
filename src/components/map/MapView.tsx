@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleMap, LoadScript, Marker, Circle } from '@react-google-maps/api';
 import { useDarkMode } from '@/hooks/useDarkMode';
@@ -6,26 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { MapPin, Ruler, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-
-interface Venue {
-  id: string;
-  name: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  address?: string;
-}
-
-interface MapViewProps {
-  address?: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  editable?: boolean;
-  onLocationChange?: (lat: number, lng: number) => void;
-  name?: string;
-  venues?: Venue[];
-  isLoading?: boolean;
-  highlightedVenueId?: string;
-}
+import { MapViewProps, Venue } from '@/types/mapTypes';
 
 const darkModeMapStyle = [
   { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
