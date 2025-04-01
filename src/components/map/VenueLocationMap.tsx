@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
@@ -26,7 +25,6 @@ const VenueLocationMap = ({
   editable = false,
   onLocationChange 
 }: VenueLocationMapProps) => {
-  // Default to Riyadh coordinates if venue doesn't have coordinates
   const defaultLat = 24.774265;
   const defaultLng = 46.738586;
   
@@ -39,13 +37,11 @@ const VenueLocationMap = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
 
-  // Load the Google Maps JS API
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     id: 'google-map-script'
   });
 
-  // Update position when props change
   useEffect(() => {
     if (latitude && longitude) {
       setPosition({
@@ -55,7 +51,6 @@ const VenueLocationMap = ({
     }
   }, [latitude, longitude]);
 
-  // When position changes in editable mode, notify parent
   useEffect(() => {
     if (editable && onLocationChange && mapLoaded) {
       onLocationChange(position.lat, position.lng);
