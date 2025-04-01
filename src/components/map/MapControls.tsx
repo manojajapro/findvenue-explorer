@@ -54,7 +54,7 @@ const MapControls = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-              <p>Set location manually</p>
+              <p>Set location manually (click on map)</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -103,7 +103,7 @@ const MapControls = ({
             </Button>
           </TooltipTrigger>
           <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-            <p>Zoom to fit</p>
+            <p>Zoom to fit all venues</p>
           </TooltipContent>
         </Tooltip>
       </div>

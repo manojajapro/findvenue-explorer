@@ -39,6 +39,88 @@ const DEFAULT_LOCATION = {
   lng: 46.738586
 };
 
+// Dark map style
+const DARK_MAP_STYLE = [
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  {
+    featureType: "administrative.locality",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }]
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }]
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#263c3f" }]
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6b9a76" }]
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#38414e" }]
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#212a37" }]
+  },
+  {
+    featureType: "road",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9ca5b3" }]
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#746855" }]
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#1f2835" }]
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#f3d19c" }]
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#2f3948" }]
+  },
+  {
+    featureType: "transit.station",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }]
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#17263c" }]
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#515c6d" }]
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#17263c" }]
+  }
+];
+
 const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const navigate = useNavigate();
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -54,6 +136,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const [isSettingManualLocation, setIsSettingManualLocation] = useState(false);
   const [searchParams] = useSearchParams();
   const [locationAddress, setLocationAddress] = useState<string>("Custom Location");
+  const [mapCursor, setMapCursor] = useState<string>('default');
   
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -125,6 +208,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   
   const handleManualLocationSetting = useCallback(() => {
     setIsSettingManualLocation(true);
+    setMapCursor('crosshair');
     
     // Ensure userLocation is set (to default if not already set)
     if (!userLocation) {
@@ -152,6 +236,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       setLocationAddress("Custom Location");
       setIsRadiusActive(true);
       setIsSettingManualLocation(false);
+      setMapCursor('default');
       
       // Try to reverse geocode the location for better display
       if (window.google && window.google.maps) {
@@ -173,6 +258,18 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         mapRef.current.panTo(newLocation);
         mapRef.current.setZoom(14);
       }
+    }
+  }, [isSettingManualLocation]);
+  
+  const handleMapMove = useCallback((e: google.maps.MapMouseEvent) => {
+    if (isSettingManualLocation && mapRef.current && e.latLng) {
+      // Preview the potential circle location by updating userLocation
+      // This creates a "follow cursor" effect for the circle
+      const previewLocation = {
+        lat: e.latLng.lat(),
+        lng: e.latLng.lng()
+      };
+      setUserLocation(previewLocation);
     }
   }, [isSettingManualLocation]);
   
@@ -340,6 +437,11 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     handleSearch('');
   }, [searchParams, handleSearch]);
   
+  const handleClearSearch = useCallback(() => {
+    setMapSearchTerm('');
+    handleSearch('');
+  }, [handleSearch]);
+  
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-findvenue-surface/50">
@@ -385,15 +487,16 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       </div>
       
       {isSettingManualLocation && (
-        <div className="absolute top-20 left-4 right-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md text-center">
+        <div className="absolute top-20 left-4 right-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md text-center border border-white/10">
           <p className="text-sm font-medium">Click anywhere on the map to set your location</p>
-          <p className="text-xs text-findvenue-text-muted mb-2">Default location: Riyadh, Saudi Arabia</p>
+          <p className="text-xs text-findvenue-text-muted mb-2">Move your cursor to preview location</p>
           <Button
             variant="outline"
             size="sm"
             className="mt-1 border-white/10"
             onClick={() => {
               setIsSettingManualLocation(false);
+              setMapCursor('default');
               // Set to default location if user cancels and no location is set
               if (!userLocation) {
                 setUserLocation(DEFAULT_LOCATION);
@@ -424,9 +527,9 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               <Button 
                 variant="outline" 
                 className="mt-3"
-                onClick={() => setRadiusInKm(Math.min(radiusInKm + 1, 5))}
+                onClick={() => setRadiusInKm(Math.min(radiusInKm + 1, 10))}
               >
-                Increase radius to {Math.min(radiusInKm + 1, 5).toFixed(1)} km
+                Increase radius to {Math.min(radiusInKm + 1, 10).toFixed(1)} km
               </Button>
             )}
           </div>
@@ -438,17 +541,13 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
           zoom={14}
           onLoad={handleMapLoad}
           onClick={handleMapClick}
+          onMouseMove={handleMapMove}
           options={{
             streetViewControl: false,
             mapTypeControl: false,
             fullscreenControl: false,
-            styles: [
-              {
-                featureType: "all",
-                elementType: "labels.text",
-                stylers: [{ lightness: 20 }]
-              }
-            ]
+            styles: DARK_MAP_STYLE,
+            cursor: mapCursor
           }}
         >
           {userLocation && isRadiusActive && (
@@ -457,9 +556,9 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                 center={userLocation} 
                 radius={radiusInKm * 1000} 
                 options={{
-                  fillColor: '#38bdf8',
-                  fillOpacity: 0.1,
-                  strokeColor: '#38bdf8',
+                  fillColor: '#10B981',
+                  fillOpacity: 0.15,
+                  strokeColor: '#10B981',
                   strokeOpacity: 0.8,
                   strokeWeight: 2,
                 }}
@@ -584,7 +683,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         isRadiusActive={isRadiusActive}
         toggleRadiusSearch={toggleRadiusSearch}
         handleManualLocationSetting={handleManualLocationSetting}
-        handleClearSearch={() => handleSearch('')}
+        handleClearSearch={handleClearSearch}
         fitBoundsToMarkers={fitBoundsToMarkers}
         resetToDefaultLocation={resetToDefaultLocation}
       />

@@ -35,7 +35,7 @@ const EnhancedMapSearch = ({
   onClearFilter
 }: EnhancedMapSearchProps) => {
   return (
-    <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md">
+    <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md border border-white/5">
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
         <span className="text-sm font-medium flex items-center">
           <MapPin className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
