@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleMap, LoadScript, Marker, Circle } from '@react-google-maps/api';
 import { useDarkMode } from '@/hooks/useDarkMode';
@@ -6,13 +7,24 @@ import { Slider } from '@/components/ui/slider';
 import { MapPin, Ruler, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
+interface Venue {
+  id: string;
+  name: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  address?: string;
+}
+
 interface MapViewProps {
-  address: string;
-  latitude: number | null;
-  longitude: number | null;
+  address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   editable?: boolean;
   onLocationChange?: (lat: number, lng: number) => void;
   name?: string;
+  venues?: Venue[];
+  isLoading?: boolean;
+  highlightedVenueId?: string;
 }
 
 const darkModeMapStyle = [
@@ -78,7 +90,17 @@ const darkModeMapStyle = [
 
 const lightModeMapStyle = [];
 
-const MapView: React.FC<MapViewProps> = ({ address, latitude, longitude, editable = false, onLocationChange, name = "Venue Location" }) => {
+const MapView: React.FC<MapViewProps> = ({ 
+  address = '', 
+  latitude = null, 
+  longitude = null, 
+  editable = false, 
+  onLocationChange, 
+  name = "Venue Location",
+  venues = [],
+  isLoading = false,
+  highlightedVenueId
+}) => {
   const { isDarkMode } = useDarkMode();
   const { toast } = useToast();
   const [center, setCenter] = useState({ lat: 25.000, lng: 45.000 });
@@ -98,14 +120,28 @@ const MapView: React.FC<MapViewProps> = ({ address, latitude, longitude, editabl
   };
 
   const loadMap = useCallback(() => {
+    // If we have venues, center on the first one with coordinates
+    if (venues.length > 0) {
+      const venueWithCoords = venues.find(venue => venue.latitude && venue.longitude);
+      if (venueWithCoords && venueWithCoords.latitude && venueWithCoords.longitude) {
+        setCenter({ 
+          lat: venueWithCoords.latitude, 
+          lng: venueWithCoords.longitude 
+        });
+        setZoom(12);
+        return;
+      }
+    }
+
+    // Fall back to single venue mode
     if (latitude && longitude) {
       setCenter({ lat: latitude, lng: longitude });
       setMarkerPosition({ lat: latitude, lng: longitude });
       setZoom(15);
-    } else {
+    } else if (address) {
       geocodeAddress(address);
     }
-  }, [address, latitude, longitude]);
+  }, [address, latitude, longitude, venues]);
 
   useEffect(() => {
     loadMap();
@@ -240,7 +276,8 @@ const MapView: React.FC<MapViewProps> = ({ address, latitude, longitude, editabl
           onLoad={onMapLoad}
           onUnmount={onMapUnmount}
         >
-          {markerPosition && (
+          {/* Single marker mode */}
+          {markerPosition && !venues.length && (
             <Marker
               position={markerPosition}
               draggable={editable}
@@ -260,6 +297,28 @@ const MapView: React.FC<MapViewProps> = ({ address, latitude, longitude, editabl
               }}
             />
           )}
+
+          {/* Multiple venues mode */}
+          {venues.length > 0 && 
+            venues.map(venue => {
+              if (venue.latitude && venue.longitude) {
+                return (
+                  <Marker
+                    key={venue.id}
+                    position={{ lat: venue.latitude, lng: venue.longitude }}
+                    title={venue.name}
+                    icon={venue.id === highlightedVenueId ? {
+                      url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                      scaledSize: new google.maps.Size(50, 50)
+                    } : undefined}
+                    animation={venue.id === highlightedVenueId ? google.maps.Animation.BOUNCE : undefined}
+                  />
+                );
+              }
+              return null;
+            })
+          }
+
           {isDrawingRadius && markerPosition && (
             <Circle
               center={markerPosition}
