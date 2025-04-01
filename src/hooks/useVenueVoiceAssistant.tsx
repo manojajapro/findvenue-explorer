@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +26,6 @@ export const useVenueVoiceAssistant = ({
   
   const recognition = useRef<SpeechRecognition | null>(null);
   
-  // Handle speech recognition events
   const handleSpeechStart = useCallback(() => {
     setIsListening(true);
     setTranscript('');
@@ -50,7 +48,6 @@ export const useVenueVoiceAssistant = ({
     }
   }, [transcript, isProcessing, onListeningChange]);
   
-  // Define processVoiceQuery function
   const processVoiceQuery = useCallback(async (query: string) => {
     if (!query.trim()) {
       return;
@@ -61,7 +58,6 @@ export const useVenueVoiceAssistant = ({
     try {
       console.log(`Processing voice query: "${query}"`);
       
-      // Call our venue-assistant Edge Function
       const { data, error } = await supabase.functions.invoke('venue-assistant', {
         body: {
           query,
@@ -83,7 +79,6 @@ export const useVenueVoiceAssistant = ({
           onAnswer(data.answer);
         }
         
-        // Use Web Speech API to speak the answer
         if ('speechSynthesis' in window) {
           const utterance = new SpeechSynthesisUtterance(data.answer);
           utterance.lang = 'en-US';
@@ -106,7 +101,6 @@ export const useVenueVoiceAssistant = ({
     }
   }, [venue?.id, toast, onAnswer]);
   
-  // Initialize speech recognition
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
@@ -122,7 +116,6 @@ export const useVenueVoiceAssistant = ({
     return () => {
       if (recognition.current) {
         try {
-          // Fix: Check and call stop() instead of abort()
           if (isListening) {
             recognition.current.stop();
           }
@@ -133,7 +126,6 @@ export const useVenueVoiceAssistant = ({
     };
   }, [isListening]);
   
-  // Handle auto-restart functionality
   useEffect(() => {
     if (autoRestart && !isListening && !isProcessing) {
       const timer = setTimeout(() => {
@@ -145,7 +137,6 @@ export const useVenueVoiceAssistant = ({
     }
   }, [autoRestart, isListening, isProcessing]);
   
-  // Define startListening
   const startListening = useCallback(() => {
     if (!recognition.current) {
       setError('Speech recognition is not supported in your browser.');
@@ -153,10 +144,9 @@ export const useVenueVoiceAssistant = ({
     }
     
     try {
-      // Fix: Use proper event handlers for SpeechRecognition
-      recognition.current.onstart = handleSpeechStart;
+      recognition.current.addEventListener('start', handleSpeechStart);
       
-      recognition.current.onresult = (event: SpeechRecognitionEvent) => {
+      recognition.current.addEventListener('result', (event) => {
         const text = event.results[0][0].transcript;
         console.log('Speech recognized:', text);
         setTranscript(text);
@@ -164,9 +154,9 @@ export const useVenueVoiceAssistant = ({
         if (onTranscript) {
           onTranscript(text);
         }
-      };
+      });
       
-      recognition.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+      recognition.current.addEventListener('error', (event) => {
         console.error('Speech recognition error:', event.error);
         setError(`Speech recognition error: ${event.error}`);
         setIsListening(false);
@@ -174,9 +164,9 @@ export const useVenueVoiceAssistant = ({
         if (onListeningChange) {
           onListeningChange(false);
         }
-      };
+      });
       
-      recognition.current.onend = handleSpeechEnd;
+      recognition.current.addEventListener('end', handleSpeechEnd);
       
       recognition.current.start();
     } catch (err: any) {
