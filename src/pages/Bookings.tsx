@@ -1,14 +1,14 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, Trash2, MessageCircle, Loader2 } from 'lucide-react';
+import { Calendar, Clock, Users, Trash2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import BookingOwnerChat from '@/components/bookings/BookingOwnerChat';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,7 @@ type Booking = {
   guests: number;
   special_requests?: string;
   owner_id?: string;
+  owner_name?: string;
 };
 
 const Bookings = () => {
@@ -64,13 +65,11 @@ const Bookings = () => {
       let query;
       
       if (isVenueOwner) {
-        // For venue owners, get bookings for their venues
         query = supabase
           .from('bookings')
           .select('*, venues:venue_id(name, image_url, owner_info)')
           .filter('venues.owner_info->user_id', 'eq', user.id);
       } else {
-        // For customers, get their own bookings
         query = supabase
           .from('bookings')
           .select('*, venues:venue_id(name, image_url, owner_info)')
@@ -81,9 +80,10 @@ const Bookings = () => {
       
       if (error) throw error;
       
-      // Transform the data to match our Booking type
       const formattedBookings: Booking[] = data.map((item: any) => {
         let ownerId = undefined;
+        let ownerName = undefined;
+        
         if (item.venues && item.venues.owner_info) {
           try {
             const ownerInfo = typeof item.venues.owner_info === 'string'
@@ -91,6 +91,7 @@ const Bookings = () => {
               : item.venues.owner_info;
               
             ownerId = ownerInfo.user_id;
+            ownerName = ownerInfo.name;
           } catch (e) {
             console.error("Error parsing owner_info", e);
           }
@@ -110,7 +111,8 @@ const Bookings = () => {
           created_at: item.created_at,
           guests: item.guests,
           special_requests: item.special_requests,
-          owner_id: ownerId
+          owner_id: ownerId,
+          owner_name: ownerName
         };
       });
       
@@ -140,14 +142,12 @@ const Bookings = () => {
         
       if (error) throw error;
       
-      // Update local state
       setBookings(prev => 
         prev.map(booking => 
           booking.id === bookingId ? { ...booking, status: 'cancelled' } : booking
         )
       );
 
-      // Notify venue owner if owner_id exists
       if (booking.owner_id) {
         await supabase
           .from('notifications')
@@ -181,18 +181,6 @@ const Bookings = () => {
     }
   };
 
-  const initiateChat = (ownerId: string | undefined) => {
-    if (!ownerId) {
-      toast({
-        title: 'Cannot Chat',
-        description: 'Owner information is not available',
-        variant: 'destructive',
-      });
-      return;
-    }
-    navigate(`/messages/${ownerId}`);
-  };
-  
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -208,16 +196,14 @@ const Bookings = () => {
   
   const now = new Date();
   
-  // FIX: Change filter logic to include pending bookings in upcoming regardless of date
   const upcomingBookings = bookings.filter(booking => 
-    (booking.status === 'pending' || // All pending bookings go to upcoming
-    (new Date(booking.booking_date) >= now && booking.status === 'confirmed')) // Future confirmed bookings
+    (booking.status === 'pending' || 
+    (new Date(booking.booking_date) >= now && booking.status === 'confirmed'))
   );
   
-  // Past bookings only include confirmed bookings in the past or cancelled bookings
   const pastBookings = bookings.filter(booking => 
-    (booking.status === 'cancelled' || // All cancelled bookings 
-    (new Date(booking.booking_date) < now && booking.status === 'confirmed')) // Past confirmed bookings
+    (booking.status === 'cancelled' || 
+    (new Date(booking.booking_date) < now && booking.status === 'confirmed'))
   );
   
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
@@ -326,14 +312,13 @@ const Bookings = () => {
                           
                           <div className="mt-4 flex flex-col gap-2">
                             {booking.owner_id && (
-                              <Button 
-                                variant="outline" 
-                                className="w-full border-findvenue text-findvenue hover:bg-findvenue/10"
-                                onClick={() => initiateChat(booking.owner_id)}
-                              >
-                                <MessageCircle className="h-4 w-4 mr-2" />
-                                Chat with Owner
-                              </Button>
+                              <BookingOwnerChat 
+                                ownerId={booking.owner_id}
+                                ownerName={booking.owner_name}
+                                venueId={booking.venue_id}
+                                venueName={booking.venue_name}
+                                bookingId={booking.id}
+                              />
                             )}
 
                             {(booking.status === 'pending' || booking.status === 'confirmed') && activeTab === 'upcoming' && (

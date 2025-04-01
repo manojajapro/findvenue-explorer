@@ -1,15 +1,22 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogDescription 
+} from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { Loader2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
 type ContactVenueOwnerProps = {
   venueId: string;
@@ -26,6 +33,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isInitiating, setIsInitiating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState(`Hello! I'm interested in your venue "${venueName}". Can you provide more information?`);
 
   const initiateChat = async () => {
     if (!user) {
@@ -83,8 +91,6 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
       
       if (!existingMessages || existingMessages.length === 0) {
         // Create initial message
-        const message = `Hello! I'm interested in your venue "${venueName}". Can you provide more information?`;
-        
         const { data: messageData, error: messageError } = await supabase
           .from('messages')
           .insert({
@@ -125,6 +131,11 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
       // Navigate to messages
       navigate(`/messages/${ownerId}`);
       
+      toast({
+        title: "Message Sent",
+        description: `You've started a conversation with ${ownerName}`,
+      });
+      
     } catch (error: any) {
       console.error('Error initiating chat:', error);
       setError(error.message || 'Failed to start conversation. Please try again.');
@@ -145,9 +156,12 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
       </Button>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-findvenue-card-bg border-white/10">
           <DialogHeader>
             <DialogTitle>Contact Venue Host</DialogTitle>
+            <DialogDescription className="text-findvenue-text-muted">
+              Start a conversation with {ownerName}, the host of {venueName}.
+            </DialogDescription>
           </DialogHeader>
           
           {error ? (
@@ -157,36 +171,39 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : (
-            <div className="py-6">
-              <p className="mb-4">
-                Start a conversation with <strong>{ownerName}</strong>, the host of <strong>{venueName}</strong>.
-              </p>
-              <p className="text-sm text-findvenue-text-muted mb-6">
-                You'll be able to discuss details, ask questions, and negotiate terms directly.
-              </p>
+            <div className="py-4">
+              <div className="mb-4">
+                <label className="text-sm font-medium mb-1 block">Your message:</label>
+                <Textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="bg-findvenue-surface/50 border-white/10 h-32"
+                  placeholder="Enter your message to the venue host..."
+                />
+              </div>
               
-              <div className="flex justify-end gap-2">
+              <DialogFooter className="flex justify-end gap-2 mt-6">
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
                 </Button>
                 <Button 
                   className="bg-findvenue hover:bg-findvenue-dark"
                   onClick={initiateChat}
-                  disabled={isInitiating}
+                  disabled={isInitiating || !message.trim()}
                 >
                   {isInitiating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Starting...
+                      Sending...
                     </>
                   ) : (
                     <>
                       <MessageCircle className="mr-2 h-4 w-4" />
-                      Start Conversation
+                      Send Message
                     </>
                   )}
                 </Button>
-              </div>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>
