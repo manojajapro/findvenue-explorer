@@ -317,26 +317,55 @@ const EditVenue = () => {
   };
 
   // New code to safely check the user ID:
-  const ownerInfoObj = typeof venue?.owner_info === 'object'
-    ? venue.owner_info
-    : null;
+  const isOwner = useCallback(() => {
+    if (!user || !venue) return false;
+    
+    let ownerUserId = null;
+    
+    // Handle owner_info regardless if it's a string or an object
+    if (venue.owner_info) {
+      try {
+        if (typeof venue.owner_info === 'string') {
+          const parsedOwnerInfo = JSON.parse(venue.owner_info);
+          ownerUserId = parsedOwnerInfo.user_id;
+        } else if (typeof venue.owner_info === 'object') {
+          ownerUserId = venue.owner_info.user_id;
+        }
+      } catch (err) {
+        console.error("Error parsing owner_info:", err);
+        return false;
+      }
+    }
+    
+    return ownerUserId === user.id;
+  }, [user, venue]);
 
-  const isOwner = !!user?.id && !!ownerInfoObj && 'user_id' in ownerInfoObj && ownerInfoObj.user_id === user.id;
+  useEffect(() => {
+    fetchVenue();
+  }, [fetchVenue]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="container mx-auto py-10 text-center">Loading venue data...</div>;
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div className="container mx-auto py-10 text-center">Error: {error}</div>;
   }
 
   if (!venue) {
-    return <div>Venue not found.</div>;
+    return <div className="container mx-auto py-10 text-center">Venue not found.</div>;
   }
 
-  if (!isOwner) {
-    return <div>You are not authorized to edit this venue.</div>;
+  if (!isOwner()) {
+    return (
+      <div className="container mx-auto py-10 text-center">
+        <h1 className="text-2xl font-bold mb-4">Not Authorized</h1>
+        <p className="mb-6">You don't have permission to edit this venue.</p>
+        <Button onClick={() => navigate(`/venue/${id}`)}>
+          View Venue Details
+        </Button>
+      </div>
+    );
   }
 
   return (
