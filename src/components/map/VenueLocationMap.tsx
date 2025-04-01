@@ -41,7 +41,7 @@ const VenueLocationMap = ({
 
   // Load the Google Maps JS API
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: process.env.VITE_GOOGLE_MAPS_API_KEY || "", // Replace with your API key
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "", // Fix: Using import.meta.env instead of process.env
     id: 'google-map-script'
   });
 

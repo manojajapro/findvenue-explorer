@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Slider } from '@/components/ui/slider';
 
-// Calculation function for distance between two coordinates
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Radius of the earth in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -48,7 +47,6 @@ const MapSearch = ({
   const debouncedSearchTerm = useDebounce(searchText, 500);
   
   useEffect(() => {
-    // Initialize search from URL parameters
     const searchFromUrl = searchParams.get('search');
     if (searchFromUrl) {
       setSearchText(searchFromUrl);
@@ -146,18 +144,15 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const [venuesInRadius, setVenuesInRadius] = useState<Venue[]>([]);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   
-  // Load the Google Maps JS API
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: process.env.VITE_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     id: 'google-map-script'
   });
 
-  // Filter venues with valid coordinates
   const venuesWithCoordinates = filteredVenues.filter(
     venue => venue.latitude && venue.longitude
   );
   
-  // Default center on Saudi Arabia
   const defaultCenter = {
     lat: 24.774265,
     lng: 46.738586
@@ -190,7 +185,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setFilteredVenues(results);
   }, [venues]);
   
-  // Get user's location
   const getUserLocation = useCallback(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -211,7 +205,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     }
   }, []);
   
-  // Filter venues by radius
   useEffect(() => {
     if (userLocation && isRadiusActive) {
       const inRadius = venuesWithCoordinates.filter(venue => {
@@ -233,7 +226,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     }
   }, [userLocation, isRadiusActive, radiusInKm, venuesWithCoordinates]);
   
-  // Compact view toggle based on map size
   useEffect(() => {
     const handleResize = () => {
       setIsCompactControls(window.innerWidth < 768);
@@ -244,7 +236,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
-  // Update filtered venues when main venues list changes
   useEffect(() => {
     if (!mapSearchTerm) {
       setFilteredVenues(venues);
@@ -253,12 +244,10 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     }
   }, [venues, mapSearchTerm, handleSearch]);
   
-  // Handle radius change
   const handleRadiusChange = useCallback((value: number) => {
     setRadiusInKm(value);
   }, []);
   
-  // Toggle radius search
   const toggleRadiusSearch = useCallback(() => {
     if (isRadiusActive) {
       setIsRadiusActive(false);
@@ -271,7 +260,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     }
   }, [isRadiusActive, userLocation, getUserLocation]);
 
-  // Fit bounds to show all markers
   const fitBoundsToMarkers = useCallback(() => {
     if (!mapRef.current) return;
     

@@ -148,7 +148,7 @@ export const useVenueVoiceAssistant = ({
         handleSpeechStart();
       };
       
-      recognition.current.onresult = (event) => {
+      recognition.current.onresult = (event: SpeechRecognitionEvent) => {
         const text = event.results[0][0].transcript;
         console.log('Speech recognized:', text);
         setTranscript(text);
@@ -158,7 +158,7 @@ export const useVenueVoiceAssistant = ({
         }
       };
       
-      recognition.current.onerror = (event) => {
+      recognition.current.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setError(`Speech recognition error: ${event.error}`);
         setIsListening(false);
