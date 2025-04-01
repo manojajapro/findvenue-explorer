@@ -5,7 +5,11 @@ import VenueSpecificChatBot from '@/components/chat/VenueSpecificChatBot';
 import VenueSpecificVoiceAssistant from '@/components/voice/VenueSpecificVoiceAssistant';
 import { MessageSquare, Mic } from 'lucide-react';
 
-const VenueAIAssistants = () => {
+type VenueAIAssistantsProps = {
+  venue?: any; // Using any for now as we don't know the exact venue type
+};
+
+const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
   const [activeTab, setActiveTab] = useState('chat');
   
   return (
@@ -25,11 +29,11 @@ const VenueAIAssistants = () => {
         </TabsList>
         
         <TabsContent value="chat" className="pt-2">
-          <VenueSpecificChatBot />
+          <VenueSpecificChatBot venue={venue} />
         </TabsContent>
         
         <TabsContent value="voice" className="pt-2">
-          <VenueSpecificVoiceAssistant />
+          <VenueSpecificVoiceAssistant venue={venue} />
         </TabsContent>
       </Tabs>
     </div>
