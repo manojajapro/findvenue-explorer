@@ -1,10 +1,12 @@
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
-import { MapPin, Search, Ruler, Locate } from 'lucide-react';
+import { MapPin, Search, Ruler, Locate, Navigation, MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export interface VenueLocationMapProps {
@@ -57,6 +59,7 @@ const VenueLocationMap = ({
   const [isRadiusActive, setIsRadiusActive] = useState(false);
   const [radiusInKm, setRadiusInKm] = useState(1.0);
   const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  const [isSettingManualLocation, setIsSettingManualLocation] = useState(false);
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -115,8 +118,24 @@ const VenueLocationMap = ({
         lng: e.latLng.lng()
       };
       setPosition(newPosition);
+    } else if (isSettingManualLocation && e.latLng) {
+      const newLocation = {
+        lat: e.latLng.lat(),
+        lng: e.latLng.lng()
+      };
+      setUserLocation(newLocation);
+      setIsRadiusActive(true);
+      setIsSettingManualLocation(false);
+      
+      toast.success("Custom location set successfully");
+      
+      // If map ref exists, center on the new location and zoom in
+      if (mapRef.current) {
+        mapRef.current.panTo(newLocation);
+        mapRef.current.setZoom(14);
+      }
     }
-  }, [editable]);
+  }, [editable, isSettingManualLocation]);
 
   const handleMarkerDragEnd = useCallback((e: google.maps.MapMouseEvent) => {
     if (editable && e.latLng) {
@@ -144,9 +163,13 @@ const VenueLocationMap = ({
             mapRef.current.panTo({ lat: latitude, lng: longitude });
             mapRef.current.setZoom(14);
           }
+
+          toast.success("Current location detected successfully");
         },
         (error) => {
           console.error("Error getting user location:", error);
+          toast.error("Could not get your location. Using default location (11461).");
+          
           // Use default location if geolocation fails
           setUserLocation(DEFAULT_LOCATION);
           setIsRadiusActive(true);
@@ -160,6 +183,8 @@ const VenueLocationMap = ({
       );
     } else {
       console.error("Geolocation is not supported by this browser.");
+      toast.error("Your browser doesn't support location services. Using default location (11461).");
+      
       // Use default location if geolocation is not supported
       setUserLocation(DEFAULT_LOCATION);
       setIsRadiusActive(true);
@@ -172,17 +197,37 @@ const VenueLocationMap = ({
     }
   }, []);
 
+  const handleManualLocationSetting = useCallback(() => {
+    setIsSettingManualLocation(true);
+    toast.info("Click on the map to set your location", {
+      description: "Click anywhere on the map to set your location for radius search",
+      position: "top-center",
+      duration: 5000
+    });
+  }, []);
+
   const toggleRadiusSearch = useCallback(() => {
     if (isRadiusActive) {
       setIsRadiusActive(false);
     } else {
       if (!userLocation) {
-        getUserLocation();
+        // Instead of immediately getting user location, set to default and enable manual setting
+        setUserLocation(DEFAULT_LOCATION);
+        setIsRadiusActive(true);
+        
+        // Center map on default location
+        if (mapRef.current) {
+          mapRef.current.panTo(DEFAULT_LOCATION);
+          mapRef.current.setZoom(14);
+        }
+        
+        // Prompt user to set location manually
+        handleManualLocationSetting();
       } else {
         setIsRadiusActive(true);
       }
     }
-  }, [isRadiusActive, userLocation, getUserLocation]);
+  }, [isRadiusActive, userLocation, handleManualLocationSetting]);
 
   if (loadError) {
     return (
@@ -351,11 +396,19 @@ const VenueLocationMap = ({
               >
                 <InfoWindow>
                   <div className="text-black text-xs">
-                    Your location
+                    {userLocation.lat === DEFAULT_LOCATION.lat && userLocation.lng === DEFAULT_LOCATION.lng 
+                      ? "Default location (11461)" 
+                      : "Your selected location"}
                   </div>
                 </InfoWindow>
               </Marker>
             </>
+          )}
+          
+          {isSettingManualLocation && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center bg-black bg-opacity-70 text-white p-2 rounded pointer-events-none">
+              Click on map to set location
+            </div>
           )}
         </GoogleMap>
         
@@ -372,21 +425,68 @@ const VenueLocationMap = ({
               <span>{address}</span>
               
               <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="outline"
-                      size="icon"
-                      className={`h-7 w-7 ${isRadiusActive ? 'bg-findvenue text-white' : 'bg-findvenue-card-bg/80'} border-white/10`}
-                      onClick={toggleRadiusSearch}
-                    >
-                      <Locate className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    {isRadiusActive ? 'Disable radius search' : 'Show my location'}
-                  </TooltipContent>
-                </Tooltip>
+                <div className="flex items-center gap-2">
+                  {isRadiusActive && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7 bg-findvenue-card-bg/80 border-white/10"
+                          onClick={handleManualLocationSetting}
+                        >
+                          <MapIcon className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Set location manually
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  
+                  {isRadiusActive && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7 bg-findvenue-card-bg/80 border-white/10"
+                          onClick={() => {
+                            // Reset to default location
+                            setUserLocation(DEFAULT_LOCATION);
+                            setIsRadiusActive(true);
+                            if (mapRef.current) {
+                              mapRef.current.panTo(DEFAULT_LOCATION);
+                              mapRef.current.setZoom(14);
+                            }
+                            toast.success("Reset to default location (11461)");
+                          }}
+                        >
+                          <Navigation className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Use default location (11461)
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline"
+                        size="icon"
+                        className={`h-7 w-7 ${isRadiusActive ? 'bg-findvenue text-white' : 'bg-findvenue-card-bg/80'} border-white/10`}
+                        onClick={toggleRadiusSearch}
+                      >
+                        <Locate className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      {isRadiusActive ? 'Disable radius search' : 'Enable radius search'}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
               </TooltipProvider>
             </div>
           )}
@@ -412,6 +512,12 @@ const VenueLocationMap = ({
             onValueChange={(values) => setRadiusInKm(values[0])}
             className="py-1"
           />
+          
+          {isSettingManualLocation && (
+            <div className="mt-2 text-xs text-center text-findvenue-text-muted">
+              Click anywhere on the map to set your custom location
+            </div>
+          )}
         </div>
       )}
       
