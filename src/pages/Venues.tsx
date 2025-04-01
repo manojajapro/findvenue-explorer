@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import VenuesList from '@/components/venues/VenuesList';
@@ -16,18 +15,17 @@ const Venues = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { venues, categories, cities, isLoading, totalCount } = useRealTimeVenues();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-  const [viewMode, setViewMode] = useState<'list' | 'map'>(searchParams.get('view') as 'list' | 'map' || 'list');
+  const [viewMode, setViewMode] = useState<'list' | 'map'>(searchParams.get('view') as 'list' | 'map' || 'map');
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
-  const debouncedSearchTerm = useDebounce(searchTerm, 300); // Reduced from 500ms to 300ms for faster response
-  
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   const categoryId = searchParams.get('categoryId');
   const cityId = searchParams.get('cityId');
   const hasFilters = searchParams.toString().length > 0;
-  
+
   const categoryName = useMemo(() => categoryId ? categories.find(c => c.id === categoryId)?.name : '', [categoryId, categories]);
   const cityName = useMemo(() => cityId ? cities.find(c => c.id === cityId)?.name : '', [cityId, cities]);
-  
-  // Set page title based on filters
+
   useEffect(() => {
     if (categoryName && cityName) {
       document.title = `${categoryName} venues in ${cityName} | FindVenue`;
@@ -39,8 +37,7 @@ const Venues = () => {
       document.title = 'All Venues | FindVenue';
     }
   }, [categoryName, cityName]);
-  
-  // Update URL when search term changes
+
   useEffect(() => {
     if (debouncedSearchTerm !== searchParams.get('search')) {
       const newParams = new URLSearchParams(searchParams);
@@ -51,60 +48,63 @@ const Venues = () => {
         newParams.delete('search');
       }
       
-      setSearchParams(newParams, { replace: true }); // Added replace: true to avoid creating extra history entries
+      setSearchParams(newParams, { replace: true });
     }
   }, [debouncedSearchTerm, searchParams, setSearchParams]);
-  
-  // Update URL when view mode changes
+
   useEffect(() => {
     const currentViewInUrl = searchParams.get('view');
     if (viewMode !== currentViewInUrl && (viewMode === 'list' || viewMode === 'map')) {
       const newParams = new URLSearchParams(searchParams);
       newParams.set('view', viewMode);
-      setSearchParams(newParams, { replace: true }); // Added replace: true
+      setSearchParams(newParams, { replace: true });
     }
   }, [viewMode, searchParams, setSearchParams]);
-  
-  // Update view mode from URL
+
   useEffect(() => {
     const viewFromUrl = searchParams.get('view') as 'list' | 'map' | null;
     if (viewFromUrl && (viewFromUrl === 'list' || viewFromUrl === 'map')) {
       setViewMode(viewFromUrl);
+    } else {
+      setViewMode('map');
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('view', 'map');
+      setSearchParams(newParams, { replace: true });
     }
-  }, [searchParams]);
-  
+  }, [searchParams, setSearchParams]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (searchTerm.trim()) {
       const newParams = new URLSearchParams(searchParams);
       newParams.set('search', searchTerm.trim());
-      setSearchParams(newParams, { replace: true }); // Added replace: true
+      setSearchParams(newParams, { replace: true });
     }
   };
-  
+
   const clearFilters = () => {
-    setSearchParams(new URLSearchParams(), { replace: true }); // Added replace: true
+    setSearchParams(new URLSearchParams(), { replace: true });
     setSearchTerm('');
   };
 
   const handleVenueMouseEnter = useCallback((venueId: string) => {
     setHoveredVenueId(venueId);
   }, []);
-  
+
   const handleVenueMouseLeave = useCallback(() => {
     setHoveredVenueId(null);
   }, []);
-  
+
   return (
-    <div className="pt-20 pb-16"> {/* Reduced top padding from 24 to 20 to save space */}
+    <div className="pt-20 pb-16">
       <div className="container mx-auto px-4">
-        <div className="mb-4"> {/* Reduced from mb-8 to mb-4 */}
-          <h1 className="text-2xl font-bold mb-1"> {/* Reduced from text-3xl to text-2xl and mb-2 to mb-1 */}
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold mb-1">
             {categoryName && `${categoryName} `}
             {cityName ? `Venues in ${cityName}` : categoryName ? 'Venues' : 'All Venues'}
           </h1>
-          <p className="text-findvenue-text-muted text-sm"> {/* Added text-sm to reduce size */}
+          <p className="text-findvenue-text-muted text-sm">
             {hasFilters 
               ? `Browse our collection of venues${categoryName ? ` for ${categoryName.toLowerCase()}` : ''}${cityName ? ` in ${cityName}` : ''}`
               : 'Browse our collection of premium venues for your next event'
@@ -112,8 +112,8 @@ const Venues = () => {
           </p>
         </div>
         
-        <Card className="mb-4 p-3 bg-findvenue-surface/30 border-white/10"> {/* Reduced from mb-8 to mb-4 and p-4 to p-3 */}
-          <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-2"> {/* Reduced gap from 3 to 2 */}
+        <Card className="mb-4 p-3 bg-findvenue-surface/30 border-white/10">
+          <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
               <Input
@@ -146,7 +146,7 @@ const Venues = () => {
           </form>
           
           {hasFilters && (
-            <div className="mt-3 flex flex-wrap gap-2"> {/* Reduced from mt-4 to mt-3 */}
+            <div className="mt-3 flex flex-wrap gap-2">
               {searchParams.get('search') && (
                 <Badge variant="outline" className="bg-findvenue-surface/50 border-white/20">
                   Search: {searchParams.get('search')}
@@ -197,7 +197,7 @@ const Venues = () => {
           )}
         </Card>
         
-        <div className="flex justify-between items-center mb-3"> {/* Reduced from mb-4 to mb-3 */}
+        <div className="flex justify-between items-center mb-3">
           <div>
             <p className="text-sm text-findvenue-text-muted">
               {isLoading ? 'Searching venues...' : `Found ${venues.length} venues`}
@@ -221,7 +221,7 @@ const Venues = () => {
         </div>
         
         {viewMode === "list" ? (
-          <div>
+          <div className="animate-fade-in">
             <VenuesList 
               venues={venues}
               isLoading={isLoading}
@@ -230,7 +230,7 @@ const Venues = () => {
             />
           </div>
         ) : (
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex flex-col lg:flex-row gap-4 animate-fade-in">
             <div className="w-full lg:w-1/3 h-auto lg:max-h-[650px] lg:overflow-y-auto">
               <VenuesList 
                 venues={venues}

@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { Venue } from '@/hooks/useSupabaseVenues';
@@ -136,6 +137,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const [searchParams] = useSearchParams();
   const [locationAddress, setLocationAddress] = useState<string>("Custom Location");
   const [mapCursor, setMapCursor] = useState<string>('default');
+  const [mapLoaded, setMapLoaded] = useState(false);
   
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -196,7 +198,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setLocationAddress(address);
     setIsRadiusActive(true);
     
-    // Center map on new location
+    // Center map on new location with animation
     if (mapRef.current) {
       mapRef.current.panTo(newLocation);
       mapRef.current.setZoom(14);
@@ -252,10 +254,10 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
         toast.success("Custom location set successfully");
       }
       
-      // Center on the new location and zoom in
+      // Center on the new location and zoom in with animation
       if (mapRef.current) {
         mapRef.current.panTo(newLocation);
-        mapRef.current.setZoom(14);
+        mapRef.current.setZoom(15);
       }
     }
   }, [isSettingManualLocation]);
@@ -278,7 +280,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setLocationAddress("Default Location (Riyadh)");
     setIsRadiusActive(true);
     
-    // Center map on default location
+    // Center map on default location with animation
     if (mapRef.current) {
       mapRef.current.panTo(DEFAULT_LOCATION);
       mapRef.current.setZoom(14);
@@ -299,7 +301,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       
       setIsRadiusActive(true);
       
-      // Center map on current location
+      // Center map on current location with animation
       if (mapRef.current && userLocation) {
         mapRef.current.panTo(userLocation);
         mapRef.current.setZoom(14);
@@ -368,6 +370,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       bounds.extend(userLocation);
     }
     
+    // Add animation by using smooth zoom
     mapRef.current.fitBounds(bounds, 50); // 50px padding
     
     // If there's only one marker, zoom out a bit
@@ -382,7 +385,10 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
 
   const handleMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
-    setTimeout(fitBoundsToMarkers, 100);
+    setTimeout(() => {
+      fitBoundsToMarkers();
+      setMapLoaded(true);
+    }, 100);
   }, [fitBoundsToMarkers]);
   
   const onMarkerClick = useCallback((venue: Venue) => {
@@ -468,8 +474,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const displayVenues = isRadiusActive ? venuesInRadius : venuesWithCoordinates;
   
   return (
-    <div className="h-full flex flex-col relative">
-      <div className="absolute top-4 left-4 right-4 z-[1000]">
+    <div className={`h-full flex flex-col relative ${mapLoaded ? 'animate-fade-in' : 'opacity-0'}`}>
+      <div className="absolute top-4 left-4 right-4 z-[1000] animate-fade-in">
         <EnhancedMapSearch 
           onSearch={handleSearch}
           onLocationSelect={handleLocationSelect}
@@ -486,7 +492,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       </div>
       
       {isSettingManualLocation && (
-        <div className="absolute top-20 left-4 right-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md text-center border border-white/10">
+        <div className="absolute top-20 left-4 right-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md text-center border border-white/10 animate-scale-in">
           <p className="text-sm font-medium">Click anywhere on the map to set your location</p>
           <p className="text-xs text-findvenue-text-muted mb-2">Move your cursor to preview location</p>
           <Button
@@ -513,7 +519,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       )}
       
       {displayVenues.length === 0 ? (
-        <div className="h-full flex items-center justify-center bg-findvenue-surface/50 p-6 text-center">
+        <div className="h-full flex items-center justify-center bg-findvenue-surface/50 p-6 text-center animate-fade-in">
           <div>
             <MapPin className="h-12 w-12 mx-auto mb-4 text-findvenue-text-muted opacity-50" />
             <h3 className="text-xl font-medium mb-2">No Venues Found</h3>
@@ -545,8 +551,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
             streetViewControl: false,
             mapTypeControl: false,
             fullscreenControl: false,
-            styles: DARK_MAP_STYLE,
-            cursor: mapCursor
+            styles: DARK_MAP_STYLE
           }}
         >
           <div 
@@ -580,6 +585,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                   url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
                   scaledSize: new google.maps.Size(40, 40)
                 }}
+                animation={google.maps.Animation.DROP}
               >
                 {selectedVenue === null && (
                   <InfoWindow
@@ -614,7 +620,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               animation={
                 venue.id === highlightedVenueId || venue.id === activeVenue
                   ? google.maps.Animation.BOUNCE
-                  : undefined
+                  : google.maps.Animation.DROP
               }
             >
               {selectedVenue && selectedVenue.id === venue.id && (
@@ -671,7 +677,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                       </div>
                       <Button 
                         size="sm" 
-                        className="bg-findvenue hover:bg-findvenue-dark text-xs px-3 py-1 h-auto flex items-center"
+                        className="bg-findvenue hover:bg-findvenue-dark text-xs px-3 py-1 h-auto flex items-center hover-scale"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleVenueClick(venue.id);

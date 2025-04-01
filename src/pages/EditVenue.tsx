@@ -77,56 +77,58 @@ const EditVenue = () => {
         
       if (error) throw error;
       
-      let ownerInfoObj;
-      if (data.owner_info) {
-        ownerInfoObj = typeof data.owner_info === 'string' 
-          ? JSON.parse(data.owner_info) 
-          : data.owner_info;
-      }
+      if (data) {
+        let ownerInfoObj;
         
-      if (ownerInfoObj && 
-          'user_id' in ownerInfoObj && 
-          ownerInfoObj.user_id && 
-          ownerInfoObj.user_id !== user?.id) {
-        toast({
-          title: 'Access Denied',
-          description: 'You do not have permission to edit this venue.',
-          variant: 'destructive',
-        });
-        navigate('/my-venues');
-        return;
-      }
-      
-      console.log("Venue data:", data);
-      
-      if (data.price_per_person) {
-        setPricingType('perPerson');
-      } else if (data.hourly_rate) {
-        setPricingType('hourly');
-      } else {
-        setPricingType('flat');
-      }
-      
-      let openingHoursData = data.opening_hours;
-      if (typeof openingHoursData === 'string') {
         try {
-          openingHoursData = JSON.parse(openingHoursData);
-        } catch (e) {
-          console.error("Error parsing opening hours", e);
-          openingHoursData = {};
+          ownerInfoObj = typeof data.owner_info === 'string' 
+            ? JSON.parse(data.owner_info) 
+            : data.owner_info;
         }
+        
+        if (ownerInfoObj && 
+            'user_id' in ownerInfoObj && 
+            ownerInfoObj.user_id && 
+            ownerInfoObj.user_id !== user?.id) {
+          toast({
+            title: 'Access Denied',
+            description: 'You do not have permission to edit this venue.',
+            variant: 'destructive'
+          });
+          return navigate('/my-venues');
+        }
+        
+        console.log("Venue data:", data);
+        
+        if (data.price_per_person) {
+          setPricingType('perPerson');
+        } else if (data.hourly_rate) {
+          setPricingType('hourly');
+        } else {
+          setPricingType('flat');
+        }
+        
+        let openingHoursData = data.opening_hours;
+        if (typeof openingHoursData === 'string') {
+          try {
+            openingHoursData = JSON.parse(openingHoursData);
+          } catch (e) {
+            console.error("Error parsing opening hours", e);
+            openingHoursData = {};
+          }
+        }
+        
+        const venueData = {
+          ...data,
+          opening_hours: openingHoursData || {},
+          accessibility_features: data.accessibility_features || [],
+          additional_services: data.additional_services || [],
+          accepted_payment_methods: data.accepted_payment_methods || ['Credit Card', 'Cash'],
+          amenities: data.amenities || []
+        };
+        
+        setVenue(venueData);
       }
-      
-      const venueData = {
-        ...data,
-        opening_hours: openingHoursData || {},
-        accessibility_features: data.accessibility_features || [],
-        additional_services: data.additional_services || [],
-        accepted_payment_methods: data.accepted_payment_methods || ['Credit Card', 'Cash'],
-        amenities: data.amenities || []
-      };
-      
-      setVenue(venueData);
     } catch (error: any) {
       console.error('Error fetching venue details:', error);
       toast({
