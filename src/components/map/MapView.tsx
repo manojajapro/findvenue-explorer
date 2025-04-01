@@ -1,16 +1,18 @@
-import { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X, Filter } from 'lucide-react';
+import { MapPin, ExternalLink, Search, ZoomIn, ArrowRight, Star, X, Filter, Locate, Ruler, Navigation } from 'lucide-react';
 import L from 'leaflet';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/hooks/useDebounce';
+import { Slider } from '@/components/ui/slider';
 
 // Fix for marker icons in React Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -40,6 +42,16 @@ const featuredIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+// Location marker icon
+const locationIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
 interface MapViewProps {
   venues: Venue[];
   isLoading: boolean;
@@ -48,17 +60,26 @@ interface MapViewProps {
 
 // Component to update map view when props change
 const MapUpdater = ({ 
-  venues, 
+  venues,
   searchTerm,
-  highlightedVenueId
+  highlightedVenueId,
+  userLocation,
+  radiusInKm
 }: { 
-  venues: Venue[]; 
+  venues: Venue[];
   searchTerm?: string;
   highlightedVenueId?: string;
+  userLocation?: [number, number];
+  radiusInKm: number;
 }) => {
   const map = useMap();
   
   useEffect(() => {
+    if (userLocation) {
+      map.setView(userLocation, 14, { animate: true, duration: 1 });
+      return;
+    }
+    
     if (venues.length > 0) {
       // Get venues with coordinates
       const venuesWithCoords = venues.filter(
@@ -94,17 +115,36 @@ const MapUpdater = ({
         map.setView([24.774265, 46.738586], 5);
       }
     }
-  }, [venues, map, searchTerm, highlightedVenueId]);
+  }, [venues, map, searchTerm, highlightedVenueId, userLocation]);
   
   return null;
 };
 
+// Calculation function for distance between two coordinates
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in km
+};
+
 const MapSearch = ({ 
   onSearch,
-  venueCount
+  venueCount,
+  onRadiusChange,
+  radiusInKm,
+  isRadiusActive
 }: { 
   onSearch: (term: string) => void;
   venueCount: number;
+  onRadiusChange: (value: number) => void;
+  radiusInKm: number;
+  isRadiusActive: boolean;
 }) => {
   const [searchText, setSearchText] = useState('');
   const [searchParams] = useSearchParams();
@@ -148,7 +188,7 @@ const MapSearch = ({
           </Button>
         )}
       </div>
-      <form onSubmit={(e) => { e.preventDefault(); onSearch(searchText); }} className="relative">
+      <form onSubmit={handleSubmit} className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
         <Input
           type="text"
@@ -170,16 +210,38 @@ const MapSearch = ({
           </button>
         )}
       </form>
+      
+      {isRadiusActive && (
+        <div className="px-3 py-2 border-t border-white/10">
+          <div className="flex items-center mb-1">
+            <Ruler className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
+            <span className="text-xs font-medium">Radius search: {radiusInKm.toFixed(1)} km</span>
+          </div>
+          <Slider
+            value={[radiusInKm]}
+            min={0.1}
+            max={5}
+            step={0.1}
+            onValueChange={(values) => onRadiusChange(values[0])}
+            className="py-1"
+          />
+        </div>
+      )}
     </div>
   );
 };
 
 const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const navigate = useNavigate();
+  const mapRef = useRef<L.Map | null>(null);
   const [activeVenue, setActiveVenue] = useState<string | null>(null);
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const [mapSearchTerm, setMapSearchTerm] = useState('');
   const [isCompactControls, setIsCompactControls] = useState(false);
+  const [userLocation, setUserLocation] = useState<[number, number] | undefined>(undefined);
+  const [isRadiusActive, setIsRadiusActive] = useState(false);
+  const [radiusInKm, setRadiusInKm] = useState(1.0);
+  const [venuesInRadius, setVenuesInRadius] = useState<Venue[]>([]);
   
   // Filter venues with valid coordinates
   const venuesWithCoordinates = filteredVenues.filter(
@@ -216,6 +278,48 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setFilteredVenues(results);
   }, [venues]);
   
+  // Get user's location
+  const getUserLocation = useCallback(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation([latitude, longitude]);
+          setIsRadiusActive(true);
+        },
+        (error) => {
+          console.error("Error getting user location:", error);
+        }
+      );
+    } else {
+      console.error("Geolocation is not supported by this browser.");
+    }
+  }, []);
+  
+  // Filter venues by radius
+  useEffect(() => {
+    if (userLocation && isRadiusActive) {
+      const [userLat, userLng] = userLocation;
+      
+      const inRadius = venuesWithCoordinates.filter(venue => {
+        if (!venue.latitude || !venue.longitude) return false;
+        
+        const distance = calculateDistance(
+          userLat, 
+          userLng, 
+          venue.latitude, 
+          venue.longitude
+        );
+        
+        return distance <= radiusInKm;
+      });
+      
+      setVenuesInRadius(inRadius);
+    } else {
+      setVenuesInRadius(venuesWithCoordinates);
+    }
+  }, [userLocation, isRadiusActive, radiusInKm, venuesWithCoordinates]);
+  
   // Compact view toggle based on map size
   useEffect(() => {
     const handleResize = () => {
@@ -236,6 +340,24 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     }
   }, [venues, mapSearchTerm, handleSearch]);
   
+  // Handle radius change
+  const handleRadiusChange = useCallback((value: number) => {
+    setRadiusInKm(value);
+  }, []);
+  
+  // Toggle radius search
+  const toggleRadiusSearch = useCallback(() => {
+    if (isRadiusActive) {
+      setIsRadiusActive(false);
+    } else {
+      if (!userLocation) {
+        getUserLocation();
+      } else {
+        setIsRadiusActive(true);
+      }
+    }
+  }, [isRadiusActive, userLocation, getUserLocation]);
+  
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-findvenue-surface/50">
@@ -244,21 +366,40 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     );
   }
   
+  const displayVenues = isRadiusActive ? venuesInRadius : venuesWithCoordinates;
+  
   return (
     <div className="h-full flex flex-col relative">
       <div className="absolute top-4 left-4 right-4 z-[1000]">
-        <MapSearch onSearch={handleSearch} venueCount={venuesWithCoordinates.length} />
+        <MapSearch 
+          onSearch={handleSearch} 
+          venueCount={displayVenues.length}
+          onRadiusChange={handleRadiusChange}
+          radiusInKm={radiusInKm}
+          isRadiusActive={isRadiusActive}
+        />
       </div>
       
-      {venuesWithCoordinates.length === 0 ? (
+      {displayVenues.length === 0 ? (
         <div className="h-full flex items-center justify-center bg-findvenue-surface/50 p-6 text-center">
           <div>
             <MapPin className="h-12 w-12 mx-auto mb-4 text-findvenue-text-muted opacity-50" />
             <h3 className="text-xl font-medium mb-2">No Venues Found</h3>
             <p className="text-findvenue-text-muted">
-              We couldn't find any venues matching your criteria with map coordinates.
-              Try adjusting your search filters or switching to list view.
+              {isRadiusActive 
+                ? `We couldn't find any venues within ${radiusInKm.toFixed(1)} km of your location.` 
+                : "We couldn't find any venues matching your criteria with map coordinates."}
             </p>
+            {isRadiusActive && (
+              <Button 
+                variant="outline" 
+                className="mt-3"
+                onClick={() => setRadiusInKm(Math.min(radiusInKm + 1, 5))}
+              >
+                <Ruler className="h-4 w-4 mr-2" />
+                Increase radius to {Math.min(radiusInKm + 1, 5).toFixed(1)} km
+              </Button>
+            )}
           </div>
         </div>
       ) : (
@@ -268,6 +409,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
           className="z-10"
+          ref={mapRef}
+          preferCanvas={true}
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -278,9 +421,34 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
             venues={venuesWithCoordinates} 
             searchTerm={mapSearchTerm} 
             highlightedVenueId={highlightedVenueId || activeVenue}
+            userLocation={userLocation}
+            radiusInKm={radiusInKm}
           />
           
-          {venuesWithCoordinates.map((venue) => (
+          {userLocation && isRadiusActive && (
+            <>
+              <Circle 
+                center={userLocation} 
+                radius={radiusInKm * 1000} 
+                pathOptions={{ color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.1 }}
+              />
+              <Marker
+                position={userLocation}
+                icon={locationIcon}
+              >
+                <Popup>
+                  <div>
+                    <h3 className="font-bold text-base mb-1">Your Location</h3>
+                    <p className="text-xs text-gray-600">
+                      Showing venues within {radiusInKm.toFixed(1)} km
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            </>
+          )}
+          
+          {displayVenues.map((venue) => (
             <Marker 
               key={venue.id}
               position={[venue.latitude || 0, venue.longitude || 0]}
@@ -306,6 +474,16 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                     {venue.featured && (
                       <Badge className="absolute top-2 right-2 bg-findvenue-gold text-black">
                         Featured
+                      </Badge>
+                    )}
+                    {isRadiusActive && userLocation && venue.latitude && venue.longitude && (
+                      <Badge className="absolute top-2 left-2 bg-findvenue text-white">
+                        {calculateDistance(
+                          userLocation[0], 
+                          userLocation[1], 
+                          venue.latitude, 
+                          venue.longitude
+                        ).toFixed(1)} km
                       </Badge>
                     )}
                   </div>
@@ -366,6 +544,22 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               <Button 
                 variant="outline" 
                 size="icon" 
+                className={`h-8 w-8 ${isRadiusActive ? 'bg-findvenue text-white' : 'bg-findvenue-surface/80'} backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md`}
+                onClick={toggleRadiusSearch}
+              >
+                <Locate className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
+              <p>{isRadiusActive ? 'Disable radius search' : 'Enable radius search'}</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon" 
                 className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
                 onClick={() => handleSearch('')}
               >
@@ -373,7 +567,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
               </Button>
             </TooltipTrigger>
             <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-              <p>Clear search</p>
+              <p>Clear filters</p>
             </TooltipContent>
           </Tooltip>
           
@@ -384,14 +578,26 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
                 size="icon" 
                 className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md"
                 onClick={() => {
-                  // This functionality would need a ref to the map
+                  if (mapRef.current) {
+                    if (userLocation && isRadiusActive) {
+                      mapRef.current.setView(userLocation, 14);
+                    } else if (venuesWithCoordinates.length > 0) {
+                      const bounds = L.latLngBounds(
+                        venuesWithCoordinates.map(venue => [
+                          venue.latitude || 24.774265, 
+                          venue.longitude || 46.738586
+                        ])
+                      );
+                      mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
+                    }
+                  }
                 }}
               >
                 <ZoomIn className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-              <p>Zoom to all venues</p>
+              <p>Zoom to fit</p>
             </TooltipContent>
           </Tooltip>
         </div>
