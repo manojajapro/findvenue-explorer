@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -144,9 +145,10 @@ export const useVenueVoiceAssistant = ({
     }
     
     try {
-      recognition.current.addEventListener('start', handleSpeechStart);
+      // Use direct property assignments instead of addEventListener
+      recognition.current.onstart = handleSpeechStart;
       
-      recognition.current.addEventListener('result', (event) => {
+      recognition.current.onresult = (event: SpeechRecognitionEvent) => {
         const text = event.results[0][0].transcript;
         console.log('Speech recognized:', text);
         setTranscript(text);
@@ -154,9 +156,9 @@ export const useVenueVoiceAssistant = ({
         if (onTranscript) {
           onTranscript(text);
         }
-      });
+      };
       
-      recognition.current.addEventListener('error', (event) => {
+      recognition.current.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setError(`Speech recognition error: ${event.error}`);
         setIsListening(false);
@@ -164,9 +166,9 @@ export const useVenueVoiceAssistant = ({
         if (onListeningChange) {
           onListeningChange(false);
         }
-      });
+      };
       
-      recognition.current.addEventListener('end', handleSpeechEnd);
+      recognition.current.onend = handleSpeechEnd;
       
       recognition.current.start();
     } catch (err: any) {
