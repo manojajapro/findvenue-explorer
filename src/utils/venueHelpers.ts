@@ -18,8 +18,8 @@ export const getVenueOwnerId = (venue: any): string | null => {
       if (Array.isArray(venue.owner_info)) {
         return null; // Handle array case (should not happen in practice)
       }
-      // Need to access user_id safely from Json type
-      return venue.owner_info.user_id || null;
+      // Access user_id safely from Json type
+      return (venue.owner_info as any).user_id || null;
     }
   } catch (err) {
     console.error("Error parsing owner_info:", err);
