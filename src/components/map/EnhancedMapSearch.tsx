@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import LocationSearchInput from './LocationSearchInput';
+import { useSearchParams } from 'react-router-dom';
 
 interface EnhancedMapSearchProps {
   onSearch: (term: string) => void;
@@ -34,6 +35,17 @@ const EnhancedMapSearch = ({
   appliedFilters,
   onClearFilter
 }: EnhancedMapSearchProps) => {
+  const [searchParams] = useSearchParams();
+  
+  // Initialize search text from URL if available
+  useEffect(() => {
+    const searchFromUrl = searchParams.get('search');
+    if (searchFromUrl && !searchText) {
+      setSearchText(searchFromUrl);
+      onSearch(searchFromUrl);
+    }
+  }, [searchParams, searchText, setSearchText, onSearch]);
+  
   return (
     <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md border border-white/5">
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">

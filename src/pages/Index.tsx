@@ -31,9 +31,21 @@ const Index = () => {
     if (hasFilters) {
       const currentParams = new URLSearchParams(searchParams);
       
-      // If there's a search term, ensure it's included as 'search' parameter
-      if (currentParams.has('eventType') && !currentParams.has('search')) {
-        currentParams.set('search', currentParams.get('eventType') || '');
+      // Handle event type search - map it to either category or search parameter
+      if (currentParams.has('eventType')) {
+        const eventType = currentParams.get('eventType') || '';
+        // If it's a search term rather than a specific category ID, set it as search
+        if (!eventType.match(/^[a-z0-9-_]+$/)) {
+          currentParams.set('search', eventType);
+          currentParams.delete('eventType');
+        }
+      }
+      
+      // If there's a location parameter, map it to cityId if it matches a city name
+      if (currentParams.has('location')) {
+        const location = currentParams.get('location') || '';
+        currentParams.set('search', location);
+        currentParams.delete('location');
       }
       
       // Set the view to map
