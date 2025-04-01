@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Database, Json } from '@/integrations/supabase/types';
@@ -34,13 +35,7 @@ import * as z from "zod"
 import { supabase } from '@/integrations/supabase/client';
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
-import { Slider } from "@/components/ui/slider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 import { isVenueOwner, getVenueOwnerId } from '@/utils/venueHelpers';
 
 // Define the venue schema for form validation
@@ -54,10 +49,10 @@ const venueSchema = z.object({
   address: z.string().min(5, {
     message: "Address must be at least 5 characters.",
   }),
-  city_id: z.string().uuid({
+  city_id: z.string().min(1, {
     message: "Please select a city.",
   }),
-  category_id: z.string().uuid({
+  category_id: z.string().min(1, {
     message: "Please select a category.",
   }),
   min_capacity: z.number().min(1, {
@@ -74,20 +69,20 @@ const venueSchema = z.object({
     message: "Starting price must be at least 0.",
   }),
   price_per_person: z.number().optional(),
-  amenities: z.string().array().optional(),
-  wifi: z.boolean().default(false).optional(),
-  parking: z.boolean().default(false).optional(),
+  amenities: z.array(z.string()).default([]),
+  wifi: z.boolean().default(false),
+  parking: z.boolean().default(false),
   opening_hours: z.record(
     z.object({
       open: z.string(),
       close: z.string(),
     })
   ).optional(),
-  availability: z.string().array().optional(),
-  accepted_payment_methods: z.string().array().optional(),
-  accessibility_features: z.string().array().optional(),
-  additional_services: z.string().array().optional(),
-  gallery_images: z.string().array().optional(),
+  availability: z.array(z.string()).default([]),
+  accepted_payment_methods: z.array(z.string()).default([]),
+  accessibility_features: z.array(z.string()).default([]),
+  additional_services: z.array(z.string()).default([]),
+  gallery_images: z.array(z.string()).default([]),
   image_url: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
@@ -172,16 +167,15 @@ const EditVenue = () => {
         console.log("Fetched venue data:", data);
         setVenue(data);
         
-        // Parse amenities from the database
-        let amenitiesArray = data.amenities || [];
-        
         // Parse owner_info if it's a string
         let ownerInfo = null;
         if (data.owner_info) {
           try {
-            ownerInfo = typeof data.owner_info === 'string' 
-              ? JSON.parse(data.owner_info) 
-              : data.owner_info;
+            if (typeof data.owner_info === 'string') {
+              ownerInfo = JSON.parse(data.owner_info);
+            } else if (typeof data.owner_info === 'object' && !Array.isArray(data.owner_info)) {
+              ownerInfo = data.owner_info;
+            }
           } catch (err) {
             console.error("Error parsing owner_info:", err);
           }
@@ -197,11 +191,10 @@ const EditVenue = () => {
           min_capacity: data.min_capacity || 1,
           max_capacity: data.max_capacity || 1,
           starting_price: data.starting_price || 0,
-          price_per_person: data.price_per_person || 0,
-          amenities: amenitiesArray,
+          price_per_person: data.price_per_person || undefined,
+          amenities: data.amenities || [],
           wifi: data.wifi || false,
           parking: data.parking || false,
-          // Additional fields
           accepted_payment_methods: data.accepted_payment_methods || [],
           accessibility_features: data.accessibility_features || [],
           additional_services: data.additional_services || [],
@@ -210,15 +203,13 @@ const EditVenue = () => {
           featured: data.featured || false,
           popular: data.popular || false,
           currency: data.currency || "SAR",
-          // These fields might be treated as read-only or computed
           rating: data.rating,
           reviews_count: data.reviews_count,
           latitude: data.latitude,
           longitude: data.longitude,
-          // Include opening_hours if available
           opening_hours: data.opening_hours as any,
-          // Include owner_info if available
-          owner_info: ownerInfo
+          owner_info: ownerInfo as any,
+          availability: data.availability || [],
         });
       } else {
         setError('Venue not found.');
@@ -253,7 +244,7 @@ const EditVenue = () => {
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
-  }, [supabase]);
+  }, []);
 
   const fetchCities = useCallback(async () => {
     try {
@@ -277,23 +268,34 @@ const EditVenue = () => {
     } catch (error) {
       console.error('Error fetching cities:', error);
     }
-  }, [supabase]);
+  }, []);
 
   const onSubmit = async (values: z.infer<typeof venueSchema>) => {
     setLoading(true);
     setError(null);
     
-    // Preserve the original owner_info when updating
+    // Ensure we have the right owner_info format for updating
+    const formattedValues = { ...values };
+    
+    // If we have owner_info from the venue but not in the form values, preserve it
     if (venue && venue.owner_info && !values.owner_info) {
-      values.owner_info = venue.owner_info;
+      if (typeof venue.owner_info === 'string') {
+        try {
+          formattedValues.owner_info = JSON.parse(venue.owner_info);
+        } catch (err) {
+          console.error("Error parsing venue owner_info:", err);
+        }
+      } else {
+        formattedValues.owner_info = venue.owner_info as any;
+      }
     }
 
-    console.log("Submitting venue update with values:", values);
+    console.log("Submitting venue update with values:", formattedValues);
 
     try {
       const { error } = await supabase
         .from('venues')
-        .update(values)
+        .update(formattedValues)
         .eq('id', id);
 
       if (error) {
@@ -363,7 +365,7 @@ const EditVenue = () => {
   useEffect(() => {
     fetchCategories();
     fetchCities();
-  }, [supabase]);
+  }, [fetchCategories, fetchCities]);
 
   if (loading) {
     return <div className="container mx-auto py-10 text-center">Loading venue data...</div>;
