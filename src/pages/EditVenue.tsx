@@ -335,7 +335,7 @@ const EditVenue = () => {
         };
       }
 
-      console.log("Submitting venue update with values:", values);
+      console.log("Final venue update values:", values);
 
       const { data, error: updateError } = await supabase
         .from('venues')

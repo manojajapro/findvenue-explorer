@@ -22,6 +22,7 @@ const TagInput = ({ tags, setTags, placeholder = "Add new item...", label, class
     // Prevent duplicate tags
     if (!tags.includes(trimmedValue)) {
       setTags([...tags, trimmedValue]);
+      console.log("Added tag:", trimmedValue, "New tags array:", [...tags, trimmedValue]);
     }
     setInputValue('');
   };
@@ -34,7 +35,9 @@ const TagInput = ({ tags, setTags, placeholder = "Add new item...", label, class
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+    const newTags = tags.filter(tag => tag !== tagToRemove);
+    setTags(newTags);
+    console.log("Removed tag:", tagToRemove, "New tags array:", newTags);
   };
 
   return (
