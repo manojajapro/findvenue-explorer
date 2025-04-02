@@ -27,7 +27,7 @@ export const useVenueData = () => {
           .from('venues')
           .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle();
 
         if (venueError) {
           console.error("Error fetching venue:", venueError);
