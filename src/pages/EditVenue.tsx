@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -37,6 +38,7 @@ import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { isVenueOwner, getVenueOwnerId } from '@/utils/venueHelpers';
 import { X, Upload } from 'lucide-react';
+import TagInput from '@/components/ui/TagInput';
 
 const venueSchema = z.object({
   name: z.string().min(3, {
@@ -115,6 +117,12 @@ const EditVenue = () => {
   const [newImageUrl, setNewImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  
+  // Custom tags states
+  const [customAmenities, setCustomAmenities] = useState<string[]>([]);
+  const [customAccessibility, setCustomAccessibility] = useState<string[]>([]);
+  const [customPaymentMethods, setCustomPaymentMethods] = useState<string[]>([]);
+  const [customServices, setCustomServices] = useState<string[]>([]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -170,6 +178,22 @@ const EditVenue = () => {
         
         if (data.gallery_images && Array.isArray(data.gallery_images)) {
           setGalleryImages(data.gallery_images);
+        }
+        
+        if (data.amenities && Array.isArray(data.amenities)) {
+          setCustomAmenities(data.amenities);
+        }
+        
+        if (data.accessibility_features && Array.isArray(data.accessibility_features)) {
+          setCustomAccessibility(data.accessibility_features);
+        }
+        
+        if (data.accepted_payment_methods && Array.isArray(data.accepted_payment_methods)) {
+          setCustomPaymentMethods(data.accepted_payment_methods);
+        }
+        
+        if (data.additional_services && Array.isArray(data.additional_services)) {
+          setCustomServices(data.additional_services);
         }
         
         let ownerInfo = null;
@@ -277,32 +301,35 @@ const EditVenue = () => {
     setLoading(true);
     setError(null);
     
-    const formattedValues = { ...values };
+    // Update with custom input values
+    values.amenities = customAmenities;
+    values.accessibility_features = customAccessibility;
+    values.accepted_payment_methods = customPaymentMethods;
+    values.additional_services = customServices;
+    values.gallery_images = galleryImages;
     
-    formattedValues.gallery_images = galleryImages;
-    
-    if (!formattedValues.image_url && galleryImages.length > 0) {
-      formattedValues.image_url = galleryImages[0];
+    if (!values.image_url && galleryImages.length > 0) {
+      values.image_url = galleryImages[0];
     }
     
     if (venue && venue.owner_info && !values.owner_info) {
       if (typeof venue.owner_info === 'string') {
         try {
-          formattedValues.owner_info = JSON.parse(venue.owner_info);
+          values.owner_info = JSON.parse(venue.owner_info);
         } catch (err) {
           console.error("Error parsing venue owner_info:", err);
         }
       } else {
-        formattedValues.owner_info = venue.owner_info as any;
+        values.owner_info = venue.owner_info as any;
       }
     }
 
-    console.log("Submitting venue update with values:", formattedValues);
+    console.log("Submitting venue update with values:", values);
 
     try {
       const { error } = await supabase
         .from('venues')
-        .update(formattedValues)
+        .update(values)
         .eq('id', id);
 
       if (error) {
@@ -766,7 +793,7 @@ const EditVenue = () => {
           <Card>
             <CardHeader>
               <CardTitle>Amenities and Features</CardTitle>
-              <CardDescription>Select the amenities and features your venue offers</CardDescription>
+              <CardDescription>Manage amenities and features your venue offers</CardDescription>
             </CardHeader>
             <CardContent>
               <FormField
@@ -811,116 +838,44 @@ const EditVenue = () => {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="amenities"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Additional Amenities</FormLabel>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                      {['air_conditioning', 'catering', 'sound_system', 'projector', 'stage', 'security'].map((amenity) => (
-                        <div key={amenity} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={amenity}
-                            checked={field.value?.includes(amenity)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                field.onChange([...(field.value || []), amenity]);
-                              } else {
-                                field.onChange(field.value?.filter((value) => value !== amenity));
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={amenity}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {amenity.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    <FormDescription>
-                      Select the amenities that your venue offers.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="accessibility_features"
-                render={({ field }) => (
-                  <FormItem className="mt-4">
-                    <FormLabel>Accessibility Features</FormLabel>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                      {['wheelchair_access', 'elevator', 'accessible_restroom', 'accessible_parking'].map((feature) => (
-                        <div key={feature} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={feature}
-                            checked={field.value?.includes(feature)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                field.onChange([...(field.value || []), feature]);
-                              } else {
-                                field.onChange(field.value?.filter((value) => value !== feature));
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={feature}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {feature.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    <FormDescription>
-                      Select the accessibility features that your venue offers.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="accepted_payment_methods"
-                render={({ field }) => (
-                  <FormItem className="mt-4">
-                    <FormLabel>Accepted Payment Methods</FormLabel>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                      {['Credit Card', 'Cash', 'Bank Transfer', 'Mobile Payment'].map((method) => (
-                        <div key={method} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={method.replace(' ', '_').toLowerCase()}
-                            checked={field.value?.includes(method)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                field.onChange([...(field.value || []), method]);
-                              } else {
-                                field.onChange(field.value?.filter((value) => value !== method));
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={method.replace(' ', '_').toLowerCase()}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {method}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    <FormDescription>
-                      Select the payment methods you accept.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="mt-6">
+                <Label>Amenities</Label>
+                <TagInput 
+                  tags={customAmenities} 
+                  setTags={setCustomAmenities}
+                  placeholder="Add amenity (e.g., Sound System, Air Conditioning)..."
+                  className="mt-2"
+                />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Add all amenities your venue offers, such as Sound System, Catering, Stage, etc.
+                </p>
+              </div>
+              
+              <div className="mt-6">
+                <Label>Accessibility Features</Label>
+                <TagInput 
+                  tags={customAccessibility} 
+                  setTags={setCustomAccessibility}
+                  placeholder="Add accessibility feature (e.g., Wheelchair Access)..."
+                  className="mt-2"
+                />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Add accessibility features your venue offers, such as Wheelchair Access, Elevator, etc.
+                </p>
+              </div>
+              
+              <div className="mt-6">
+                <Label>Accepted Payment Methods</Label>
+                <TagInput 
+                  tags={customPaymentMethods} 
+                  setTags={setCustomPaymentMethods}
+                  placeholder="Add payment method (e.g., Credit Card, Cash)..."
+                  className="mt-2"
+                />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Add all payment methods you accept, such as Credit Card, Cash, Bank Transfer, etc.
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -930,42 +885,17 @@ const EditVenue = () => {
               <CardDescription>Add any additional services your venue offers</CardDescription>
             </CardHeader>
             <CardContent>
-              <FormField
-                control={form.control}
-                name="additional_services"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Additional Services</FormLabel>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                      {['catering', 'decoration', 'entertainment', 'photography', 'cleaning', 'valet_parking'].map((service) => (
-                        <div key={service} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`service-${service}`}
-                            checked={field.value?.includes(service)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                field.onChange([...(field.value || []), service]);
-                              } else {
-                                field.onChange(field.value?.filter((value) => value !== service));
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`service-${service}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {service.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    <FormDescription>
-                      Select additional services you provide with the venue.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="mt-2">
+                <TagInput 
+                  tags={customServices} 
+                  setTags={setCustomServices}
+                  placeholder="Add service (e.g., Catering, Decoration)..."
+                  className="mt-2"
+                />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Add additional services your venue offers, such as Catering, Decoration, Photography, etc.
+                </p>
+              </div>
             </CardContent>
           </Card>
 
