@@ -301,40 +301,47 @@ const EditVenue = () => {
     setLoading(true);
     setError(null);
     
-    // Update with custom input values
-    values.amenities = customAmenities;
-    values.accessibility_features = customAccessibility;
-    values.accepted_payment_methods = customPaymentMethods;
-    values.additional_services = customServices;
-    values.gallery_images = galleryImages;
-    
-    if (!values.image_url && galleryImages.length > 0) {
-      values.image_url = galleryImages[0];
-    }
-    
-    if (venue && venue.owner_info && !values.owner_info) {
-      if (typeof venue.owner_info === 'string') {
-        try {
-          values.owner_info = JSON.parse(venue.owner_info);
-        } catch (err) {
-          console.error("Error parsing venue owner_info:", err);
-        }
-      } else {
-        values.owner_info = venue.owner_info as any;
-      }
-    }
-
-    console.log("Submitting venue update with values:", values);
-
     try {
-      const { error } = await supabase
+      console.log("Starting venue update with ID:", id);
+      console.log("Form values before updating custom fields:", values);
+      
+      // Update with custom input values
+      values.amenities = customAmenities;
+      values.accessibility_features = customAccessibility;
+      values.accepted_payment_methods = customPaymentMethods;
+      values.additional_services = customServices;
+      values.gallery_images = galleryImages;
+      
+      if (!values.image_url && galleryImages.length > 0) {
+        values.image_url = galleryImages[0];
+      }
+      
+      if (venue && venue.owner_info && !values.owner_info) {
+        if (typeof venue.owner_info === 'string') {
+          try {
+            values.owner_info = JSON.parse(venue.owner_info);
+          } catch (err) {
+            console.error("Error parsing venue owner_info:", err);
+          }
+        } else {
+          values.owner_info = venue.owner_info as any;
+        }
+      }
+
+      console.log("Submitting venue update with values:", values);
+
+      const { data, error: updateError } = await supabase
         .from('venues')
         .update(values)
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
-      if (error) {
-        throw error;
+      if (updateError) {
+        console.error("Supabase update error:", updateError);
+        throw updateError;
       }
+
+      console.log("Update response:", data);
 
       toast({
         title: "Venue updated successfully!",
@@ -342,13 +349,13 @@ const EditVenue = () => {
       });
       navigate(`/venue/${id}`);
     } catch (err: any) {
+      console.error('Failed to update venue:', err);
       setError(err.message);
       toast({
         variant: "destructive",
         title: "Update failed!",
         description: err.message || "Something went wrong. Please try again.",
       });
-      console.error('Failed to update venue:', err);
     } finally {
       setLoading(false);
     }

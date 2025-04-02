@@ -38,7 +38,7 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} className="w-full">
             <TabsContent value="chat" className="mt-0 pt-4">
               <VenueSpecificChatBot venue={venue} />
             </TabsContent>
