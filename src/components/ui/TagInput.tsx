@@ -62,7 +62,7 @@ const TagInput = ({ tags, setTags, placeholder = "Add new item...", label, class
       <div className="flex flex-wrap gap-2 mt-2">
         {tags.map((tag, index) => (
           <div 
-            key={index} 
+            key={`${tag}-${index}`} 
             className="flex items-center gap-1 px-2 py-1 text-sm bg-secondary rounded-md"
           >
             <span>{tag}</span>

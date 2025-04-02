@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -118,7 +117,6 @@ const EditVenue = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   
-  // Custom tags states
   const [customAmenities, setCustomAmenities] = useState<string[]>([]);
   const [customAccessibility, setCustomAccessibility] = useState<string[]>([]);
   const [customPaymentMethods, setCustomPaymentMethods] = useState<string[]>([]);
@@ -298,6 +296,7 @@ const EditVenue = () => {
   }, []);
 
   const onSubmit = async (values: z.infer<typeof venueSchema>) => {
+    console.log("Submit button clicked");
     setLoading(true);
     setError(null);
     
@@ -305,7 +304,6 @@ const EditVenue = () => {
       console.log("Starting venue update with ID:", id);
       console.log("Form values before updating custom fields:", values);
       
-      // Update with custom input values
       values.amenities = customAmenities;
       values.accessibility_features = customAccessibility;
       values.accepted_payment_methods = customPaymentMethods;
@@ -328,6 +326,15 @@ const EditVenue = () => {
         }
       }
 
+      if (!values.owner_info) {
+        values.owner_info = {
+          user_id: user?.id || '',
+          name: '',
+          contact: '',
+          response_time: ''
+        };
+      }
+
       console.log("Submitting venue update with values:", values);
 
       const { data, error: updateError } = await supabase
@@ -336,12 +343,13 @@ const EditVenue = () => {
         .eq('id', id)
         .select();
 
+      console.log("Update response:", data);
+      console.log("Update error:", updateError);
+
       if (updateError) {
         console.error("Supabase update error:", updateError);
         throw updateError;
       }
-
-      console.log("Update response:", data);
 
       toast({
         title: "Venue updated successfully!",
@@ -941,7 +949,7 @@ const EditVenue = () => {
                     <p className="text-muted-foreground mb-2 text-center">
                       Drag and drop photos or click to select from your device
                     </p>
-                    <p className="text-xs text-muted-foreground mb-4 text-center">
+                    <p className="text-xs text-muted-foreground mt-4 text-center">
                       Supported formats: JPG, PNG, WebP (up to 5MB each)
                     </p>
                     <div className="relative">
