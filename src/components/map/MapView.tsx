@@ -235,6 +235,48 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     setIsRadiusActive(true);
   }, [userLocation]);
   
+  const handleCurrentLocation = useCallback(() => {
+    if (navigator.geolocation) {
+      toast.info("Getting your current location...");
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const newLocation = { lat: latitude, lng: longitude };
+          setUserLocation(newLocation);
+          setIsRadiusActive(true);
+          
+          if (window.google && window.google.maps) {
+            const geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ location: newLocation }, (results, status) => {
+              if (status === 'OK' && results && results[0]) {
+                setLocationAddress(results[0].formatted_address);
+                toast.success(`Location set to: ${results[0].formatted_address}`);
+              } else {
+                setLocationAddress("Your Current Location");
+                toast.success("Current location detected");
+              }
+            });
+          } else {
+            setLocationAddress("Your Current Location");
+            toast.success("Current location detected");
+          }
+          
+          if (mapRef.current) {
+            mapRef.current.panTo(newLocation);
+            mapRef.current.setZoom(14);
+          }
+        },
+        (error) => {
+          console.error("Error getting user location:", error);
+          toast.error("Could not access your location. Please allow location access in your browser settings or try setting location manually.");
+        }
+      );
+    } else {
+      toast.error("Your browser doesn't support geolocation");
+    }
+  }, []);
+  
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (isSettingManualLocation && e.latLng) {
       const newLocation = {
@@ -380,7 +422,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
       }, 100);
     }
   }, [venuesInRadius, venuesWithCoordinates, isRadiusActive, userLocation]);
-
+  
   const handleMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     setTimeout(() => {
@@ -480,6 +522,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
           onLocationSelect={handleLocationSelect}
           onRadiusChange={handleRadiusChange}
           onManualLocation={handleManualLocationSetting}
+          onCurrentLocation={handleCurrentLocation}
           venueCount={displayVenues.length}
           radiusInKm={radiusInKm}
           isRadiusActive={isRadiusActive}

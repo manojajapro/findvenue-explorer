@@ -128,7 +128,6 @@ const VenueLocationMap = ({
       
       toast.success("Custom location set successfully");
       
-      // If map ref exists, center on the new location and zoom in
       if (mapRef.current) {
         mapRef.current.panTo(newLocation);
         mapRef.current.setZoom(14);
@@ -157,7 +156,6 @@ const VenueLocationMap = ({
           });
           setIsRadiusActive(true);
           
-          // Center map on user location
           if (mapRef.current) {
             mapRef.current.panTo({ lat: latitude, lng: longitude });
             mapRef.current.setZoom(14);
@@ -167,13 +165,11 @@ const VenueLocationMap = ({
         },
         (error) => {
           console.error("Error getting user location:", error);
-          toast.error("Could not get your location. Using default location (11461).");
+          toast.error("Could not get your location. Using default location instead.");
           
-          // Use default location if geolocation fails
           setUserLocation(DEFAULT_LOCATION);
           setIsRadiusActive(true);
           
-          // Center map on default location
           if (mapRef.current) {
             mapRef.current.panTo(DEFAULT_LOCATION);
             mapRef.current.setZoom(14);
@@ -182,13 +178,11 @@ const VenueLocationMap = ({
       );
     } else {
       console.error("Geolocation is not supported by this browser.");
-      toast.error("Your browser doesn't support location services. Using default location (11461).");
+      toast.error("Your browser doesn't support location services. Using default location.");
       
-      // Use default location if geolocation is not supported
       setUserLocation(DEFAULT_LOCATION);
       setIsRadiusActive(true);
       
-      // Center map on default location
       if (mapRef.current) {
         mapRef.current.panTo(DEFAULT_LOCATION);
         mapRef.current.setZoom(14);
@@ -199,11 +193,9 @@ const VenueLocationMap = ({
   const handleManualLocationSetting = useCallback(() => {
     setIsSettingManualLocation(true);
     
-    // Always ensure userLocation is set (to default if not already set)
     if (!userLocation) {
       setUserLocation(DEFAULT_LOCATION);
       
-      // Center map on default location
       if (mapRef.current) {
         mapRef.current.panTo(DEFAULT_LOCATION);
         mapRef.current.setZoom(14); 
@@ -216,7 +208,6 @@ const VenueLocationMap = ({
       duration: 5000
     });
     
-    // Make sure radius search is active
     setIsRadiusActive(true);
   }, [userLocation]);
 
@@ -224,17 +215,14 @@ const VenueLocationMap = ({
     if (isRadiusActive) {
       setIsRadiusActive(false);
     } else {
-      // Always set default location first
       setUserLocation(DEFAULT_LOCATION);
       setIsRadiusActive(true);
       
-      // Center map on default location
       if (mapRef.current) {
         mapRef.current.panTo(DEFAULT_LOCATION);
         mapRef.current.setZoom(14);
       }
       
-      // Show manual location setting toast
       handleManualLocationSetting();
     }
   }, [isRadiusActive, handleManualLocationSetting]);
@@ -462,7 +450,6 @@ const VenueLocationMap = ({
                           size="icon"
                           className="h-7 w-7 bg-findvenue-card-bg/80 border-white/10"
                           onClick={() => {
-                            // Reset to default location
                             setUserLocation(DEFAULT_LOCATION);
                             setIsRadiusActive(true);
                             if (mapRef.current) {
@@ -516,9 +503,9 @@ const VenueLocationMap = ({
           </div>
           <Slider
             value={[radiusInKm]}
-            min={0.2}
-            max={5}
-            step={0.1}
+            min={0.5}
+            max={25}
+            step={0.5}
             onValueChange={(values) => setRadiusInKm(values[0])}
             className="py-1"
           />
