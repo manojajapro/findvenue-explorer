@@ -2,12 +2,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import useVenueVoiceAssistant from '@/hooks/useVenueVoiceAssistant';
 import { Badge } from '@/components/ui/badge';
+import useVenueVoiceAssistant from '@/hooks/useVenueVoiceAssistant';
+import { Venue } from '@/hooks/useSupabaseVenues';
 
 type VenueSpecificVoiceAssistantProps = {
-  venue: any;
+  venue: Venue;
 };
 
 const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
@@ -45,24 +45,21 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   }, [transcriptHistory]);
 
   return (
-    <Card className="glass-card border-white/10 w-full max-w-md mx-auto">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex justify-between items-center">
-          <div>
-            Voice Assistant
-            <p className="text-sm font-normal text-findvenue-text-muted mt-1">
-              Speak to get information about {venue.name}
-            </p>
-          </div>
-          {isListening && (
-            <Badge className="bg-green-500 text-white animate-pulse">
-              Listening...
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <p className="text-sm text-findvenue-text-muted">
+            Speak to get information about {venue.name}
+          </p>
+        </div>
+        {isListening && (
+          <Badge className="bg-green-500 text-white animate-pulse">
+            Listening...
+          </Badge>
+        )}
+      </div>
       
-      <CardContent className="p-4 max-h-[50vh] overflow-y-auto">
+      <div className="max-h-[50vh] overflow-y-auto mb-4">
         {transcriptHistory.length === 0 ? (
           <div className="text-center py-6">
             <p className="text-findvenue-text-muted mb-2">
@@ -105,9 +102,9 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
           </div>
         )}
         <div ref={messagesEndRef} />
-      </CardContent>
+      </div>
 
-      <CardFooter className="p-4 pt-2 border-t border-white/10 flex justify-between">
+      <div className="flex justify-between">
         <div className="flex gap-2">
           {transcriptHistory.length > 0 && (
             <Button
@@ -128,7 +125,6 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
           onClick={isListening ? stopListening : startListening}
           disabled={isProcessing}
           className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-findvenue hover:bg-findvenue-dark"}
-          size="lg"
         >
           {isListening ? (
             <>
@@ -142,8 +138,8 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
             </>
           )}
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </>
   );
 };
 
