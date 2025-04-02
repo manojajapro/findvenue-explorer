@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -37,6 +36,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { isVenueOwner, getVenueOwnerId } from '@/utils/venueHelpers';
+import { X, Upload } from 'lucide-react';
 
 // Define the venue schema for form validation
 const venueSchema = z.object({
@@ -113,6 +113,9 @@ const EditVenue = () => {
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [user, setUser] = useState<{ id: string } | null>(null);
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
 
   // Get the current user on mount
   useEffect(() => {
@@ -166,6 +169,11 @@ const EditVenue = () => {
       if (data) {
         console.log("Fetched venue data:", data);
         setVenue(data);
+        
+        // Set gallery images for our separate state
+        if (data.gallery_images && Array.isArray(data.gallery_images)) {
+          setGalleryImages(data.gallery_images);
+        }
         
         // Parse owner_info if it's a string
         let ownerInfo = null;
@@ -277,6 +285,14 @@ const EditVenue = () => {
     // Ensure we have the right owner_info format for updating
     const formattedValues = { ...values };
     
+    // Update with our separate galleryImages state
+    formattedValues.gallery_images = galleryImages;
+    
+    // Set the main image to the first gallery image if not already set
+    if (!formattedValues.image_url && galleryImages.length > 0) {
+      formattedValues.image_url = galleryImages[0];
+    }
+    
     // If we have owner_info from the venue but not in the form values, preserve it
     if (venue && venue.owner_info && !values.owner_info) {
       if (typeof venue.owner_info === 'string') {
@@ -366,6 +382,107 @@ const EditVenue = () => {
     fetchCategories();
     fetchCities();
   }, [fetchCategories, fetchCities]);
+
+  const handleAddImageUrl = () => {
+    if (!newImageUrl.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Empty URL",
+        description: "Please enter a valid image URL",
+      });
+      return;
+    }
+    
+    if (galleryImages.includes(newImageUrl)) {
+      toast({
+        variant: "destructive",
+        title: "Duplicate URL",
+        description: "This image URL is already in your gallery",
+      });
+      return;
+    }
+    
+    setGalleryImages(prev => [...prev, newImageUrl]);
+    setNewImageUrl('');
+    
+    toast({
+      title: "Image Added",
+      description: "Your image has been added to the gallery",
+    });
+  };
+  
+  const handleRemoveImage = (index: number) => {
+    setGalleryImages(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setUploadingImage(true);
+    
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Check file size (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+          toast({
+            variant: "destructive",
+            title: "File Too Large",
+            description: `${file.name} exceeds the 5MB limit`,
+          });
+          continue;
+        }
+        
+        // Create a unique file path
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `venues/${user?.id}/${fileName}`;
+        
+        // Upload to Supabase storage
+        const { error: uploadError, data } = await supabase.storage
+          .from('venue-images')
+          .upload(filePath, file);
+          
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast({
+            variant: "destructive",
+            title: "Upload Failed",
+            description: `Failed to upload ${file.name}: ${uploadError.message}`,
+          });
+          continue;
+        }
+        
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('venue-images')
+          .getPublicUrl(filePath);
+          
+        setGalleryImages(prev => [...prev, publicUrl]);
+        
+        toast({
+          title: "Upload Successful",
+          description: `${file.name} has been uploaded`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        variant: "destructive",
+        title: "Upload Error",
+        description: error.message || "An unexpected error occurred during upload",
+      });
+    } finally {
+      setUploadingImage(false);
+      
+      // Reset the file input
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
+  };
 
   if (loading) {
     return <div className="container mx-auto py-10 text-center">Loading venue data...</div>;
@@ -876,6 +993,126 @@ const EditVenue = () => {
                       Select additional services you provide with the venue.
                     </FormDescription>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Gallery Images Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Venue Images</CardTitle>
+              <CardDescription>Add and manage your venue images</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Manual URL Input */}
+              <div className="mb-6">
+                <Label htmlFor="newImageUrl">Add Image URL</Label>
+                <div className="flex mt-2 gap-2">
+                  <Input
+                    id="newImageUrl"
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    className="flex-grow"
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={handleAddImageUrl}
+                  >
+                    Add
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Enter a direct URL to an image to add it to your venue gallery
+                </p>
+              </div>
+              
+              {/* File Upload */}
+              <div className="mb-6">
+                <div className="border border-dashed border-input rounded-md p-6">
+                  <div className="flex flex-col items-center">
+                    <Upload className="h-10 w-10 text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground mb-2 text-center">
+                      Drag and drop photos or click to select from your device
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4 text-center">
+                      Supported formats: JPG, PNG, WebP (up to 5MB each)
+                    </p>
+                    <div className="relative">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleFileUpload}
+                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                        disabled={uploadingImage}
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        disabled={uploadingImage}
+                      >
+                        {uploadingImage ? (
+                          <>
+                            <span className="animate-spin mr-2">⟳</span>
+                            Uploading...
+                          </>
+                        ) : (
+                          'Select Files'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Image Gallery Preview */}
+              {galleryImages.length > 0 && (
+                <div className="mt-6">
+                  <Label className="block mb-3">Gallery Images ({galleryImages.length})</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {galleryImages.map((image, index) => (
+                      <div key={index} className="relative group aspect-video rounded-md overflow-hidden border">
+                        <img 
+                          src={image} 
+                          alt={`Venue image ${index + 1}`} 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            className="text-xs"
+                            onClick={() => handleRemoveImage(index)}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Remove
+                          </Button>
+                        </div>
+                        {index === 0 && (
+                          <div className="absolute top-2 left-2 bg-primary/80 text-primary-foreground text-xs px-2 py-1 rounded">
+                            Main Image
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    The first image will be used as the main display image for your venue.
+                  </p>
+                </div>
+              )}
+              
+              <FormField
+                control={form.control}
+                name="gallery_images"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormControl>
+                      <Input type="hidden" {...field} value={JSON.stringify(galleryImages)} />
+                    </FormControl>
                   </FormItem>
                 )}
               />
