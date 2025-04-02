@@ -21,7 +21,7 @@ const CategoriesSection = () => {
               Browse spaces by the type of event you're planning, from weddings to corporate gatherings
             </p>
           </div>
-          <Link to="/?view=categories" className="mt-4 md:mt-0">
+          <Link to="/categories" className="mt-4 md:mt-0">
             <Button variant="outline" className="border-findvenue text-findvenue hover:bg-findvenue/10">
               View All Categories
               <ArrowRight className="ml-2 h-4 w-4" />

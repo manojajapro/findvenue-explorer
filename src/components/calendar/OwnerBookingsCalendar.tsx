@@ -390,7 +390,7 @@ export function OwnerBookingsCalendar() {
         <div className="grid grid-cols-1 md:grid-cols-7 gap-0">
           {/* Calendar Column - Fixed on the left (3/7 of space) */}
           <div className="md:col-span-3 p-6 border-r border-white/10 min-h-[650px]">
-            <div className="flex justify-between items-center mb-4">
+            {/* <div className="flex justify-between items-center mb-4">
               <Button 
                 variant="ghost" 
                 size="sm"
@@ -416,7 +416,7 @@ export function OwnerBookingsCalendar() {
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
-            </div>
+            </div> */}
             
             <Calendar
               mode="single"

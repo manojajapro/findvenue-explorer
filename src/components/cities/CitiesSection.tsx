@@ -24,7 +24,7 @@ const CitiesSection = () => {
               From modern conference centers in Riyadh to beachfront venues in Jeddah, find the perfect location for your next event
             </p>
           </div>
-          <Link to="/?view=cities" className="mt-4 md:mt-0">
+          <Link to="/cities" className="mt-4 md:mt-0">
             <Button variant="outline" className="border-findvenue text-findvenue hover:bg-findvenue/10">
               View All Cities
               <ArrowRight className="ml-2 h-4 w-4" />

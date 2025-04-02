@@ -231,7 +231,7 @@ const Venues = () => {
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row gap-4 animate-fade-in">
-            <div className="w-full lg:w-1/3 h-auto lg:max-h-[650px] lg:overflow-y-auto">
+            <div className="w-full lg:w-2/3 h-auto lg:max-h-[650px] lg:overflow-y-auto">
               <VenuesList 
                 venues={venues}
                 isLoading={isLoading}
