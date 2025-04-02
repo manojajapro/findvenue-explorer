@@ -38,7 +38,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { isVenueOwner, getVenueOwnerId } from '@/utils/venueHelpers';
 import { X, Upload } from 'lucide-react';
 
-// Define the venue schema for form validation
 const venueSchema = z.object({
   name: z.string().min(3, {
     message: "Venue name must be at least 3 characters.",
@@ -117,7 +116,6 @@ const EditVenue = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
 
-  // Get the current user on mount
   useEffect(() => {
     const getUser = async () => {
       const { data } = await supabase.auth.getUser();
@@ -170,12 +168,10 @@ const EditVenue = () => {
         console.log("Fetched venue data:", data);
         setVenue(data);
         
-        // Set gallery images for our separate state
         if (data.gallery_images && Array.isArray(data.gallery_images)) {
           setGalleryImages(data.gallery_images);
         }
         
-        // Parse owner_info if it's a string
         let ownerInfo = null;
         if (data.owner_info) {
           try {
@@ -189,7 +185,6 @@ const EditVenue = () => {
           }
         }
         
-        // Set default values for the form with all venue attributes
         form.reset({
           name: data.name,
           description: data.description || "",
@@ -282,18 +277,14 @@ const EditVenue = () => {
     setLoading(true);
     setError(null);
     
-    // Ensure we have the right owner_info format for updating
     const formattedValues = { ...values };
     
-    // Update with our separate galleryImages state
     formattedValues.gallery_images = galleryImages;
     
-    // Set the main image to the first gallery image if not already set
     if (!formattedValues.image_url && galleryImages.length > 0) {
       formattedValues.image_url = galleryImages[0];
     }
     
-    // If we have owner_info from the venue but not in the form values, preserve it
     if (venue && venue.owner_info && !values.owner_info) {
       if (typeof venue.owner_info === 'string') {
         try {
@@ -425,7 +416,6 @@ const EditVenue = () => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
-        // Check file size (5MB limit)
         if (file.size > 5 * 1024 * 1024) {
           toast({
             variant: "destructive",
@@ -435,12 +425,10 @@ const EditVenue = () => {
           continue;
         }
         
-        // Create a unique file path
         const fileExt = file.name.split('.').pop();
         const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
         const filePath = `venues/${user?.id}/${fileName}`;
         
-        // Upload to Supabase storage
         const { error: uploadError, data } = await supabase.storage
           .from('venue-images')
           .upload(filePath, file);
@@ -455,7 +443,6 @@ const EditVenue = () => {
           continue;
         }
         
-        // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('venue-images')
           .getPublicUrl(filePath);
@@ -477,7 +464,6 @@ const EditVenue = () => {
     } finally {
       setUploadingImage(false);
       
-      // Reset the file input
       if (e.target) {
         e.target.value = '';
       }
@@ -521,7 +507,6 @@ const EditVenue = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Venue Name */}
                 <FormField
                   control={form.control}
                   name="name"
@@ -539,7 +524,6 @@ const EditVenue = () => {
                   )}
                 />
 
-                {/* Venue Description */}
                 <FormField
                   control={form.control}
                   name="description"
@@ -561,7 +545,6 @@ const EditVenue = () => {
                   )}
                 />
 
-                {/* Venue Address */}
                 <FormField
                   control={form.control}
                   name="address"
@@ -579,7 +562,6 @@ const EditVenue = () => {
                   )}
                 />
 
-                {/* City Select */}
                 <FormField
                   control={form.control}
                   name="city_id"
@@ -608,7 +590,6 @@ const EditVenue = () => {
                   )}
                 />
 
-                {/* Category Select */}
                 <FormField
                   control={form.control}
                   name="category_id"
@@ -637,7 +618,6 @@ const EditVenue = () => {
                   )}
                 />
 
-                {/* Image URL */}
                 <FormField
                   control={form.control}
                   name="image_url"
@@ -665,7 +645,6 @@ const EditVenue = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Minimum Capacity */}
                 <FormField
                   control={form.control}
                   name="min_capacity"
@@ -688,7 +667,6 @@ const EditVenue = () => {
                   )}
                 />
 
-                {/* Maximum Capacity */}
                 <FormField
                   control={form.control}
                   name="max_capacity"
@@ -711,7 +689,6 @@ const EditVenue = () => {
                   )}
                 />
 
-                {/* Starting Price */}
                 <FormField
                   control={form.control}
                   name="starting_price"
@@ -734,7 +711,6 @@ const EditVenue = () => {
                   )}
                 />
 
-                {/* Price Per Person */}
                 <FormField
                   control={form.control}
                   name="price_per_person"
@@ -758,7 +734,6 @@ const EditVenue = () => {
                   )}
                 />
 
-                {/* Currency */}
                 <FormField
                   control={form.control}
                   name="currency"
@@ -794,7 +769,6 @@ const EditVenue = () => {
               <CardDescription>Select the amenities and features your venue offers</CardDescription>
             </CardHeader>
             <CardContent>
-              {/* WiFi */}
               <FormField
                 control={form.control}
                 name="wifi"
@@ -816,7 +790,6 @@ const EditVenue = () => {
                 )}
               />
 
-              {/* Parking */}
               <FormField
                 control={form.control}
                 name="parking"
@@ -838,7 +811,6 @@ const EditVenue = () => {
                 )}
               />
 
-              {/* More Amenities as checkboxes */}
               <FormField
                 control={form.control}
                 name="amenities"
@@ -876,7 +848,6 @@ const EditVenue = () => {
                 )}
               />
 
-              {/* Accessibility Features */}
               <FormField
                 control={form.control}
                 name="accessibility_features"
@@ -914,7 +885,6 @@ const EditVenue = () => {
                 )}
               />
 
-              {/* Payment Methods */}
               <FormField
                 control={form.control}
                 name="accepted_payment_methods"
@@ -999,14 +969,12 @@ const EditVenue = () => {
             </CardContent>
           </Card>
 
-          {/* Gallery Images Section */}
           <Card>
             <CardHeader>
               <CardTitle>Venue Images</CardTitle>
               <CardDescription>Add and manage your venue images</CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Manual URL Input */}
               <div className="mb-6">
                 <Label htmlFor="newImageUrl">Add Image URL</Label>
                 <div className="flex mt-2 gap-2">
@@ -1029,7 +997,6 @@ const EditVenue = () => {
                 </p>
               </div>
               
-              {/* File Upload */}
               <div className="mb-6">
                 <div className="border border-dashed border-input rounded-md p-6">
                   <div className="flex flex-col items-center">
@@ -1068,7 +1035,6 @@ const EditVenue = () => {
                 </div>
               </div>
               
-              {/* Image Gallery Preview */}
               {galleryImages.length > 0 && (
                 <div className="mt-6">
                   <Label className="block mb-3">Gallery Images ({galleryImages.length})</Label>
@@ -1119,13 +1085,11 @@ const EditVenue = () => {
             </CardContent>
           </Card>
 
-          {/* Submit Button */}
           <div className="flex gap-4">
             <Button type="submit" disabled={loading}>
               {loading ? "Updating..." : "Update Venue"}
             </Button>
 
-            {/* Delete Venue */}
             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive">Delete Venue</Button>
