@@ -145,6 +145,15 @@ const EditVenue = () => {
       amenities: [],
       wifi: false,
       parking: false,
+      opening_hours: {
+        monday: { open: "09:00", close: "17:00" },
+        tuesday: { open: "09:00", close: "17:00" },
+        wednesday: { open: "09:00", close: "17:00" },
+        thursday: { open: "09:00", close: "17:00" },
+        friday: { open: "09:00", close: "17:00" },
+        saturday: { open: "09:00", close: "17:00" },
+        sunday: { open: "09:00", close: "17:00" }
+      }
     },
     mode: "onChange",
   });
@@ -207,6 +216,38 @@ const EditVenue = () => {
           }
         }
         
+        let openingHours = null;
+        if (data.opening_hours) {
+          try {
+            if (typeof data.opening_hours === 'string') {
+              openingHours = JSON.parse(data.opening_hours);
+            } else if (typeof data.opening_hours === 'object') {
+              openingHours = data.opening_hours;
+            }
+          } catch (err) {
+            console.error("Error parsing opening_hours:", err);
+            openingHours = {
+              monday: { open: "09:00", close: "17:00" },
+              tuesday: { open: "09:00", close: "17:00" },
+              wednesday: { open: "09:00", close: "17:00" },
+              thursday: { open: "09:00", close: "17:00" },
+              friday: { open: "09:00", close: "17:00" },
+              saturday: { open: "09:00", close: "17:00" },
+              sunday: { open: "09:00", close: "17:00" }
+            };
+          }
+        } else {
+          openingHours = {
+            monday: { open: "09:00", close: "17:00" },
+            tuesday: { open: "09:00", close: "17:00" },
+            wednesday: { open: "09:00", close: "17:00" },
+            thursday: { open: "09:00", close: "17:00" },
+            friday: { open: "09:00", close: "17:00" },
+            saturday: { open: "09:00", close: "17:00" },
+            sunday: { open: "09:00", close: "17:00" }
+          };
+        }
+        
         form.reset({
           name: data.name,
           description: data.description || "",
@@ -232,7 +273,7 @@ const EditVenue = () => {
           reviews_count: data.reviews_count,
           latitude: data.latitude,
           longitude: data.longitude,
-          opening_hours: data.opening_hours as any,
+          opening_hours: openingHours,
           owner_info: ownerInfo as any,
           availability: data.availability || [],
         });
@@ -259,11 +300,20 @@ const EditVenue = () => {
       }
 
       if (data) {
-        const formattedCategories = data.map(cat => ({
-          id: cat.category_id || '',
-          name: cat.category_name || ''
-        })).filter(cat => cat.id && cat.name);
-
+        console.log("Fetched categories:", data);
+        // Ensure unique categories by using a Map
+        const uniqueCategories = new Map();
+        data.forEach(cat => {
+          if (cat.category_id && cat.category_name) {
+            uniqueCategories.set(cat.category_id, {
+              id: cat.category_id,
+              name: cat.category_name
+            });
+          }
+        });
+        
+        const formattedCategories = Array.from(uniqueCategories.values());
+        console.log("Formatted unique categories:", formattedCategories);
         setCategories(formattedCategories);
       }
     } catch (error) {
@@ -283,11 +333,20 @@ const EditVenue = () => {
       }
 
       if (data) {
-        const formattedCities = data.map(city => ({
-          id: city.city_id || '',
-          name: city.city_name || ''
-        })).filter(city => city.id && city.name);
-
+        console.log("Fetched cities:", data);
+        // Ensure unique cities by using a Map
+        const uniqueCities = new Map();
+        data.forEach(city => {
+          if (city.city_id && city.city_name) {
+            uniqueCities.set(city.city_id, {
+              id: city.city_id,
+              name: city.city_name
+            });
+          }
+        });
+        
+        const formattedCities = Array.from(uniqueCities.values());
+        console.log("Formatted unique cities:", formattedCities);
         setCities(formattedCities);
       }
     } catch (error) {
@@ -297,6 +356,9 @@ const EditVenue = () => {
 
   const onSubmit = async (values: z.infer<typeof venueSchema>) => {
     console.log("Submit button clicked");
+    console.log("Form values:", values);
+    console.log("User:", user);
+    console.log("Venue ID:", id);
     setLoading(true);
     setError(null);
     
@@ -541,7 +603,12 @@ const EditVenue = () => {
       <h1 className="text-3xl font-bold mb-5">Edit Venue</h1>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={form.handleSubmit((values) => {
+          console.log("Form submitted with values:", values);
+          onSubmit(values);
+        }, (errors) => {
+          console.error("Form validation errors:", errors);
+        })} className="space-y-8">
           <Card>
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
@@ -618,7 +685,11 @@ const EditVenue = () => {
                         </FormControl>
                         <SelectContent>
                           {cities.map((city) => (
-                            <SelectItem key={city.id} value={city.id}>
+                            <SelectItem 
+                              key={`city-${city.id}`} 
+                              value={city.id}
+                              data-city-id={city.id}
+                            >
                               {city.name}
                             </SelectItem>
                           ))}
@@ -646,7 +717,11 @@ const EditVenue = () => {
                         </FormControl>
                         <SelectContent>
                           {categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
+                            <SelectItem 
+                              key={`category-${category.id}`} 
+                              value={category.id}
+                              data-category-id={category.id}
+                            >
                               {category.name}
                             </SelectItem>
                           ))}
