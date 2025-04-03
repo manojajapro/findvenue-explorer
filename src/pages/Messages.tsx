@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,7 +6,7 @@ import DirectChat from '@/components/chat/DirectChat';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, MessageSquare, AlertCircle } from 'lucide-react';
+import { ArrowLeft, MessageSquare, AlertCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -260,9 +259,9 @@ const Messages = () => {
   }
   
   return (
-    <div className="min-h-screen pt-24 pb-16">
-      <div className="container mx-auto px-4">
-        <div className="mb-6">
+    <div className="h-[calc(100vh-64px)] overflow-hidden">
+      <div className="container h-full mx-auto px-4 flex flex-col py-6">
+        <div className="mb-4 flex-shrink-0">
           <Button 
             variant="ghost" 
             className="p-0 flex items-center text-findvenue-text-muted hover:text-findvenue"
@@ -275,34 +274,26 @@ const Messages = () => {
         </div>
         
         {error ? (
-          <Card className="glass-card border-white/10 overflow-hidden">
+          <Card className="flex-1 border-white/10 overflow-hidden bg-findvenue-surface/5">
             <CardContent className="p-6">
               <Alert variant="destructive" className="mb-4">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Error</AlertTitle>
-                <AlertDescription>
-                  {error}
-                </AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
               <div className="text-center mt-4">
-                <Button 
-                  onClick={() => {
-                    setError(null);
-                    fetchContacts();
-                  }} 
-                  className="bg-findvenue hover:bg-findvenue-dark"
-                >
+                <Button onClick={() => { setError(null); fetchContacts(); }}>
                   Try Again
                 </Button>
               </div>
             </CardContent>
           </Card>
         ) : (
-          <Card className="glass-card border-white/10 overflow-hidden">
-            <div className="grid grid-cols-1 md:grid-cols-3 h-[calc(100vh-12rem)]">
-              <div className="border-r border-white/10 md:col-span-1 overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-white/10">
-                  <h2 className="font-semibold">Conversations</h2>
+          <Card className="flex-1 border-white/10 overflow-hidden bg-findvenue-surface/5">
+            <div className="h-full grid grid-cols-1 md:grid-cols-3">
+              <div className="border-r border-white/10 md:col-span-1 overflow-hidden flex flex-col bg-findvenue-surface/10">
+                <div className="p-4 border-b border-white/10 bg-findvenue-surface/20">
+                  <h2 className="font-semibold text-lg">Conversations</h2>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto">
@@ -319,33 +310,36 @@ const Messages = () => {
                       ))}
                     </div>
                   ) : contacts.length === 0 ? (
-                    <div className="p-4 text-center text-findvenue-text-muted">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                      <p>No conversations yet</p>
-                      <p className="text-sm mt-2">When you message a venue owner, your conversations will appear here.</p>
+                    <div className="p-8 text-center text-findvenue-text-muted">
+                      <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                      <p className="font-medium mb-2">No conversations yet</p>
+                      <p className="text-sm">When you message a venue owner, your conversations will appear here.</p>
                     </div>
                   ) : (
-                    <div>
+                    <div className="divide-y divide-white/5">
                       {contacts.map((contact) => (
                         <div 
                           key={contact.id}
-                          className={`flex items-center p-4 cursor-pointer hover:bg-findvenue-surface/30 transition-colors ${
-                            selectedContact?.id === contact.id ? 'bg-findvenue-surface/50' : ''
-                          }`}
+                          className={`flex items-center p-4 cursor-pointer transition-colors
+                            ${selectedContact?.id === contact.id 
+                              ? 'bg-findvenue-surface/30' 
+                              : 'hover:bg-findvenue-surface/20'}`}
                           onClick={() => handleContactSelect(contact)}
                         >
-                          <Avatar className="h-10 w-10 mr-3">
+                          <Avatar className="h-12 w-12 mr-3 border-2 border-white/10">
                             <AvatarImage src={contact.avatar || ''} />
-                            <AvatarFallback className="bg-findvenue-surface text-findvenue">
+                            <AvatarFallback className="bg-findvenue text-white font-medium">
                               {contact.name.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                           
                           <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center">
-                              <h3 className="font-medium truncate">{contact.name}</h3>
+                            <div className="flex justify-between items-center mb-1">
+                              <h3 className="font-medium truncate text-white">
+                                {contact.name}
+                              </h3>
                               {contact.lastMessageTime && (
-                                <span className="text-xs text-findvenue-text-muted">
+                                <span className="text-xs text-findvenue-text-muted ml-2">
                                   {formatLastMessageTime(contact.lastMessageTime)}
                                 </span>
                               )}
@@ -357,7 +351,7 @@ const Messages = () => {
                               </p>
                               
                               {contact.unreadCount > 0 && (
-                                <span className="ml-2 bg-findvenue text-white text-xs rounded-full h-5 min-w-5 flex items-center justify-center px-1">
+                                <span className="ml-2 bg-findvenue text-white text-xs font-medium rounded-full h-5 min-w-5 flex items-center justify-center px-1.5">
                                   {contact.unreadCount}
                                 </span>
                               )}
@@ -370,19 +364,21 @@ const Messages = () => {
                 </div>
               </div>
               
-              <div className="md:col-span-2 flex flex-col">
-                {contactId ? (
-                  <DirectChat />
+              <div className="md:col-span-2 flex flex-col h-full bg-findvenue-surface/5 overflow-hidden">
+                {contactId && selectedContact ? (
+                  <DirectChat key={contactId} />
                 ) : selectedContact ? (
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center p-4">
+                  <div className="flex-1 flex items-center justify-center p-8">
+                    <div className="text-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-findvenue mx-auto mb-4" />
                       <h3 className="text-lg font-medium mb-2">Loading conversation...</h3>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center p-4">
-                      <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
+                  <div className="flex-1 flex items-center justify-center p-8">
+                    <div className="text-center max-w-md mx-auto">
+                      <MessageSquare className="h-12 w-12 mx-auto mb-4 text-findvenue opacity-50" />
+                      <h3 className="text-xl font-medium mb-2">Select a conversation</h3>
                       <p className="text-findvenue-text-muted">
                         Choose a contact from the list to start chatting
                       </p>
