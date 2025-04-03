@@ -26,6 +26,7 @@ import { VenueCard } from '@/components/ui';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
+import ShareVenue from '@/components/venue/ShareVenue';
 
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
@@ -344,6 +345,8 @@ const VenueDetails = () => {
     );
   }
   
+  const socialLinks = venue?.ownerInfo?.socialLinks || {};
+  
   return (
     <div className="pt-24 pb-16">
       <div className="container mx-auto px-4">
@@ -370,14 +373,16 @@ const VenueDetails = () => {
                     </Badge>
                   </div>
                 )}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="absolute top-4 right-4 bg-black/30 text-white hover:bg-black/50"
-                  onClick={() => {/* Share functionality */}}
-                >
-                  <Share2 className="h-5 w-5" />
-                </Button>
+                <div className="absolute top-4 right-4">
+                  <ShareVenue 
+                    venueName={venue?.name || ''}
+                    venueId={venue?.id || ''}
+                    facebookUrl={socialLinks.facebook}
+                    twitterUrl={socialLinks.twitter}
+                    instagramUrl={socialLinks.instagram}
+                    linkedinUrl={socialLinks.linkedin}
+                  />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-4 md:grid-cols-1 gap-2">

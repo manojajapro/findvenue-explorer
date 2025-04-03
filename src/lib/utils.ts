@@ -121,3 +121,32 @@ export function isTimeSlotAvailable(
     return (startTime < bookingEnd && endTime > bookingStart);
   });
 }
+
+/**
+ * Generates a shareable link for a venue
+ * @param venueId Venue ID
+ * @param origin Optional origin URL
+ * @returns Shareable link
+ */
+export function generateShareableLink(venueId: string, origin?: string): string {
+  const baseUrl = origin || window.location.origin;
+  return `${baseUrl}/venue/${venueId}`;
+}
+
+/**
+ * Formats a date with consistent timezone handling
+ * @param date Date to format
+ * @param formatStr Format string (date-fns compatible)
+ * @returns Formatted date string
+ */
+export function formatDate(date: Date | string, formatStr: string = 'yyyy-MM-dd'): string {
+  if (typeof date === 'string') {
+    // Handle date strings that are already in YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [year, month, day] = date.split('-').map(Number);
+      return format(new Date(year, month - 1, day), formatStr);
+    }
+    date = new Date(date);
+  }
+  return format(date, formatStr);
+}

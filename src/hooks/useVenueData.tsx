@@ -49,7 +49,13 @@ export const useVenueData = () => {
                 name: ownerInfo.name || '',
                 contact: ownerInfo.contact || '',
                 responseTime: ownerInfo.response_time || '',
-                user_id: ownerInfo.user_id || ''
+                user_id: ownerInfo.user_id || '',
+                socialLinks: ownerInfo.social_links || {
+                  facebook: ownerInfo.facebook_url,
+                  twitter: ownerInfo.twitter_url,
+                  instagram: ownerInfo.instagram_url,
+                  linkedin: ownerInfo.linkedin_url
+                }
               };
             }
           } catch (e) {
