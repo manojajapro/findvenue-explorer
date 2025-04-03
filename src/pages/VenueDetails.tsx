@@ -27,7 +27,7 @@ import { VenueCard } from '@/components/ui';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
-import BookingForm from '@/components/venue/BookingForm';
+import VenueBookingTabs from '@/components/venue/VenueBookingTabs';
 import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
 import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
@@ -556,13 +556,17 @@ const VenueDetails = () => {
                 </div>
               )}
               
-              <BookingForm 
-                venueId={venue?.id || ''} 
-                venueName={venue?.name || ''} 
-                pricePerHour={venue?.pricing.startingPrice || 0} 
-                ownerId={getVenueOwnerId(venue) || ''}
-                ownerName={venue?.ownerInfo?.name || 'Venue Host'}
-              />
+              {venue && (
+                <VenueBookingTabs
+                  venueId={venue.id}
+                  venueName={venue.name}
+                  pricePerHour={venue.pricing.startingPrice || 0}
+                  minCapacity={venue.capacity.min}
+                  maxCapacity={venue.capacity.max}
+                  ownerId={getVenueOwnerId(venue) || ''}
+                  ownerName={venue.ownerInfo?.name || 'Venue Host'}
+                />
+              )}
               
               <div className="mt-4">
                 {venue?.ownerInfo && (

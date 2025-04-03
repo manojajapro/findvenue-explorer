@@ -1,16 +1,16 @@
-
 import { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar as CalendarIcon, Clock, Users, Info } from 'lucide-react';
 import { format } from 'date-fns';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -68,7 +68,6 @@ export default function MultiDayBookingForm({
   }, [venueId]);
 
   useEffect(() => {
-    // Calculate total price based on hours and days
     let newTotal = 0;
     selectedDays.forEach(day => {
       const startHour = parseInt(day.startTime.split(':')[0]);
@@ -111,7 +110,6 @@ export default function MultiDayBookingForm({
       const bookingStart = booking.start_time;
       const bookingEnd = booking.end_time;
       
-      // Check if the time slots overlap
       return (startTime < bookingEnd && endTime > bookingStart);
     });
   };
@@ -120,15 +118,13 @@ export default function MultiDayBookingForm({
     const startHour = parseInt(startTime.split(':')[0]);
     const availableEndTimes = [];
     
-    // Generate all possible end times after the start time
     for (let i = startHour + 1; i <= 22; i++) {
       const endTime = `${i.toString().padStart(2, '0')}:00`;
       
-      // Check if this entire block (from start to end) is available
       if (isTimeSlotAvailable(date, startTime, endTime)) {
         availableEndTimes.push(endTime);
       } else {
-        break; // Stop at the first unavailable slot
+        break;
       }
     }
     
@@ -151,14 +147,12 @@ export default function MultiDayBookingForm({
     const updatedDays = [...selectedDays];
     updatedDays[index] = { ...updatedDays[index], [field]: value };
     
-    // If date or start time changes, we need to validate end time
     if (field === 'date' || field === 'startTime') {
       const availableEndTimes = getAvailableEndTimes(
         updatedDays[index].date, 
         updatedDays[index].startTime
       );
       
-      // If current end time is not available, set to the first available
       if (availableEndTimes.length > 0 && !availableEndTimes.includes(updatedDays[index].endTime)) {
         updatedDays[index].endTime = availableEndTimes[0];
       }
@@ -188,27 +182,23 @@ export default function MultiDayBookingForm({
     setIsSubmitting(true);
 
     try {
-      // Process each selected day as a separate booking
       for (const day of selectedDays) {
         const bookingDate = format(day.date, 'yyyy-MM-dd');
         
-        // Verify availability once more before booking
         if (!isTimeSlotAvailable(day.date, day.startTime, day.endTime)) {
           toast({
             title: "Time Slot Unavailable",
             description: `The selected time on ${format(day.date, 'MMMM d, yyyy')} is no longer available.`,
             variant: "destructive",
           });
-          continue; // Skip this day and try the next
+          continue;
         }
         
-        // Calculate hours for this booking
         const startHour = parseInt(day.startTime.split(':')[0]);
         const endHour = parseInt(day.endTime.split(':')[0]);
         const hours = endHour - startHour;
         const dayPrice = hours * pricePerHour;
         
-        // Create booking
         const { error } = await supabase.from('bookings').insert({
           user_id: user.id,
           venue_id: venueId,
@@ -230,7 +220,6 @@ export default function MultiDayBookingForm({
         description: `You have successfully requested ${selectedDays.length} booking${selectedDays.length > 1 ? 's' : ''}.`,
       });
 
-      // Reset form
       setSelectedDays([]);
       setSpecialRequests('');
     } catch (error: any) {
@@ -248,9 +237,12 @@ export default function MultiDayBookingForm({
   const timeSlots = generateTimeSlots();
 
   return (
-    <Card className="glass-card border-white/10 w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle className="text-xl">Book Multiple Days</CardTitle>
+    <Card className="glass-card border-white/10 w-full mx-auto">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Multi-Day Booking</CardTitle>
+        <CardDescription>
+          Book this venue for multiple specific days with custom times
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -406,6 +398,14 @@ export default function MultiDayBookingForm({
                 </div>
               </div>
             </>
+          )}
+          
+          {selectedDays.length === 0 && (
+            <Alert className="mt-4 bg-findvenue/10 border-findvenue/20">
+              <AlertDescription>
+                Click "Add Booking Day" to select specific dates and times for your booking.
+              </AlertDescription>
+            </Alert>
           )}
         </div>
       </CardContent>

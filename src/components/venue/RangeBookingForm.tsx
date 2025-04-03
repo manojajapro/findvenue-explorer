@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { DateRange } from 'react-day-picker';
 import { format, addDays, eachDayOfInterval, isBefore, addHours } from 'date-fns';
@@ -6,12 +5,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar as CalendarIcon, Clock, Users, Info, X, Check } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -72,14 +72,12 @@ const RangeBookingForm = ({
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const timeSlots = generateTimeSlots();
   
-  // Fetch existing bookings
   useEffect(() => {
     if (venueId) {
       fetchExistingBookings();
     }
   }, [venueId]);
 
-  // Update booking days when date range changes
   useEffect(() => {
     if (dateRange?.from && dateRange?.to) {
       const dates = eachDayOfInterval({
@@ -89,7 +87,6 @@ const RangeBookingForm = ({
       
       setSelectedDates(dates);
       
-      // Create booking days from date range
       const newBookingDays = dates
         .filter(date => !isDateBooked(date, existingBookings))
         .map(date => ({
@@ -103,7 +100,6 @@ const RangeBookingForm = ({
     }
   }, [dateRange, existingBookings, startTime, endTime, guests]);
 
-  // Update total price
   useEffect(() => {
     let newTotal = 0;
     bookingDays.forEach(day => {
@@ -115,7 +111,6 @@ const RangeBookingForm = ({
     setTotalPrice(newTotal);
   }, [bookingDays, pricePerHour]);
 
-  // Update booked dates
   useEffect(() => {
     const dates: Date[] = [];
     existingBookings.forEach(booking => {
@@ -145,7 +140,6 @@ const RangeBookingForm = ({
   };
 
   const isTimeSlotAvailableForAll = (startTime: string, endTime: string) => {
-    // Check if selected time slot is available for all selected dates
     return bookingDays.every(day => 
       isTimeSlotAvailable(day.date, startTime, endTime, existingBookings)
     );
@@ -156,7 +150,6 @@ const RangeBookingForm = ({
       setStartTime(startTime);
       setEndTime(endTime);
       
-      // Update all booking days with new times
       setBookingDays(bookingDays.map(day => ({
         ...day,
         startTime,
@@ -170,7 +163,6 @@ const RangeBookingForm = ({
   const updateAllBookingGuests = (guests: number) => {
     setGuests(guests);
     
-    // Update all booking days with new guest count
     setBookingDays(bookingDays.map(day => ({
       ...day,
       guests
@@ -180,13 +172,11 @@ const RangeBookingForm = ({
   const handleAddCustomDate = () => {
     const today = new Date();
     
-    // Check if date is already in bookingDays
     if (bookingDays.some(day => format(day.date, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'))) {
       toast.error('This date is already added to your booking');
       return;
     }
     
-    // Check if date is booked
     if (isDateBooked(today, existingBookings)) {
       toast.error('This date is already booked');
       return;
@@ -212,13 +202,11 @@ const RangeBookingForm = ({
   const updateBookingDay = (index: number, field: keyof BookingDay, value: any) => {
     const updatedDays = [...bookingDays];
     
-    // If updating date, check if date is already booked
     if (field === 'date' && isDateBooked(value, existingBookings)) {
       toast.error('This date is already booked');
       return;
     }
     
-    // If updating times, check if time slot is available
     if ((field === 'startTime' || field === 'endTime')) {
       const day = updatedDays[index];
       const newStartTime = field === 'startTime' ? value : day.startTime;
@@ -248,21 +236,17 @@ const RangeBookingForm = ({
     setIsSubmitting(true);
 
     try {
-      // Process each booking day
       for (const day of bookingDays) {
-        // Calculate hours for this booking
         const startHour = parseInt(day.startTime.split(':')[0]);
         const endHour = parseInt(day.endTime.split(':')[0]);
         const hours = endHour - startHour;
         const dayPrice = hours * pricePerHour;
         
-        // Verify availability once more before booking
         if (!isTimeSlotAvailable(day.date, day.startTime, day.endTime, existingBookings)) {
           toast.error(`The selected time on ${format(day.date, 'MMMM d, yyyy')} is no longer available.`);
-          continue; // Skip this day
+          continue;
         }
         
-        // Create booking
         const { error } = await supabase.from('bookings').insert({
           user_id: user.id,
           venue_id: venueId,
@@ -281,7 +265,6 @@ const RangeBookingForm = ({
 
       toast.success(`You have successfully requested ${bookingDays.length} booking${bookingDays.length > 1 ? 's' : ''}.`);
 
-      // Reset form
       setDateRange(undefined);
       setBookingDays([]);
       setSpecialRequests('');
@@ -294,9 +277,12 @@ const RangeBookingForm = ({
   };
 
   return (
-    <Card className="glass-card border-white/10 w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle className="text-xl">Book Multiple Days</CardTitle>
+    <Card className="glass-card border-white/10 w-full mx-auto">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Date Range Booking</CardTitle>
+        <CardDescription>
+          Book this venue for a specific date range or multiple individual days
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -315,7 +301,6 @@ const RangeBookingForm = ({
                     selected={dateRange}
                     onSelect={setDateRange}
                     disabled={(date) => {
-                      // Disable past dates and fully booked dates
                       return isBefore(date, new Date()) || 
                         bookedDates.some(bookedDate => 
                           format(bookedDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
@@ -347,7 +332,6 @@ const RangeBookingForm = ({
                       <Select
                         value={startTime}
                         onValueChange={(value) => {
-                          // Make sure start time is before end time
                           const startHour = parseInt(value.split(':')[0]);
                           const endHour = parseInt(endTime.split(':')[0]);
                           
@@ -377,7 +361,6 @@ const RangeBookingForm = ({
                       <Select
                         value={endTime}
                         onValueChange={(value) => {
-                          // Make sure end time is after start time
                           const startHour = parseInt(startTime.split(':')[0]);
                           const endHour = parseInt(value.split(':')[0]);
                           
@@ -486,7 +469,6 @@ const RangeBookingForm = ({
                               selected={day.date}
                               onSelect={(date) => date && updateBookingDay(index, 'date', date)}
                               disabled={(date) => {
-                                // Disable past dates and fully booked dates
                                 return isBefore(date, new Date()) || 
                                   bookedDates.some(bookedDate => 
                                     format(bookedDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
@@ -504,7 +486,6 @@ const RangeBookingForm = ({
                           <Select
                             value={day.startTime}
                             onValueChange={(value) => {
-                              // Make sure start time is before end time
                               const startHour = parseInt(value.split(':')[0]);
                               const endHour = parseInt(day.endTime.split(':')[0]);
                               
@@ -535,7 +516,6 @@ const RangeBookingForm = ({
                           <Select
                             value={day.endTime}
                             onValueChange={(value) => {
-                              // Make sure end time is after start time
                               const startHour = parseInt(day.startTime.split(':')[0]);
                               const endHour = parseInt(value.split(':')[0]);
                               
@@ -618,6 +598,14 @@ const RangeBookingForm = ({
               </div>
             </div>
           </>
+        )}
+        
+        {bookingDays.length === 0 && (
+          <Alert className="mt-4 bg-findvenue/10 border-findvenue/20">
+            <AlertDescription>
+              Please select one or more dates for your booking. You can either choose a date range or add individual days.
+            </AlertDescription>
+          </Alert>
         )}
       </CardContent>
       <CardFooter>
