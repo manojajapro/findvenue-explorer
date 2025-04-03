@@ -269,7 +269,7 @@ export default function MultiDayBookingForm({
                         <span>Day {index + 1}:</span>
                         <span className="text-findvenue">{format(day.date, 'MMMM d, yyyy')}</span>
                         <span className="text-findvenue-text-muted">
-                          {day.startTime} - {day.endTime}
+                          {day.startTime} -  {day.endTime}
                         </span>
                       </div>
                     </AccordionTrigger>
@@ -288,7 +288,7 @@ export default function MultiDayBookingForm({
                                   {format(day.date, 'MMMM d, yyyy')}
                                 </Button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
+                              <PopoverContent className="w-auto p-0" align="start">
                                 <Calendar
                                   mode="single"
                                   selected={day.date}
