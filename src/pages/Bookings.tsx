@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -98,7 +97,6 @@ const Bookings = () => {
           }
         }
         
-        // Ensure the booking_date is properly formatted for display
         let formattedDate = item.booking_date;
         
         return {
@@ -212,7 +210,6 @@ const Bookings = () => {
   
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
   
-  // Group bookings by date and venue to identify multiple bookings
   const getGroupedBookings = () => {
     const groupedBookings: Record<string, Booking[]> = {};
     
@@ -229,15 +226,23 @@ const Bookings = () => {
   
   const bookingGroups = getGroupedBookings();
   
-  // Helper function to format date consistently
   const formatBookingDate = (dateString: string) => {
     try {
-      // Try to parse the date string in different formats
+      const dateParts = dateString.split('-');
+      if (dateParts.length === 3) {
+        const year = parseInt(dateParts[0]);
+        const month = parseInt(dateParts[1]) - 1;
+        const day = parseInt(dateParts[2]);
+        
+        const date = new Date(year, month, day);
+        return format(date, 'MMMM d, yyyy');
+      }
+      
       const date = new Date(dateString);
       return format(date, 'MMMM d, yyyy');
     } catch (e) {
       console.error("Error formatting date:", e, dateString);
-      return dateString; // Return original if parsing fails
+      return dateString;
     }
   };
   

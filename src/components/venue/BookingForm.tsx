@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +56,7 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([]);
   const [hoursBooked, setHoursBooked] = useState<number>(0);
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
   
   useEffect(() => {
     if (venueId) {
@@ -76,28 +76,32 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   
   useEffect(() => {
     if (startTime && endTime) {
-      const start = parseTime(startTime);
-      const end = parseTime(endTime);
-      
-      if (start && end) {
-        let hours = end.getHours() - start.getHours();
-        const minutesDiff = end.getMinutes() - start.getMinutes();
-        hours += minutesDiff / 60;
-        
-        if (hours > 0) {
-          setHoursBooked(hours);
-        } else {
-          setHoursBooked(0);
-        }
-      }
+      calculateHoursBooked();
     }
   }, [startTime, endTime]);
+  
+  const calculateHoursBooked = () => {
+    const start = parseTime(startTime);
+    const end = parseTime(endTime);
+    
+    if (start && end) {
+      let hours = end.getHours() - start.getHours();
+      const minutesDiff = end.getMinutes() - start.getMinutes();
+      hours += minutesDiff / 60;
+      
+      if (hours > 0) {
+        setHoursBooked(hours);
+      } else {
+        setHoursBooked(0);
+      }
+    }
+  };
   
   const generateAvailableTimeSlots = () => {
     if (!date) return;
     
     const slots: TimeSlot[] = [];
-    const selectedDateStr = date.toISOString().split('T')[0];
+    const selectedDateStr = formatDateForDatabase(date);
     const bookedSlots: {start: string, end: string}[] = [];
     
     // Create a list of all booked time slots for the selected date
@@ -157,6 +161,38 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       
       if (data) {
         setExistingBookings(data);
+        
+        // Process booked dates to highlight fully booked dates
+        const fullyBookedDates = new Set<string>();
+        const dateBookingHours = new Map<string, number>();
+        
+        // Count total booked hours for each date
+        data.forEach(booking => {
+          const dateStr = booking.booking_date;
+          const start = parseTime(booking.start_time);
+          const end = parseTime(booking.end_time);
+          
+          if (start && end) {
+            let hours = end.getHours() - start.getHours();
+            const minutesDiff = end.getMinutes() - start.getMinutes();
+            hours += minutesDiff / 60;
+            
+            if (!dateBookingHours.has(dateStr)) {
+              dateBookingHours.set(dateStr, 0);
+            }
+            
+            dateBookingHours.set(dateStr, dateBookingHours.get(dateStr)! + hours);
+          }
+        });
+        
+        // Check which dates are fully booked (14+ hours)
+        dateBookingHours.forEach((hours, dateStr) => {
+          if (hours >= 14) { // A full day is considered 14 hours (8am-10pm)
+            fullyBookedDates.add(dateStr);
+          }
+        });
+        
+        setBookedDates(fullyBookedDates);
       }
     } catch (error) {
       console.error('Error fetching existing bookings:', error);
@@ -223,40 +259,12 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     return date;
   };
   
-  const formatDateTime = (dateObj: Date, timeString: string): string => {
-    if (!dateObj || !timeString) return '';
-    
-    const [hours, minutes] = timeString.split(':');
-    const datetime = new Date(dateObj);
-    datetime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-    
-    return datetime.toISOString();
-  };
-  
-  const isDateBooked = (date: Date): boolean => {
-    // Only disable dates that are fully booked (all time slots unavailable)
-    const dateStr = date.toISOString().split('T')[0];
-    const bookingsOnDate = existingBookings.filter(booking => booking.booking_date === dateStr);
-    
-    // If there are 14 or more hours booked on this date (complete day is 14 hours from 8am-10pm),
-    // consider it fully booked
-    let totalHoursBooked = 0;
-    bookingsOnDate.forEach(booking => {
-      const startTime = parseTime(booking.start_time);
-      const endTime = parseTime(booking.end_time);
-      
-      if (startTime && endTime) {
-        let hours = endTime.getHours() - startTime.getHours();
-        const minutesDiff = endTime.getMinutes() - startTime.getMinutes();
-        hours += minutesDiff / 60;
-        
-        if (hours > 0) {
-          totalHoursBooked += hours;
-        }
-      }
-    });
-    
-    return totalHoursBooked >= 14; // A full day is booked
+  const formatDateForDatabase = (dateObj: Date): string => {
+    // Format as YYYY-MM-DD for database storage
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -292,7 +300,7 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       return;
     }
     
-    const selectedDateStr = date.toISOString().split('T')[0];
+    const selectedDateStr = formatDateForDatabase(date);
     const timeConflict = existingBookings.some(booking => {
       if (booking.booking_date !== selectedDateStr) return false;
       
@@ -318,7 +326,10 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     setIsSubmitting(true);
     
     try {
-      const formattedDate = date.toISOString().split('T')[0]; // Ensure date is properly formatted
+      // Create proper date string in YYYY-MM-DD format for database
+      const formattedDate = formatDateForDatabase(date);
+      
+      console.log("Submitting booking with date:", formattedDate);
       
       const { data: bookingData, error: bookingError } = await supabase
         .from('bookings')
@@ -720,10 +731,16 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
                     setEndTime('');
                   }}
                   initialFocus
-                  disabled={(date) => {
+                  disabled={(day) => {
+                    // Disable past dates
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    return date < today || isDateBooked(date);
+                    
+                    // Disable fully booked dates
+                    if (day < today) return true;
+                    
+                    const dayStr = formatDateForDatabase(day);
+                    return bookedDates.has(dayStr);
                   }}
                   className={cn("p-3 pointer-events-auto")}
                 />
@@ -743,20 +760,26 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
                     key={index}
                     type="button"
                     size="sm"
-                    variant={slot.isAvailable ? "outline" : "ghost"}
+                    variant={slot.isAvailable ? (
+                      startTime === slot.time || endTime === slot.time ? "default" : "outline"
+                    ) : "ghost"}
                     disabled={!slot.isAvailable}
                     className={cn(
                       "text-xs h-auto py-1",
-                      !slot.isAvailable && "opacity-50 cursor-not-allowed"
+                      !slot.isAvailable && "opacity-50 cursor-not-allowed line-through bg-red-900/10",
+                      startTime === slot.time && "bg-findvenue text-white",
+                      endTime === slot.time && "bg-findvenue-dark text-white"
                     )}
                     onClick={() => {
-                      if (startTime === '') {
-                        setStartTime(slot.time);
-                      } else if (endTime === '' && parseTime(slot.time)! > parseTime(startTime)!) {
-                        setEndTime(slot.time);
-                      } else {
-                        setStartTime(slot.time);
-                        setEndTime('');
+                      if (slot.isAvailable) {
+                        if (startTime === '') {
+                          setStartTime(slot.time);
+                        } else if (endTime === '' && parseTime(slot.time)! > parseTime(startTime)!) {
+                          setEndTime(slot.time);
+                        } else {
+                          setStartTime(slot.time);
+                          setEndTime('');
+                        }
                       }
                     }}
                   >
@@ -837,12 +860,12 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
           </div>
           
           <div className="bg-findvenue/10 p-4 rounded-md">
-            <p className="text-sm mb-2">Booking Summary</p>
+            <p className="text-sm mb-2 font-medium">Booking Summary</p>
             
             {hoursBooked > 0 && (
               <div className="flex justify-between items-center mb-2 text-findvenue-text-muted text-sm">
                 <span>Hourly Rate:</span>
-                <span>SAR {pricePerHour.toLocaleString()} × {hoursBooked} {hoursBooked === 1 ? 'hour' : 'hours'}</span>
+                <span>SAR {pricePerHour.toLocaleString()} × {hoursBooked.toFixed(1)} {hoursBooked === 1 ? 'hour' : 'hours'}</span>
               </div>
             )}
             
