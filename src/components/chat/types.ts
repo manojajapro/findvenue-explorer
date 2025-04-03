@@ -10,6 +10,7 @@ export type Message = {
   receiver_name?: string;
   venue_id?: string;
   venue_name?: string;
+  booking_id?: string; // Added to link messages with specific bookings
 };
 
 export type ChatContact = {
@@ -20,4 +21,5 @@ export type ChatContact = {
   status?: string;
   venue_id?: string;
   venue_name?: string;
+  booking_id?: string; // Added to link contacts with specific bookings
 };

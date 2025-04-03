@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -97,6 +98,7 @@ const Bookings = () => {
           }
         }
         
+        // Ensure we're handling the booking date correctly without timezone shifts
         let formattedDate = item.booking_date;
         
         return {
@@ -228,16 +230,19 @@ const Bookings = () => {
   
   const formatBookingDate = (dateString: string) => {
     try {
-      const dateParts = dateString.split('-');
-      if (dateParts.length === 3) {
+      // Fix for date display issues - handle date as YYYY-MM-DD without timezone conversion
+      if (dateString.includes('-') && dateString.split('-').length === 3) {
+        const dateParts = dateString.split('-');
         const year = parseInt(dateParts[0]);
-        const month = parseInt(dateParts[1]) - 1;
+        const month = parseInt(dateParts[1]) - 1; // JS months are 0-indexed
         const day = parseInt(dateParts[2]);
         
+        // Create date object without timezone conversion
         const date = new Date(year, month, day);
         return format(date, 'MMMM d, yyyy');
       }
       
+      // Fallback for other date formats
       const date = new Date(dateString);
       return format(date, 'MMMM d, yyyy');
     } catch (e) {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,6 +28,26 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+
+const formatBookingDate = (dateString: string) => {
+  try {
+    if (dateString.includes('-') && dateString.split('-').length === 3) {
+      const dateParts = dateString.split('-');
+      const year = parseInt(dateParts[0]);
+      const month = parseInt(dateParts[1]) - 1;
+      const day = parseInt(dateParts[2]);
+      
+      const date = new Date(year, month, day);
+      return format(date, 'MMMM d, yyyy');
+    }
+    
+    const date = new Date(dateString);
+    return format(date, 'MMMM d, yyyy');
+  } catch (e) {
+    console.error("Error formatting date:", e, dateString);
+    return dateString;
+  }
+};
 
 const CustomerBookings = () => {
   const { user, isVenueOwner } = useAuth();
@@ -251,7 +270,6 @@ const CustomerBookings = () => {
   
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
   
-  // Group bookings by date and venue to identify multiple bookings on same day/venue
   const getBookingGroups = () => {
     const groups: Record<string, any[]> = {};
     
@@ -381,7 +399,7 @@ const CustomerBookings = () => {
                       const group = bookingGroups[groupKey];
                       const firstBooking = group[0];
                       const hasMultipleBookings = group.length > 1;
-                      const dateDisplay = format(new Date(firstBooking.booking_date), 'MMM d, yyyy');
+                      const dateDisplay = formatBookingDate(firstBooking.booking_date);
                       
                       return group.map((booking, idx) => (
                         <TableRow key={booking.id} className={`border-white/10 ${hasMultipleBookings ? 'bg-findvenue-surface/20' : ''}`}>
@@ -466,7 +484,7 @@ const CustomerBookings = () => {
                       <div className="flex flex-col gap-2">
                         <div className="flex justify-between">
                           <h3 className="font-medium">
-                            {booking.venue_name} - {format(new Date(booking.booking_date), 'MMM d, yyyy')}
+                            {booking.venue_name} - {formatBookingDate(booking.booking_date)}
                           </h3>
                           <Button
                             variant="ghost"
