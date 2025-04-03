@@ -2,6 +2,7 @@
 import { VenueCard } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Venue } from '@/hooks/useSupabaseVenues';
+import { useState, useEffect } from 'react';
 
 interface VenuesListProps {
   venues?: Venue[];
@@ -21,7 +22,7 @@ const VenuesList = ({
   
   if (isLoading) {
     return (
-      <div className={`grid grid-cols-1 ${compact ? '' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-4`}>
+      <div className={`grid grid-cols-1 ${compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-4`}>
         {Array(compact ? 4 : 8).fill(0).map((_, i) => (
           <div key={i} className="bg-findvenue-surface/30 rounded-lg overflow-hidden">
             <Skeleton className="h-40 w-full" />

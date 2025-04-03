@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { Venue } from '@/hooks/useSupabaseVenues';
@@ -26,6 +27,7 @@ interface MapViewProps {
   venues: Venue[];
   isLoading: boolean;
   highlightedVenueId?: string;
+  onFilteredVenuesChange?: (venues: Venue[]) => void;
 }
 
 const containerStyle = {
@@ -119,7 +121,7 @@ const DARK_MAP_STYLE = [
   }
 ];
 
-const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
+const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange }: MapViewProps) => {
   const navigate = useNavigate();
   const mapRef = useRef<google.maps.Map | null>(null);
   const [activeVenue, setActiveVenue] = useState<string | null>(null);
@@ -145,6 +147,14 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
   const venuesWithCoordinates = filteredVenues.filter(
     venue => venue.latitude && venue.longitude
   );
+
+  // When filteredVenues or venuesInRadius changes, notify parent component
+  useEffect(() => {
+    const displayVenues = isRadiusActive ? venuesInRadius : venuesWithCoordinates;
+    if (onFilteredVenuesChange) {
+      onFilteredVenuesChange(displayVenues);
+    }
+  }, [venuesInRadius, venuesWithCoordinates, isRadiusActive, onFilteredVenuesChange]);
   
   useEffect(() => {
     const searchParam = searchParams.get('search');
@@ -351,6 +361,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     }
   }, [isRadiusActive, userLocation]);
   
+  // Calculate venues in radius
   useEffect(() => {
     if (userLocation && isRadiusActive) {
       const inRadius = venuesWithCoordinates.filter(venue => {
@@ -382,6 +393,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId }: MapViewProps) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
+  // Update filtered venues when main venues prop changes
   useEffect(() => {
     if (!mapSearchTerm) {
       setFilteredVenues(venues);

@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import VenuesList from '@/components/venues/VenuesList';
@@ -10,6 +11,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Venue } from '@/hooks/useSupabaseVenues';
 
 const Venues = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -17,6 +19,7 @@ const Venues = () => {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [viewMode, setViewMode] = useState<'list' | 'map'>(searchParams.get('view') as 'list' | 'map' || 'map');
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
+  const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const categoryId = searchParams.get('categoryId');
@@ -25,6 +28,11 @@ const Venues = () => {
 
   const categoryName = useMemo(() => categoryId ? categories.find(c => c.id === categoryId)?.name : '', [categoryId, categories]);
   const cityName = useMemo(() => cityId ? cities.find(c => c.id === cityId)?.name : '', [cityId, cities]);
+
+  // Update filtered venues when venues or search params change
+  useEffect(() => {
+    setFilteredVenues(venues);
+  }, [venues]);
 
   useEffect(() => {
     if (categoryName && cityName) {
@@ -94,6 +102,11 @@ const Venues = () => {
 
   const handleVenueMouseLeave = useCallback(() => {
     setHoveredVenueId(null);
+  }, []);
+
+  // Handle receiving filtered venues from map component
+  const handleMapFilteredVenues = useCallback((mapFilteredVenues: Venue[]) => {
+    setFilteredVenues(mapFilteredVenues);
   }, []);
 
   return (
@@ -200,7 +213,7 @@ const Venues = () => {
         <div className="flex justify-between items-center mb-3">
           <div>
             <p className="text-sm text-findvenue-text-muted">
-              {isLoading ? 'Searching venues...' : `Found ${venues.length} venues`}
+              {isLoading ? 'Searching venues...' : `Found ${filteredVenues.length} venues`}
             </p>
           </div>
           
@@ -223,7 +236,7 @@ const Venues = () => {
         {viewMode === "list" ? (
           <div className="animate-fade-in">
             <VenuesList 
-              venues={venues}
+              venues={filteredVenues}
               isLoading={isLoading}
               onVenueMouseEnter={handleVenueMouseEnter}
               onVenueMouseLeave={handleVenueMouseLeave}
@@ -233,7 +246,7 @@ const Venues = () => {
           <div className="flex flex-col lg:flex-row gap-4 animate-fade-in">
             <div className="w-full lg:w-2/3 h-auto lg:max-h-[650px] lg:overflow-y-auto">
               <VenuesList 
-                venues={venues}
+                venues={filteredVenues}
                 isLoading={isLoading}
                 compact={true} 
                 onVenueMouseEnter={handleVenueMouseEnter}
@@ -245,6 +258,7 @@ const Venues = () => {
                 venues={venues} 
                 isLoading={isLoading} 
                 highlightedVenueId={hoveredVenueId || undefined}
+                onFilteredVenuesChange={handleMapFilteredVenues}
               />
             </div>
           </div>
