@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { format, isSameDay, isToday, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { format, isSameDay, isToday, startOfMonth, endOfMonth, eachDayOfInterval, isAfter, isBefore, addDays } from "date-fns";
 import { 
   BookOpen, 
   Users, 
@@ -18,10 +18,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
-  Info
+  Info,
+  MessageCircle
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 
 interface BookingDay {
   date: Date;
@@ -47,6 +57,7 @@ interface BookingType {
 export function OwnerBookingsCalendar() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<BookingType[]>([]);
   const [dates, setDates] = useState<BookingDay[]>([]);
@@ -54,6 +65,7 @@ export function OwnerBookingsCalendar() {
   const [selectedDateBookings, setSelectedDateBookings] = useState<BookingType[]>([]);
   const [month, setMonth] = useState<Date>(new Date());
   const [showStats, setShowStats] = useState(false);
+  const [bookedTimeSlots, setBookedTimeSlots] = useState<Record<string, string[]>>({});
 
   // Fetch all bookings for the venue owner
   const fetchBookings = async () => {
@@ -124,6 +136,24 @@ export function OwnerBookingsCalendar() {
       });
       
       setBookings(enhancedBookings);
+      
+      // Process bookings to identify booked time slots by date and venue
+      const timeSlots: Record<string, string[]> = {};
+      enhancedBookings.forEach(booking => {
+        // Only consider confirmed bookings for blocking time slots
+        if (booking.status === 'confirmed') {
+          const dateKey = booking.booking_date;
+          const timeSlot = `${booking.start_time} - ${booking.end_time}`;
+          
+          if (!timeSlots[dateKey]) {
+            timeSlots[dateKey] = [];
+          }
+          
+          timeSlots[dateKey].push(timeSlot);
+        }
+      });
+      
+      setBookedTimeSlots(timeSlots);
     } catch (error) {
       console.error('Error fetching bookings:', error);
       toast({
@@ -343,6 +373,10 @@ export function OwnerBookingsCalendar() {
     
     return { confirmed, pending, cancelled, totalRevenue };
   };
+
+  const handleChatWithUser = (userId: string) => {
+    navigate(`/messages/${userId}`);
+  };
   
   if (isLoading) {
     return (
@@ -390,34 +424,6 @@ export function OwnerBookingsCalendar() {
         <div className="grid grid-cols-1 md:grid-cols-7 gap-0">
           {/* Calendar Column - Fixed on the left (3/7 of space) */}
           <div className="md:col-span-3 p-6 border-r border-white/10 min-h-[650px]">
-            {/* <div className="flex justify-between items-center mb-4">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => {
-                  const prevMonth = new Date(month);
-                  prevMonth.setMonth(prevMonth.getMonth() - 1);
-                  setMonth(prevMonth);
-                }}
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <h3 className="text-lg font-medium">
-                {format(month, 'MMMM yyyy')}
-              </h3>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => {
-                  const nextMonth = new Date(month);
-                  nextMonth.setMonth(nextMonth.getMonth() + 1);
-                  setMonth(nextMonth);
-                }}
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-            </div> */}
-            
             <Calendar
               mode="single"
               selected={selectedDate}
@@ -586,69 +592,111 @@ export function OwnerBookingsCalendar() {
                     <Separator className="mb-4" />
                     
                     {selectedDateBookings.length > 0 ? (
-                      <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2">
-                        {selectedDateBookings.map(booking => (
-                          <div key={booking.id} className="bg-findvenue-card-bg/30 backdrop-blur-sm border border-white/10 rounded-lg p-4">
-                            <div className="flex flex-col md:flex-row md:justify-between">
-                              <div className="mb-3 md:mb-0">
-                                <h4 className="text-lg font-medium mb-1 flex items-center">
-                                  {booking.venue_name}
-                                  <Badge className={`ml-2 ${getBookingStatusColor(booking.status)}`}>
-                                    {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                                  </Badge>
-                                </h4>
-                                <div className="flex items-center text-findvenue-text-muted text-sm">
-                                  <Clock className="h-4 w-4 mr-1" />
-                                  <span>{booking.start_time} - {booking.end_time}</span>
-                                </div>
-                                <div className="flex items-center text-findvenue-text-muted text-sm mt-1">
-                                  <Users className="h-4 w-4 mr-1" />
-                                  <span>{booking.guests} guests</span>
-                                </div>
-                                <div className="text-sm mt-1">
-                                  Booked by: {booking.user_name}
-                                </div>
-                              </div>
-                              
-                              <div className="flex flex-col items-start md:items-end">
-                                <div className="flex items-center">
-                                  <DollarSign className="h-4 w-4 mr-1 text-green-400" />
-                                  <span className="font-semibold">SAR {booking.total_price.toFixed(2)}</span>
+                      <div>
+                        <div className="mb-4">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-white/10">
+                                <TableHead>Customer</TableHead>
+                                <TableHead>Venue</TableHead>
+                                <TableHead>Time</TableHead>
+                                <TableHead>Guests</TableHead>
+                                <TableHead>Amount</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {selectedDateBookings.map((booking) => (
+                                <TableRow key={booking.id} className="border-white/10">
+                                  <TableCell className="font-medium">{booking.user_name}</TableCell>
+                                  <TableCell>{booking.venue_name}</TableCell>
+                                  <TableCell>{booking.start_time} - {booking.end_time}</TableCell>
+                                  <TableCell>{booking.guests}</TableCell>
+                                  <TableCell>SAR {booking.total_price.toFixed(2)}</TableCell>
+                                  <TableCell>
+                                    <Badge className={getBookingStatusColor(booking.status)}>
+                                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex space-x-2 justify-end">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-findvenue text-findvenue hover:bg-findvenue/10"
+                                        onClick={() => handleChatWithUser(booking.user_id)}
+                                      >
+                                        <MessageCircle className="h-4 w-4 mr-1" />
+                                        Chat
+                                      </Button>
+                                      
+                                      {booking.status === 'pending' && (
+                                        <>
+                                          <Button 
+                                            size="sm" 
+                                            variant="outline"
+                                            className="border-green-500 text-green-500 hover:bg-green-500/10"
+                                            onClick={() => handleConfirmBooking(booking.id)}
+                                          >
+                                            <CalendarCheck className="h-4 w-4 mr-1" />
+                                            Confirm
+                                          </Button>
+                                          
+                                          <Button 
+                                            size="sm" 
+                                            variant="outline"
+                                            className="border-destructive text-destructive hover:bg-destructive/10"
+                                            onClick={() => handleCancelBooking(booking.id)}
+                                          >
+                                            <CalendarX className="h-4 w-4 mr-1" />
+                                            Cancel
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
+                          {selectedDateBookings.filter(booking => booking.special_requests).map(booking => (
+                            <div key={`req-${booking.id}`} className="bg-findvenue-card-bg/30 backdrop-blur-sm border border-white/10 rounded-lg p-4">
+                              <div className="flex flex-col md:flex-row md:justify-between">
+                                <div className="mb-3 md:mb-0">
+                                  <h4 className="text-lg font-medium mb-1 flex items-center">
+                                    Special Request: {booking.user_name}
+                                    <Badge className={`ml-2 ${getBookingStatusColor(booking.status)}`}>
+                                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                                    </Badge>
+                                  </h4>
+                                  <div className="text-sm mt-1">
+                                    {booking.venue_name} • {booking.start_time} - {booking.end_time} • {booking.guests} guests
+                                  </div>
                                 </div>
                                 
-                                {booking.status === 'pending' && (
-                                  <div className="flex mt-2 gap-2">
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline"
-                                      className="border-green-500 text-green-500 hover:bg-green-500/10"
-                                      onClick={() => handleConfirmBooking(booking.id)}
-                                    >
-                                      <CalendarCheck className="h-4 w-4 mr-1" />
-                                      Confirm
-                                    </Button>
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline"
-                                      className="border-destructive text-destructive hover:bg-destructive/10"
-                                      onClick={() => handleCancelBooking(booking.id)}
-                                    >
-                                      <CalendarX className="h-4 w-4 mr-1" />
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-findvenue text-findvenue hover:bg-findvenue/10 h-8"
+                                  onClick={() => handleChatWithUser(booking.user_id)}
+                                >
+                                  <MessageCircle className="h-4 w-4 mr-1" />
+                                  Chat with Customer
+                                </Button>
                               </div>
+                              
+                              {booking.special_requests && (
+                                <div className="mt-4 pt-2 border-t border-white/10">
+                                  <p className="text-sm text-findvenue-text-muted">{booking.special_requests}</p>
+                                </div>
+                              )}
                             </div>
-                            
-                            {booking.special_requests && (
-                              <div className="mt-4 pt-2 border-t border-white/10">
-                                <p className="text-sm font-medium mb-1">Special Requests:</p>
-                                <p className="text-sm text-findvenue-text-muted">{booking.special_requests}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <div className="text-center py-8">

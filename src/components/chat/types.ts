@@ -1,3 +1,4 @@
+
 export type Message = {
   id: string;
   sender_id: string;
@@ -17,4 +18,6 @@ export type ChatContact = {
   image?: string;
   role?: 'venue-owner' | 'customer';
   status?: string;
+  venue_id?: string;
+  venue_name?: string;
 };

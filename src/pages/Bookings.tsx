@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -208,6 +209,23 @@ const Bookings = () => {
   
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
   
+  // Group bookings by date and venue to identify multiple bookings
+  const getGroupedBookings = () => {
+    const groupedBookings: Record<string, Booking[]> = {};
+    
+    displayBookings.forEach(booking => {
+      const key = `${booking.venue_id}-${booking.booking_date}`;
+      if (!groupedBookings[key]) {
+        groupedBookings[key] = [];
+      }
+      groupedBookings[key].push(booking);
+    });
+    
+    return groupedBookings;
+  };
+  
+  const bookingGroups = getGroupedBookings();
+  
   return (
     <div className="min-h-screen pt-28 pb-16">
       <div className="container mx-auto px-4">
@@ -260,109 +278,131 @@ const Bookings = () => {
             </Card>
           ) : (
             <div className="space-y-6">
-              {displayBookings.map((booking) => (
-                <Card key={booking.id} className="glass-card border-white/10 overflow-hidden">
-                  <div className="flex flex-col md:flex-row">
-                    {booking.venue_image && (
-                      <div className="w-full md:w-1/4 h-48 md:h-auto">
-                        <img 
-                          src={booking.venue_image} 
-                          alt={booking.venue_name} 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    <div className={`flex-1 p-6 ${!booking.venue_image ? 'w-full' : 'w-3/4'}`}>
-                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold">{booking.venue_name}</h3>
-                            <Badge className={`ml-2 ${getStatusColor(booking.status)}`}>
-                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                            </Badge>
-                          </div>
-                          
-                          <div className="mt-4 space-y-2">
-                            <div className="flex items-center text-findvenue-text-muted">
-                              <Calendar className="h-4 w-4 mr-2" />
-                              <span>{format(new Date(booking.booking_date), 'MMMM d, yyyy')}</span>
-                            </div>
-                            <div className="flex items-center text-findvenue-text-muted">
-                              <Clock className="h-4 w-4 mr-2" />
-                              <span>{booking.start_time} - {booking.end_time}</span>
-                            </div>
-                            <div className="flex items-center text-findvenue-text-muted">
-                              <Users className="h-4 w-4 mr-2" />
-                              <span>{booking.guests} guests</span>
-                            </div>
-                            {booking.special_requests && (
-                              <div className="mt-4 p-3 bg-findvenue-surface/30 rounded-md border border-white/5 text-sm">
-                                <p className="font-medium mb-1">Special Requests:</p>
-                                <p className="text-findvenue-text-muted">{booking.special_requests}</p>
-                              </div>
-                            )}
-                          </div>
+              {Object.entries(bookingGroups).map(([groupKey, groupBookings]) => {
+                const isMultipleBookings = groupBookings.length > 1;
+                const firstBooking = groupBookings[0];
+                
+                return (
+                  <Card key={groupKey} className={`glass-card border-white/10 overflow-hidden ${isMultipleBookings ? 'border-l-4 border-l-findvenue' : ''}`}>
+                    <div className="flex flex-col md:flex-row">
+                      {firstBooking.venue_image && (
+                        <div className="w-full md:w-1/4 h-48 md:h-auto">
+                          <img 
+                            src={firstBooking.venue_image} 
+                            alt={firstBooking.venue_name} 
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                        
-                        <div className="flex flex-col items-end justify-between h-full">
-                          <div className="text-right">
-                            <p className="text-findvenue-text-muted text-sm">Total Price</p>
-                            <p className="text-xl font-bold">${booking.total_price.toFixed(2)}</p>
+                      )}
+                      <div className={`flex-1 p-6 ${!firstBooking.venue_image ? 'w-full' : 'w-3/4'}`}>
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-xl font-bold">{firstBooking.venue_name}</h3>
+                              <Badge className={`ml-2 ${getStatusColor(firstBooking.status)}`}>
+                                {firstBooking.status.charAt(0).toUpperCase() + firstBooking.status.slice(1)}
+                              </Badge>
+                            </div>
+                            
+                            <div className="mt-4 space-y-2">
+                              <div className="flex items-center text-findvenue-text-muted">
+                                <Calendar className="h-4 w-4 mr-2" />
+                                <span>{format(new Date(firstBooking.booking_date), 'MMMM d, yyyy')}</span>
+                              </div>
+                              
+                              {isMultipleBookings ? (
+                                <div className="flex flex-col space-y-1">
+                                  <p className="text-sm font-medium text-findvenue">Multiple bookings on this date:</p>
+                                  {groupBookings.map((booking, idx) => (
+                                    <div key={idx} className="flex items-center ml-6 text-findvenue-text-muted">
+                                      <Clock className="h-4 w-4 mr-2" />
+                                      <span>{booking.start_time} - {booking.end_time}</span>
+                                      <span className="ml-2">({booking.guests} guests)</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex items-center text-findvenue-text-muted">
+                                    <Clock className="h-4 w-4 mr-2" />
+                                    <span>{firstBooking.start_time} - {firstBooking.end_time}</span>
+                                  </div>
+                                  <div className="flex items-center text-findvenue-text-muted">
+                                    <Users className="h-4 w-4 mr-2" />
+                                    <span>{firstBooking.guests} guests</span>
+                                  </div>
+                                </>
+                              )}
+                              
+                              {firstBooking.special_requests && (
+                                <div className="mt-4 p-3 bg-findvenue-surface/30 rounded-md border border-white/5 text-sm">
+                                  <p className="font-medium mb-1">Special Requests:</p>
+                                  <p className="text-findvenue-text-muted">{firstBooking.special_requests}</p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           
-                          <div className="mt-4 flex flex-col gap-2">
-                            {booking.owner_id && (
-                              <BookingOwnerChat 
-                                ownerId={booking.owner_id}
-                                ownerName={booking.owner_name}
-                                venueId={booking.venue_id}
-                                venueName={booking.venue_name}
-                                bookingId={booking.id}
-                              />
-                            )}
+                          <div className="flex flex-col items-end justify-between h-full">
+                            <div className="text-right">
+                              <p className="text-findvenue-text-muted text-sm">Total Price</p>
+                              <p className="text-xl font-bold">${firstBooking.total_price.toFixed(2)}</p>
+                            </div>
+                            
+                            <div className="mt-4 flex flex-col gap-2">
+                              {firstBooking.owner_id && (
+                                <BookingOwnerChat 
+                                  ownerId={firstBooking.owner_id}
+                                  ownerName={firstBooking.owner_name}
+                                  venueId={firstBooking.venue_id}
+                                  venueName={firstBooking.venue_name}
+                                  bookingId={firstBooking.id}
+                                />
+                              )}
 
-                            {(booking.status === 'pending' || booking.status === 'confirmed') && activeTab === 'upcoming' && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button 
-                                    variant="outline" 
-                                    className="w-full border-destructive text-destructive hover:bg-destructive/10"
-                                    disabled={isCancelling}
-                                  >
-                                    {isCancelling ? (
-                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                    ) : (
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                    )}
-                                    Cancel Booking
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent className="bg-findvenue-card-bg border-white/10">
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to cancel this booking? This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Keep Booking</AlertDialogCancel>
-                                    <AlertDialogAction 
-                                      className="bg-destructive hover:bg-destructive/90 text-white"
-                                      onClick={() => cancelBooking(booking.id)}
+                              {(firstBooking.status === 'pending' || firstBooking.status === 'confirmed') && activeTab === 'upcoming' && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      className="w-full border-destructive text-destructive hover:bg-destructive/10"
+                                      disabled={isCancelling}
                                     >
-                                      Yes, Cancel
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
+                                      {isCancelling ? (
+                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                      ) : (
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                      )}
+                                      Cancel Booking
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent className="bg-findvenue-card-bg border-white/10">
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to cancel this booking? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Keep Booking</AlertDialogCancel>
+                                      <AlertDialogAction 
+                                        className="bg-destructive hover:bg-destructive/90 text-white"
+                                        onClick={() => cancelBooking(firstBooking.id)}
+                                      >
+                                        Yes, Cancel
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -250,6 +251,23 @@ const CustomerBookings = () => {
   
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
   
+  // Group bookings by date and venue to identify multiple bookings on same day/venue
+  const getBookingGroups = () => {
+    const groups: Record<string, any[]> = {};
+    
+    displayBookings.forEach(booking => {
+      const key = `${booking.booking_date}-${booking.venue_id}`;
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(booking);
+    });
+    
+    return groups;
+  };
+  
+  const bookingGroups = getBookingGroups();
+  
   if (!user) {
     return (
       <div className="min-h-screen pt-28 pb-16">
@@ -359,72 +377,79 @@ const CustomerBookings = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {displayBookings.map((booking) => (
-                      <TableRow key={booking.id} className="border-white/10">
-                        <TableCell className="font-medium">{booking.user_name}</TableCell>
-                        <TableCell>{booking.venue_name}</TableCell>
-                        <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>{booking.start_time} - {booking.end_time}</TableCell>
-                        <TableCell>{booking.guests}</TableCell>
-                        <TableCell>SAR {booking.total_price.toFixed(2)}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(booking.status)}>
-                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {booking.status === 'pending' && activeTab === 'upcoming' && (
-                            <div className="flex space-x-2 justify-end">
-                              <Button 
-                                variant="outline"
-                                className="border-green-500 text-green-500 hover:bg-green-500/10"
-                                size="sm"
-                                onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
-                                disabled={processingBookingIds.has(booking.id) || isBusy}
-                              >
-                                {processingBookingIds.has(booking.id) ? (
-                                  <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full mr-1"></div>
-                                ) : (
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                )}
-                                Confirm
-                              </Button>
-                              
-                              <Button 
-                                variant="outline"
-                                className="border-destructive text-destructive hover:bg-destructive/10"
-                                size="sm"
-                                onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
-                                disabled={processingBookingIds.has(booking.id) || isBusy}
-                              >
-                                {processingBookingIds.has(booking.id) ? (
-                                  <div className="animate-spin h-4 w-4 border-2 border-destructive border-t-transparent rounded-full mr-1"></div>
-                                ) : (
-                                  <XCircle className="h-4 w-4 mr-1" />
-                                )}
-                                Cancel
-                              </Button>
-                            </div>
-                          )}
-                          {!processingBookingIds.has(booking.id) && booking.status !== 'pending' && (
-                            <div className="flex space-x-2 justify-end">
-                              <span className="text-findvenue-text-muted text-sm mr-2">
-                                {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
-                              </span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="border-findvenue text-findvenue hover:bg-findvenue/10"
-                                onClick={() => initiateChat(booking.user_id)}
-                              >
-                                <MessageCircle className="h-4 w-4 mr-1" />
-                                Chat
-                              </Button>
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {Object.keys(bookingGroups).map(groupKey => {
+                      const group = bookingGroups[groupKey];
+                      const firstBooking = group[0];
+                      const hasMultipleBookings = group.length > 1;
+                      const dateDisplay = format(new Date(firstBooking.booking_date), 'MMM d, yyyy');
+                      
+                      return group.map((booking, idx) => (
+                        <TableRow key={booking.id} className={`border-white/10 ${hasMultipleBookings ? 'bg-findvenue-surface/20' : ''}`}>
+                          <TableCell className="font-medium">{booking.user_name}</TableCell>
+                          <TableCell>{booking.venue_name}</TableCell>
+                          <TableCell>{dateDisplay}</TableCell>
+                          <TableCell>{booking.start_time} - {booking.end_time}</TableCell>
+                          <TableCell>{booking.guests}</TableCell>
+                          <TableCell>SAR {booking.total_price.toFixed(2)}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(booking.status)}>
+                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {booking.status === 'pending' && activeTab === 'upcoming' && (
+                              <div className="flex space-x-2 justify-end">
+                                <Button 
+                                  variant="outline"
+                                  className="border-green-500 text-green-500 hover:bg-green-500/10"
+                                  size="sm"
+                                  onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
+                                  disabled={processingBookingIds.has(booking.id) || isBusy}
+                                >
+                                  {processingBookingIds.has(booking.id) ? (
+                                    <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full mr-1"></div>
+                                  ) : (
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                  )}
+                                  Confirm
+                                </Button>
+                                
+                                <Button 
+                                  variant="outline"
+                                  className="border-destructive text-destructive hover:bg-destructive/10"
+                                  size="sm"
+                                  onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
+                                  disabled={processingBookingIds.has(booking.id) || isBusy}
+                                >
+                                  {processingBookingIds.has(booking.id) ? (
+                                    <div className="animate-spin h-4 w-4 border-2 border-destructive border-t-transparent rounded-full mr-1"></div>
+                                  ) : (
+                                    <XCircle className="h-4 w-4 mr-1" />
+                                  )}
+                                  Cancel
+                                </Button>
+                              </div>
+                            )}
+                            {!processingBookingIds.has(booking.id) && booking.status !== 'pending' && (
+                              <div className="flex space-x-2 justify-end">
+                                <span className="text-findvenue-text-muted text-sm mr-2">
+                                  {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
+                                </span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-findvenue text-findvenue hover:bg-findvenue/10"
+                                  onClick={() => initiateChat(booking.user_id)}
+                                >
+                                  <MessageCircle className="h-4 w-4 mr-1" />
+                                  Chat
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ));
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
