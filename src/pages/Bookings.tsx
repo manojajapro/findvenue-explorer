@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Users, Trash2, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -98,13 +98,16 @@ const Bookings = () => {
           }
         }
         
+        // Ensure the booking_date is properly formatted for display
+        let formattedDate = item.booking_date;
+        
         return {
           id: item.id,
           user_id: item.user_id,
           venue_id: item.venue_id,
           venue_name: item.venues?.name || item.venue_name || 'Unnamed Venue',
           venue_image: item.venues?.image_url,
-          booking_date: item.booking_date,
+          booking_date: formattedDate,
           start_time: item.start_time,
           end_time: item.end_time,
           status: item.status,
@@ -226,6 +229,18 @@ const Bookings = () => {
   
   const bookingGroups = getGroupedBookings();
   
+  // Helper function to format date consistently
+  const formatBookingDate = (dateString: string) => {
+    try {
+      // Try to parse the date string in different formats
+      const date = new Date(dateString);
+      return format(date, 'MMMM d, yyyy');
+    } catch (e) {
+      console.error("Error formatting date:", e, dateString);
+      return dateString; // Return original if parsing fails
+    }
+  };
+  
   return (
     <div className="min-h-screen pt-28 pb-16">
       <div className="container mx-auto px-4">
@@ -307,7 +322,7 @@ const Bookings = () => {
                             <div className="mt-4 space-y-2">
                               <div className="flex items-center text-findvenue-text-muted">
                                 <Calendar className="h-4 w-4 mr-2" />
-                                <span>{format(new Date(firstBooking.booking_date), 'MMMM d, yyyy')}</span>
+                                <span>{formatBookingDate(firstBooking.booking_date)}</span>
                               </div>
                               
                               {isMultipleBookings ? (

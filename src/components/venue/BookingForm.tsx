@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarIcon, Clock, Users, Loader2, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, Clock, Users, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
@@ -33,6 +34,11 @@ type BookingFormProps = {
   ownerName: string;
 };
 
+type TimeSlot = {
+  time: string;
+  isAvailable: boolean;
+};
+
 const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: BookingFormProps) => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
@@ -48,6 +54,9 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   const [userBookings, setUserBookings] = useState<any[]>([]);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([]);
+  const [hoursBooked, setHoursBooked] = useState<number>(0);
   
   useEffect(() => {
     if (venueId) {
@@ -59,13 +68,90 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     }
   }, [venueId, user]);
   
+  useEffect(() => {
+    if (date) {
+      generateAvailableTimeSlots();
+    }
+  }, [date, existingBookings]);
+  
+  useEffect(() => {
+    if (startTime && endTime) {
+      const start = parseTime(startTime);
+      const end = parseTime(endTime);
+      
+      if (start && end) {
+        let hours = end.getHours() - start.getHours();
+        const minutesDiff = end.getMinutes() - start.getMinutes();
+        hours += minutesDiff / 60;
+        
+        if (hours > 0) {
+          setHoursBooked(hours);
+        } else {
+          setHoursBooked(0);
+        }
+      }
+    }
+  }, [startTime, endTime]);
+  
+  const generateAvailableTimeSlots = () => {
+    if (!date) return;
+    
+    const slots: TimeSlot[] = [];
+    const selectedDateStr = date.toISOString().split('T')[0];
+    const bookedSlots: {start: string, end: string}[] = [];
+    
+    // Create a list of all booked time slots for the selected date
+    existingBookings.forEach(booking => {
+      if (booking.booking_date === selectedDateStr) {
+        bookedSlots.push({
+          start: booking.start_time,
+          end: booking.end_time
+        });
+      }
+    });
+    
+    // Generate all possible time slots (hourly from 8 AM to 10 PM)
+    for (let hour = 8; hour <= 22; hour++) {
+      const timeString = `${hour.toString().padStart(2, '0')}:00`;
+      
+      // Check if this time slot overlaps with any booking
+      const isSlotAvailable = !isTimeOverlappingWithBookings(timeString, bookedSlots);
+      
+      slots.push({
+        time: timeString,
+        isAvailable: isSlotAvailable
+      });
+    }
+    
+    setAvailableTimeSlots(slots);
+  };
+  
+  const isTimeOverlappingWithBookings = (timeString: string, bookedSlots: {start: string, end: string}[]): boolean => {
+    const slotTime = parseTime(timeString);
+    if (!slotTime) return true; // If parsing fails, treat as unavailable
+    
+    for (const booking of bookedSlots) {
+      const bookingStart = parseTime(booking.start);
+      const bookingEnd = parseTime(booking.end);
+      
+      if (!bookingStart || !bookingEnd) continue;
+      
+      // Check if the time slot falls within a booking
+      if (slotTime >= bookingStart && slotTime < bookingEnd) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+  
   const fetchExistingBookings = async () => {
     try {
       const { data, error } = await supabase
         .from('bookings')
         .select('booking_date, start_time, end_time')
         .eq('venue_id', venueId)
-        .eq('status', 'confirmed');
+        .or('status.eq.pending,status.eq.confirmed');
         
       if (error) throw error;
       
@@ -106,22 +192,13 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   };
   
   const calculateTotalPrice = (): number => {
-    if (!startTime || !endTime || !guestCount) return 0;
+    if (hoursBooked <= 0) return 0;
     
-    const start = parseTime(startTime);
-    const end = parseTime(endTime);
+    // Calculate base price based on hours
+    const basePrice = Math.round(hoursBooked * pricePerHour);
     
-    if (!start || !end) return 0;
-    
-    let hours = end.getHours() - start.getHours();
-    const minutesDiff = end.getMinutes() - start.getMinutes();
-    hours += minutesDiff / 60;
-    
-    if (hours <= 0) return 0;
-    
-    const basePrice = Math.round(hours * pricePerHour);
-    
-    const guests = parseInt(guestCount);
+    // Apply guest count multiplier if needed
+    const guests = parseInt(guestCount || '0');
     if (guests <= 1) {
       return basePrice;
     } else if (guests <= 5) {
@@ -157,8 +234,29 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   };
   
   const isDateBooked = (date: Date): boolean => {
+    // Only disable dates that are fully booked (all time slots unavailable)
     const dateStr = date.toISOString().split('T')[0];
-    return existingBookings.some(booking => booking.booking_date === dateStr);
+    const bookingsOnDate = existingBookings.filter(booking => booking.booking_date === dateStr);
+    
+    // If there are 14 or more hours booked on this date (complete day is 14 hours from 8am-10pm),
+    // consider it fully booked
+    let totalHoursBooked = 0;
+    bookingsOnDate.forEach(booking => {
+      const startTime = parseTime(booking.start_time);
+      const endTime = parseTime(booking.end_time);
+      
+      if (startTime && endTime) {
+        let hours = endTime.getHours() - startTime.getHours();
+        const minutesDiff = endTime.getMinutes() - startTime.getMinutes();
+        hours += minutesDiff / 60;
+        
+        if (hours > 0) {
+          totalHoursBooked += hours;
+        }
+      }
+    });
+    
+    return totalHoursBooked >= 14; // A full day is booked
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -220,13 +318,15 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     setIsSubmitting(true);
     
     try {
+      const formattedDate = date.toISOString().split('T')[0]; // Ensure date is properly formatted
+      
       const { data: bookingData, error: bookingError } = await supabase
         .from('bookings')
         .insert({
           user_id: user.id,
           venue_id: venueId,
           venue_name: venueName,
-          booking_date: date.toISOString().split('T')[0],
+          booking_date: formattedDate,
           start_time: startTime,
           end_time: endTime,
           guests: parseInt(guestCount),
@@ -613,7 +713,12 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
                 <Calendar
                   mode="single"
                   selected={date}
-                  onSelect={setDate}
+                  onSelect={(newDate) => {
+                    setDate(newDate);
+                    // Reset start and end times when date changes
+                    setStartTime('');
+                    setEndTime('');
+                  }}
                   initialFocus
                   disabled={(date) => {
                     const today = new Date();
@@ -626,6 +731,45 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
             </Popover>
           </div>
           
+          {date && (
+            <div className="bg-findvenue/5 p-4 rounded-md border border-findvenue/10">
+              <div className="flex items-center mb-3">
+                <Info className="h-4 w-4 mr-2 text-findvenue" />
+                <p className="text-sm font-medium">Available Time Slots</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {availableTimeSlots.map((slot, index) => (
+                  <Button
+                    key={index}
+                    type="button"
+                    size="sm"
+                    variant={slot.isAvailable ? "outline" : "ghost"}
+                    disabled={!slot.isAvailable}
+                    className={cn(
+                      "text-xs h-auto py-1",
+                      !slot.isAvailable && "opacity-50 cursor-not-allowed"
+                    )}
+                    onClick={() => {
+                      if (startTime === '') {
+                        setStartTime(slot.time);
+                      } else if (endTime === '' && parseTime(slot.time)! > parseTime(startTime)!) {
+                        setEndTime(slot.time);
+                      } else {
+                        setStartTime(slot.time);
+                        setEndTime('');
+                      }
+                    }}
+                  >
+                    {slot.time}
+                    {startTime === slot.time && " (Start)"}
+                    {endTime === slot.time && " (End)"}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-findvenue-text-muted">Click to select start time, then end time</p>
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="startTime">Start Time <span className="text-red-500">*</span></Label>
@@ -636,7 +780,13 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
                   type="time"
                   className="pl-10"
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
+                  onChange={(e) => {
+                    setStartTime(e.target.value);
+                    // Clear end time if it's before the start time
+                    if (endTime && parseTime(endTime)! <= parseTime(e.target.value)!) {
+                      setEndTime('');
+                    }
+                  }}
                   required
                 />
               </div>
@@ -688,6 +838,27 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
           
           <div className="bg-findvenue/10 p-4 rounded-md">
             <p className="text-sm mb-2">Booking Summary</p>
+            
+            {hoursBooked > 0 && (
+              <div className="flex justify-between items-center mb-2 text-findvenue-text-muted text-sm">
+                <span>Hourly Rate:</span>
+                <span>SAR {pricePerHour.toLocaleString()} × {hoursBooked} {hoursBooked === 1 ? 'hour' : 'hours'}</span>
+              </div>
+            )}
+            
+            {parseInt(guestCount) > 1 && hoursBooked > 0 && (
+              <div className="flex justify-between items-center mb-2 text-findvenue-text-muted text-sm">
+                <span>Guest Adjustment:</span>
+                <span>
+                  {parseInt(guestCount) <= 5 ? '+10%' : 
+                   parseInt(guestCount) <= 10 ? '+20%' : 
+                   parseInt(guestCount) <= 20 ? '+30%' : '+50%'}
+                </span>
+              </div>
+            )}
+            
+            <div className="border-t border-white/10 my-2 pt-2"></div>
+            
             <div className="flex justify-between items-center">
               <span className="text-findvenue-text-muted">Total Amount:</span>
               <span className="text-xl font-bold">
