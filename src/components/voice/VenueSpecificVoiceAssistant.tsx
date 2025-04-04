@@ -13,6 +13,7 @@ type VenueSpecificVoiceAssistantProps = {
 
 const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
+  const [autoListenMode, setAutoListenMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -28,6 +29,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     toggleAudio
   } = useVenueVoiceAssistant({
     venue,
+    autoRestart: autoListenMode,
     onTranscript: (text) => {
       if (text.trim()) {
         setTranscriptHistory(prev => [...prev, { text, isUser: true }]);
@@ -48,11 +50,15 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     try {
       if (isListening) {
         stopListening();
+        setAutoListenMode(false);
       } else {
+        setAutoListenMode(true);
         await startListening();
         toast({
           title: "Voice Assistant Active",
-          description: "Speak clearly to ask about this venue",
+          description: autoListenMode 
+            ? "Continuous mode enabled - I'll keep listening after each response" 
+            : "Speak clearly to ask about this venue",
         });
       }
     } catch (err) {
@@ -63,6 +69,16 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
         description: "Please make sure your microphone is connected and you've granted permission to use it.",
       });
     }
+  };
+
+  const toggleAutoListenMode = () => {
+    setAutoListenMode(prev => !prev);
+    toast({
+      title: autoListenMode ? "Continuous Mode Disabled" : "Continuous Mode Enabled",
+      description: autoListenMode 
+        ? "You'll need to click the microphone button for each question" 
+        : "I'll automatically listen for your next question after responding",
+    });
   };
 
   useEffect(() => {
@@ -97,6 +113,11 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
           {isProcessing && (
             <Badge className="bg-blue-500 text-white">
               Processing...
+            </Badge>
+          )}
+          {autoListenMode && (
+            <Badge className="bg-purple-500 text-white">
+              Continuous Mode
             </Badge>
           )}
         </div>
@@ -172,6 +193,20 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
             className="border-white/10 bg-findvenue-surface/50 hover:bg-findvenue-surface"
           >
             {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={toggleAutoListenMode}
+            title={autoListenMode ? "Disable continuous mode" : "Enable continuous mode"}
+            className={`border-white/10 ${
+              autoListenMode 
+                ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30' 
+                : 'bg-findvenue-surface/50 hover:bg-findvenue-surface'
+            }`}
+          >
+            {autoListenMode ? "Auto Listen: On" : "Auto Listen: Off"}
           </Button>
         </div>
         

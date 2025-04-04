@@ -28,12 +28,21 @@ export const useVenueVoiceAssistant = ({
   const recognition = useRef<SpeechRecognition | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const retryCount = useRef(0);
+  const autoRestartTimeout = useRef<number | null>(null);
   
   // Initialize audio element for playing responses
   useEffect(() => {
     audioRef.current = new Audio();
     audioRef.current.onended = () => {
       console.log('Audio playback ended');
+      if (autoRestart) {
+        // Auto restart listening after audio ends
+        const timer = setTimeout(() => {
+          console.log('Auto-restarting voice recognition after audio...');
+          startListening();
+        }, 1000);
+        autoRestartTimeout.current = timer as unknown as number;
+      }
     };
     
     return () => {
@@ -41,8 +50,11 @@ export const useVenueVoiceAssistant = ({
         audioRef.current.pause();
         audioRef.current = null;
       }
+      if (autoRestartTimeout.current) {
+        clearTimeout(autoRestartTimeout.current);
+      }
     };
-  }, []);
+  }, [autoRestart]);
   
   const handleSpeechStart = useCallback(() => {
     setIsListening(true);
@@ -102,6 +114,7 @@ export const useVenueVoiceAssistant = ({
         if (audioEnabled) {
           // 2. Call text-to-speech to convert response to audio
           try {
+            console.log('Starting text-to-speech conversion...');
             const response = await supabase.functions.invoke('text-to-speech', {
               body: {
                 text: data.answer,
@@ -114,6 +127,7 @@ export const useVenueVoiceAssistant = ({
               throw new Error(response.error.message);
             }
             
+            console.log('Received audio data, creating audio element...');
             // Create blob from array buffer
             const blob = new Blob([response.data], { type: 'audio/mpeg' });
             const url = URL.createObjectURL(blob);
@@ -134,6 +148,16 @@ export const useVenueVoiceAssistant = ({
                   audioRef.current.onended = () => {
                     URL.revokeObjectURL(url);
                     console.log('Audio playback completed');
+                    
+                    // Auto restart listening after response
+                    if (autoRestart) {
+                      console.log('Setting up auto-restart after audio...');
+                      const timer = setTimeout(() => {
+                        console.log('Auto-restarting voice recognition...');
+                        startListening();
+                      }, 1000);
+                      autoRestartTimeout.current = timer as unknown as number;
+                    }
                   };
                 }
               };
@@ -150,6 +174,13 @@ export const useVenueVoiceAssistant = ({
             // Fallback to browser's speech synthesis
             useBrowserTTS(data.answer);
           }
+        } else if (autoRestart) {
+          // If audio is disabled but autoRestart is enabled, restart after a delay
+          const timer = setTimeout(() => {
+            console.log('Auto-restarting voice recognition (audio disabled)...');
+            startListening();
+          }, 3000); // Longer delay when audio is disabled
+          autoRestartTimeout.current = timer as unknown as number;
         }
       } else {
         throw new Error('No answer received from AI assistant');
@@ -170,10 +201,19 @@ export const useVenueVoiceAssistant = ({
       }
       
       retryCount.current = 0;
+      
+      // Auto restart listening after error
+      if (autoRestart) {
+        const timer = setTimeout(() => {
+          console.log('Auto-restarting voice recognition after error...');
+          startListening();
+        }, 3000); // Longer delay after error
+        autoRestartTimeout.current = timer as unknown as number;
+      }
     } finally {
       setIsProcessing(false);
     }
-  }, [venue?.id, onAnswer, audioEnabled]);
+  }, [venue?.id, onAnswer, audioEnabled, autoRestart]);
   
   // Helper function to use browser's built-in TTS as fallback
   const useBrowserTTS = (text: string) => {
@@ -182,9 +222,30 @@ export const useVenueVoiceAssistant = ({
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'en-US';
       utterance.rate = 1.0;
+      
+      // Set callback to restart listening after speech ends
+      if (autoRestart) {
+        utterance.onend = () => {
+          console.log('Browser TTS playback ended, auto-restarting...');
+          const timer = setTimeout(() => {
+            startListening();
+          }, 1000);
+          autoRestartTimeout.current = timer as unknown as number;
+        };
+      }
+      
       window.speechSynthesis.speak(utterance);
     } else {
       console.warn('Browser TTS not available');
+      
+      // Even without TTS, restart listening if enabled
+      if (autoRestart) {
+        const timer = setTimeout(() => {
+          console.log('Auto-restarting voice recognition (no TTS)...');
+          startListening();
+        }, 3000);
+        autoRestartTimeout.current = timer as unknown as number;
+      }
     }
   };
   
@@ -210,24 +271,24 @@ export const useVenueVoiceAssistant = ({
           console.error('Error stopping speech recognition:', e);
         }
       }
+      
+      // Clear any pending auto-restart timers
+      if (autoRestartTimeout.current) {
+        clearTimeout(autoRestartTimeout.current);
+      }
     };
   }, [isListening]);
   
-  useEffect(() => {
-    if (autoRestart && !isListening && !isProcessing) {
-      const timer = setTimeout(() => {
-        console.log('Auto-restarting voice recognition...');
-        startListening();
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [autoRestart, isListening, isProcessing]);
-  
   const startListening = useCallback(() => {
+    // Clear any existing auto-restart timers
+    if (autoRestartTimeout.current) {
+      clearTimeout(autoRestartTimeout.current);
+      autoRestartTimeout.current = null;
+    }
+    
     if (!recognition.current) {
       setError('Speech recognition is not supported in your browser.');
-      return;
+      return Promise.reject(new Error('Speech recognition not supported'));
     }
     
     try {
@@ -253,6 +314,15 @@ export const useVenueVoiceAssistant = ({
         if (onListeningChange) {
           onListeningChange(false);
         }
+        
+        // Auto restart listening after error
+        if (autoRestart) {
+          const timer = setTimeout(() => {
+            console.log('Auto-restarting voice recognition after error...');
+            startListening();
+          }, 3000); // Longer delay after error
+          autoRestartTimeout.current = timer as unknown as number;
+        }
       };
       
       recognition.current.onend = () => {
@@ -263,6 +333,7 @@ export const useVenueVoiceAssistant = ({
       
       // Reset retry counter on new listening session
       retryCount.current = 0;
+      return Promise.resolve();
     } catch (err: any) {
       console.error('Error starting speech recognition:', err);
       setError(err.message);
@@ -271,10 +342,18 @@ export const useVenueVoiceAssistant = ({
       if (onListeningChange) {
         onListeningChange(false);
       }
+      
+      return Promise.reject(err);
     }
-  }, [handleSpeechStart, handleSpeechEnd, onTranscript, onListeningChange]);
+  }, [handleSpeechStart, handleSpeechEnd, onTranscript, onListeningChange, autoRestart]);
   
   const stopListening = useCallback(() => {
+    // Clear any existing auto-restart timers
+    if (autoRestartTimeout.current) {
+      clearTimeout(autoRestartTimeout.current);
+      autoRestartTimeout.current = null;
+    }
+    
     if (recognition.current) {
       try {
         recognition.current.stop();
