@@ -24,6 +24,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type BookingFormProps = {
   venueId: string;
@@ -104,7 +111,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     const selectedDateStr = formatDateForDatabase(date);
     const bookedSlots: {start: string, end: string}[] = [];
     
-    // Create a list of all booked time slots for the selected date
     existingBookings.forEach(booking => {
       if (booking.booking_date === selectedDateStr) {
         bookedSlots.push({
@@ -114,11 +120,9 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       }
     });
     
-    // Generate all possible time slots (hourly from 8 AM to 10 PM)
     for (let hour = 8; hour <= 22; hour++) {
       const timeString = `${hour.toString().padStart(2, '0')}:00`;
       
-      // Check if this time slot overlaps with any booking
       const isSlotAvailable = !isTimeOverlappingWithBookings(timeString, bookedSlots);
       
       slots.push({
@@ -132,7 +136,7 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   
   const isTimeOverlappingWithBookings = (timeString: string, bookedSlots: {start: string, end: string}[]): boolean => {
     const slotTime = parseTime(timeString);
-    if (!slotTime) return true; // If parsing fails, treat as unavailable
+    if (!slotTime) return true;
     
     for (const booking of bookedSlots) {
       const bookingStart = parseTime(booking.start);
@@ -140,7 +144,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       
       if (!bookingStart || !bookingEnd) continue;
       
-      // Check if the time slot falls within a booking
       if (slotTime >= bookingStart && slotTime < bookingEnd) {
         return true;
       }
@@ -162,11 +165,9 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
       if (data) {
         setExistingBookings(data);
         
-        // Process booked dates to highlight fully booked dates
         const fullyBookedDates = new Set<string>();
         const dateBookingHours = new Map<string, number>();
         
-        // Count total booked hours for each date
         data.forEach(booking => {
           const dateStr = booking.booking_date;
           const start = parseTime(booking.start_time);
@@ -185,9 +186,8 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
           }
         });
         
-        // Check which dates are fully booked (14+ hours)
         dateBookingHours.forEach((hours, dateStr) => {
-          if (hours >= 14) { // A full day is considered 14 hours (8am-10pm)
+          if (hours >= 14) {
             fullyBookedDates.add(dateStr);
           }
         });
@@ -230,10 +230,8 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   const calculateTotalPrice = (): number => {
     if (hoursBooked <= 0) return 0;
     
-    // Calculate base price based on hours
     const basePrice = Math.round(hoursBooked * pricePerHour);
     
-    // Apply guest count multiplier if needed
     const guests = parseInt(guestCount || '0');
     if (guests <= 1) {
       return basePrice;
@@ -260,7 +258,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
   };
   
   const formatDateForDatabase = (dateObj: Date): string => {
-    // Format as YYYY-MM-DD for database storage
     const year = dateObj.getFullYear();
     const month = String(dateObj.getMonth() + 1).padStart(2, '0');
     const day = String(dateObj.getDate()).padStart(2, '0');
@@ -326,7 +323,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
     setIsSubmitting(true);
     
     try {
-      // Create proper date string in YYYY-MM-DD format for database
       const formattedDate = formatDateForDatabase(date);
       
       console.log("Submitting booking with date:", formattedDate);
@@ -726,18 +722,13 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
                   selected={date}
                   onSelect={(newDate) => {
                     setDate(newDate);
-                    // Reset start and end times when date changes
                     setStartTime('');
                     setEndTime('');
                   }}
                   initialFocus
                   disabled={(day) => {
-                    // Disable past dates
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
-                    
-                    // Disable fully booked dates
-                    if (day < today) return true;
                     
                     const dayStr = formatDateForDatabase(day);
                     return bookedDates.has(dayStr);
@@ -805,7 +796,6 @@ const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: B
                   value={startTime}
                   onChange={(e) => {
                     setStartTime(e.target.value);
-                    // Clear end time if it's before the start time
                     if (endTime && parseTime(endTime)! <= parseTime(e.target.value)!) {
                       setEndTime('');
                     }

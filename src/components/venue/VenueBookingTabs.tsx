@@ -49,6 +49,7 @@ export default function VenueBookingTabs({
             pricePerHour={pricePerHour} 
             ownerId={ownerId}
             ownerName={ownerName}
+            allowHourAdjustment={true}
           />
         </TabsContent>
         
