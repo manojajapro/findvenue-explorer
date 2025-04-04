@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
@@ -239,9 +240,9 @@ export default function MultiDayBookingForm({
   return (
     <Card className="glass-card border-white/10 w-full mx-auto">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Multi-Day Booking</CardTitle>
+        <CardTitle className="text-lg">Day Booking</CardTitle>
         <CardDescription>
-          Book this venue for multiple specific days with custom times
+          Book this venue for one or multiple days
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -403,7 +404,7 @@ export default function MultiDayBookingForm({
           {selectedDays.length === 0 && (
             <Alert className="mt-4 bg-findvenue/10 border-findvenue/20">
               <AlertDescription>
-                Click "Add Booking Day" to select specific dates and times for your booking.
+                Click "Add Booking Day" to select one or more days for your booking.
               </AlertDescription>
             </Alert>
           )}
