@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar as CalendarIcon, Clock, Users, Info } from 'lucide-react';
-import { format, isEqual } from 'date-fns';
+import { format, isEqual, isSameDay } from 'date-fns';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
@@ -93,7 +93,7 @@ export default function MultiDayBookingForm({
       // Update existing bookings
       setExistingBookings(data || []);
       
-      // Create array of fully booked dates (dates where all 24 hours are booked)
+      // Create a map of dates to their booked hours
       const dateBookingMap = new Map();
       
       data?.forEach(booking => {
@@ -110,12 +110,12 @@ export default function MultiDayBookingForm({
         }
       });
       
-      // Find dates where all 24 hours are booked
+      // Find fully booked dates (dates where all 24 hours are booked or enough hours that no meaningful booking can be made)
       const fullyBookedDates: Date[] = [];
       
       dateBookingMap.forEach((hours, date) => {
-        // If all 24 hours are booked (or enough that no meaningful booking can be made)
-        if (hours.size >= 22) { // Considering at least 22 hours booked as fully booked
+        // If more than 20 hours are booked, consider the day fully booked
+        if (hours.size >= 20) {
           fullyBookedDates.push(new Date(date));
         }
       });
@@ -172,8 +172,22 @@ export default function MultiDayBookingForm({
     
     // Check if this date is already selected
     const dateAlreadySelected = selectedDays.some(day => 
-      isEqual(new Date(day.date).setHours(0,0,0,0), today.setHours(0,0,0,0))
+      isSameDay(day.date, today)
     );
+    
+    // Check if the date is fully booked
+    const isDateFullyBooked = disabledDates.some(disabledDate => 
+      isSameDay(disabledDate, today)
+    );
+    
+    if (isDateFullyBooked) {
+      toast({
+        title: "Date Unavailable",
+        description: "This date is fully booked.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (!dateAlreadySelected) {
       setSelectedDays([
@@ -197,8 +211,21 @@ export default function MultiDayBookingForm({
     // If updating the date, check if it's already selected in another booking
     if (field === 'date') {
       const dateAlreadySelected = selectedDays.some((day, i) => 
-        i !== index && isEqual(new Date(day.date).setHours(0,0,0,0), new Date(value).setHours(0,0,0,0))
+        i !== index && isSameDay(day.date, value)
       );
+      
+      const isDateFullyBooked = disabledDates.some(disabledDate => 
+        isSameDay(disabledDate, value)
+      );
+      
+      if (isDateFullyBooked) {
+        toast({
+          title: "Date Unavailable",
+          description: "This date is fully booked.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       if (dateAlreadySelected) {
         toast({
@@ -359,8 +386,15 @@ export default function MultiDayBookingForm({
                                     }
                                     
                                     // Disable dates that are already fully booked
-                                    return disabledDates.some(disabledDate => 
-                                      isEqual(new Date(disabledDate).setHours(0,0,0,0), date.setHours(0,0,0,0))
+                                    if (disabledDates.some(disabledDate => 
+                                      isSameDay(disabledDate, date)
+                                    )) {
+                                      return true;
+                                    }
+                                    
+                                    // Disable dates that are already selected in other booking days
+                                    return selectedDays.some((selectedDay, i) => 
+                                      i !== index && isSameDay(selectedDay.date, date)
                                     );
                                   }}
                                   className="pointer-events-auto"

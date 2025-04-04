@@ -189,6 +189,6 @@ const VenueDetails = () => {
       <VenueSpecificVoiceAssistant venue={venue} />
     </div>
   );
-};
+}
 
 export default VenueDetails;
