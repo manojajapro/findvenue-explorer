@@ -278,6 +278,13 @@ const VenueDetails = () => {
   const renderOwnerInfo = () => {
     if (!venue?.ownerInfo) return null;
     
+    const socialLinks = {
+      facebook: venue?.ownerInfo?.socialLinks?.facebook || '',
+      twitter: venue?.ownerInfo?.socialLinks?.twitter || '',
+      instagram: venue?.ownerInfo?.socialLinks?.instagram || '',
+      linkedin: venue?.ownerInfo?.socialLinks?.linkedin || ''
+    };
+    
     return (
       <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
         <div className="p-4 border-b border-white/10">
@@ -301,13 +308,6 @@ const VenueDetails = () => {
         </div>
       </div>
     );
-  };
-  
-  const socialLinks = {
-    facebook: venue?.ownerInfo?.socialLinks?.facebook || '',
-    twitter: venue?.ownerInfo?.socialLinks?.twitter || '',
-    instagram: venue?.ownerInfo?.socialLinks?.instagram || '',
-    linkedin: venue?.ownerInfo?.socialLinks?.linkedin || ''
   };
   
   if (loading) {

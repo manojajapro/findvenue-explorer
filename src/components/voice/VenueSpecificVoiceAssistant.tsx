@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import useVenueVoiceAssistant from '@/hooks/useVenueVoiceAssistant';
 import { Venue } from '@/hooks/useSupabaseVenues';
+import { useToast } from '@/components/ui/use-toast';
 
 type VenueSpecificVoiceAssistantProps = {
   venue: Venue;
@@ -13,6 +14,7 @@ type VenueSpecificVoiceAssistantProps = {
 const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
   
   const {
     isListening,
@@ -40,14 +42,36 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     setTranscriptHistory([]);
   };
 
+  const handleMicClick = async () => {
+    try {
+      if (isListening) {
+        stopListening();
+      } else {
+        await startListening();
+        toast({
+          title: "Voice Assistant Active",
+          description: "Speak clearly to ask about this venue",
+        });
+      }
+    } catch (err) {
+      console.error("Microphone error:", err);
+      toast({
+        variant: "destructive",
+        title: "Microphone Error",
+        description: "Please make sure your microphone is connected and you've granted permission to use it.",
+      });
+    }
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcriptHistory]);
 
   return (
-    <>
+    <div className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4">
       <div className="flex justify-between items-center mb-4">
         <div>
+          <h3 className="font-semibold text-lg mb-1">Voice Assistant</h3>
           <p className="text-sm text-findvenue-text-muted">
             Speak to get information about {venue.name}
           </p>
@@ -59,7 +83,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
         )}
       </div>
       
-      <div className="max-h-[50vh] overflow-y-auto mb-4">
+      <div className="max-h-[50vh] overflow-y-auto mb-4 p-2">
         {transcriptHistory.length === 0 ? (
           <div className="text-center py-6">
             <p className="text-findvenue-text-muted mb-2">
@@ -122,7 +146,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
         </div>
         
         <Button
-          onClick={isListening ? stopListening : startListening}
+          onClick={handleMicClick}
           disabled={isProcessing}
           className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-findvenue hover:bg-findvenue-dark"}
         >
@@ -139,7 +163,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
           )}
         </Button>
       </div>
-    </>
+    </div>
   );
 };
 

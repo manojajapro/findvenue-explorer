@@ -27,37 +27,43 @@ export default function VenueBookingTabs({
   const [activeTab, setActiveTab] = useState('hourly');
 
   return (
-    <Tabs defaultValue="hourly" value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid grid-cols-2 mb-4">
-        <TabsTrigger value="hourly" className="text-xs sm:text-sm flex items-center gap-1">
-          <Clock className="h-3 w-3" />
-          <span>Hourly Booking</span>
-        </TabsTrigger>
-        <TabsTrigger value="daily" className="text-xs sm:text-sm flex items-center gap-1">
-          <Calendar className="h-3 w-3" />
-          <span>Day Booking</span>
-        </TabsTrigger>
-      </TabsList>
+    <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
+      <h3 className="text-lg font-semibold mb-4">Book this venue</h3>
       
-      <TabsContent value="hourly">
-        <BookingForm 
-          venueId={venueId} 
-          venueName={venueName} 
-          pricePerHour={pricePerHour} 
-          ownerId={ownerId}
-          ownerName={ownerName}
-        />
-      </TabsContent>
-      
-      <TabsContent value="daily">
-        <MultiDayBookingForm 
-          venueId={venueId} 
-          venueName={venueName} 
-          pricePerHour={pricePerHour}
-          minCapacity={minCapacity}
-          maxCapacity={maxCapacity}
-        />
-      </TabsContent>
-    </Tabs>
+      <Tabs defaultValue="hourly" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-2 mb-4">
+          <TabsTrigger value="hourly" className="text-xs sm:text-sm flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            <span>Hourly Booking</span>
+          </TabsTrigger>
+          <TabsTrigger value="daily" className="text-xs sm:text-sm flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            <span>Day Booking</span>
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="hourly">
+          <BookingForm 
+            venueId={venueId} 
+            venueName={venueName} 
+            pricePerHour={pricePerHour} 
+            ownerId={ownerId}
+            ownerName={ownerName}
+          />
+        </TabsContent>
+        
+        <TabsContent value="daily">
+          <MultiDayBookingForm 
+            venueId={venueId} 
+            venueName={venueName} 
+            pricePerHour={pricePerHour}
+            minCapacity={minCapacity}
+            maxCapacity={maxCapacity}
+            ownerId={ownerId}
+            ownerName={ownerName}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

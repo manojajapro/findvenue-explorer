@@ -23,3 +23,10 @@ export type ChatContact = {
   venue_name?: string; // Changed from venueName to be consistent
   booking_id?: string; // Added to link contacts with specific bookings
 };
+
+export type SocialLinks = {
+  facebook?: string;
+  twitter?: string;
+  instagram?: string;
+  linkedin?: string;
+};

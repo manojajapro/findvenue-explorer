@@ -50,11 +50,11 @@ export const useVenueData = () => {
                 contact: ownerInfo.contact || '',
                 responseTime: ownerInfo.response_time || '',
                 user_id: ownerInfo.user_id || '',
-                socialLinks: ownerInfo.social_links || {
-                  facebook: ownerInfo.facebook_url,
-                  twitter: ownerInfo.twitter_url,
-                  instagram: ownerInfo.instagram_url,
-                  linkedin: ownerInfo.linkedin_url
+                socialLinks: {
+                  facebook: ownerInfo.facebook_url || ownerInfo.facebook || '',
+                  twitter: ownerInfo.twitter_url || ownerInfo.twitter || '',
+                  instagram: ownerInfo.instagram_url || ownerInfo.instagram || '',
+                  linkedin: ownerInfo.linkedin_url || ownerInfo.linkedin || ''
                 }
               };
             }
