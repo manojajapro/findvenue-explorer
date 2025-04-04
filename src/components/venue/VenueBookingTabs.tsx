@@ -169,7 +169,7 @@ export default function VenueBookingTabs({
             pricePerHour={pricePerHour} 
             ownerId={ownerId}
             ownerName={ownerName}
-            bookedTimeSlots={timeSlots}
+            bookedTimeSlots={bookedTimeSlots}
             isLoading={isLoadingBookings}
           />
         </TabsContent>
