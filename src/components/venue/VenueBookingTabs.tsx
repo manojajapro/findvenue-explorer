@@ -94,7 +94,7 @@ export default function VenueBookingTabs({
         Object.entries(bookingsByDate).forEach(([dateStr, bookings]) => {
           // Track day bookings (full day)
           const fullDayBookings = bookings.filter(b => 
-            b.start_time === '09:00' && b.end_time === '22:00'
+            b.start_time === '00:00' && b.end_time === '23:59'
           );
           
           if (fullDayBookings.length > 0) {
@@ -106,7 +106,7 @@ export default function VenueBookingTabs({
             if (!timeSlots[dateStr]) {
               timeSlots[dateStr] = [];
             }
-            timeSlots[dateStr].push('09:00 - 22:00');
+            timeSlots[dateStr].push('00:00 - 23:59');
           } else {
             // Track hourly bookings
             if (!timeSlots[dateStr]) {
@@ -114,6 +114,7 @@ export default function VenueBookingTabs({
             }
             
             let totalBookedHours = 0;
+            let bookedSlots = new Set<number>();
             
             bookings.forEach(booking => {
               const timeSlot = `${booking.start_time} - ${booking.end_time}`;
@@ -121,10 +122,15 @@ export default function VenueBookingTabs({
                 timeSlots[dateStr].push(timeSlot);
               }
               
-              // Calculate booked hours
+              // Track booked hours for 24-hour format
               const startHour = parseInt(booking.start_time.split(':')[0]);
               const endHour = parseInt(booking.end_time.split(':')[0]);
               totalBookedHours += (endHour - startHour);
+              
+              // Mark all hours in this range as booked
+              for (let hour = startHour; hour < endHour; hour++) {
+                bookedSlots.add(hour);
+              }
             });
             
             // If there are any hourly bookings, mark the date
@@ -132,9 +138,9 @@ export default function VenueBookingTabs({
               hourlyBooked.push(dateStr);
             }
             
-            // If more than 6 hours are booked (considering 13 business hours), 
+            // If more than 12 hours are booked (considering 24-hour day),
             // consider the day unavailable for full-day booking
-            if (totalBookedHours >= 6) {
+            if (bookedSlots.size >= 12 || totalBookedHours >= 12) {
               fullyBooked.push(dateStr);
             }
           }
@@ -214,6 +220,7 @@ export default function VenueBookingTabs({
             bookedTimeSlots={bookedTimeSlots}
             isLoading={isLoadingBookings}
             fullyBookedDates={[...fullyBookedDates, ...dayBookedDates]} // Disable dates with full-day bookings for hourly booking
+            availableTimeSlots={generateTimeSlots()}
           />
         </TabsContent>
         

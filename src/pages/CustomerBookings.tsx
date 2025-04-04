@@ -1,53 +1,16 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, CheckCircle, XCircle, MessageCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-
-const formatBookingDate = (dateString: string) => {
-  try {
-    if (dateString.includes('-') && dateString.split('-').length === 3) {
-      const dateParts = dateString.split('-');
-      const year = parseInt(dateParts[0]);
-      const month = parseInt(dateParts[1]) - 1;
-      const day = parseInt(dateParts[2]);
-      
-      const date = new Date(year, month, day);
-      return format(date, 'MMMM d, yyyy');
-    }
-    
-    const date = new Date(dateString);
-    return format(date, 'MMMM d, yyyy');
-  } catch (e) {
-    console.error("Error formatting date:", e, dateString);
-    return dateString;
-  }
-};
+import { CustomerBookingsTable } from '@/components/booking/CustomerBookingsTable';
+import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const CustomerBookings = () => {
   const { user, isVenueOwner } = useAuth();
@@ -56,6 +19,7 @@ const CustomerBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
   const [error, setError] = useState<string | null>(null);
   const [processingBookingIds, setProcessingBookingIds] = useState<Set<string>>(new Set());
   
@@ -121,7 +85,10 @@ const CustomerBookings = () => {
             created_at,
             guests,
             special_requests,
-            user_id
+            user_id,
+            customer_email,
+            customer_phone,
+            payment_method
           `)
           .in('venue_id', venueIds);
           
@@ -148,7 +115,8 @@ const CustomerBookings = () => {
             id: booking.id,
             user_id: booking.user_id,
             user_name: userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Unknown Customer',
-            user_email: userProfile?.email,
+            user_email: booking.customer_email || userProfile?.email,
+            customer_phone: booking.customer_phone,
             venue_id: booking.venue_id,
             venue_name: booking.venue_name || 'Unnamed Venue',
             booking_date: booking.booking_date,
@@ -159,6 +127,7 @@ const CustomerBookings = () => {
             created_at: booking.created_at,
             guests: booking.guests,
             special_requests: booking.special_requests,
+            payment_method: booking.payment_method,
           };
         });
         
@@ -243,19 +212,6 @@ const CustomerBookings = () => {
     navigate(`/messages/${userId}`);
   };
   
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'pending':
-        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'cancelled':
-        return 'bg-destructive/20 text-destructive border-destructive/30';
-      default:
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
-  };
-  
   const now = new Date();
   
   const upcomingBookings = bookings.filter(booking => 
@@ -269,22 +225,6 @@ const CustomerBookings = () => {
   );
   
   const displayBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
-  
-  const getBookingGroups = () => {
-    const groups: Record<string, any[]> = {};
-    
-    displayBookings.forEach(booking => {
-      const key = `${booking.booking_date}-${booking.venue_id}`;
-      if (!groups[key]) {
-        groups[key] = [];
-      }
-      groups[key].push(booking);
-    });
-    
-    return groups;
-  };
-  
-  const bookingGroups = getBookingGroups();
   
   if (!user) {
     return (
@@ -325,21 +265,42 @@ const CustomerBookings = () => {
             Manage bookings for all your venues
           </p>
           
-          <div className="mb-6 flex space-x-2">
-            <Button
-              variant={activeTab === 'upcoming' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('upcoming')}
-              className={activeTab === 'upcoming' ? 'bg-findvenue hover:bg-findvenue-dark' : ''}
-            >
-              Upcoming ({upcomingBookings.length})
-            </Button>
-            <Button
-              variant={activeTab === 'past' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('past')}
-              className={activeTab === 'past' ? 'bg-findvenue hover:bg-findvenue-dark' : ''}
-            >
-              Past & Cancelled ({pastBookings.length})
-            </Button>
+          <div className="mb-6 flex flex-col sm:flex-row gap-4">
+            <div className="flex space-x-2">
+              <Button
+                variant={activeTab === 'upcoming' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('upcoming')}
+                className={activeTab === 'upcoming' ? 'bg-findvenue hover:bg-findvenue-dark' : ''}
+              >
+                Upcoming ({upcomingBookings.length})
+              </Button>
+              <Button
+                variant={activeTab === 'past' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('past')}
+                className={activeTab === 'past' ? 'bg-findvenue hover:bg-findvenue-dark' : ''}
+              >
+                Past & Cancelled ({pastBookings.length})
+              </Button>
+            </div>
+            
+            <div className="ms-auto flex space-x-2">
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'outline'}
+                onClick={() => setViewMode('table')}
+                className={viewMode === 'table' ? 'bg-findvenue hover:bg-findvenue-dark' : ''}
+                size="sm"
+              >
+                Table View
+              </Button>
+              <Button
+                variant={viewMode === 'calendar' ? 'default' : 'outline'}
+                onClick={() => setViewMode('calendar')}
+                className={viewMode === 'calendar' ? 'bg-findvenue hover:bg-findvenue-dark' : ''}
+                size="sm"
+              >
+                Calendar View
+              </Button>
+            </div>
           </div>
           
           {error && (
@@ -379,99 +340,33 @@ const CustomerBookings = () => {
               </CardContent>
             </Card>
           ) : (
-            <Card className="glass-card border-white/10 overflow-hidden">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-white/10">
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Venue</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Guests</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Object.keys(bookingGroups).map(groupKey => {
-                      const group = bookingGroups[groupKey];
-                      const firstBooking = group[0];
-                      const hasMultipleBookings = group.length > 1;
-                      const dateDisplay = formatBookingDate(firstBooking.booking_date);
-                      
-                      return group.map((booking, idx) => (
-                        <TableRow key={booking.id} className={`border-white/10 ${hasMultipleBookings ? 'bg-findvenue-surface/20' : ''}`}>
-                          <TableCell className="font-medium">{booking.user_name}</TableCell>
-                          <TableCell>{booking.venue_name}</TableCell>
-                          <TableCell>{dateDisplay}</TableCell>
-                          <TableCell>{booking.start_time} - {booking.end_time}</TableCell>
-                          <TableCell>{booking.guests}</TableCell>
-                          <TableCell>SAR {booking.total_price.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(booking.status)}>
-                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {booking.status === 'pending' && activeTab === 'upcoming' && (
-                              <div className="flex space-x-2 justify-end">
-                                <Button 
-                                  variant="outline"
-                                  className="border-green-500 text-green-500 hover:bg-green-500/10"
-                                  size="sm"
-                                  onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
-                                  disabled={processingBookingIds.has(booking.id) || isBusy}
-                                >
-                                  {processingBookingIds.has(booking.id) ? (
-                                    <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full mr-1"></div>
-                                  ) : (
-                                    <CheckCircle className="h-4 w-4 mr-1" />
-                                  )}
-                                  Confirm
-                                </Button>
-                                
-                                <Button 
-                                  variant="outline"
-                                  className="border-destructive text-destructive hover:bg-destructive/10"
-                                  size="sm"
-                                  onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
-                                  disabled={processingBookingIds.has(booking.id) || isBusy}
-                                >
-                                  {processingBookingIds.has(booking.id) ? (
-                                    <div className="animate-spin h-4 w-4 border-2 border-destructive border-t-transparent rounded-full mr-1"></div>
-                                  ) : (
-                                    <XCircle className="h-4 w-4 mr-1" />
-                                  )}
-                                  Cancel
-                                </Button>
-                              </div>
-                            )}
-                            {!processingBookingIds.has(booking.id) && booking.status !== 'pending' && (
-                              <div className="flex space-x-2 justify-end">
-                                <span className="text-findvenue-text-muted text-sm mr-2">
-                                  {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
-                                </span>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-findvenue text-findvenue hover:bg-findvenue/10"
-                                  onClick={() => initiateChat(booking.user_id)}
-                                >
-                                  <MessageCircle className="h-4 w-4 mr-1" />
-                                  Chat
-                                </Button>
-                              </div>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ));
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <Tabs defaultValue={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'calendar')}>
+              <TabsContent value="table">
+                <Card className="glass-card border-white/10 overflow-hidden">
+                  <CardContent className="p-0">
+                    <CustomerBookingsTable 
+                      bookings={displayBookings}
+                      activeTab={activeTab}
+                      processingBookingIds={processingBookingIds}
+                      isBusy={isBusy}
+                      handleStatusUpdate={handleStatusUpdate}
+                      initiateChat={initiateChat}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="calendar">
+                <Card className="glass-card border-white/10">
+                  <CardHeader>
+                    <CardTitle>Bookings Calendar</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <OwnerBookingsCalendar />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           )}
           
           {displayBookings.some(booking => booking.special_requests) && (
@@ -484,7 +379,7 @@ const CustomerBookings = () => {
                       <div className="flex flex-col gap-2">
                         <div className="flex justify-between">
                           <h3 className="font-medium">
-                            {booking.venue_name} - {formatBookingDate(booking.booking_date)}
+                            {booking.venue_name} - {new Date(booking.booking_date).toLocaleDateString()}
                           </h3>
                           <Button
                             variant="ghost"
@@ -492,7 +387,6 @@ const CustomerBookings = () => {
                             className="text-findvenue hover:bg-findvenue/10"
                             onClick={() => initiateChat(booking.user_id)}
                           >
-                            <MessageCircle className="h-4 w-4 mr-1" />
                             Chat with Customer
                           </Button>
                         </div>

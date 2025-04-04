@@ -1,31 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon, Clock, Users } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/components/ui/use-toast';
-import { format, addDays, isBefore, isAfter, parse, startOfDay, addMonths } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { 
-  CalendarIcon, 
-  Clock, 
-  Users, 
-  CalendarCheck, 
-  BadgeInfo, 
-  Loader2,
-  AlertCircle,
-  Mail,
-  Phone,
-  CreditCard,
-  Banknote
-} from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -33,22 +21,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { CheckCircle } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface BookingFormProps {
   venueId: string;
@@ -56,667 +50,497 @@ interface BookingFormProps {
   pricePerHour?: number;
   ownerId: string;
   ownerName: string;
-  bookedTimeSlots?: Record<string, string[]>;
-  isLoading?: boolean;
-  fullyBookedDates?: string[];
+  bookedTimeSlots: Record<string, string[]>;
+  isLoading: boolean;
+  fullyBookedDates: string[];
+  availableTimeSlots: string[];
 }
 
-const TIME_SLOTS = [
-  '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', 
-  '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
-];
+const formSchema = z.object({
+  date: z.date({
+    required_error: "Please select a date",
+  }),
+  startTime: z.string().min(1, "Please select a start time"),
+  endTime: z.string().min(1, "Please select an end time"),
+  guests: z.number().min(1, "At least one guest is required"),
+  specialRequests: z.string().optional(),
+  customerEmail: z.string().email("Please enter a valid email"),
+  customerPhone: z.string().min(5, "Please enter a valid phone number"),
+  paymentMethod: z.string().min(1, "Please select a payment method"),
+});
 
-const PAYMENT_METHODS = [
-  { id: 'credit_card', name: 'Credit Card', icon: <CreditCard className="w-4 h-4" /> },
-  { id: 'cash', name: 'Cash', icon: <Banknote className="w-4 h-4" /> }
-];
-
-const BookingForm = ({ 
-  venueId, 
-  venueName, 
-  pricePerHour = 0, 
+export default function BookingForm({
+  venueId,
+  venueName,
+  pricePerHour = 0,
   ownerId,
   ownerName,
-  bookedTimeSlots = {},
-  isLoading = false,
-  fullyBookedDates = []
-}: BookingFormProps) => {
+  bookedTimeSlots,
+  isLoading,
+  fullyBookedDates,
+  availableTimeSlots
+}: BookingFormProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [displayDate, setDisplayDate] = useState<string>('');
-  const [startTime, setStartTime] = useState<string>('');
-  const [endTime, setEndTime] = useState<string>('');
-  const [guests, setGuests] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [totalPrice, setTotalPrice] = useState(0);
-  const [duration, setDuration] = useState(1);
-  const [specialRequests, setSpecialRequests] = useState('');
   const [availableStartTimes, setAvailableStartTimes] = useState<string[]>([]);
   const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([]);
-  const [isBooking, setIsBooking] = useState(false);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
-  const [showUnavailableDialog, setShowUnavailableDialog] = useState(false);
-  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
-  
-  // New fields for customer details
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('credit_card');
-  
-  // Get user profile info if logged in
-  useEffect(() => {
-    if (user) {
-      const getUserProfile = async () => {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('email, phone')
-          .eq('id', user.id)
-          .single();
-        
-        if (data && !error) {
-          setCustomerEmail(data.email || '');
-          setCustomerPhone(data.phone || '');
-        }
-      };
-      
-      getUserProfile();
-    }
-  }, [user]);
-  
-  useEffect(() => {
-    if (date) {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      
-      if (fullyBookedDates.includes(dateStr)) {
-        setShowUnavailableDialog(true);
-        setDate(undefined);
-        return;
-      }
-      
-      setDisplayDate(format(date, 'EEEE, MMMM d, yyyy'));
-      setStartTime('');
-      setEndTime('');
-      
-      updateAvailableStartTimes(dateStr);
-    } else {
-      setDisplayDate('');
-      setAvailableStartTimes([]);
-      setAvailableEndTimes([]);
-    }
-  }, [date, bookedTimeSlots, fullyBookedDates]);
-  
-  useEffect(() => {
-    if (startTime && date) {
-      updateAvailableEndTimes(startTime);
-    } else {
-      setEndTime('');
-      setAvailableEndTimes([]);
-    }
-  }, [startTime, date]);
-  
+  const [showTimeAlert, setShowTimeAlert] = useState(false);
+  const [timeAlertMessage, setTimeAlertMessage] = useState('');
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      guests: 1,
+      specialRequests: "",
+      customerEmail: user?.email ?? "",
+      customerPhone: "",
+      paymentMethod: "Cash",
+    },
+  });
+
+  const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const startTime = form.watch('startTime');
+  const endTime = form.watch('endTime');
+
+  // Update total price when start time or end time changes
   useEffect(() => {
     if (startTime && endTime) {
-      const start = parseInt(startTime.split(':')[0]);
-      const end = parseInt(endTime.split(':')[0]);
-      const hours = end - start;
-      
-      setDuration(hours);
-      setTotalPrice(pricePerHour * hours);
-    } else {
-      setDuration(0);
-      setTotalPrice(0);
-    }
-  }, [startTime, endTime, pricePerHour]);
-  
-  const updateAvailableStartTimes = (dateStr: string) => {
-    const bookedSlots = bookedTimeSlots[dateStr] || [];
-    
-    if (bookedSlots.length >= TIME_SLOTS.length - 1) {
-      setAvailableStartTimes([]);
-      return;
-    }
-    
-    const bookedStartTimes = new Set();
-    const bookedEndTimes = new Set();
-    
-    bookedSlots.forEach(slot => {
-      const [start, end] = slot.split(' - ');
-      
-      for (let hour = parseInt(start.split(':')[0]); hour < parseInt(end.split(':')[0]); hour++) {
-        const hourStr = `${hour.toString().padStart(2, '0')}:00`;
-        bookedStartTimes.add(hourStr);
-      }
-    });
-    
-    const available = TIME_SLOTS.filter(time => {
-      if (date && isSameDay(date, new Date()) && isPastTime(time)) {
-        return false;
-      }
-      
-      return !bookedStartTimes.has(time);
-    });
-    
-    setAvailableStartTimes(available);
-  };
-  
-  const updateAvailableEndTimes = (start: string) => {
-    if (!date || !start) return;
-    
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const bookedSlots = bookedTimeSlots[dateStr] || [];
-    const startHour = parseInt(start.split(':')[0]);
-    const available: string[] = [];
-    
-    let nextBookedTime = 22;
-    
-    bookedSlots.forEach(slot => {
-      const [bookedStart] = slot.split(' - ');
-      const bookedHour = parseInt(bookedStart.split(':')[0]);
-      
-      if (bookedHour > startHour && bookedHour < nextBookedTime) {
-        nextBookedTime = bookedHour;
-      }
-    });
-    
-    for (let i = startHour + 1; i <= Math.min(22, nextBookedTime); i++) {
-      available.push(`${i.toString().padStart(2, '0')}:00`);
-    }
-    
-    setAvailableEndTimes(available);
-  };
-  
-  const isPastTime = (time: string) => {
-    const now = new Date();
-    const [hour] = time.split(':').map(Number);
-    return now.getHours() >= hour;
-  };
-  
-  const isSameDay = (date1: Date, date2: Date) => {
-    return date1.getDate() === date2.getDate() &&
-      date1.getMonth() === date2.getMonth() &&
-      date1.getFullYear() === date2.getFullYear();
-  };
-  
-  const checkTimeSlotAvailability = async (dateStr: string, startTime: string, endTime: string) => {
-    setIsCheckingAvailability(true);
-    
-    try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('venue_id', venueId)
-        .eq('booking_date', dateStr)
-        .in('status', ['confirmed', 'pending']);
-        
-      if (error) throw error;
-      
-      const hasFullDayBooking = data.some(booking => 
-        booking.start_time === '09:00' && booking.end_time === '22:00'
-      );
-      
-      if (hasFullDayBooking) {
-        return { isAvailable: false };
-      }
-      
       const startHour = parseInt(startTime.split(':')[0]);
       const endHour = parseInt(endTime.split(':')[0]);
       
-      const hasConflict = data.some(booking => {
-        const bookingStartHour = parseInt(booking.start_time.split(':')[0]);
-        const bookingEndHour = parseInt(booking.end_time.split(':')[0]);
+      if (endHour > startHour) {
+        const hours = endHour - startHour;
+        setTotalPrice(hours * pricePerHour);
+      } else {
+        setTotalPrice(0);
+      }
+    } else {
+      setTotalPrice(0);
+    }
+  }, [startTime, endTime, pricePerHour]);
+
+  // Check if a date has any hourly bookings
+  const hasHourlyBookings = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return bookedTimeSlots[dateStr] && bookedTimeSlots[dateStr].length > 0;
+  };
+  
+  // Check if a specific date is fully booked (either as a full day or too many hourly slots)
+  const isDateFullyBooked = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return fullyBookedDates.includes(dateStr);
+  };
+
+  // Update available time slots when date changes
+  useEffect(() => {
+    if (selectedDate) {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const bookedSlots = bookedTimeSlots[dateStr] || [];
+      
+      // Extract all booked hours for this date
+      const bookedHours = new Set<number>();
+      
+      bookedSlots.forEach(slot => {
+        const [start, end] = slot.split(' - ');
+        const startHour = parseInt(start.split(':')[0]);
+        const endHour = parseInt(end.split(':')[0]);
         
-        return (startHour < bookingEndHour && endHour > bookingStartHour);
+        for (let hour = startHour; hour < endHour; hour++) {
+          bookedHours.add(hour);
+        }
       });
       
-      return { isAvailable: !hasConflict };
-    } catch (error) {
-      console.error('Error checking time slot availability:', error);
-      return { isAvailable: false };
-    } finally {
-      setIsCheckingAvailability(false);
+      // Filter available start times (can't start at or after a booked hour)
+      const filtered = availableTimeSlots.filter(timeSlot => {
+        const hour = parseInt(timeSlot.split(':')[0]);
+        return !bookedHours.has(hour);
+      });
+      
+      setAvailableStartTimes(filtered);
+      
+      // Update end times based on selected start time
+      if (startTime) {
+        updateAvailableEndTimes(startTime, bookedHours);
+      }
+    }
+  }, [selectedDate, bookedTimeSlots, availableTimeSlots, startTime]);
+
+  // Update available end times based on selected start time
+  const updateAvailableEndTimes = (start: string, bookedHours: Set<number>) => {
+    const startHour = parseInt(start.split(':')[0]);
+    let foundBookedHour = false;
+    
+    // End time must be after start time and before the next booked hour
+    const filtered = availableTimeSlots.filter(timeSlot => {
+      const hour = parseInt(timeSlot.split(':')[0]);
+      
+      // Once we find a booked hour after our start time, we can't go further
+      if (hour > startHour && bookedHours.has(hour) && !foundBookedHour) {
+        foundBookedHour = true;
+      }
+      
+      return hour > startHour && (!foundBookedHour || bookedHours.has(hour));
+    });
+    
+    setAvailableEndTimes(filtered);
+  };
+
+  // When start time is selected, update end time options
+  const handleStartTimeChange = (value: string) => {
+    form.setValue('startTime', value);
+    form.setValue('endTime', ''); // Reset end time
+    
+    if (selectedDate) {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const bookedSlots = bookedTimeSlots[dateStr] || [];
+      
+      // Extract all booked hours for this date
+      const bookedHours = new Set<number>();
+      
+      bookedSlots.forEach(slot => {
+        const [start, end] = slot.split(' - ');
+        const startHour = parseInt(start.split(':')[0]);
+        const endHour = parseInt(end.split(':')[0]);
+        
+        for (let hour = startHour; hour < endHour; hour++) {
+          bookedHours.add(hour);
+        }
+      });
+      
+      updateAvailableEndTimes(value, bookedHours);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (!user) {
       toast({
-        title: "Error",
-        description: "You must be logged in to book a venue.",
+        title: "Not logged in",
+        description: "Please log in to book this venue.",
         variant: "destructive",
       });
       return;
     }
+
+    // Final validation to ensure time slot is available
+    const dateStr = format(data.date, 'yyyy-MM-dd');
+    const bookedSlots = bookedTimeSlots[dateStr] || [];
+    const startHour = parseInt(data.startTime.split(':')[0]);
+    const endHour = parseInt(data.endTime.split(':')[0]);
     
-    if (!date || !startTime || !endTime) {
-      toast({
-        title: "Error",
-        description: "Please select a date and time for your booking.",
-        variant: "destructive",
-      });
-      return;
-    }
+    let timeConflict = false;
     
-    if (!customerEmail || !customerPhone) {
-      toast({
-        title: "Error",
-        description: "Please provide your contact details.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    try {
-      setIsBooking(true);
+    bookedSlots.forEach(slot => {
+      const [slotStart, slotEnd] = slot.split(' - ');
+      const slotStartHour = parseInt(slotStart.split(':')[0]);
+      const slotEndHour = parseInt(slotEnd.split(':')[0]);
       
-      const formattedDate = format(date, 'yyyy-MM-dd');
-      
-      const { isAvailable } = await checkTimeSlotAvailability(formattedDate, startTime, endTime);
-      
-      if (!isAvailable) {
-        setShowUnavailableDialog(true);
-        setDate(undefined);
-        setIsBooking(false);
+      // Check if our booking overlaps with an existing booking
+      if ((startHour < slotEndHour && endHour > slotStartHour) || 
+          (startHour === slotStartHour && endHour === slotEndHour)) {
+        timeConflict = true;
+        setTimeAlertMessage(`The time slot from ${data.startTime} to ${data.endTime} conflicts with an existing booking.`);
+        setShowTimeAlert(true);
         return;
       }
-      
-      // Update user profile with contact info if needed
-      if (user.email !== customerEmail || customerPhone) {
-        await supabase
-          .from('user_profiles')
-          .update({
-            phone: customerPhone
-          })
-          .eq('id', user.id);
-      }
-      
-      // Create the booking
-      const { data, error } = await supabase
+    });
+    
+    if (timeConflict) return;
+    
+    setIsSubmitting(true);
+
+    try {
+      const { data: bookingData, error } = await supabase
         .from('bookings')
         .insert([
           {
+            user_id: user.id,
             venue_id: venueId,
             venue_name: venueName,
-            user_id: user.id,
-            booking_date: formattedDate,
-            start_time: startTime,
-            end_time: endTime,
-            guests,
+            booking_date: format(data.date, 'yyyy-MM-dd'),
+            start_time: data.startTime,
+            end_time: data.endTime,
+            status: 'confirmed', // Auto-confirm all bookings
             total_price: totalPrice,
-            special_requests: specialRequests || null,
-            status: 'confirmed',
-            customer_email: customerEmail,
-            customer_phone: customerPhone,
-            payment_method: paymentMethod
+            guests: data.guests,
+            special_requests: data.specialRequests,
+            customer_email: data.customerEmail,
+            customer_phone: data.customerPhone,
+            payment_method: data.paymentMethod,
           }
         ])
         .select();
+
+      if (error) {
+        throw error;
+      }
+
+      // If booking successful, redirect to bookings page
+      toast({
+        title: "Booking confirmed!",
+        description: `You've successfully booked ${venueName} for ${format(data.date, 'PPP')}. Total: SAR ${totalPrice}`,
+      });
       
-      if (error) throw error;
-      
-      setBookingSuccess(true);
-      
-      // Create notification for the venue owner
-      await supabase
-        .from('notifications')
-        .insert([
-          {
-            user_id: ownerId,
-            type: 'booking_request',
-            title: 'New Confirmed Booking',
-            message: `You have a new confirmed booking for ${venueName} on ${format(date, 'MMM d, yyyy')} from ${startTime} to ${endTime}`,
-            data: {
-              venue_id: venueId,
-              venue_name: venueName,
-              booking_date: formattedDate,
-              start_time: startTime,
-              end_time: endTime,
-              booking_id: data?.[0]?.id
-            }
-          }
-        ]);
-        
+      navigate('/bookings');
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create booking. Please try again.",
+        title: "Booking failed",
+        description: error.message || "There was a problem creating your booking.",
         variant: "destructive",
       });
+      console.error("Booking error:", error);
     } finally {
-      setIsBooking(false);
+      setIsSubmitting(false);
     }
   };
-  
-  const handleReset = () => {
-    setDate(undefined);
-    setStartTime('');
-    setEndTime('');
-    setGuests(1);
-    setSpecialRequests('');
-    setBookingSuccess(false);
-  };
-  
-  const disabledDays = (day: Date) => {
-    if (isBefore(day, startOfDay(new Date()))) {
-      return true;
-    }
-    
-    const dateStr = format(day, 'yyyy-MM-dd');
-    return fullyBookedDates.includes(dateStr);
-  };
-  
-  if (bookingSuccess) {
-    return (
-      <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-        <CardContent className="pt-6 text-center">
-          <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
-          <h3 className="text-xl font-semibold mb-2">Booking Successful!</h3>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Your booking for {venueName} on {displayDate} from {startTime} to {endTime} has been automatically confirmed.
-          </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            You can view and manage your booking in your bookings page.
-          </p>
-          <Button
-            onClick={handleReset}
-            className="mt-2"
-          >
-            Make Another Booking
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-3/4 mx-auto" />
-      </div>
-    );
-  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Select Date
-          </label>
-          
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !date && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date ? format(date, 'EEEE, MMMM d, yyyy') : <span>Select a date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                disabled={disabledDays}
-                initialFocus
-                fromDate={new Date()}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="date"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel>Date</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={"outline"}
+                        className={`w-full text-left font-normal flex justify-between items-center ${!field.value && "text-muted-foreground"}`}
+                      >
+                        {field.value ? (
+                          format(field.value, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={(date) => {
+                        field.onChange(date);
+                        setSelectedDate(date);
+                        // Reset time selections when date changes
+                        form.setValue('startTime', '');
+                        form.setValue('endTime', '');
+                      }}
+                      disabled={(date) => {
+                        // Disable dates in the past
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        if (date < today) return true;
+                        
+                        // Disable fully booked dates
+                        return isDateFullyBooked(date);
+                      }}
+                      modifiers={{
+                        booked: (date) => hasHourlyBookings(date),
+                      }}
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        {date && (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Start Time
-              </label>
-              <Select
-                value={startTime}
-                onValueChange={setStartTime}
-                disabled={availableStartTimes.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select start time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableStartTimes.length > 0 ? (
-                    availableStartTimes.map((time) => (
-                      <SelectItem key={`start-${time}`} value={time}>
-                        {time}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>
-                      No available times
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                End Time
-              </label>
-              <Select
-                value={endTime}
-                onValueChange={setEndTime}
-                disabled={!startTime || availableEndTimes.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select end time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableEndTimes.length > 0 ? (
-                    availableEndTimes.map((time) => (
-                      <SelectItem key={`end-${time}`} value={time}>
-                        {time}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>
-                      Select start time first
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Number of Guests
-          </label>
-          <div className="flex items-center">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setGuests(Math.max(1, guests - 1))}
-              className="rounded-r-none"
-            >
-              -
-            </Button>
-            <Input
-              type="number"
-              min="1"
-              value={guests}
-              onChange={(e) => setGuests(parseInt(e.target.value) || 1)}
-              className="text-center rounded-none w-16 border-x-0"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setGuests(guests + 1)}
-              className="rounded-l-none"
-            >
-              +
-            </Button>
-          </div>
-        </div>
-
-        {/* Customer Contact Information */}
-        <div className="space-y-3">
-          <h4 className="font-medium">Contact Information</h4>
-          
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Email
-            </label>
-            <div className="relative">
-              <Input 
-                type="email" 
-                placeholder="Your email address" 
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                required
-                className="pl-9"
-              />
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Phone
-            </label>
-            <div className="relative">
-              <Input 
-                type="tel" 
-                placeholder="Your phone number" 
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                required
-                className="pl-9"
-              />
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-        </div>
-        
-        {/* Payment Method */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Payment Method
-          </label>
-          <RadioGroup 
-            value={paymentMethod} 
-            onValueChange={setPaymentMethod}
-            className="flex flex-col space-y-2"
-          >
-            {PAYMENT_METHODS.map((method) => (
-              <div key={method.id} className="flex items-center space-x-2">
-                <RadioGroupItem value={method.id} id={`payment-${method.id}`} />
-                <Label 
-                  htmlFor={`payment-${method.id}`}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  {method.icon}
-                  {method.name}
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Special Requests (Optional)
-          </label>
-          <Textarea
-            placeholder="Any special requirements or setup needs?"
-            value={specialRequests}
-            onChange={(e) => setSpecialRequests(e.target.value)}
-            className="resize-none"
+          <FormField
+            control={form.control}
+            name="guests"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Number of Guests</FormLabel>
+                <FormControl>
+                  <div className="flex items-center">
+                    <Users className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="number"
+                      min="1"
+                      {...field}
+                      onChange={(e) => field.onChange(parseInt(e.target.value))}
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
         </div>
-      </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="startTime"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Start Time</FormLabel>
+                <Select 
+                  onValueChange={handleStartTimeChange}
+                  value={field.value}
+                  disabled={!selectedDate || isLoading || availableStartTimes.length === 0}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select start time" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {availableStartTimes.map((time) => (
+                      <SelectItem key={`start-${time}`} value={time}>{time}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-      {startTime && endTime && (
-        <Card className="mt-4 bg-findvenue-surface/20 dark:bg-findvenue-card-bg border-white/10">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium">Booking Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="pb-2">
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between items-center">
-                <span className="text-findvenue-text-muted">Date:</span>
-                <span>{displayDate}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-findvenue-text-muted">Time:</span>
-                <span>{startTime} - {endTime} ({duration} hour{duration !== 1 ? 's' : ''})</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-findvenue-text-muted">Guests:</span>
-                <span>{guests}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-findvenue-text-muted">Rate:</span>
-                <span>SAR {pricePerHour} / hour</span>
-              </div>
-              <div className="border-t border-white/10 mt-2 pt-2 flex justify-between items-center font-medium">
-                <span>Total:</span>
-                <span>SAR {totalPrice.toLocaleString()}</span>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="pt-2">
-            <Button 
-              className="w-full bg-findvenue hover:bg-findvenue-dark"
-              type="submit"
-              disabled={isBooking}
-            >
-              {isBooking ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <CalendarCheck className="mr-2 h-4 w-4" />
-                  Book Now
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
-      )}
-      
-      <Dialog open={showUnavailableDialog} onOpenChange={setShowUnavailableDialog}>
-        <DialogContent className="sm:max-w-md bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <AlertCircle className="h-5 w-5 mr-2 text-red-500" />
-              Time Slot Unavailable
-            </DialogTitle>
-          </DialogHeader>
-          <DialogDescription className="text-red-700 dark:text-red-300">
-            Sorry, this time slot is already booked or has been reserved by another user.
-            Please select a different date or time.
-          </DialogDescription>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline" className="w-full">Close</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </form>
+          <FormField
+            control={form.control}
+            name="endTime"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>End Time</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value}
+                  disabled={!startTime || availableEndTimes.length === 0}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select end time" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {availableEndTimes.map((time) => (
+                      <SelectItem key={`end-${time}`} value={time}>{time}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="customerEmail"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input placeholder="your.email@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="customerPhone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone Number</FormLabel>
+                <FormControl>
+                  <Input placeholder="+1234567890" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        
+        <FormField
+          control={form.control}
+          name="paymentMethod"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Payment Method</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Credit Card">Credit Card</SelectItem>
+                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="specialRequests"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Special Requests (Optional)</FormLabel>
+              <FormControl>
+                <Textarea 
+                  placeholder="Any special requirements for your booking?" 
+                  className="min-h-24"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="bg-findvenue-surface/20 p-4 rounded-md">
+          <div className="flex justify-between items-center">
+            <span className="font-medium">Total Price:</span>
+            <span className="font-bold text-lg">SAR {totalPrice.toFixed(2)}</span>
+          </div>
+          <p className="text-sm text-findvenue-text-muted mt-1">
+            {pricePerHour} SAR × {totalPrice / pricePerHour || 0} hours
+          </p>
+        </div>
+
+        <Button 
+          type="submit" 
+          className="w-full bg-findvenue hover:bg-findvenue-dark" 
+          disabled={isSubmitting || isLoading || !user}
+        >
+          {isSubmitting ? (
+            <><span className="animate-spin mr-2">◌</span> Processing...</>
+          ) : (
+            "Confirm Booking"
+          )}
+        </Button>
+        
+        <AlertDialog open={showTimeAlert} onOpenChange={setShowTimeAlert}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Time Slot Unavailable</AlertDialogTitle>
+              <AlertDialogDescription>
+                {timeAlertMessage}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction>OK</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </form>
+    </Form>
   );
-};
-
-export default BookingForm;
+}

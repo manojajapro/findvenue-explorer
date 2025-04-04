@@ -13,9 +13,12 @@ export type Database = {
         Row: {
           booking_date: string
           created_at: string
+          customer_email: string | null
+          customer_phone: string | null
           end_time: string
           guests: number
           id: string
+          payment_method: string | null
           special_requests: string | null
           start_time: string
           status: string
@@ -28,9 +31,12 @@ export type Database = {
         Insert: {
           booking_date: string
           created_at?: string
+          customer_email?: string | null
+          customer_phone?: string | null
           end_time: string
           guests?: number
           id?: string
+          payment_method?: string | null
           special_requests?: string | null
           start_time: string
           status?: string
@@ -43,9 +49,12 @@ export type Database = {
         Update: {
           booking_date?: string
           created_at?: string
+          customer_email?: string | null
+          customer_phone?: string | null
           end_time?: string
           guests?: number
           id?: string
+          payment_method?: string | null
           special_requests?: string | null
           start_time?: string
           status?: string
