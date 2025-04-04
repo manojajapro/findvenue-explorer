@@ -1,7 +1,6 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSupabaseVenues, Venue } from '@/hooks/useSupabaseVenues';
+import { useVenueData } from '@/hooks/useVenueData';
 import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import VenueBookingTabs from '@/components/venue/VenueBookingTabs';
@@ -17,16 +16,8 @@ import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
   const navigate = useNavigate();
-  const { venues, isLoading, error } = useSupabaseVenues();
-  const [venue, setVenue] = useState<Venue | null>(null);
+  const { venue, isLoading, error } = useVenueData();
   const { user } = useAuth();
-  
-  useEffect(() => {
-    if (venueId && venues.length > 0) {
-      const foundVenue = venues.find(venue => venue.id === venueId);
-      setVenue(foundVenue || null);
-    }
-  }, [venueId, venues]);
   
   if (isLoading) {
     return (

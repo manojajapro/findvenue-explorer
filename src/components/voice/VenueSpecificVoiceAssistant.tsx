@@ -1,58 +1,88 @@
 
-import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Loader2, RefreshCw, Volume2, VolumeX } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Mic, MicOff, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import useVenueVoiceAssistant from '@/hooks/useVenueVoiceAssistant';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import { useToast } from '@/components/ui/use-toast';
+import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/hooks/use-toast';
 
-type VenueSpecificVoiceAssistantProps = {
-  venue: Venue;
-};
+interface VenueSpecificVoiceAssistantProps {
+  venue: Venue | null;
+}
 
 const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
   const [autoListenMode, setAutoListenMode] = useState(true); // Set to true by default
+  const [initialGreetingPlayed, setInitialGreetingPlayed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
-  const {
+  const { 
     isListening,
-    isProcessing,
     transcript,
-    answer,
-    error,
-    audioEnabled,
     startListening,
     stopListening,
-    toggleAudio
+    isProcessing,
+    isSpeaking,
+    toggleVoiceOutput,
+    voiceOutputEnabled,
+    error
   } = useVenueVoiceAssistant({
     venue,
-    autoRestart: autoListenMode,
-    onTranscript: (text) => {
-      if (text.trim()) {
-        setTranscriptHistory(prev => [...prev, { text, isUser: true }]);
+    onResult: (response) => {
+      // Add the user's question to the history
+      if (transcript) {
+        setTranscriptHistory(prev => [...prev, { text: transcript, isUser: true }]);
       }
-    },
-    onAnswer: (text) => {
-      if (text.trim()) {
-        setTranscriptHistory(prev => [...prev, { text, isUser: false }]);
+      
+      // Add the assistant's response to the history
+      setTranscriptHistory(prev => [...prev, { text: response, isUser: false }]);
+      
+      // If auto-listen mode is enabled, restart listening once response is spoken
+      if (autoListenMode) {
+        setTimeout(() => {
+          startListening().catch(() => {
+            toast({
+              title: "Error",
+              description: "Could not automatically restart listening",
+              variant: "destructive"
+            });
+          });
+        }, 1000);
       }
     }
   });
-
-  const clearHistory = () => {
-    setTranscriptHistory([]);
-  };
-
-  const handleMicClick = async () => {
+  
+  // Scroll to bottom when transcript history updates
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [transcriptHistory]);
+  
+  // Error handling
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error",
+        description: error || "There was an error with the voice assistant",
+        variant: "destructive"
+      });
+    }
+  }, [error, toast]);
+  
+  const handleMicToggle = async () => {
     try {
       if (isListening) {
         stopListening();
-        setAutoListenMode(false);
+        toast({
+          title: "Voice Assistant Stopped",
+          description: "Stopped listening",
+        });
       } else {
-        setAutoListenMode(true);
         await startListening();
         toast({
           title: "Voice Assistant Active",
@@ -60,181 +90,132 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
         });
       }
     } catch (err) {
-      console.error("Microphone error:", err);
       toast({
-        variant: "destructive",
-        title: "Microphone Error",
-        description: "Please make sure your microphone is connected and you've granted permission to use it.",
+        title: "Error",
+        description: "Could not access microphone. Please ensure microphone permissions are granted.",
+        variant: "destructive"
       });
     }
   };
-
-  const toggleAutoListenMode = () => {
-    setAutoListenMode(prev => !prev);
+  
+  const handleVoiceOutputToggle = () => {
+    toggleVoiceOutput();
+    
     toast({
-      title: autoListenMode ? "Continuous Mode Disabled" : "Continuous Mode Enabled",
-      description: autoListenMode 
-        ? "You'll need to click the microphone button for each question" 
-        : "I'll automatically listen for your next question after responding",
-    });
-  };
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [transcriptHistory]);
-
-  const handleAudioToggle = () => {
-    toggleAudio();
-    toast({
-      title: audioEnabled ? "Voice Response Disabled" : "Voice Response Enabled",
-      description: audioEnabled 
+      title: voiceOutputEnabled ? "Voice Output Disabled" : "Voice Output Enabled",
+      description: voiceOutputEnabled 
         ? "The assistant will respond with text only" 
         : "The assistant will respond with voice and text",
     });
   };
 
-  // Display initial venue info when the component mounts and no conversation yet
+  // Play initial greeting when the component mounts
   useEffect(() => {
-    if (transcriptHistory.length === 0 && venue) {
+    if (venue && !initialGreetingPlayed && transcriptHistory.length === 0) {
       const initialInfo = `Welcome! I'm your virtual assistant for ${venue.name}. This ${venue.category || 'venue'} is located in ${venue.city} and can accommodate ${venue.capacity.min}-${venue.capacity.max} people. How can I help you today?`;
       
       setTranscriptHistory([{ text: initialInfo, isUser: false }]);
+      setInitialGreetingPlayed(true);
+      
+      // Start listening automatically after greeting
+      if (autoListenMode) {
+        setTimeout(() => {
+          startListening().catch(err => {
+            console.error("Failed to auto-start listening:", err);
+          });
+        }, 3000);
+      }
     }
-  }, [venue, transcriptHistory.length]);
+  }, [venue, initialGreetingPlayed, transcriptHistory.length, autoListenMode, startListening]);
+
+  // If venue is not available, show loading or error state
+  if (!venue) {
+    return (
+      <div className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4 mt-6">
+        <h3 className="text-lg font-medium mb-2">Voice Assistant</h3>
+        <p className="text-findvenue-text-muted">Venue information is loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4 mt-6">
       <div className="flex justify-between items-center mb-4">
-        <div>
-          <h3 className="font-semibold text-lg mb-1">Voice Assistant</h3>
-          <p className="text-sm text-findvenue-text-muted">
-            Speak to get information about {venue.name}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isListening && (
-            <Badge className="bg-green-500 text-white animate-pulse">
-              Listening...
-            </Badge>
-          )}
-          {isProcessing && (
-            <Badge className="bg-blue-500 text-white">
-              Processing...
-            </Badge>
-          )}
-          {autoListenMode && (
-            <Badge className="bg-purple-500 text-white">
-              Continuous Mode
-            </Badge>
-          )}
+        <h3 className="text-lg font-medium">Voice Assistant</h3>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className={`${voiceOutputEnabled ? 'border-green-500' : 'border-white/10'}`}
+            onClick={handleVoiceOutputToggle}
+          >
+            {voiceOutputEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant={isListening ? "default" : "outline"}
+            size="sm"
+            onClick={handleMicToggle}
+            className={isListening ? "bg-green-600 hover:bg-green-700" : "border-white/10"}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isListening ? (
+              <Mic className="h-4 w-4" />
+            ) : (
+              <MicOff className="h-4 w-4" />
+            )}
+          </Button>
         </div>
       </div>
       
-      <div className="max-h-[50vh] overflow-y-auto mb-4 p-2 bg-findvenue-surface/20 rounded-lg">
+      <Separator className="mb-4" />
+      
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm text-findvenue-text-muted">Auto-listen mode</span>
+        <Switch 
+          checked={autoListenMode} 
+          onCheckedChange={setAutoListenMode} 
+        />
+      </div>
+      
+      <ScrollArea className="h-60 mb-4 rounded-md border border-white/10 p-4">
         {transcriptHistory.length === 0 ? (
-          <div className="text-center py-6">
-            <p className="text-findvenue-text-muted mb-2">
-              Click the microphone button and ask a question about {venue.name}
-            </p>
-            <p className="text-sm text-findvenue-text-muted">
-              Try asking: "What are the amenities?", "How many people can it host?", or "Tell me about the venue"
-            </p>
+          <div className="text-center py-10 text-findvenue-text-muted">
+            <p>No conversation history yet.</p>
+            <p className="text-xs mt-2">Click the microphone to start talking to your AI venue assistant</p>
           </div>
         ) : (
           <div className="space-y-4">
             {transcriptHistory.map((item, index) => (
               <div 
                 key={index} 
-                className={`flex ${item.isUser ? 'justify-end' : 'justify-start'}`}
+                className={`p-3 rounded-lg text-sm ${
+                  item.isUser 
+                    ? 'bg-findvenue/20 ml-8' 
+                    : 'bg-gray-700/30 mr-8'
+                }`}
               >
-                <div 
-                  className={`px-4 py-2 rounded-lg max-w-[85%] ${
-                    item.isUser 
-                      ? 'bg-findvenue text-white rounded-tr-none' 
-                      : 'bg-findvenue-surface/50 text-findvenue-text rounded-tl-none'
-                  }`}
-                >
-                  {item.text}
-                </div>
+                <p className="text-xs font-medium mb-1">{item.isUser ? 'You' : 'Assistant'}</p>
+                <p>{item.text}</p>
               </div>
             ))}
-            {isProcessing && (
-              <div className="flex justify-start">
-                <div className="px-4 py-2 rounded-lg bg-findvenue-surface/50 text-findvenue-text rounded-tl-none flex items-center">
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Processing your question...
-                </div>
-              </div>
-            )}
+            <div ref={messagesEndRef} />
           </div>
         )}
-        {error && (
-          <div className="mt-2 p-2 bg-red-500/10 text-red-500 rounded text-sm">
-            Error: {error}
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      <div className="flex justify-between">
-        <div className="flex gap-2">
-          {transcriptHistory.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={clearHistory}
-              disabled={isProcessing}
-              title="Clear conversation"
-              className="border-white/10 bg-findvenue-surface/50 hover:bg-findvenue-surface"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={handleAudioToggle}
-            title={audioEnabled ? "Disable voice responses" : "Enable voice responses"}
-            className="border-white/10 bg-findvenue-surface/50 hover:bg-findvenue-surface"
-          >
-            {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={toggleAutoListenMode}
-            title={autoListenMode ? "Disable continuous mode" : "Enable continuous mode"}
-            className={`border-white/10 ${
-              autoListenMode 
-                ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30' 
-                : 'bg-findvenue-surface/50 hover:bg-findvenue-surface'
-            }`}
-          >
-            {autoListenMode ? "Auto Listen: On" : "Auto Listen: Off"}
-          </Button>
+      </ScrollArea>
+      
+      {isListening && (
+        <div className="text-center py-2 px-4 bg-findvenue/10 rounded-md text-sm border border-dashed border-white/10 animate-pulse">
+          Listening... {transcript ? `"${transcript}"` : "Say something about this venue"}
         </div>
-        
-        <Button
-          onClick={handleMicClick}
-          disabled={isProcessing}
-          className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-findvenue hover:bg-findvenue-dark"}
-        >
-          {isListening ? (
-            <>
-              <MicOff className="mr-2 h-5 w-5" />
-              Stop Listening
-            </>
-          ) : (
-            <>
-              <Mic className="mr-2 h-5 w-5" />
-              Start Listening
-            </>
-          )}
-        </Button>
-      </div>
+      )}
+      
+      {isSpeaking && (
+        <div className="text-center py-2 px-4 bg-green-600/10 rounded-md text-sm border border-dashed border-green-500/30 mt-2">
+          Speaking... <Volume2 className="h-3 w-3 inline-block ml-1 animate-pulse" />
+        </div>
+      )}
     </div>
   );
 };
