@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Loader2, User, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
@@ -15,9 +15,10 @@ interface VenueSpecificVoiceAssistantProps {
 
 const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
-  const [autoListenMode, setAutoListenMode] = useState(true); // Set to true by default
+  const [autoListenMode, setAutoListenMode] = useState(true);
   const [initialGreetingPlayed, setInitialGreetingPlayed] = useState(false);
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true);
+  const [lastTranscript, setLastTranscript] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -34,15 +35,16 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     venue,
     autoRestart: false,
     onTranscript: (text) => {
-      // Just for tracking, we don't need to do anything with it here
+      // Save the latest transcript to prevent repetition
+      setLastTranscript(text);
     },
     onAnswer: (response) => {
-      // Add the user's question to the history
-      if (transcript) {
-        setTranscriptHistory(prev => [...prev, { text: transcript, isUser: true }]);
+      // Only add the user's transcript if it's different from the last one added
+      if (lastTranscript && !transcriptHistory.some(item => item.isUser && item.text === lastTranscript)) {
+        setTranscriptHistory(prev => [...prev, { text: lastTranscript, isUser: true }]);
       }
       
-      // Add the assistant's response to the history
+      // Add the assistant's response
       setTranscriptHistory(prev => [...prev, { text: response, isUser: false }]);
       
       // If auto-listen mode is enabled, restart listening once response is spoken
@@ -90,7 +92,9 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
         await startListening();
         toast({
           title: "Voice Assistant Active",
-          description: "Continuous mode enabled - I'll keep listening after each response",
+          description: autoListenMode 
+            ? "Continuous mode enabled - I'll keep listening after each response" 
+            : "Press the mic button again when you finish speaking",
         });
       }
     } catch (err) {
@@ -195,14 +199,21 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
             {transcriptHistory.map((item, index) => (
               <div 
                 key={index} 
-                className={`p-3 rounded-lg text-sm ${
+                className={`flex gap-2 p-3 rounded-lg text-sm ${
                   item.isUser 
                     ? 'bg-findvenue/20 ml-8' 
                     : 'bg-gray-700/30 mr-8'
                 }`}
               >
-                <p className="text-xs font-medium mb-1">{item.isUser ? 'You' : 'Assistant'}</p>
-                <p>{item.text}</p>
+                {item.isUser ? (
+                  <User className="h-4 w-4 mt-1 shrink-0" />
+                ) : (
+                  <Bot className="h-4 w-4 mt-1 shrink-0" />
+                )}
+                <div>
+                  <p className="text-xs font-medium mb-1">{item.isUser ? 'You' : 'Assistant'}</p>
+                  <p>{item.text}</p>
+                </div>
               </div>
             ))}
             <div ref={messagesEndRef} />

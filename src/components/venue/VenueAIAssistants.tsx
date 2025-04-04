@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import VenueSpecificVoiceAssistant from '@/components/voice/VenueSpecificVoiceAssistant';
 import VenueSpecificChatBot from '@/components/chat/VenueSpecificChatBot';
 import { Venue } from '@/hooks/useSupabaseVenues';
+import { Mic, MessageSquare } from 'lucide-react';
 
 interface VenueAIAssistantsProps {
   venue: Venue | null;
@@ -18,8 +19,14 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
       
       <Tabs defaultValue="voice" onValueChange={setActiveTab} value={activeTab}>
         <TabsList className="grid w-full grid-cols-2 mb-4">
-          <TabsTrigger value="voice">Voice Assistant</TabsTrigger>
-          <TabsTrigger value="chat">Chat Assistant</TabsTrigger>
+          <TabsTrigger value="voice" className="flex items-center gap-2">
+            <Mic className="h-4 w-4" />
+            <span>Voice Assistant</span>
+          </TabsTrigger>
+          <TabsTrigger value="chat" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            <span>Chat Assistant</span>
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="voice">
