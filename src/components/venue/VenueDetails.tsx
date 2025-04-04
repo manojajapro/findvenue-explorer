@@ -304,10 +304,10 @@ const VenueDetails = () => {
   };
   
   const socialLinks = {
-    facebook: venue?.ownerInfo?.facebook || '',
-    twitter: venue?.ownerInfo?.twitter || '',
-    instagram: venue?.ownerInfo?.instagram || '',
-    linkedin: venue?.ownerInfo?.linkedin || ''
+    facebook: venue?.ownerInfo?.socialLinks?.facebook || '',
+    twitter: venue?.ownerInfo?.socialLinks?.twitter || '',
+    instagram: venue?.ownerInfo?.socialLinks?.instagram || '',
+    linkedin: venue?.ownerInfo?.socialLinks?.linkedin || ''
   };
   
   if (loading) {
