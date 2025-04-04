@@ -33,6 +33,8 @@ export default function VenueBookingTabs({
   const [bookedTimeSlots, setBookedTimeSlots] = useState<Record<string, string[]>>({});
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [fullyBookedDates, setFullyBookedDates] = useState<string[]>([]);
+  const [hourlyBookedDates, setHourlyBookedDates] = useState<string[]>([]);
+  const [dayBookedDates, setDayBookedDates] = useState<string[]>([]);
 
   // Fetch existing bookings for this venue to disable already booked dates/times
   useEffect(() => {
@@ -54,6 +56,8 @@ export default function VenueBookingTabs({
         const dates: string[] = [];
         const timeSlots: Record<string, string[]> = {};
         const fullyBooked: string[] = [];
+        const hourlyBooked: string[] = [];
+        const dayBooked: string[] = [];
         
         // Group bookings by date
         const bookingsByDate: Record<string, any[]> = {};
@@ -76,6 +80,7 @@ export default function VenueBookingTabs({
           if (fullDayBookings.length > 0) {
             dates.push(dateStr);
             fullyBooked.push(dateStr);
+            dayBooked.push(dateStr);
             
             // Add all time slots as booked for this date to prevent hourly bookings
             if (!timeSlots[dateStr]) {
@@ -88,20 +93,28 @@ export default function VenueBookingTabs({
               timeSlots[dateStr] = [];
             }
             
+            let totalBookedHours = 0;
+            
             bookings.forEach(booking => {
               const timeSlot = `${booking.start_time} - ${booking.end_time}`;
               if (!timeSlots[dateStr].includes(timeSlot)) {
                 timeSlots[dateStr].push(timeSlot);
               }
+              
+              // Calculate booked hours
+              const startHour = parseInt(booking.start_time.split(':')[0]);
+              const endHour = parseInt(booking.end_time.split(':')[0]);
+              totalBookedHours += (endHour - startHour);
             });
             
-            // Check if all time slots are booked or if there are enough bookings to 
-            // make the day unavailable for full-day booking
-            const bookedHours = getBookedHoursCount(bookings);
+            // If there are any hourly bookings, mark the date
+            if (bookings.length > 0) {
+              hourlyBooked.push(dateStr);
+            }
             
             // If more than 6 hours are booked (considering 13 business hours), 
             // consider the day unavailable for full-day booking
-            if (bookedHours >= 6) {
+            if (totalBookedHours >= 6) {
               fullyBooked.push(dateStr);
             }
           }
@@ -110,6 +123,8 @@ export default function VenueBookingTabs({
         setBookedDates(dates);
         setBookedTimeSlots(timeSlots);
         setFullyBookedDates(fullyBooked);
+        setHourlyBookedDates(hourlyBooked);
+        setDayBookedDates(dayBooked);
       } catch (err) {
         console.error('Error processing bookings data:', err);
       } finally {
@@ -129,19 +144,6 @@ export default function VenueBookingTabs({
       slots.push(`${i.toString().padStart(2, '0')}:00`);
     }
     return slots;
-  };
-  
-  // Helper function to count booked hours
-  const getBookedHoursCount = (bookings: any[]): number => {
-    let bookedHours = 0;
-    
-    bookings.forEach(booking => {
-      const startHour = parseInt(booking.start_time.split(':')[0]);
-      const endHour = parseInt(booking.end_time.split(':')[0]);
-      bookedHours += (endHour - startHour);
-    });
-    
-    return bookedHours;
   };
 
   // Don't show booking tabs for the venue owner
@@ -180,6 +182,7 @@ export default function VenueBookingTabs({
             ownerName={ownerName}
             bookedTimeSlots={bookedTimeSlots}
             isLoading={isLoadingBookings}
+            fullyBookedDates={[...fullyBookedDates, ...dayBookedDates]} // Disable dates with full-day bookings for hourly booking
           />
         </TabsContent>
         
@@ -190,7 +193,7 @@ export default function VenueBookingTabs({
             pricePerHour={pricePerHour}
             minCapacity={minCapacity}
             maxCapacity={maxCapacity}
-            bookedDates={fullyBookedDates}
+            bookedDates={[...fullyBookedDates, ...hourlyBookedDates]} // Disable dates with hourly bookings for day booking
             isLoading={isLoadingBookings}
           />
         </TabsContent>

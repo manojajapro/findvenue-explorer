@@ -13,7 +13,8 @@ import {
   Users, 
   CalendarCheck, 
   BadgeInfo, 
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import {
   Popover,
@@ -32,6 +33,15 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 interface BookingFormProps {
   venueId: string;
@@ -41,9 +51,9 @@ interface BookingFormProps {
   ownerName: string;
   bookedTimeSlots?: Record<string, string[]>;
   isLoading?: boolean;
+  fullyBookedDates?: string[];
 }
 
-// Time slots available for booking
 const TIME_SLOTS = [
   '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', 
   '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
@@ -56,7 +66,8 @@ const BookingForm = ({
   ownerId,
   ownerName,
   bookedTimeSlots = {},
-  isLoading = false
+  isLoading = false,
+  fullyBookedDates = []
 }: BookingFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -73,26 +84,33 @@ const BookingForm = ({
   const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([]);
   const [isBooking, setIsBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [showUnavailableDialog, setShowUnavailableDialog] = useState(false);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   
-  // Reset form when changing date
   useEffect(() => {
     if (date) {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      if (fullyBookedDates.includes(dateStr)) {
+        setShowUnavailableDialog(true);
+        setDate(undefined);
+        return;
+      }
+      
       setDisplayDate(format(date, 'EEEE, MMMM d, yyyy'));
       setStartTime('');
       setEndTime('');
       
-      // Get available start times for the selected date
-      updateAvailableStartTimes(format(date, 'yyyy-MM-dd'));
+      updateAvailableStartTimes(dateStr);
     } else {
       setDisplayDate('');
       setAvailableStartTimes([]);
       setAvailableEndTimes([]);
     }
-  }, [date, bookedTimeSlots]);
+  }, [date, bookedTimeSlots, fullyBookedDates]);
   
-  // Update end time options when start time changes
   useEffect(() => {
-    if (startTime) {
+    if (startTime && date) {
       updateAvailableEndTimes(startTime);
     } else {
       setEndTime('');
@@ -100,7 +118,6 @@ const BookingForm = ({
     }
   }, [startTime, date]);
   
-  // Calculate price and duration when start/end times change
   useEffect(() => {
     if (startTime && endTime) {
       const start = parseInt(startTime.split(':')[0]);
@@ -115,39 +132,37 @@ const BookingForm = ({
     }
   }, [startTime, endTime, pricePerHour]);
   
-  // Update available start times based on bookings
   const updateAvailableStartTimes = (dateStr: string) => {
     const bookedSlots = bookedTimeSlots[dateStr] || [];
     
-    // If all time slots for the day are booked, we'll return an empty array
     if (bookedSlots.length >= TIME_SLOTS.length - 1) {
       setAvailableStartTimes([]);
       return;
     }
     
     const bookedStartTimes = new Set();
+    const bookedEndTimes = new Set();
     
-    // Extract start times from booked slots to exclude them
     bookedSlots.forEach(slot => {
-      const [start] = slot.split(' - ');
-      bookedStartTimes.add(start);
+      const [start, end] = slot.split(' - ');
+      
+      for (let hour = parseInt(start.split(':')[0]); hour < parseInt(end.split(':')[0]); hour++) {
+        const hourStr = `${hour.toString().padStart(2, '0')}:00`;
+        bookedStartTimes.add(hourStr);
+      }
     });
     
-    // Filter out already booked start times
     const available = TIME_SLOTS.filter(time => {
-      // Don't show past times for today
       if (date && isSameDay(date, new Date()) && isPastTime(time)) {
         return false;
       }
       
-      // Don't show already booked times
       return !bookedStartTimes.has(time);
     });
     
     setAvailableStartTimes(available);
   };
   
-  // Update available end times based on start time
   const updateAvailableEndTimes = (start: string) => {
     if (!date || !start) return;
     
@@ -156,8 +171,7 @@ const BookingForm = ({
     const startHour = parseInt(start.split(':')[0]);
     const available: string[] = [];
     
-    // Find the next booked time after the selected start time
-    let nextBookedTime = 24; // Default to end of day
+    let nextBookedTime = 22;
     
     bookedSlots.forEach(slot => {
       const [bookedStart] = slot.split(' - ');
@@ -168,7 +182,6 @@ const BookingForm = ({
       }
     });
     
-    // Add available end times (must be after start time and before next booking)
     for (let i = startHour + 1; i <= Math.min(22, nextBookedTime); i++) {
       available.push(`${i.toString().padStart(2, '0')}:00`);
     }
@@ -176,21 +189,58 @@ const BookingForm = ({
     setAvailableEndTimes(available);
   };
   
-  // Check if time is in the past
   const isPastTime = (time: string) => {
     const now = new Date();
     const [hour] = time.split(':').map(Number);
     return now.getHours() >= hour;
   };
   
-  // Check if day is same as current date
   const isSameDay = (date1: Date, date2: Date) => {
     return date1.getDate() === date2.getDate() &&
       date1.getMonth() === date2.getMonth() &&
       date1.getFullYear() === date2.getFullYear();
   };
+  
+  const checkTimeSlotAvailability = async (dateStr: string, startTime: string, endTime: string) => {
+    setIsCheckingAvailability(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('venue_id', venueId)
+        .eq('booking_date', dateStr)
+        .in('status', ['confirmed', 'pending']);
+        
+      if (error) throw error;
+      
+      const hasFullDayBooking = data.some(booking => 
+        booking.start_time === '09:00' && booking.end_time === '22:00'
+      );
+      
+      if (hasFullDayBooking) {
+        return { isAvailable: false };
+      }
+      
+      const startHour = parseInt(startTime.split(':')[0]);
+      const endHour = parseInt(endTime.split(':')[0]);
+      
+      const hasConflict = data.some(booking => {
+        const bookingStartHour = parseInt(booking.start_time.split(':')[0]);
+        const bookingEndHour = parseInt(booking.end_time.split(':')[0]);
+        
+        return (startHour < bookingEndHour && endHour > bookingStartHour);
+      });
+      
+      return { isAvailable: !hasConflict };
+    } catch (error) {
+      console.error('Error checking time slot availability:', error);
+      return { isAvailable: false };
+    } finally {
+      setIsCheckingAvailability(false);
+    }
+  };
 
-  // Handler for submitting the booking
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -217,34 +267,14 @@ const BookingForm = ({
       
       const formattedDate = format(date, 'yyyy-MM-dd');
       
-      // Check if the time slot is available (not booked already)
-      const { data: existingBookings, error: checkError } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('venue_id', venueId)
-        .eq('booking_date', formattedDate)
-        .in('status', ['confirmed', 'pending'])
-        .order('created_at', { ascending: false });
-        
-      if (checkError) throw checkError;
+      const { isAvailable } = await checkTimeSlotAvailability(formattedDate, startTime, endTime);
       
-      // Check if there's any time conflict with existing bookings
-      const hasConflict = existingBookings?.some(booking => {
-        const bookingStartHour = parseInt(booking.start_time.split(':')[0]);
-        const bookingEndHour = parseInt(booking.end_time.split(':')[0]);
-        const newStartHour = parseInt(startTime.split(':')[0]);
-        const newEndHour = parseInt(endTime.split(':')[0]);
-        
-        // Check if there's an overlap
-        return (
-          (newStartHour < bookingEndHour && newEndHour > bookingStartHour) ||
-          (newStartHour === bookingStartHour) ||
-          (newEndHour === bookingEndHour)
-        );
-      });
-      
-      // Auto-confirm if no conflict, otherwise set as pending
-      const bookingStatus = hasConflict ? 'pending' : 'confirmed';
+      if (!isAvailable) {
+        setShowUnavailableDialog(true);
+        setDate(undefined);
+        setIsBooking(false);
+        return;
+      }
       
       const { data, error } = await supabase
         .from('bookings')
@@ -259,25 +289,23 @@ const BookingForm = ({
             guests,
             total_price: totalPrice,
             special_requests: specialRequests || null,
-            status: bookingStatus
+            status: 'confirmed'
           }
         ])
         .select();
       
       if (error) throw error;
       
-      // Show success message and reset form
       setBookingSuccess(true);
       
-      // Create notification for venue owner
       await supabase
         .from('notifications')
         .insert([
           {
             user_id: ownerId,
             type: 'booking_request',
-            title: bookingStatus === 'confirmed' ? 'New Confirmed Booking' : 'New Booking Request',
-            message: `You have a new ${bookingStatus} booking for ${venueName} on ${format(date, 'MMM d, yyyy')}`,
+            title: 'New Confirmed Booking',
+            message: `You have a new confirmed booking for ${venueName} on ${format(date, 'MMM d, yyyy')} from ${startTime} to ${endTime}`,
             data: {
               venue_id: venueId,
               venue_name: venueName,
@@ -300,7 +328,6 @@ const BookingForm = ({
     }
   };
   
-  // Reset the form
   const handleReset = () => {
     setDate(undefined);
     setStartTime('');
@@ -310,25 +337,15 @@ const BookingForm = ({
     setBookingSuccess(false);
   };
   
-  // Disable past dates and fully booked dates
   const disabledDays = (day: Date) => {
-    // Disable past days
     if (isBefore(day, startOfDay(new Date()))) {
       return true;
     }
     
-    // Disable fully booked days
     const dateStr = format(day, 'yyyy-MM-dd');
-    const bookedSlots = bookedTimeSlots[dateStr] || [];
-    
-    // If more than 80% of the time slots are booked, consider the day fully booked
-    // This ensures that days with only 1-2 hours available aren't shown as available
-    const isFullyBooked = bookedSlots.length >= TIME_SLOTS.length * 0.8;
-    
-    return isFullyBooked;
+    return fullyBookedDates.includes(dateStr);
   };
   
-  // Show success confirmation
   if (bookingSuccess) {
     return (
       <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
@@ -336,7 +353,7 @@ const BookingForm = ({
           <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
           <h3 className="text-xl font-semibold mb-2">Booking Successful!</h3>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Your booking for {venueName} on {displayDate} from {startTime} to {endTime} has been {startTime && endTime ? 'automatically confirmed' : 'sent to the venue owner for confirmation'}.
+            Your booking for {venueName} on {displayDate} from {startTime} to {endTime} has been automatically confirmed.
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             You can view and manage your booking in your bookings page.
@@ -352,7 +369,6 @@ const BookingForm = ({
     );
   }
   
-  // Show loading state
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -554,6 +570,26 @@ const BookingForm = ({
           </CardFooter>
         </Card>
       )}
+      
+      <Dialog open={showUnavailableDialog} onOpenChange={setShowUnavailableDialog}>
+        <DialogContent className="sm:max-w-md bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2 text-red-500" />
+              Time Slot Unavailable
+            </DialogTitle>
+          </DialogHeader>
+          <DialogDescription className="text-red-700 dark:text-red-300">
+            Sorry, this time slot is already booked or has been reserved by another user.
+            Please select a different date or time.
+          </DialogDescription>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" className="w-full">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 };
