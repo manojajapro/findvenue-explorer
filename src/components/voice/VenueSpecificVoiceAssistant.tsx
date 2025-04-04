@@ -13,7 +13,7 @@ type VenueSpecificVoiceAssistantProps = {
 
 const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
-  const [autoListenMode, setAutoListenMode] = useState(false);
+  const [autoListenMode, setAutoListenMode] = useState(true); // Set to true by default
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -56,9 +56,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
         await startListening();
         toast({
           title: "Voice Assistant Active",
-          description: autoListenMode 
-            ? "Continuous mode enabled - I'll keep listening after each response" 
-            : "Speak clearly to ask about this venue",
+          description: "Continuous mode enabled - I'll keep listening after each response",
         });
       }
     } catch (err) {
@@ -94,6 +92,15 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
         : "The assistant will respond with voice and text",
     });
   };
+
+  // Display initial venue info when the component mounts and no conversation yet
+  useEffect(() => {
+    if (transcriptHistory.length === 0 && venue) {
+      const initialInfo = `Welcome! I'm your virtual assistant for ${venue.name}. This ${venue.category || 'venue'} is located in ${venue.city} and can accommodate ${venue.capacity.min}-${venue.capacity.max} people. How can I help you today?`;
+      
+      setTranscriptHistory([{ text: initialInfo, isUser: false }]);
+    }
+  }, [venue, transcriptHistory.length]);
 
   return (
     <div className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4 mt-6">

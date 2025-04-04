@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import VenueSpecificVoiceAssistant from '@/components/voice/VenueSpecificVoiceAssistant';
+import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -185,8 +185,8 @@ const VenueDetails = () => {
         </>
       )}
 
-      {/* Voice Assistant for the venue */}
-      <VenueSpecificVoiceAssistant venue={venue} />
+      {/* AI Assistants for the venue */}
+      <VenueAIAssistants venue={venue} />
     </div>
   );
 }
