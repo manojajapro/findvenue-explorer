@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -7,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { format, addDays, isBefore, isAfter, parse, startOfDay } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { 
   CalendarIcon, 
   Clock, 
