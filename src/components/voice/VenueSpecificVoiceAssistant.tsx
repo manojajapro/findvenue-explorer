@@ -17,6 +17,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
   const [autoListenMode, setAutoListenMode] = useState(true); // Set to true by default
   const [initialGreetingPlayed, setInitialGreetingPlayed] = useState(false);
+  const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -26,13 +27,16 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     startListening,
     stopListening,
     isProcessing,
-    isSpeaking,
-    toggleVoiceOutput,
-    voiceOutputEnabled,
+    audioEnabled,
+    toggleAudio,
     error
   } = useVenueVoiceAssistant({
     venue,
-    onResult: (response) => {
+    autoRestart: false,
+    onTranscript: (text) => {
+      // Just for tracking, we don't need to do anything with it here
+    },
+    onAnswer: (response) => {
       // Add the user's question to the history
       if (transcript) {
         setTranscriptHistory(prev => [...prev, { text: transcript, isUser: true }]);
@@ -99,11 +103,12 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   };
   
   const handleVoiceOutputToggle = () => {
-    toggleVoiceOutput();
+    toggleAudio();
+    setVoiceOutputEnabled(!audioEnabled);
     
     toast({
-      title: voiceOutputEnabled ? "Voice Output Disabled" : "Voice Output Enabled",
-      description: voiceOutputEnabled 
+      title: audioEnabled ? "Voice Output Disabled" : "Voice Output Enabled",
+      description: audioEnabled 
         ? "The assistant will respond with text only" 
         : "The assistant will respond with voice and text",
     });
@@ -211,9 +216,9 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
         </div>
       )}
       
-      {isSpeaking && (
+      {isProcessing && (
         <div className="text-center py-2 px-4 bg-green-600/10 rounded-md text-sm border border-dashed border-green-500/30 mt-2">
-          Speaking... <Volume2 className="h-3 w-3 inline-block ml-1 animate-pulse" />
+          Processing... <Loader2 className="h-3 w-3 inline-block ml-1 animate-spin" />
         </div>
       )}
     </div>
