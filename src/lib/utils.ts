@@ -80,12 +80,12 @@ export function getAvailableTimeSlots(date: Date, existingBookings: any[]): stri
 }
 
 /**
- * Generate time slots from 9:00 to 22:00
+ * Generate time slots for 24 hours
  * @returns Array of time slots
  */
 export function generateTimeSlots(): string[] {
   const slots = [];
-  for (let i = 9; i <= 21; i++) {
+  for (let i = 0; i < 24; i++) {
     slots.push(`${i.toString().padStart(2, '0')}:00`);
   }
   return slots;

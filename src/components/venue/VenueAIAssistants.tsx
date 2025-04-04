@@ -20,7 +20,7 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
   return (
     <>
       {/* Fixed positioned AI assistant buttons */}
-      <div className="fixed right-4 bottom-4 flex flex-col gap-2 z-50">
+      <div className="fixed left-4 bottom-4 flex flex-col gap-2 z-50">
         <Button
           onClick={() => {
             setIsOpen(true);
@@ -46,9 +46,12 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
         </Button>
       </div>
       
-      {/* Dialog for AI assistants */}
+      {/* Dialog for AI assistants - position updated to left side */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden">
+        <DialogContent 
+          className="sm:max-w-[425px] p-0 overflow-hidden" 
+          side="left"
+        >
           <div className="p-4 pb-0">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-semibold">Venue Assistant</h2>

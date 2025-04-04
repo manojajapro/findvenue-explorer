@@ -5,7 +5,20 @@ import BookingForm from '@/components/venue/BookingForm';
 import MultiDayBookingForm from '@/components/venue/MultiDayBookingForm';
 import { Calendar, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
+
+// Use the correct import
+export const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL || '',
+  import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      storage: localStorage
+    }
+  }
+);
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -71,12 +84,20 @@ export default function VenueBookingTabs({
         Object.entries(bookingsByDate).forEach(([dateStr, bookings]) => {
           // Track day bookings (full day)
           const fullDayBookings = bookings.filter(b => 
-            b.start_time === '09:00' && b.end_time === '22:00'
+            b.start_time === '00:00' && b.end_time === '23:59'
           );
           
           if (fullDayBookings.length > 0) {
             dates.push(dateStr);
             fullyBooked.push(dateStr);
+            
+            // Add all time slots as booked for this date to prevent hourly bookings
+            if (!timeSlots[dateStr]) {
+              timeSlots[dateStr] = [];
+            }
+            allTimeSlots.forEach(slot => {
+              timeSlots[dateStr].push(`${slot} - ${slot}`);
+            });
           } else {
             // Track hourly bookings
             if (!timeSlots[dateStr]) {
@@ -92,7 +113,7 @@ export default function VenueBookingTabs({
             
             // Check if all time slots are booked
             const bookedTimeCount = getBookedHoursCount(bookings);
-            if (bookedTimeCount >= 8) { // If 8+ hours are booked, consider it fully booked
+            if (bookedTimeCount >= 18) { // If 18+ hours are booked (full day is 24 hours now), consider it fully booked
               fullyBooked.push(dateStr);
             }
           }
@@ -113,10 +134,10 @@ export default function VenueBookingTabs({
     }
   }, [venueId]);
   
-  // Helper function to generate time slots
+  // Helper function to generate time slots - Updated for 24 hours
   const generateTimeSlots = (): string[] => {
     const slots = [];
-    for (let i = 9; i <= 21; i++) {
+    for (let i = 0; i < 24; i++) {
       slots.push(`${i.toString().padStart(2, '0')}:00`);
     }
     return slots;
