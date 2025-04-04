@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart3, Calendar, DollarSign, Users, PlusCircle, Edit } from 'lucide-react';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 import { Helmet } from 'react-helmet';
+import { useToast } from '@/hooks/use-toast';
 
 const MyVenues = () => {
   const { user, isVenueOwner, profile } = useAuth();
@@ -27,6 +27,7 @@ const MyVenues = () => {
     revenue: 0
   });
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
