@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,7 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Calendar, DollarSign, Users, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { 
+  BarChart3, Calendar, DollarSign, Users, PlusCircle, Edit, 
+  Trash2, Activity, ChevronLeft, ChevronRight
+} from 'lucide-react';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 import { Helmet } from 'react-helmet';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +31,8 @@ const MyVenues = () => {
     revenue: 0
   });
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -266,6 +272,85 @@ const MyVenues = () => {
     }
   };
 
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const handlePrevMonth = () => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() - 1);
+      return newDate;
+    });
+  };
+
+  const handleNextMonth = () => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() + 1);
+      return newDate;
+    });
+  };
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    
+    // Create days array
+    const days = [];
+    
+    // Add previous month's days
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      const prevMonthDate = new Date(year, month, -i);
+      days.unshift({
+        date: prevMonthDate.getDate(),
+        fullDate: prevMonthDate,
+        isCurrentMonth: false
+      });
+    }
+    
+    // Add current month's days
+    for (let i = 1; i <= daysInMonth; i++) {
+      const currentDate = new Date(year, month, i);
+      days.push({
+        date: i,
+        fullDate: currentDate,
+        isCurrentMonth: true,
+        isToday: currentDate.toDateString() === new Date().toDateString()
+      });
+    }
+    
+    // Add next month's days to fill remaining cells
+    const remainingCells = 42 - days.length; // 6 rows of 7 days
+    for (let i = 1; i <= remainingCells; i++) {
+      const nextMonthDate = new Date(year, month + 1, i);
+      days.push({
+        date: i,
+        fullDate: nextMonthDate,
+        isCurrentMonth: false
+      });
+    }
+    
+    return days;
+  };
+
+  const getBookingsForDate = (date: Date) => {
+    const dateString = date.toISOString().split('T')[0];
+    return recentBookings.filter(booking => booking.booking_date === dateString);
+  };
+
+  const getTodayBookings = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return recentBookings.filter(booking => booking.booking_date === today);
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen pt-28 pb-16 flex items-center justify-center">
@@ -303,7 +388,7 @@ const MyVenues = () => {
         <meta name="description" content="Manage your venues, bookings and revenue in one place." />
       </Helmet>
       
-      <div className="min-h-screen pt-24 pb-16">
+      <div className="min-h-screen pt-24 pb-16 bg-gradient-to-b from-[#0f172a] to-[#020617]">
         <div className="container mx-auto px-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
             <div>
@@ -329,15 +414,15 @@ const MyVenues = () => {
             onValueChange={handleTabChange} 
             className="space-y-6"
           >
-            <TabsList className="grid grid-cols-3 w-full max-w-md mx-auto">
-              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-              <TabsTrigger value="venues">My Venues</TabsTrigger>
-              <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsList className="flex justify-center mb-6 bg-findvenue-surface/50 p-1 rounded-lg">
+              <TabsTrigger value="dashboard" className="flex-1">Dashboard</TabsTrigger>
+              <TabsTrigger value="venues" className="flex-1">My Venues</TabsTrigger>
+              <TabsTrigger value="bookings" className="flex-1">Bookings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="glass-card border-white/10 hover:border-white/20 transition-all">
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 hover:border-white/20 transition-all">
                   <CardContent className="flex items-center p-6">
                     <div className="mr-4 p-3 rounded-full bg-findvenue/10">
                       <BarChart3 className="h-6 w-6 text-findvenue" />
@@ -349,10 +434,10 @@ const MyVenues = () => {
                   </CardContent>
                 </Card>
                 
-                <Card className="glass-card border-white/10 hover:border-white/20 transition-all">
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 hover:border-white/20 transition-all">
                   <CardContent className="flex items-center p-6">
                     <div className="mr-4 p-3 rounded-full bg-indigo-500/10">
-                      <Calendar className="h-6 w-6 text-indigo-500" />
+                      <Activity className="h-6 w-6 text-indigo-500" />
                     </div>
                     <div>
                       <p className="text-sm text-findvenue-text-muted">Active Bookings</p>
@@ -361,7 +446,7 @@ const MyVenues = () => {
                   </CardContent>
                 </Card>
                 
-                <Card className="glass-card border-white/10 hover:border-white/20 transition-all">
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 hover:border-white/20 transition-all">
                   <CardContent className="flex items-center p-6">
                     <div className="mr-4 p-3 rounded-full bg-green-500/10">
                       <Users className="h-6 w-6 text-green-500" />
@@ -373,7 +458,7 @@ const MyVenues = () => {
                   </CardContent>
                 </Card>
                 
-                <Card className="glass-card border-white/10 hover:border-white/20 transition-all">
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 hover:border-white/20 transition-all">
                   <CardContent className="flex items-center p-6">
                     <div className="mr-4 p-3 rounded-full bg-yellow-500/10">
                       <DollarSign className="h-6 w-6 text-yellow-500" />
@@ -386,60 +471,247 @@ const MyVenues = () => {
                 </Card>
               </div>
               
-              <Card className="glass-card border-white/10">
-                <CardHeader>
-                  <CardTitle>Bookings Calendar</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <OwnerBookingsCalendar />
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card border-white/10">
-                <CardHeader>
-                  <CardTitle>Recent Bookings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {recentBookings.length > 0 ? (
-                    <div className="space-y-3">
-                      {recentBookings.map((booking) => (
-                        <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-findvenue-card-bg/50 rounded-lg hover:bg-findvenue-card-bg/80 transition-colors border border-white/5">
-                          <div className="mb-2 sm:mb-0">
-                            <p className="font-medium">{booking.venue_name}</p>
-                            <p className="text-sm text-findvenue-text-muted flex flex-wrap gap-x-2">
-                              <span>{new Date(booking.booking_date).toLocaleDateString()}</span>
-                              <span>•</span>
-                              <span>{booking.start_time} - {booking.end_time}</span>
-                              <span>•</span>
-                              <span>{booking.guests} guests</span>
-                            </p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 lg:col-span-2">
+                  <CardHeader className="border-b border-white/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-findvenue" />
+                        <CardTitle>Bookings Calendar</CardTitle>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center text-sm">
+                          <span className="h-2 w-2 rounded-full bg-green-500 mr-1"></span>
+                          <span className="text-findvenue-text-muted">1-3</span>
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <span className="h-2 w-2 rounded-full bg-yellow-500 mr-1"></span>
+                          <span className="text-findvenue-text-muted">3-6</span>
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <span className="h-2 w-2 rounded-full bg-findvenue mr-1"></span>
+                          <span className="text-findvenue-text-muted">6+</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-medium">
+                          {selectedDate.toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            year: 'numeric'
+                          })}
+                        </h3>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            className="h-8 w-8 border-white/10"
+                            onClick={handlePrevMonth}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            className="h-8 w-8 border-white/10"
+                            onClick={handleNextMonth}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-7 gap-1">
+                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day, index) => (
+                          <div key={index} className="text-center text-xs text-findvenue-text-muted py-2">
+                            {day}
                           </div>
-                          <div className="flex items-center gap-3">
-                            <Badge className={
-                              booking.status === 'confirmed' ? 'bg-green-500' :
-                              booking.status === 'pending' ? 'bg-yellow-500' :
-                              booking.status === 'cancelled' ? 'bg-red-500' :
-                              'bg-blue-500'
-                            }>
-                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                            </Badge>
-                            <span className="font-medium whitespace-nowrap">SAR {booking.total_price.toLocaleString()}</span>
+                        ))}
+                        
+                        {getDaysInMonth(selectedDate).map((day, index) => {
+                          const dateBookings = getBookingsForDate(day.fullDate);
+                          const bookingCount = dateBookings.length;
+                          let bgColor = '';
+                          
+                          if (bookingCount > 6) {
+                            bgColor = 'bg-findvenue hover:bg-findvenue-dark';
+                          } else if (bookingCount > 3) {
+                            bgColor = 'bg-yellow-600 hover:bg-yellow-700';
+                          } else if (bookingCount > 0) {
+                            bgColor = 'bg-green-600 hover:bg-green-700';
+                          }
+                          
+                          return (
+                            <Button
+                              key={index}
+                              variant="ghost"
+                              className={`h-10 w-full rounded p-0 ${
+                                day.isCurrentMonth 
+                                  ? day.isToday
+                                    ? 'border border-findvenue/50'
+                                    : 'hover:bg-findvenue/10'
+                                  : 'text-findvenue-text-muted/50 hover:bg-findvenue/5'
+                              } ${bgColor ? `${bgColor} text-white` : ''}`}
+                              onClick={() => setSelectedBooking(bookingCount > 0 ? dateBookings[0] : null)}
+                            >
+                              <span>{day.date}</span>
+                              {bookingCount > 0 && !bgColor && (
+                                <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 h-1 w-1 bg-findvenue rounded-full"></div>
+                              )}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {selectedBooking && (
+                      <div className="p-4 border-t border-white/10">
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="font-medium">{formatDate(selectedBooking.booking_date)}</h4>
+                          <Badge className={
+                            selectedBooking.status === 'confirmed' ? 'bg-green-500' :
+                            selectedBooking.status === 'pending' ? 'bg-yellow-500' :
+                            selectedBooking.status === 'cancelled' ? 'bg-red-500' :
+                            'bg-blue-500'
+                          }>
+                            {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-sm">
+                          <div className="sm:col-span-2">
+                            <span className="text-findvenue-text-muted block text-xs">Venue</span>
+                            <span>{selectedBooking.venue_name}</span>
+                          </div>
+                          <div>
+                            <span className="text-findvenue-text-muted block text-xs">Time</span>
+                            <span>{selectedBooking.start_time} - {selectedBooking.end_time}</span>
+                          </div>
+                          <div>
+                            <span className="text-findvenue-text-muted block text-xs">Guests</span>
+                            <span>{selectedBooking.guests}</span>
+                          </div>
+                          <div>
+                            <span className="text-findvenue-text-muted block text-xs">Amount</span>
+                            <span className="font-medium">SAR {selectedBooking.total_price.toLocaleString()}</span>
                           </div>
                         </div>
-                      ))}
+                        {selectedBooking.customer_email && (
+                          <div className="mt-2 text-sm">
+                            <span className="text-findvenue-text-muted block text-xs">Customer</span>
+                            <span>{selectedBooking.customer_email} • {selectedBooking.customer_phone || 'No phone'}</span>
+                          </div>
+                        )}
+                        {selectedBooking.special_requests && (
+                          <div className="mt-2 text-sm">
+                            <span className="text-findvenue-text-muted block text-xs">Special Requests</span>
+                            <span>{selectedBooking.special_requests}</span>
+                          </div>
+                        )}
+                        <Button 
+                          className="mt-4 bg-findvenue hover:bg-findvenue-dark"
+                          size="sm"
+                          onClick={() => navigate('/customer-bookings')}
+                        >
+                          View All Bookings
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10">
+                  <CardHeader className="border-b border-white/10 pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Recent Bookings</CardTitle>
+                      <Button 
+                        variant="link" 
+                        className="text-findvenue p-0 h-auto"
+                        onClick={() => navigate('/customer-bookings')}
+                      >
+                        View Stats
+                      </Button>
                     </div>
-                  ) : (
-                    <p className="text-center py-6 text-findvenue-text-muted">No recent bookings</p>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4 mt-2">
+                      <h4 className="text-sm font-medium mb-3">Today's Bookings</h4>
+                      {getTodayBookings().length > 0 ? (
+                        <div className="space-y-2">
+                          {getTodayBookings().map((booking) => (
+                            <div key={booking.id} className="p-3 bg-findvenue-surface/30 border border-white/5 rounded-lg">
+                              <div className="flex justify-between items-center">
+                                <Badge className={
+                                  booking.status === 'confirmed' ? 'bg-green-500' :
+                                  booking.status === 'pending' ? 'bg-yellow-500' :
+                                  'bg-blue-500'
+                                } size="sm">
+                                  {booking.status}
+                                </Badge>
+                                <span className="text-xs text-findvenue-text-muted">{booking.start_time} - {booking.end_time}</span>
+                              </div>
+                              <p className="text-sm font-medium mt-1">{booking.venue_name}</p>
+                              <div className="flex justify-between items-center mt-1">
+                                <span className="text-xs text-findvenue-text-muted">{booking.guests} guests</span>
+                                <span className="text-sm font-medium">SAR {booking.total_price}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-center py-3 text-findvenue-text-muted text-sm">No bookings today</p>
+                      )}
+                    </div>
+                    
+                    {recentBookings.length > 0 ? (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium">Upcoming Bookings</h4>
+                        {recentBookings.slice(0, 5).map((booking) => (
+                          <div key={booking.id} className="flex flex-col p-3 bg-findvenue-surface/30 border border-white/5 rounded-lg hover:bg-findvenue-surface/50 transition-colors">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs">{formatDate(booking.booking_date)}</span>
+                              <Badge className={
+                                booking.status === 'confirmed' ? 'bg-green-500' :
+                                booking.status === 'pending' ? 'bg-yellow-500' :
+                                booking.status === 'cancelled' ? 'bg-red-500' :
+                                'bg-blue-500'
+                              } size="sm">
+                                {booking.status}
+                              </Badge>
+                            </div>
+                            <p className="font-medium mt-1">{booking.venue_name}</p>
+                            <div className="flex justify-between items-center mt-1">
+                              <span className="text-xs text-findvenue-text-muted">
+                                {booking.start_time} - {booking.end_time} • {booking.guests} guests
+                              </span>
+                              <span className="font-medium">SAR {booking.total_price}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-center py-6 text-findvenue-text-muted">No recent bookings</p>
+                    )}
+                    
+                    <Button 
+                      variant="outline"
+                      className="w-full mt-4 border-white/10"
+                      onClick={() => navigate('/customer-bookings')}
+                    >
+                      View All Bookings
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="venues">
               {isLoading ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[...Array(3)].map((_, i) => (
-                    <Card key={i} className="glass-card border-white/10">
+                    <Card key={i} className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10">
                       <Skeleton className="h-48 w-full" />
                       <div className="p-4 space-y-3">
                         <Skeleton className="h-6 w-3/4" />
@@ -452,7 +724,7 @@ const MyVenues = () => {
               ) : venues.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {venues.map((venue) => (
-                    <Card key={venue.id} className="glass-card border-white/10 overflow-hidden hover:border-white/20 transition-all">
+                    <Card key={venue.id} className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 overflow-hidden hover:border-white/20 transition-all">
                       <div className="relative">
                         <img 
                           src={venue.imageUrl} 
@@ -512,7 +784,7 @@ const MyVenues = () => {
                   ))}
                 </div>
               ) : (
-                <Card className="p-8 text-center glass-card border-white/10">
+                <Card className="p-8 text-center bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10">
                   <h3 className="text-xl font-semibold mb-4">No Venues Added Yet</h3>
                   <p className="text-findvenue-text-muted mb-6">
                     You haven't added any venues yet. Start by listing your first venue.

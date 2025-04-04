@@ -24,6 +24,7 @@ export const useVenueVoiceAssistant = ({
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [isWelcomePlayed, setIsWelcomePlayed] = useState(false);
   
   const recognition = useRef<SpeechRecognition | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -77,6 +78,114 @@ export const useVenueVoiceAssistant = ({
       processVoiceQuery(transcript);
     }
   }, [transcript, isProcessing, onListeningChange]);
+  
+  // Function to play welcome message
+  const playWelcomeMessage = useCallback(async () => {
+    if (!venue || isWelcomePlayed) return;
+    
+    const welcomeMessage = `Welcome to ${venue.name}! This ${venue.category || 'venue'} is located in ${venue.city} and can accommodate ${venue.capacity.min}-${venue.capacity.max} people. How can I help you today?`;
+    
+    setIsProcessing(true);
+    
+    try {
+      console.log("Playing welcome message:", welcomeMessage);
+      
+      if (onAnswer) {
+        onAnswer(welcomeMessage);
+      }
+      
+      // Only try text-to-speech if audio is enabled
+      if (audioEnabled) {
+        try {
+          console.log('Starting text-to-speech conversion for welcome message...');
+          const response = await supabase.functions.invoke('text-to-speech', {
+            body: {
+              text: welcomeMessage,
+              voice: 'alloy' // You can customize the voice here
+            },
+            responseType: 'arraybuffer'
+          });
+          
+          if (response.error) {
+            throw new Error(response.error.message);
+          }
+          
+          console.log('Received audio data for welcome message, creating audio element...');
+          // Create blob from array buffer
+          const blob = new Blob([response.data], { type: 'audio/mpeg' });
+          const url = URL.createObjectURL(blob);
+          
+          if (audioRef.current) {
+            audioRef.current.src = url;
+            audioRef.current.oncanplaythrough = () => {
+              if (audioRef.current) {
+                console.log('Welcome audio ready to play');
+                audioRef.current.play()
+                  .catch(e => {
+                    console.error('Error playing welcome audio:', e);
+                    // Fall back to browser TTS
+                    useBrowserTTS(welcomeMessage);
+                  });
+                
+                // Clean up blob URL when audio is done
+                audioRef.current.onended = () => {
+                  URL.revokeObjectURL(url);
+                  console.log('Welcome audio playback completed');
+                  setIsWelcomePlayed(true);
+                  
+                  // Auto restart listening after response
+                  if (autoRestart) {
+                    console.log('Setting up auto-restart after welcome audio...');
+                    const timer = setTimeout(() => {
+                      console.log('Auto-restarting voice recognition...');
+                      startListening();
+                    }, 1000);
+                    autoRestartTimeout.current = timer as unknown as number;
+                  }
+                };
+              }
+            };
+            
+            audioRef.current.onerror = () => {
+              console.error('Audio element error for welcome message');
+              URL.revokeObjectURL(url);
+              // Fall back to browser TTS
+              useBrowserTTS(welcomeMessage);
+              setIsWelcomePlayed(true);
+            };
+          }
+        } catch (speechError) {
+          console.error('Error generating welcome speech:', speechError);
+          // Fallback to browser's speech synthesis
+          useBrowserTTS(welcomeMessage);
+          setIsWelcomePlayed(true);
+        }
+      } else {
+        setIsWelcomePlayed(true);
+        if (autoRestart) {
+          // If audio is disabled but autoRestart is enabled, restart after a delay
+          const timer = setTimeout(() => {
+            console.log('Auto-restarting voice recognition (audio disabled)...');
+            startListening();
+          }, 3000); // Longer delay when audio is disabled
+          autoRestartTimeout.current = timer as unknown as number;
+        }
+      }
+    } catch (err: any) {
+      console.error('Error processing welcome message:', err);
+      setIsWelcomePlayed(true);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [venue, isWelcomePlayed, onAnswer, audioEnabled, autoRestart]);
+
+  // Call playWelcomeMessage when venue data is available
+  useEffect(() => {
+    if (venue && !isWelcomePlayed) {
+      console.log("Venue data available, playing welcome message");
+      playWelcomeMessage();
+    }
+  }, [venue, isWelcomePlayed, playWelcomeMessage]);
   
   const processVoiceQuery = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -373,6 +482,12 @@ export const useVenueVoiceAssistant = ({
     setAudioEnabled(prev => !prev);
   }, []);
   
+  // Force welcome message to play
+  const forcePlayWelcome = () => {
+    setIsWelcomePlayed(false);
+    playWelcomeMessage();
+  };
+  
   return {
     isListening,
     transcript,
@@ -380,10 +495,12 @@ export const useVenueVoiceAssistant = ({
     error,
     isProcessing,
     audioEnabled,
+    isWelcomePlayed,
     startListening,
     stopListening,
     setTranscript,
-    toggleAudio
+    toggleAudio,
+    forcePlayWelcome
   };
 };
 

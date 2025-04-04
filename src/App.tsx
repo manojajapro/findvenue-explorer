@@ -9,6 +9,8 @@ import { useAuth } from "./hooks/useAuth";
 import Index from "./pages/Index";
 import VenueDetails from "./pages/VenueDetails";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import ListVenue from "./pages/ListVenue";
 import VenueOwnerPromo from "./pages/VenueOwnerPromo";
 import NotFound from "./pages/NotFound";
@@ -128,6 +130,8 @@ function App() {
               <Route path="/" element={<HomeRoute />} />
               <Route path="/venue/:id" element={<VenueDetails />} />
               <Route path="/login" element={<LoginRoute />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/venues" element={<Venues />} />
               <Route path="/categories" element={<Categories />} />
               <Route path="/cities" element={<Cities />} />
