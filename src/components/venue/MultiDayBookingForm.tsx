@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar as CalendarIcon, Clock, Users, Info } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isEqual } from 'date-fns';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
@@ -61,6 +61,7 @@ export default function MultiDayBookingForm({
   const [availableTimeSlots, setAvailableTimeSlots] = useState<Record<string, string[]>>({});
   const [existingBookings, setExistingBookings] = useState<any[]>([]);
   const [totalPrice, setTotalPrice] = useState(0);
+  const [disabledDates, setDisabledDates] = useState<Date[]>([]);
 
   useEffect(() => {
     if (venueId) {
@@ -88,7 +89,39 @@ export default function MultiDayBookingForm({
         .in('status', ['pending', 'confirmed']);
 
       if (error) throw error;
+      
+      // Update existing bookings
       setExistingBookings(data || []);
+      
+      // Create array of fully booked dates (dates where all 24 hours are booked)
+      const dateBookingMap = new Map();
+      
+      data?.forEach(booking => {
+        const date = booking.booking_date;
+        const startHour = parseInt(booking.start_time.split(':')[0]);
+        const endHour = parseInt(booking.end_time.split(':')[0]);
+        
+        if (!dateBookingMap.has(date)) {
+          dateBookingMap.set(date, new Set());
+        }
+        
+        for (let hour = startHour; hour < endHour; hour++) {
+          dateBookingMap.get(date).add(hour);
+        }
+      });
+      
+      // Find dates where all 24 hours are booked
+      const fullyBookedDates: Date[] = [];
+      
+      dateBookingMap.forEach((hours, date) => {
+        // If all 24 hours are booked (or enough that no meaningful booking can be made)
+        if (hours.size >= 22) { // Considering at least 22 hours booked as fully booked
+          fullyBookedDates.push(new Date(date));
+        }
+      });
+      
+      setDisabledDates(fullyBookedDates);
+      
     } catch (error) {
       console.error('Error fetching existing bookings:', error);
     }
@@ -96,7 +129,8 @@ export default function MultiDayBookingForm({
 
   const generateTimeSlots = () => {
     const slots = [];
-    for (let i = 9; i <= 21; i++) {
+    // Generate 24 hour time slots
+    for (let i = 0; i <= 23; i++) {
       slots.push(`${i.toString().padStart(2, '0')}:00`);
     }
     return slots;
@@ -119,7 +153,8 @@ export default function MultiDayBookingForm({
     const startHour = parseInt(startTime.split(':')[0]);
     const availableEndTimes = [];
     
-    for (let i = startHour + 1; i <= 22; i++) {
+    // Allow up to 24 hour bookings
+    for (let i = startHour + 1; i <= 24; i++) {
       const endTime = `${i.toString().padStart(2, '0')}:00`;
       
       if (isTimeSlotAvailable(date, startTime, endTime)) {
@@ -134,10 +169,24 @@ export default function MultiDayBookingForm({
 
   const addBookingDay = () => {
     const today = new Date();
-    setSelectedDays([
-      ...selectedDays, 
-      { date: today, startTime: '10:00', endTime: '12:00', guests: minCapacity }
-    ]);
+    
+    // Check if this date is already selected
+    const dateAlreadySelected = selectedDays.some(day => 
+      isEqual(new Date(day.date).setHours(0,0,0,0), today.setHours(0,0,0,0))
+    );
+    
+    if (!dateAlreadySelected) {
+      setSelectedDays([
+        ...selectedDays, 
+        { date: today, startTime: '10:00', endTime: '12:00', guests: minCapacity }
+      ]);
+    } else {
+      toast({
+        title: "Date Already Selected",
+        description: "This date is already in your booking.",
+        variant: "destructive",
+      });
+    }
   };
 
   const removeBookingDay = (index: number) => {
@@ -145,6 +194,22 @@ export default function MultiDayBookingForm({
   };
 
   const updateBookingDay = (index: number, field: keyof BookingDay, value: any) => {
+    // If updating the date, check if it's already selected in another booking
+    if (field === 'date') {
+      const dateAlreadySelected = selectedDays.some((day, i) => 
+        i !== index && isEqual(new Date(day.date).setHours(0,0,0,0), new Date(value).setHours(0,0,0,0))
+      );
+      
+      if (dateAlreadySelected) {
+        toast({
+          title: "Date Already Selected",
+          description: "This date is already in your booking.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     const updatedDays = [...selectedDays];
     updatedDays[index] = { ...updatedDays[index], [field]: value };
     
@@ -287,7 +352,17 @@ export default function MultiDayBookingForm({
                                   selected={day.date}
                                   onSelect={(date) => date && updateBookingDay(index, 'date', date)}
                                   initialFocus
-                                  disabled={(date) => date < new Date()}
+                                  disabled={(date) => {
+                                    // Disable past dates
+                                    if (date < new Date(new Date().setHours(0,0,0,0))) {
+                                      return true;
+                                    }
+                                    
+                                    // Disable dates that are already fully booked
+                                    return disabledDates.some(disabledDate => 
+                                      isEqual(new Date(disabledDate).setHours(0,0,0,0), date.setHours(0,0,0,0))
+                                    );
+                                  }}
                                   className="pointer-events-auto"
                                 />
                               </PopoverContent>

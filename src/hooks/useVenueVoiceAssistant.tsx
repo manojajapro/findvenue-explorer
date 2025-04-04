@@ -23,9 +23,11 @@ export const useVenueVoiceAssistant = ({
   const [answer, setAnswer] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(true);
   
   const recognition = useRef<SpeechRecognition | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const retryCount = useRef(0);
   
   // Initialize audio element for playing responses
   useEffect(() => {
@@ -96,41 +98,57 @@ export const useVenueVoiceAssistant = ({
           onAnswer(data.answer);
         }
         
-        // 2. Call text-to-speech to convert response to audio
-        try {
-          const response = await supabase.functions.invoke('text-to-speech', {
-            body: {
-              text: data.answer,
-              voice: 'alloy' // You can customize the voice here
-            },
-            responseType: 'arraybuffer'
-          });
-          
-          if (response.error) {
-            throw new Error(response.error.message);
-          }
-          
-          // Create blob from array buffer
-          const blob = new Blob([response.data], { type: 'audio/mpeg' });
-          const url = URL.createObjectURL(blob);
-          
-          if (audioRef.current) {
-            audioRef.current.src = url;
-            audioRef.current.play().catch(e => console.error('Error playing audio:', e));
+        // Only try text-to-speech if audio is enabled
+        if (audioEnabled) {
+          // 2. Call text-to-speech to convert response to audio
+          try {
+            const response = await supabase.functions.invoke('text-to-speech', {
+              body: {
+                text: data.answer,
+                voice: 'alloy' // You can customize the voice here
+              },
+              responseType: 'arraybuffer'
+            });
             
-            // Clean up blob URL when audio is done
-            audioRef.current.onended = () => {
-              URL.revokeObjectURL(url);
-            };
-          }
-        } catch (speechError) {
-          console.error('Error generating speech:', speechError);
-          // Fallback to browser's speech synthesis if available
-          if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(data.answer);
-            utterance.lang = 'en-US';
-            utterance.rate = 1.0;
-            window.speechSynthesis.speak(utterance);
+            if (response.error) {
+              throw new Error(response.error.message);
+            }
+            
+            // Create blob from array buffer
+            const blob = new Blob([response.data], { type: 'audio/mpeg' });
+            const url = URL.createObjectURL(blob);
+            
+            if (audioRef.current) {
+              audioRef.current.src = url;
+              audioRef.current.oncanplaythrough = () => {
+                if (audioRef.current) {
+                  console.log('Audio ready to play');
+                  audioRef.current.play()
+                    .catch(e => {
+                      console.error('Error playing audio:', e);
+                      // Fall back to browser TTS
+                      useBrowserTTS(data.answer);
+                    });
+                  
+                  // Clean up blob URL when audio is done
+                  audioRef.current.onended = () => {
+                    URL.revokeObjectURL(url);
+                    console.log('Audio playback completed');
+                  };
+                }
+              };
+              
+              audioRef.current.onerror = () => {
+                console.error('Audio element error');
+                URL.revokeObjectURL(url);
+                // Fall back to browser TTS
+                useBrowserTTS(data.answer);
+              };
+            }
+          } catch (speechError) {
+            console.error('Error generating speech:', speechError);
+            // Fallback to browser's speech synthesis
+            useBrowserTTS(data.answer);
           }
         }
       } else {
@@ -142,10 +160,33 @@ export const useVenueVoiceAssistant = ({
       toast.error('Error processing your request', {
         description: err.message || 'Please try again later'
       });
+      
+      // If we encounter an error and have retry attempts left
+      if (retryCount.current < 2) {
+        retryCount.current++;
+        console.log(`Retrying (${retryCount.current}/2)...`);
+        setTimeout(() => processVoiceQuery(query), 1000);
+        return;
+      }
+      
+      retryCount.current = 0;
     } finally {
       setIsProcessing(false);
     }
-  }, [venue?.id, onAnswer]);
+  }, [venue?.id, onAnswer, audioEnabled]);
+  
+  // Helper function to use browser's built-in TTS as fallback
+  const useBrowserTTS = (text: string) => {
+    if ('speechSynthesis' in window) {
+      console.log('Using browser TTS as fallback');
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 1.0;
+      window.speechSynthesis.speak(utterance);
+    } else {
+      console.warn('Browser TTS not available');
+    }
+  };
   
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -219,6 +260,9 @@ export const useVenueVoiceAssistant = ({
       };
       
       recognition.current.start();
+      
+      // Reset retry counter on new listening session
+      retryCount.current = 0;
     } catch (err: any) {
       console.error('Error starting speech recognition:', err);
       setError(err.message);
@@ -246,15 +290,21 @@ export const useVenueVoiceAssistant = ({
     }
   }, [onListeningChange]);
   
+  const toggleAudio = useCallback(() => {
+    setAudioEnabled(prev => !prev);
+  }, []);
+  
   return {
     isListening,
     transcript,
     answer,
     error,
     isProcessing,
+    audioEnabled,
     startListening,
     stopListening,
-    setTranscript
+    setTranscript,
+    toggleAudio
   };
 };
 

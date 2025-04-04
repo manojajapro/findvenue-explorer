@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Loader2, RefreshCw } from 'lucide-react';
+import { Mic, MicOff, Loader2, RefreshCw, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import useVenueVoiceAssistant from '@/hooks/useVenueVoiceAssistant';
@@ -21,9 +21,11 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     isProcessing,
     transcript,
     answer,
+    error,
+    audioEnabled,
     startListening,
     stopListening,
-    error,
+    toggleAudio
   } = useVenueVoiceAssistant({
     venue,
     onTranscript: (text) => {
@@ -67,8 +69,18 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcriptHistory]);
 
+  const handleAudioToggle = () => {
+    toggleAudio();
+    toast({
+      title: audioEnabled ? "Voice Response Disabled" : "Voice Response Enabled",
+      description: audioEnabled 
+        ? "The assistant will respond with text only" 
+        : "The assistant will respond with voice and text",
+    });
+  };
+
   return (
-    <div className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4">
+    <div className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4 mt-6">
       <div className="flex justify-between items-center mb-4">
         <div>
           <h3 className="font-semibold text-lg mb-1">Voice Assistant</h3>
@@ -76,14 +88,21 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
             Speak to get information about {venue.name}
           </p>
         </div>
-        {isListening && (
-          <Badge className="bg-green-500 text-white animate-pulse">
-            Listening...
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {isListening && (
+            <Badge className="bg-green-500 text-white animate-pulse">
+              Listening...
+            </Badge>
+          )}
+          {isProcessing && (
+            <Badge className="bg-blue-500 text-white">
+              Processing...
+            </Badge>
+          )}
+        </div>
       </div>
       
-      <div className="max-h-[50vh] overflow-y-auto mb-4 p-2">
+      <div className="max-h-[50vh] overflow-y-auto mb-4 p-2 bg-findvenue-surface/20 rounded-lg">
         {transcriptHistory.length === 0 ? (
           <div className="text-center py-6">
             <p className="text-findvenue-text-muted mb-2">
@@ -113,8 +132,9 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
             ))}
             {isProcessing && (
               <div className="flex justify-start">
-                <div className="px-4 py-2 rounded-lg bg-findvenue-surface/50 text-findvenue-text rounded-tl-none">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="px-4 py-2 rounded-lg bg-findvenue-surface/50 text-findvenue-text rounded-tl-none flex items-center">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing your question...
                 </div>
               </div>
             )}
@@ -143,6 +163,16 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
               <RefreshCw className="h-4 w-4" />
             </Button>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={handleAudioToggle}
+            title={audioEnabled ? "Disable voice responses" : "Enable voice responses"}
+            className="border-white/10 bg-findvenue-surface/50 hover:bg-findvenue-surface"
+          >
+            {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </Button>
         </div>
         
         <Button

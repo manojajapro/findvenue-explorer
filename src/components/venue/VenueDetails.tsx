@@ -1,7 +1,8 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSupabaseVenues, Venue } from '@/hooks/useSupabaseVenues';
-import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, Accessible, CreditCard } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import VenueBookingTabs from '@/components/venue/VenueBookingTabs';
 import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
@@ -11,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import VenueSpecificVoiceAssistant from '@/components/voice/VenueSpecificVoiceAssistant';
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -50,6 +52,9 @@ const VenueDetails = () => {
   if (!venue) {
     return <div className="container mx-auto p-4">Venue not found.</div>;
   }
+
+  // Check if user is the venue owner
+  const isOwner = user?.id === venue.ownerInfo?.user_id;
   
   return (
     <div className="container mx-auto p-4">
@@ -109,8 +114,8 @@ const VenueDetails = () => {
             </p>
           </div>
           
-          {/* Contact Venue Owner */}
-          {venue.ownerInfo && (
+          {/* Contact Venue Owner - Only show if user is not the owner */}
+          {venue.ownerInfo && !isOwner && (
             <ContactVenueOwner 
               venueId={venue.id}
               venueName={venue.name}
@@ -131,16 +136,18 @@ const VenueDetails = () => {
       
       <Separator className="my-4" />
       
-      {/* Venue Booking Tabs */}
-      <VenueBookingTabs 
-        venueId={venue.id}
-        venueName={venue.name}
-        pricePerHour={venue.pricing.hourlyRate}
-        minCapacity={venue.capacity.min}
-        maxCapacity={venue.capacity.max}
-        ownerId={venue.ownerInfo?.user_id || ''}
-        ownerName={venue.ownerInfo?.name || ''}
-      />
+      {/* Venue Booking Tabs - Only show if user is not the owner */}
+      {!isOwner && (
+        <VenueBookingTabs 
+          venueId={venue.id}
+          venueName={venue.name}
+          pricePerHour={venue.pricing.hourlyRate}
+          minCapacity={venue.capacity.min}
+          maxCapacity={venue.capacity.max}
+          ownerId={venue.ownerInfo?.user_id || ''}
+          ownerName={venue.ownerInfo?.name || ''}
+        />
+      )}
       
       {/* Owner Information */}
       {venue.ownerInfo && (
@@ -150,7 +157,7 @@ const VenueDetails = () => {
             <h4 className="text-lg font-semibold">Venue Host</h4>
             <p className="text-gray-700">Contact: {venue.ownerInfo.contact}</p>
             <p className="text-gray-700">Response Time: {venue.ownerInfo.responseTime}</p>
-            {venue.ownerInfo && venue.ownerInfo.socialLinks && (
+            {venue.ownerInfo.socialLinks && (
               <div className="mt-4 flex space-x-3">
                 {venue.ownerInfo.socialLinks.facebook && (
                   <a href={venue.ownerInfo.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
@@ -177,6 +184,9 @@ const VenueDetails = () => {
           </div>
         </>
       )}
+
+      {/* Voice Assistant for the venue */}
+      <VenueSpecificVoiceAssistant venue={venue} />
     </div>
   );
 };

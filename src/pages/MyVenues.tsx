@@ -5,20 +5,18 @@ import { useAuth } from '@/hooks/useAuth';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { VenueCard } from '@/components/ui';
-import { useToast } from '@/components/ui/use-toast';
-import { PlusCircle, Edit, BarChart3, Calendar, DollarSign, Users } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { BarChart3, Calendar, DollarSign, Users, PlusCircle, Edit } from 'lucide-react';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
+import { Helmet } from 'react-helmet';
 
 const MyVenues = () => {
   const { user, isVenueOwner, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
   const [venues, setVenues] = useState<Venue[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -91,7 +89,13 @@ const MyVenues = () => {
                 name: ownerInfo.name || '',
                 contact: ownerInfo.contact || '',
                 responseTime: ownerInfo.response_time || '',
-                user_id: ownerInfo.user_id || ''
+                user_id: ownerInfo.user_id || '',
+                socialLinks: ownerInfo.socialLinks || {
+                  facebook: '',
+                  twitter: '',
+                  instagram: '',
+                  linkedin: ''
+                }
               };
             }
           } catch (e) {
@@ -116,7 +120,8 @@ const MyVenues = () => {
             pricing: {
               currency: venue.currency || 'SAR',
               startingPrice: venue.starting_price || 0,
-              pricePerPerson: venue.price_per_person
+              pricePerPerson: venue.price_per_person,
+              hourlyRate: venue.hourly_rate || 0
             },
             amenities: venue.amenities || [],
             rating: venue.rating || 0,
@@ -134,11 +139,6 @@ const MyVenues = () => {
       }
     } catch (error) {
       console.error('Error fetching venues:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load your venues',
-        variant: 'destructive'
-      });
     } finally {
       setIsLoading(false);
     }
@@ -158,7 +158,7 @@ const MyVenues = () => {
         .from('bookings')
         .select('*')
         .in('venue_id', venueIds)
-        .order('created_at', { ascending: false });
+        .order('booking_date', { ascending: false });
       
       if (bookingsError) throw bookingsError;
       
@@ -178,7 +178,14 @@ const MyVenues = () => {
           revenue: totalRevenue
         });
         
-        setRecentBookings(bookingsData.slice(0, 5));
+        // Sort by booking_date in descending order before slicing
+        const sortedBookings = [...bookingsData].sort((a, b) => {
+          if (a.booking_date > b.booking_date) return -1;
+          if (a.booking_date < b.booking_date) return 1;
+          return 0;
+        });
+        
+        setRecentBookings(sortedBookings.slice(0, 5));
       }
     } catch (error) {
       console.error('Error fetching booking stats:', error);
@@ -293,233 +300,251 @@ const MyVenues = () => {
   }
 
   return (
-    <div className="min-h-screen pt-24 pb-16">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Venue Owner Dashboard</h1>
-            {profile && (
-              <p className="text-findvenue-text-muted">
-                Welcome, {profile.first_name} {profile.last_name}
-              </p>
-            )}
-          </div>
-          <Button 
-            className="mt-4 sm:mt-0 bg-findvenue hover:bg-findvenue-dark flex items-center gap-2"
-            onClick={handleAddVenue}
-          >
-            <PlusCircle className="h-4 w-4" />
-            List New Venue
-          </Button>
-        </div>
-
-        <Tabs 
-          defaultValue="dashboard" 
-          value={activeTab} 
-          onValueChange={handleTabChange} 
-          className="space-y-6"
-        >
-          <TabsList className="grid grid-cols-3 w-full max-w-md mx-auto">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="venues">My Venues</TabsTrigger>
-            <TabsTrigger value="bookings">Bookings</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="dashboard" className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="glass-card border-white/10">
-                <CardContent className="flex items-center p-6">
-                  <div className="mr-4 p-3 rounded-full bg-findvenue/10">
-                    <BarChart3 className="h-6 w-6 text-findvenue" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-findvenue-text-muted">Total Venues</p>
-                    <h3 className="text-2xl font-bold">{stats.totalVenues}</h3>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="glass-card border-white/10">
-                <CardContent className="flex items-center p-6">
-                  <div className="mr-4 p-3 rounded-full bg-indigo-500/10">
-                    <Calendar className="h-6 w-6 text-indigo-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-findvenue-text-muted">Active Bookings</p>
-                    <h3 className="text-2xl font-bold">{stats.activeBookings}</h3>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="glass-card border-white/10">
-                <CardContent className="flex items-center p-6">
-                  <div className="mr-4 p-3 rounded-full bg-green-500/10">
-                    <Users className="h-6 w-6 text-green-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-findvenue-text-muted">Completed Bookings</p>
-                    <h3 className="text-2xl font-bold">{stats.completedBookings}</h3>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="glass-card border-white/10">
-                <CardContent className="flex items-center p-6">
-                  <div className="mr-4 p-3 rounded-full bg-yellow-500/10">
-                    <DollarSign className="h-6 w-6 text-yellow-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-findvenue-text-muted">Total Revenue</p>
-                    <h3 className="text-2xl font-bold">SAR {stats.revenue.toLocaleString()}</h3>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            
-            {/* Add Bookings Calendar */}
-            <OwnerBookingsCalendar />
-
-            <Card className="glass-card border-white/10">
-              <CardHeader>
-                <h3 className="text-xl font-bold">Recent Bookings</h3>
-              </CardHeader>
-              <CardContent>
-                {recentBookings.length > 0 ? (
-                  <div className="space-y-4">
-                    {recentBookings.map((booking) => (
-                      <div key={booking.id} className="flex items-center justify-between p-3 bg-findvenue-card-bg/50 rounded-lg">
-                        <div>
-                          <p className="font-medium">{booking.venue_name}</p>
-                          <p className="text-sm text-findvenue-text-muted">
-                            {new Date(booking.booking_date).toLocaleDateString()} • {booking.guests} guests
-                          </p>
-                        </div>
-                        <div className="flex items-center">
-                          <Badge className={
-                            booking.status === 'confirmed' ? 'bg-green-500' :
-                            booking.status === 'pending' ? 'bg-yellow-500' :
-                            booking.status === 'cancelled' ? 'bg-red-500' :
-                            'bg-blue-500'
-                          }>
-                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                          </Badge>
-                          <span className="ml-4 font-medium">SAR {booking.total_price.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center py-6 text-findvenue-text-muted">No recent bookings</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="venues">
-            {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(3)].map((_, i) => (
-                  <Card key={i} className="glass-card border-white/10">
-                    <Skeleton className="h-48 w-full" />
-                    <div className="p-4 space-y-3">
-                      <Skeleton className="h-6 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                      <Skeleton className="h-20 w-full" />
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : venues.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {venues.map((venue) => (
-                  <Card key={venue.id} className="glass-card border-white/10 overflow-hidden">
-                    <div className="relative">
-                      <img 
-                        src={venue.imageUrl} 
-                        alt={venue.name} 
-                        className="w-full h-48 object-cover"
-                      />
-                      <div className="absolute top-2 right-2 flex gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          className="bg-black/40 hover:bg-black/60 backdrop-blur-sm"
-                          onClick={() => handleEditVenue(venue.id)}
-                        >
-                          <Edit className="h-4 w-4 text-white" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          className="bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm"
-                          onClick={() => handleDeleteVenue(venue.id, venue.name)}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                            <path d="M3 6h18"></path>
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                          </svg>
-                        </Button>
-                      </div>
-                      {venue.featured ? (
-                        <Badge className="absolute top-2 left-2 bg-findvenue-gold text-black">
-                          Featured
-                        </Badge>
-                      ) : venue.popular ? (
-                        <Badge className="absolute top-2 left-2 bg-findvenue text-white">
-                          Popular
-                        </Badge>
-                      ) : (
-                        <Badge className="absolute top-2 left-2 bg-gray-500/80 text-white">
-                          Pending
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <h3 className="text-xl font-semibold mb-2">{venue.name}</h3>
-                      <p className="text-sm text-findvenue-text-muted mb-3">
-                        {venue.city} • {venue.category}
-                      </p>
-                      <p className="text-sm text-findvenue-text-muted mb-4 line-clamp-2">
-                        {venue.description}
-                      </p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">
-                          {venue.capacity.min}-{venue.capacity.max} guests
-                        </span>
-                        <span className="font-semibold">
-                          SAR {venue.pricing.startingPrice.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card className="p-8 text-center glass-card border-white/10">
-                <h3 className="text-xl font-semibold mb-4">No Venues Added Yet</h3>
-                <p className="text-findvenue-text-muted mb-6">
-                  You haven't added any venues yet. Start by listing your first venue.
+    <>
+      <Helmet>
+        <title>Venue Owner Dashboard | FindVenue</title>
+        <meta name="description" content="Manage your venues, bookings and revenue in one place." />
+      </Helmet>
+      
+      <div className="min-h-screen pt-24 pb-16">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold">Venue Owner Dashboard</h1>
+              {profile && (
+                <p className="text-findvenue-text-muted">
+                  Welcome, {profile.first_name} {profile.last_name}
                 </p>
-                <Button 
-                  className="bg-findvenue hover:bg-findvenue-dark flex items-center gap-2 mx-auto"
-                  onClick={handleAddVenue}
-                >
-                  <PlusCircle className="h-4 w-4" />
-                  List Venue
-                </Button>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="bookings">
-            <div className="text-center py-10">
-              <p className="text-findvenue-text-muted mb-4">Redirecting to customer bookings...</p>
+              )}
             </div>
-          </TabsContent>
-        </Tabs>
+            <Button 
+              className="mt-4 sm:mt-0 bg-findvenue hover:bg-findvenue-dark flex items-center gap-2"
+              onClick={handleAddVenue}
+            >
+              <PlusCircle className="h-4 w-4" />
+              List New Venue
+            </Button>
+          </div>
+
+          <Tabs 
+            defaultValue="dashboard" 
+            value={activeTab} 
+            onValueChange={handleTabChange} 
+            className="space-y-6"
+          >
+            <TabsList className="grid grid-cols-3 w-full max-w-md mx-auto">
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="venues">My Venues</TabsTrigger>
+              <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dashboard" className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="glass-card border-white/10 hover:border-white/20 transition-all">
+                  <CardContent className="flex items-center p-6">
+                    <div className="mr-4 p-3 rounded-full bg-findvenue/10">
+                      <BarChart3 className="h-6 w-6 text-findvenue" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted">Total Venues</p>
+                      <h3 className="text-2xl font-bold">{stats.totalVenues}</h3>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="glass-card border-white/10 hover:border-white/20 transition-all">
+                  <CardContent className="flex items-center p-6">
+                    <div className="mr-4 p-3 rounded-full bg-indigo-500/10">
+                      <Calendar className="h-6 w-6 text-indigo-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted">Active Bookings</p>
+                      <h3 className="text-2xl font-bold">{stats.activeBookings}</h3>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="glass-card border-white/10 hover:border-white/20 transition-all">
+                  <CardContent className="flex items-center p-6">
+                    <div className="mr-4 p-3 rounded-full bg-green-500/10">
+                      <Users className="h-6 w-6 text-green-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted">Completed Bookings</p>
+                      <h3 className="text-2xl font-bold">{stats.completedBookings}</h3>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="glass-card border-white/10 hover:border-white/20 transition-all">
+                  <CardContent className="flex items-center p-6">
+                    <div className="mr-4 p-3 rounded-full bg-yellow-500/10">
+                      <DollarSign className="h-6 w-6 text-yellow-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted">Total Revenue</p>
+                      <h3 className="text-2xl font-bold">SAR {stats.revenue.toLocaleString()}</h3>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Add Bookings Calendar */}
+              <Card className="glass-card border-white/10">
+                <CardHeader>
+                  <CardTitle>Bookings Calendar</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <OwnerBookingsCalendar />
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card border-white/10">
+                <CardHeader>
+                  <CardTitle>Recent Bookings</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {recentBookings.length > 0 ? (
+                    <div className="space-y-3">
+                      {recentBookings.map((booking) => (
+                        <div key={booking.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-findvenue-card-bg/50 rounded-lg hover:bg-findvenue-card-bg/80 transition-colors border border-white/5">
+                          <div className="mb-2 sm:mb-0">
+                            <p className="font-medium">{booking.venue_name}</p>
+                            <p className="text-sm text-findvenue-text-muted flex flex-wrap gap-x-2">
+                              <span>{new Date(booking.booking_date).toLocaleDateString()}</span>
+                              <span>•</span>
+                              <span>{booking.start_time} - {booking.end_time}</span>
+                              <span>•</span>
+                              <span>{booking.guests} guests</span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge className={
+                              booking.status === 'confirmed' ? 'bg-green-500' :
+                              booking.status === 'pending' ? 'bg-yellow-500' :
+                              booking.status === 'cancelled' ? 'bg-red-500' :
+                              'bg-blue-500'
+                            }>
+                              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                            </Badge>
+                            <span className="font-medium whitespace-nowrap">SAR {booking.total_price.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center py-6 text-findvenue-text-muted">No recent bookings</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="venues">
+              {isLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(3)].map((_, i) => (
+                    <Card key={i} className="glass-card border-white/10">
+                      <Skeleton className="h-48 w-full" />
+                      <div className="p-4 space-y-3">
+                        <Skeleton className="h-6 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                        <Skeleton className="h-20 w-full" />
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : venues.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {venues.map((venue) => (
+                    <Card key={venue.id} className="glass-card border-white/10 overflow-hidden hover:border-white/20 transition-all">
+                      <div className="relative">
+                        <img 
+                          src={venue.imageUrl} 
+                          alt={venue.name} 
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="bg-black/40 hover:bg-black/60 backdrop-blur-sm"
+                            onClick={() => handleEditVenue(venue.id)}
+                          >
+                            <Edit className="h-4 w-4 text-white" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm"
+                            onClick={() => handleDeleteVenue(venue.id, venue.name)}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                              <path d="M3 6h18"></path>
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                            </svg>
+                          </Button>
+                        </div>
+                        {venue.featured ? (
+                          <Badge className="absolute top-2 left-2 bg-findvenue-gold text-black">
+                            Featured
+                          </Badge>
+                        ) : venue.popular ? (
+                          <Badge className="absolute top-2 left-2 bg-findvenue text-white">
+                            Popular
+                          </Badge>
+                        ) : (
+                          <Badge className="absolute top-2 left-2 bg-gray-500/80 text-white">
+                            Regular
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <h3 className="text-xl font-semibold mb-2">{venue.name}</h3>
+                        <p className="text-sm text-findvenue-text-muted mb-3">
+                          {venue.city} • {venue.category}
+                        </p>
+                        <p className="text-sm text-findvenue-text-muted mb-4 line-clamp-2">
+                          {venue.description}
+                        </p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm">
+                            {venue.capacity.min}-{venue.capacity.max} guests
+                          </span>
+                          <span className="font-semibold">
+                            SAR {venue.pricing.startingPrice.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="p-8 text-center glass-card border-white/10">
+                  <h3 className="text-xl font-semibold mb-4">No Venues Added Yet</h3>
+                  <p className="text-findvenue-text-muted mb-6">
+                    You haven't added any venues yet. Start by listing your first venue.
+                  </p>
+                  <Button 
+                    className="bg-findvenue hover:bg-findvenue-dark flex items-center gap-2 mx-auto"
+                    onClick={handleAddVenue}
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                    List Venue
+                  </Button>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="bookings">
+              <div className="text-center py-10">
+                <p className="text-findvenue-text-muted mb-4">Redirecting to customer bookings...</p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
