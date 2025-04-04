@@ -1,913 +1,520 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarIcon, Clock, Users, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/components/ui/use-toast';
+import { format, addDays, isBefore, isAfter, parse, startOfDay } from 'date-fns';
+import { 
+  CalendarIcon, 
+  Clock, 
+  Users, 
+  CalendarCheck, 
+  BadgeInfo, 
+  Loader2
+} from 'lucide-react';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle } from 'lucide-react';
 
-type BookingFormProps = {
+interface BookingFormProps {
   venueId: string;
   venueName: string;
-  pricePerHour: number;
+  pricePerHour?: number;
   ownerId: string;
   ownerName: string;
-};
+  bookedTimeSlots?: Record<string, string[]>;
+  isLoading?: boolean;
+}
 
-type TimeSlot = {
-  time: string;
-  isAvailable: boolean;
-};
+// Time slots available for booking
+const TIME_SLOTS = [
+  '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', 
+  '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
+];
 
-const BookingForm = ({ venueId, venueName, pricePerHour, ownerId, ownerName }: BookingFormProps) => {
-  const { user, profile } = useAuth();
+const BookingForm = ({ 
+  venueId, 
+  venueName, 
+  pricePerHour = 0, 
+  ownerId,
+  ownerName,
+  bookedTimeSlots = {},
+  isLoading = false
+}: BookingFormProps) => {
+  const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   
   const [date, setDate] = useState<Date | undefined>(undefined);
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [guestCount, setGuestCount] = useState('');
+  const [displayDate, setDisplayDate] = useState<string>('');
+  const [startTime, setStartTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
+  const [guests, setGuests] = useState(1);
+  const [totalPrice, setTotalPrice] = useState(0);
+  const [duration, setDuration] = useState(1);
   const [specialRequests, setSpecialRequests] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [existingBookings, setExistingBookings] = useState<any[]>([]);
-  const [userBookings, setUserBookings] = useState<any[]>([]);
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([]);
-  const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([]);
-  const [hoursBooked, setHoursBooked] = useState<number>(0);
-  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const [availableStartTimes, setAvailableStartTimes] = useState<string[]>([]);
+  const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([]);
+  const [isBooking, setIsBooking] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
   
-  useEffect(() => {
-    if (venueId) {
-      fetchExistingBookings();
-    }
-
-    if (user && venueId) {
-      fetchUserBookings();
-    }
-  }, [venueId, user]);
-  
+  // Reset form when changing date
   useEffect(() => {
     if (date) {
-      generateAvailableTimeSlots();
+      setDisplayDate(format(date, 'EEEE, MMMM d, yyyy'));
+      setStartTime('');
+      setEndTime('');
+      
+      // Get available start times for the selected date
+      updateAvailableStartTimes(format(date, 'yyyy-MM-dd'));
+    } else {
+      setDisplayDate('');
+      setAvailableStartTimes([]);
+      setAvailableEndTimes([]);
     }
-  }, [date, existingBookings]);
+  }, [date, bookedTimeSlots]);
   
+  // Update end time options when start time changes
+  useEffect(() => {
+    if (startTime) {
+      updateAvailableEndTimes(startTime);
+    } else {
+      setEndTime('');
+      setAvailableEndTimes([]);
+    }
+  }, [startTime, date]);
+  
+  // Calculate price and duration when start/end times change
   useEffect(() => {
     if (startTime && endTime) {
-      calculateHoursBooked();
-    }
-  }, [startTime, endTime]);
-  
-  const calculateHoursBooked = () => {
-    const start = parseTime(startTime);
-    const end = parseTime(endTime);
-    
-    if (start && end) {
-      let hours = end.getHours() - start.getHours();
-      const minutesDiff = end.getMinutes() - start.getMinutes();
-      hours += minutesDiff / 60;
+      const start = parseInt(startTime.split(':')[0]);
+      const end = parseInt(endTime.split(':')[0]);
+      const hours = end - start;
       
-      if (hours > 0) {
-        setHoursBooked(hours);
-      } else {
-        setHoursBooked(0);
-      }
+      setDuration(hours);
+      setTotalPrice(pricePerHour * hours);
+    } else {
+      setDuration(0);
+      setTotalPrice(0);
     }
+  }, [startTime, endTime, pricePerHour]);
+  
+  // Update available start times based on bookings
+  const updateAvailableStartTimes = (dateStr: string) => {
+    const bookedSlots = bookedTimeSlots[dateStr] || [];
+    const bookedStartTimes = new Set();
+    
+    // Extract start times from booked slots to exclude them
+    bookedSlots.forEach(slot => {
+      const [start] = slot.split(' - ');
+      bookedStartTimes.add(start);
+    });
+    
+    // Filter out already booked start times
+    const available = TIME_SLOTS.filter(time => {
+      // Don't show past times for today
+      if (date && isSameDay(date, new Date()) && isPastTime(time)) {
+        return false;
+      }
+      
+      // Don't show already booked times
+      return !bookedStartTimes.has(time);
+    });
+    
+    setAvailableStartTimes(available);
   };
   
-  const generateAvailableTimeSlots = () => {
-    if (!date) return;
+  // Update available end times based on start time
+  const updateAvailableEndTimes = (start: string) => {
+    if (!date || !start) return;
     
-    const slots: TimeSlot[] = [];
-    const selectedDateStr = formatDateForDatabase(date);
-    const bookedSlots: {start: string, end: string}[] = [];
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const bookedSlots = bookedTimeSlots[dateStr] || [];
+    const startHour = parseInt(start.split(':')[0]);
+    const available: string[] = [];
     
-    existingBookings.forEach(booking => {
-      if (booking.booking_date === selectedDateStr) {
-        bookedSlots.push({
-          start: booking.start_time,
-          end: booking.end_time
-        });
+    // Find the next booked time after the selected start time
+    let nextBookedTime = 24; // Default to end of day
+    
+    bookedSlots.forEach(slot => {
+      const [bookedStart] = slot.split(' - ');
+      const bookedHour = parseInt(bookedStart.split(':')[0]);
+      
+      if (bookedHour > startHour && bookedHour < nextBookedTime) {
+        nextBookedTime = bookedHour;
       }
     });
     
-    for (let hour = 8; hour <= 22; hour++) {
-      const timeString = `${hour.toString().padStart(2, '0')}:00`;
-      
-      const isSlotAvailable = !isTimeOverlappingWithBookings(timeString, bookedSlots);
-      
-      slots.push({
-        time: timeString,
-        isAvailable: isSlotAvailable
-      });
+    // Add available end times (must be after start time and before next booking)
+    for (let i = startHour + 1; i <= Math.min(22, nextBookedTime); i++) {
+      available.push(`${i.toString().padStart(2, '0')}:00`);
     }
     
-    setAvailableTimeSlots(slots);
+    setAvailableEndTimes(available);
   };
   
-  const isTimeOverlappingWithBookings = (timeString: string, bookedSlots: {start: string, end: string}[]): boolean => {
-    const slotTime = parseTime(timeString);
-    if (!slotTime) return true;
-    
-    for (const booking of bookedSlots) {
-      const bookingStart = parseTime(booking.start);
-      const bookingEnd = parseTime(booking.end);
-      
-      if (!bookingStart || !bookingEnd) continue;
-      
-      if (slotTime >= bookingStart && slotTime < bookingEnd) {
-        return true;
-      }
-    }
-    
-    return false;
+  // Check if time is in the past
+  const isPastTime = (time: string) => {
+    const now = new Date();
+    const [hour] = time.split(':').map(Number);
+    return now.getHours() >= hour;
   };
   
-  const fetchExistingBookings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('booking_date, start_time, end_time')
-        .eq('venue_id', venueId)
-        .or('status.eq.pending,status.eq.confirmed');
-        
-      if (error) throw error;
-      
-      if (data) {
-        setExistingBookings(data);
-        
-        const fullyBookedDates = new Set<string>();
-        const dateBookingHours = new Map<string, number>();
-        
-        data.forEach(booking => {
-          const dateStr = booking.booking_date;
-          const start = parseTime(booking.start_time);
-          const end = parseTime(booking.end_time);
-          
-          if (start && end) {
-            let hours = end.getHours() - start.getHours();
-            const minutesDiff = end.getMinutes() - start.getMinutes();
-            hours += minutesDiff / 60;
-            
-            if (!dateBookingHours.has(dateStr)) {
-              dateBookingHours.set(dateStr, 0);
-            }
-            
-            dateBookingHours.set(dateStr, dateBookingHours.get(dateStr)! + hours);
-          }
-        });
-        
-        dateBookingHours.forEach((hours, dateStr) => {
-          if (hours >= 14) {
-            fullyBookedDates.add(dateStr);
-          }
-        });
-        
-        setBookedDates(fullyBookedDates);
-      }
-    } catch (error) {
-      console.error('Error fetching existing bookings:', error);
-    }
+  // Check if day is same as current date
+  const isSameDay = (date1: Date, date2: Date) => {
+    return date1.getDate() === date2.getDate() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getFullYear() === date2.getFullYear();
   };
 
-  const fetchUserBookings = async () => {
-    if (!user) return;
-    
-    try {
-      console.log(`Fetching user bookings for venue ${venueId} and user ${user.id}`);
-      
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('venue_id', venueId)
-        .eq('user_id', user.id)
-        .or('status.eq.pending,status.eq.confirmed');
-        
-      if (error) {
-        console.error('Error fetching user bookings:', error);
-        throw error;
-      }
-      
-      console.log('User bookings fetched:', data);
-      
-      if (data) {
-        setUserBookings(data);
-      }
-    } catch (error) {
-      console.error('Error fetching user bookings:', error);
-    }
-  };
-  
-  const calculateTotalPrice = (): number => {
-    if (hoursBooked <= 0) return 0;
-    
-    const basePrice = Math.round(hoursBooked * pricePerHour);
-    
-    const guests = parseInt(guestCount || '0');
-    if (guests <= 1) {
-      return basePrice;
-    } else if (guests <= 5) {
-      return basePrice * 1.1;
-    } else if (guests <= 10) {
-      return basePrice * 1.2;
-    } else if (guests <= 20) {
-      return basePrice * 1.3;
-    } else {
-      return basePrice * 1.5;
-    }
-  };
-  
-  const parseTime = (timeString: string): Date | null => {
-    if (!timeString) return null;
-    
-    const [hours, minutes] = timeString.split(':').map(Number);
-    if (isNaN(hours) || isNaN(minutes)) return null;
-    
-    const date = new Date();
-    date.setHours(hours, minutes, 0, 0);
-    return date;
-  };
-  
-  const formatDateForDatabase = (dateObj: Date): string => {
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-  
+  // Handler for submitting the booking
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !profile) {
-      toast({
-        title: 'Login Required',
-        description: 'Please log in to book this venue',
-        variant: 'destructive',
-      });
-      navigate('/login');
-      return;
-    }
-    
-    if (!date || !startTime || !endTime || !guestCount) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please fill in all required fields',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    const totalPrice = calculateTotalPrice();
-    
-    if (totalPrice <= 0) {
-      toast({
-        title: 'Invalid Time Selection',
-        description: 'End time must be after start time',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    const selectedDateStr = formatDateForDatabase(date);
-    const timeConflict = existingBookings.some(booking => {
-      if (booking.booking_date !== selectedDateStr) return false;
-      
-      const bookingStart = parseTime(booking.start_time);
-      const bookingEnd = parseTime(booking.end_time);
-      const newStart = parseTime(startTime);
-      const newEnd = parseTime(endTime);
-      
-      if (!bookingStart || !bookingEnd || !newStart || !newEnd) return false;
-      
-      return (newStart < bookingEnd && newEnd > bookingStart);
-    });
-    
-    if (timeConflict) {
-      toast({
-        title: 'Time Slot Unavailable',
-        description: 'This time slot is already booked. Please select a different time.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      const formattedDate = formatDateForDatabase(date);
-      
-      console.log("Submitting booking with date:", formattedDate);
-      
-      const { data: bookingData, error: bookingError } = await supabase
-        .from('bookings')
-        .insert({
-          user_id: user.id,
-          venue_id: venueId,
-          venue_name: venueName,
-          booking_date: formattedDate,
-          start_time: startTime,
-          end_time: endTime,
-          guests: parseInt(guestCount),
-          special_requests: specialRequests,
-          total_price: totalPrice,
-          status: 'pending'
-        })
-        .select();
-      
-      if (bookingError) throw bookingError;
-      
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: ownerId,
-          title: 'New Booking Request',
-          message: `${profile.first_name} ${profile.last_name} has requested to book "${venueName}" on ${format(date, 'PPP')}`,
-          type: 'booking',
-          read: false,
-          link: '/customer-bookings',
-          data: {
-            booking_id: bookingData?.[0]?.id,
-            venue_id: venueId
-          }
-        });
-      
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: user.id,
-          title: 'Booking Requested',
-          message: `Your booking request for "${venueName}" has been submitted and is pending approval`,
-          type: 'booking',
-          read: false,
-          link: '/bookings',
-          data: {
-            booking_id: bookingData?.[0]?.id,
-            venue_id: venueId
-          }
-        });
-      
-      toast({
-        title: 'Booking Submitted',
-        description: 'Your booking request has been submitted successfully',
-      });
-      
-      setDate(undefined);
-      setStartTime('');
-      setEndTime('');
-      setGuestCount('');
-      setSpecialRequests('');
-      
-      fetchUserBookings();
-      
-      toast({
-        title: 'View Bookings',
-        description: 'Go to your bookings to view the status of your request',
-        action: (
-          <Button onClick={() => navigate('/bookings')} variant="outline" size="sm">
-            View Bookings
-          </Button>
-        ),
-      });
-    } catch (error: any) {
-      console.error('Error submitting booking:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to submit booking',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const cancelBooking = async (bookingId: string) => {
-    setIsCancelling(true);
-    try {
-      console.log(`Cancelling booking ${bookingId}`);
-      
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'cancelled' })
-        .eq('id', bookingId);
-        
-      if (error) {
-        console.error('Error cancelling booking:', error);
-        throw error;
-      }
-      
-      console.log(`Booking ${bookingId} cancelled successfully`);
-      
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('bookings')
-        .select('status')
-        .eq('id', bookingId)
-        .single();
-        
-      if (verifyError) {
-        console.error('Error verifying booking cancellation:', verifyError);
-      } else {
-        console.log(`Booking ${bookingId} status verified as: ${verifyData.status}`);
-      }
-      
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: ownerId,
-          title: 'Booking Cancelled',
-          message: `A booking for "${venueName}" has been cancelled by the customer`,
-          type: 'booking',
-          read: false,
-          link: '/customer-bookings'
-        });
-
-      toast({
-        title: 'Booking Cancelled',
-        description: 'Your booking has been cancelled successfully',
-      });
-      
-      await fetchUserBookings();
-      
-    } catch (error: any) {
-      console.error('Error cancelling booking:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to cancel booking',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsCancelling(false);
-    }
-  };
-
-  const initiateChat = async () => {
     if (!user) {
       toast({
-        title: 'Login Required',
-        description: 'Please log in to chat with the venue owner',
-        variant: 'destructive',
+        title: "Error",
+        description: "You must be logged in to book a venue.",
+        variant: "destructive",
       });
-      navigate('/login');
       return;
     }
     
-    if (!ownerId) {
+    if (!date || !startTime || !endTime) {
       toast({
-        title: 'Error',
-        description: 'Could not identify the venue owner. Please try again later.',
-        variant: 'destructive',
+        title: "Error",
+        description: "Please select a date and time for your booking.",
+        variant: "destructive",
       });
       return;
     }
     
     try {
-      console.log("Initiating chat with owner:", ownerId);
-      setIsLoading(true);
+      setIsBooking(true);
       
-      const { data: existingMessages, error: messagesError } = await supabase
-        .from('messages')
-        .select('id')
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${ownerId}),and(sender_id.eq.${ownerId},receiver_id.eq.${user.id})`)
-        .limit(1);
-        
-      if (messagesError) {
-        console.error("Error checking existing messages:", messagesError);
-        throw messagesError;
-      }
+      const formattedDate = format(date, 'yyyy-MM-dd');
       
-      if (!existingMessages || existingMessages.length === 0) {
-        console.log("No existing conversation found, creating initial message");
-        
-        let senderName = '';
-        if (profile) {
-          senderName = `${profile.first_name} ${profile.last_name}`;
-        } else {
-          const { data: userData, error: userError } = await supabase
-            .from('user_profiles')
-            .select('first_name, last_name')
-            .eq('id', user.id)
-            .single();
-            
-          if (!userError && userData) {
-            senderName = `${userData.first_name} ${userData.last_name}`;
-          } else {
-            senderName = 'User';
-            console.warn("Could not get user profile data:", userError);
-          }
-        }
-        
-        const { data: messageData, error: messageError } = await supabase
-          .from('messages')
-          .insert({
-            sender_id: user.id,
-            receiver_id: ownerId,
-            content: `Hello! I'm interested in booking ${venueName}. Can you provide more information?`,
-            sender_name: senderName,
-            receiver_name: ownerName || 'Venue Owner',
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([
+          {
             venue_id: venueId,
             venue_name: venueName,
-            read: false
-          })
-          .select()
-          .single();
-          
-        if (messageError) {
-          console.error("Error sending initial message:", messageError);
-          throw messageError;
-        }
-        
-        console.log("Initial message created:", messageData);
-        
-        await supabase
-          .from('notifications')
-          .insert({
+            user_id: user.id,
+            booking_date: formattedDate,
+            start_time: startTime,
+            end_time: endTime,
+            guests,
+            total_price: totalPrice,
+            special_requests: specialRequests || null,
+            status: 'pending'
+          }
+        ])
+        .select();
+      
+      if (error) throw error;
+      
+      // Show success message and reset form
+      setBookingSuccess(true);
+      
+      // Create notification for venue owner
+      await supabase
+        .from('notifications')
+        .insert([
+          {
             user_id: ownerId,
-            title: 'New Message',
-            message: `${senderName} started a conversation with you about ${venueName}`,
-            type: 'message',
-            read: false,
-            link: `/messages/${user.id}`,
+            type: 'booking_request',
+            title: 'New Booking Request',
+            message: `You have a new booking request for ${venueName} on ${format(date, 'MMM d, yyyy')}`,
             data: {
-              sender_id: user.id,
-              venue_id: venueId
+              venue_id: venueId,
+              venue_name: venueName,
+              booking_date: formattedDate,
+              start_time: startTime,
+              end_time: endTime,
+              booking_id: data?.[0]?.id
             }
-          });
-      } else {
-        console.log("Existing conversation found");
-      }
-      
-      navigate(`/messages/${ownerId}`);
-      
+          }
+        ]);
+        
     } catch (error: any) {
-      console.error("Error initiating chat:", error);
       toast({
-        title: 'Error',
-        description: 'Failed to start conversation. Please try again later.',
-        variant: 'destructive',
+        title: "Error",
+        description: error.message || "Failed to create booking. Please try again.",
+        variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsBooking(false);
     }
   };
   
-  if (!user) {
+  // Reset the form
+  const handleReset = () => {
+    setDate(undefined);
+    setStartTime('');
+    setEndTime('');
+    setGuests(1);
+    setSpecialRequests('');
+    setBookingSuccess(false);
+  };
+  
+  // Disable past dates and fully booked dates
+  const disabledDays = (day: Date) => {
+    // Disable past days
+    if (isBefore(day, startOfDay(new Date()))) {
+      return true;
+    }
+    
+    // Disable fully booked days
+    const dateStr = format(day, 'yyyy-MM-dd');
+    const isFullyBooked = bookedTimeSlots[dateStr]?.length === TIME_SLOTS.length;
+    
+    return isFullyBooked;
+  };
+  
+  // Show success confirmation
+  if (bookingSuccess) {
     return (
-      <Card className="glass-card border-white/10">
-        <CardContent className="pt-6">
-          <div className="text-center">
-            <p className="text-findvenue-text-muted mb-4">
-              Please log in to book this venue
-            </p>
-            <Button 
-              onClick={() => navigate('/login')}
-              className="bg-findvenue hover:bg-findvenue-dark"
-            >
-              Login to Book
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (userBookings.length > 0) {
-    return (
-      <Card className="glass-card border-white/10">
-        <CardHeader>
-          <CardTitle className="text-xl">Your Booking for This Venue</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {userBookings.map(booking => (
-            <div key={booking.id} className="border border-white/10 rounded-md p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold">{format(new Date(booking.booking_date), 'MMMM d, yyyy')}</h3>
-                  <p className="text-findvenue-text-muted">{booking.start_time} - {booking.end_time}</p>
-                  <p className="text-findvenue-text-muted">{booking.guests} guests</p>
-                  <div className="mt-2">
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs ${
-                      booking.status === 'confirmed' ? 'bg-green-500/20 text-green-400' :
-                      booking.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>
-                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-findvenue-text-muted text-sm">Total Price</p>
-                  <p className="font-bold">SAR {booking.total_price}</p>
-                </div>
-              </div>
-
-              {booking.special_requests && (
-                <div className="mt-3 bg-findvenue-surface/30 p-3 rounded-md">
-                  <p className="text-sm font-medium mb-1">Special Requests:</p>
-                  <p className="text-sm text-findvenue-text-muted">{booking.special_requests}</p>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center mt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={initiateChat}
-                  className="text-findvenue border-findvenue hover:bg-findvenue/10"
-                >
-                  Chat with Owner
-                </Button>
-
-                {booking.status !== 'cancelled' && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        className="border-destructive text-destructive hover:bg-destructive/10"
-                        disabled={isCancelling}
-                      >
-                        {isCancelling ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <AlertTriangle className="h-4 w-4 mr-2" />
-                        )}
-                        Cancel Booking
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-findvenue-card-bg border-white/10">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to cancel this booking? This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Keep Booking</AlertDialogCancel>
-                        <AlertDialogAction 
-                          className="bg-destructive hover:bg-destructive/90 text-white"
-                          onClick={() => cancelBooking(booking.id)}
-                        >
-                          Yes, Cancel
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
-            </div>
-          ))}
-
-          <Button 
-            onClick={() => navigate('/bookings')} 
-            className="w-full mt-4 bg-findvenue hover:bg-findvenue-dark"
+      <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+        <CardContent className="pt-6 text-center">
+          <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Booking Request Sent!</h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            Your booking request for {venueName} on {displayDate} from {startTime} to {endTime} has been sent to the venue owner.
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            You'll receive a notification once the venue owner confirms your booking.
+          </p>
+          <Button
+            onClick={handleReset}
+            className="mt-2"
           >
-            View All Bookings
+            Make Another Booking
           </Button>
         </CardContent>
       </Card>
     );
   }
   
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-3/4 mx-auto" />
+      </div>
+    );
+  }
+
   return (
-    <Card className="glass-card border-white/10">
-      <CardHeader>
-        <CardTitle className="text-xl">Book This Venue</CardTitle>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="date">Date <span className="text-red-500">*</span></Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-findvenue-text-muted"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, 'PPP') : <span>Select date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(newDate) => {
-                    setDate(newDate);
-                    setStartTime('');
-                    setEndTime('');
-                  }}
-                  initialFocus
-                  disabled={(day) => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    
-                    const dayStr = formatDateForDatabase(day);
-                    return bookedDates.has(dayStr);
-                  }}
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Select Date
+          </label>
           
-          {date && (
-            <div className="bg-findvenue/5 p-4 rounded-md border border-findvenue/10">
-              <div className="flex items-center mb-3">
-                <Info className="h-4 w-4 mr-2 text-findvenue" />
-                <p className="text-sm font-medium">Available Time Slots</p>
-              </div>
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                {availableTimeSlots.map((slot, index) => (
-                  <Button
-                    key={index}
-                    type="button"
-                    size="sm"
-                    variant={slot.isAvailable ? (
-                      startTime === slot.time || endTime === slot.time ? "default" : "outline"
-                    ) : "ghost"}
-                    disabled={!slot.isAvailable}
-                    className={cn(
-                      "text-xs h-auto py-1",
-                      !slot.isAvailable && "opacity-50 cursor-not-allowed line-through bg-red-900/10",
-                      startTime === slot.time && "bg-findvenue text-white",
-                      endTime === slot.time && "bg-findvenue-dark text-white"
-                    )}
-                    onClick={() => {
-                      if (slot.isAvailable) {
-                        if (startTime === '') {
-                          setStartTime(slot.time);
-                        } else if (endTime === '' && parseTime(slot.time)! > parseTime(startTime)!) {
-                          setEndTime(slot.time);
-                        } else {
-                          setStartTime(slot.time);
-                          setEndTime('');
-                        }
-                      }
-                    }}
-                  >
-                    {slot.time}
-                    {startTime === slot.time && " (Start)"}
-                    {endTime === slot.time && " (End)"}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-xs text-findvenue-text-muted">Click to select start time, then end time</p>
-            </div>
-          )}
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="startTime">Start Time <span className="text-red-500">*</span></Label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
-                <Input
-                  id="startTime"
-                  type="time"
-                  className="pl-10"
-                  value={startTime}
-                  onChange={(e) => {
-                    setStartTime(e.target.value);
-                    if (endTime && parseTime(endTime)! <= parseTime(e.target.value)!) {
-                      setEndTime('');
-                    }
-                  }}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="endTime">End Time <span className="text-red-500">*</span></Label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
-                <Input
-                  id="endTime"
-                  type="time"
-                  className="pl-10"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="guests">Number of Guests <span className="text-red-500">*</span></Label>
-            <div className="relative">
-              <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
-              <Input
-                id="guests"
-                type="number"
-                placeholder="Enter number of guests"
-                className="pl-10"
-                value={guestCount}
-                onChange={(e) => setGuestCount(e.target.value)}
-                min="1"
-                required
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, 'EEEE, MMMM d, yyyy') : <span>Select a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                disabled={disabledDays}
+                initialFocus
+                fromDate={new Date()}
               />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="specialRequests">Special Requests</Label>
-            <Textarea
-              id="specialRequests"
-              placeholder="Any special requirements or setup instructions?"
-              className="min-h-[100px]"
-              value={specialRequests}
-              onChange={(e) => setSpecialRequests(e.target.value)}
-            />
-          </div>
-          
-          <div className="bg-findvenue/10 p-4 rounded-md">
-            <p className="text-sm mb-2 font-medium">Booking Summary</p>
-            
-            {hoursBooked > 0 && (
-              <div className="flex justify-between items-center mb-2 text-findvenue-text-muted text-sm">
-                <span>Hourly Rate:</span>
-                <span>SAR {pricePerHour.toLocaleString()} × {hoursBooked.toFixed(1)} {hoursBooked === 1 ? 'hour' : 'hours'}</span>
-              </div>
-            )}
-            
-            {parseInt(guestCount) > 1 && hoursBooked > 0 && (
-              <div className="flex justify-between items-center mb-2 text-findvenue-text-muted text-sm">
-                <span>Guest Adjustment:</span>
-                <span>
-                  {parseInt(guestCount) <= 5 ? '+10%' : 
-                   parseInt(guestCount) <= 10 ? '+20%' : 
-                   parseInt(guestCount) <= 20 ? '+30%' : '+50%'}
-                </span>
-              </div>
-            )}
-            
-            <div className="border-t border-white/10 my-2 pt-2"></div>
-            
-            <div className="flex justify-between items-center">
-              <span className="text-findvenue-text-muted">Total Amount:</span>
-              <span className="text-xl font-bold">
-                SAR {calculateTotalPrice().toLocaleString()}
-              </span>
-            </div>
-          </div>
+            </PopoverContent>
+          </Popover>
+        </div>
 
-          <div className="flex items-center justify-between">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={initiateChat}
-              className="text-findvenue border-findvenue hover:bg-findvenue/10"
+        {date && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Start Time
+              </label>
+              <Select
+                value={startTime}
+                onValueChange={setStartTime}
+                disabled={availableStartTimes.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select start time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableStartTimes.length > 0 ? (
+                    availableStartTimes.map((time) => (
+                      <SelectItem key={`start-${time}`} value={time}>
+                        {time}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No available times
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                End Time
+              </label>
+              <Select
+                value={endTime}
+                onValueChange={setEndTime}
+                disabled={!startTime || availableEndTimes.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select end time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableEndTimes.length > 0 ? (
+                    availableEndTimes.map((time) => (
+                      <SelectItem key={`end-${time}`} value={time}>
+                        {time}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      Select start time first
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Number of Guests
+          </label>
+          <div className="flex items-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setGuests(Math.max(1, guests - 1))}
+              className="rounded-r-none"
             >
-              Chat with Owner
+              -
             </Button>
-
-            <Button 
-              type="submit" 
-              className="bg-findvenue hover:bg-findvenue-dark"
-              disabled={isSubmitting || !date || !startTime || !endTime || !guestCount}
+            <Input
+              type="number"
+              min="1"
+              value={guests}
+              onChange={(e) => setGuests(parseInt(e.target.value) || 1)}
+              className="text-center rounded-none w-16 border-x-0"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setGuests(guests + 1)}
+              className="rounded-l-none"
             >
-              {isSubmitting ? (
+              +
+            </Button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Special Requests (Optional)
+          </label>
+          <Textarea
+            placeholder="Any special requirements or setup needs?"
+            value={specialRequests}
+            onChange={(e) => setSpecialRequests(e.target.value)}
+            className="resize-none"
+          />
+        </div>
+      </div>
+
+      {startTime && endTime && (
+        <Card className="mt-4 bg-findvenue-surface/20 dark:bg-findvenue-card-bg border-white/10">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium">Booking Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-2">
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-findvenue-text-muted">Date:</span>
+                <span>{displayDate}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-findvenue-text-muted">Time:</span>
+                <span>{startTime} - {endTime} ({duration} hour{duration !== 1 ? 's' : ''})</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-findvenue-text-muted">Guests:</span>
+                <span>{guests}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-findvenue-text-muted">Rate:</span>
+                <span>SAR {pricePerHour} / hour</span>
+              </div>
+              <div className="border-t border-white/10 mt-2 pt-2 flex justify-between items-center font-medium">
+                <span>Total:</span>
+                <span>SAR {totalPrice.toLocaleString()}</span>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="pt-2">
+            <Button 
+              className="w-full bg-findvenue hover:bg-findvenue-dark"
+              type="submit"
+              disabled={isBooking}
+            >
+              {isBooking ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Processing...
                 </>
               ) : (
-                'Request Booking'
+                <>
+                  <CalendarCheck className="mr-2 h-4 w-4" />
+                  Book Now
+                </>
               )}
             </Button>
-          </div>
-        </CardContent>
-      </form>
-    </Card>
+          </CardFooter>
+        </Card>
+      )}
+    </form>
   );
 };
 

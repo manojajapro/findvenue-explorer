@@ -1,10 +1,11 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import BookingForm from '@/components/venue/BookingForm';
 import MultiDayBookingForm from '@/components/venue/MultiDayBookingForm';
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -28,6 +29,62 @@ export default function VenueBookingTabs({
   const [activeTab, setActiveTab] = useState('hourly');
   const { user } = useAuth();
   const isOwner = user?.id === ownerId;
+  const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [bookedTimeSlots, setBookedTimeSlots] = useState<Record<string, string[]>>({});
+  const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+
+  // Fetch existing bookings for this venue to disable already booked dates/times
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        setIsLoadingBookings(true);
+        const { data, error } = await supabase
+          .from('bookings')
+          .select('booking_date, start_time, end_time, status')
+          .eq('venue_id', venueId)
+          .eq('status', 'confirmed');
+          
+        if (error) {
+          console.error('Error fetching bookings:', error);
+          return;
+        }
+
+        // Process confirmed bookings to track booked dates and time slots
+        const dates: string[] = [];
+        const timeSlots: Record<string, string[]> = {};
+        
+        data.forEach(booking => {
+          const dateStr = booking.booking_date;
+          const timeSlot = `${booking.start_time} - ${booking.end_time}`;
+          
+          // Track fully booked dates for day bookings
+          if (!dates.includes(dateStr)) {
+            dates.push(dateStr);
+          }
+          
+          // Track booked time slots for hourly bookings
+          if (!timeSlots[dateStr]) {
+            timeSlots[dateStr] = [];
+          }
+          
+          if (!timeSlots[dateStr].includes(timeSlot)) {
+            timeSlots[dateStr].push(timeSlot);
+          }
+        });
+        
+        setBookedDates(dates);
+        setBookedTimeSlots(timeSlots);
+      } catch (err) {
+        console.error('Error processing bookings data:', err);
+      } finally {
+        setIsLoadingBookings(false);
+      }
+    };
+    
+    if (venueId) {
+      fetchBookings();
+    }
+  }, [venueId]);
 
   // Don't show booking tabs for the venue owner
   if (isOwner) {
@@ -51,7 +108,7 @@ export default function VenueBookingTabs({
             <span>Hourly Booking</span>
           </TabsTrigger>
           <TabsTrigger value="daily" className="text-xs sm:text-sm flex items-center gap-1">
-            <Calendar className="h-3 w-3" />
+            <CalendarIcon className="h-3 w-3" />
             <span>Day Booking</span>
           </TabsTrigger>
         </TabsList>
@@ -63,6 +120,8 @@ export default function VenueBookingTabs({
             pricePerHour={pricePerHour} 
             ownerId={ownerId}
             ownerName={ownerName}
+            bookedTimeSlots={bookedTimeSlots}
+            isLoading={isLoadingBookings}
           />
         </TabsContent>
         
@@ -73,6 +132,8 @@ export default function VenueBookingTabs({
             pricePerHour={pricePerHour}
             minCapacity={minCapacity}
             maxCapacity={maxCapacity}
+            bookedDates={bookedDates}
+            isLoading={isLoadingBookings}
           />
         </TabsContent>
       </Tabs>

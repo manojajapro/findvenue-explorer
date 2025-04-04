@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -67,14 +66,12 @@ export function OwnerBookingsCalendar() {
   const [showStats, setShowStats] = useState(false);
   const [bookedTimeSlots, setBookedTimeSlots] = useState<Record<string, string[]>>({});
 
-  // Fetch all bookings for the venue owner
   const fetchBookings = async () => {
     if (!user) return;
     
     try {
       setIsLoading(true);
       
-      // First get venue IDs owned by the user
       const { data: venuesData, error: venuesError } = await supabase
         .from('venues')
         .select('id, name, owner_info');
@@ -104,7 +101,6 @@ export function OwnerBookingsCalendar() {
       
       const venueIds = ownerVenues.map(venue => venue.id);
       
-      // Now fetch all bookings for these venues
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select('*, user_id')
@@ -112,7 +108,6 @@ export function OwnerBookingsCalendar() {
       
       if (bookingsError) throw bookingsError;
       
-      // Fetch user profiles for all user IDs
       const userIds = [...new Set((bookingsData || []).map(booking => booking.user_id))];
       
       const { data: userProfiles, error: profilesError } = await supabase
@@ -124,7 +119,6 @@ export function OwnerBookingsCalendar() {
         console.error('Error fetching user profiles:', profilesError);
       }
       
-      // Map through bookings and add user_name
       const enhancedBookings = (bookingsData || []).map(booking => {
         const userProfile = userProfiles?.find(profile => profile.id === booking.user_id);
         return {
@@ -137,10 +131,8 @@ export function OwnerBookingsCalendar() {
       
       setBookings(enhancedBookings);
       
-      // Process bookings to identify booked time slots by date and venue
       const timeSlots: Record<string, string[]> = {};
       enhancedBookings.forEach(booking => {
-        // Only consider confirmed bookings for blocking time slots
         if (booking.status === 'confirmed') {
           const dateKey = booking.booking_date;
           const timeSlot = `${booking.start_time} - ${booking.end_time}`;
@@ -170,14 +162,12 @@ export function OwnerBookingsCalendar() {
     fetchBookings();
   }, [user]);
 
-  // Build calendar dates with booking information
   useEffect(() => {
     if (bookings.length === 0) {
       setDates([]);
       return;
     }
     
-    // Create a map of dates to bookings count
     const dateMap = new Map<string, BookingType[]>();
     
     bookings.forEach(booking => {
@@ -186,7 +176,6 @@ export function OwnerBookingsCalendar() {
       dateMap.set(dateStr, [...existingBookings, booking]);
     });
     
-    // Convert map to array of BookingDay objects
     const datesArray: BookingDay[] = Array.from(dateMap.entries()).map(([dateStr, dayBookings]) => {
       const bookingsCount = dayBookings.length;
       let status: 'low' | 'medium' | 'high' | 'none' = 'none';
@@ -204,13 +193,11 @@ export function OwnerBookingsCalendar() {
     
     setDates(datesArray);
     
-    // If a date is selected, update the selectedDateBookings
     if (selectedDate) {
       updateSelectedDateBookings(selectedDate);
     }
   }, [bookings]);
   
-  // Function to update the selected date's bookings
   const updateSelectedDateBookings = (date: Date) => {
     const matchingBookings = bookings.filter(booking => 
       isSameDay(new Date(booking.booking_date), date)
@@ -219,7 +206,6 @@ export function OwnerBookingsCalendar() {
     setSelectedDateBookings(matchingBookings);
   };
   
-  // Handle date selection
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
     
@@ -227,7 +213,6 @@ export function OwnerBookingsCalendar() {
     updateSelectedDateBookings(date);
   };
   
-  // Create a rendering function for date cells
   const modifiers = useMemo(() => {
     const modifiersObj: Record<string, Date[]> = {
       hasLowBookings: [],
@@ -296,7 +281,6 @@ export function OwnerBookingsCalendar() {
         description: 'Booking confirmed successfully',
       });
       
-      // Update bookings list
       fetchBookings();
     } catch (error: any) {
       toast({
@@ -321,7 +305,6 @@ export function OwnerBookingsCalendar() {
         description: 'Booking cancelled successfully',
       });
       
-      // Update bookings list
       fetchBookings();
     } catch (error: any) {
       toast({
@@ -345,12 +328,10 @@ export function OwnerBookingsCalendar() {
   };
   
   const getMonthlyBookingStats = () => {
-    // Get all dates in the current month
     const start = startOfMonth(month);
     const end = endOfMonth(month);
     const daysInMonth = eachDayOfInterval({ start, end });
     
-    // Count bookings by status
     let confirmed = 0;
     let pending = 0;
     let cancelled = 0;
@@ -422,7 +403,6 @@ export function OwnerBookingsCalendar() {
       
       <CardContent className="p-0">
         <div className="grid grid-cols-1 md:grid-cols-7 gap-0">
-          {/* Calendar Column - Fixed on the left (3/7 of space) */}
           <div className="md:col-span-3 p-6 border-r border-white/10 min-h-[650px]">
             <Calendar
               mode="single"
@@ -466,10 +446,8 @@ export function OwnerBookingsCalendar() {
             </div>
           </div>
           
-          {/* Details/Stats Column - Right side (4/7 of space) */}
           <div className="md:col-span-4 p-6">
             {showStats ? (
-              // Stats View
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-medium">
@@ -566,7 +544,6 @@ export function OwnerBookingsCalendar() {
                 )}
               </div>
             ) : (
-              // Details View for Selected Date
               <div>
                 {selectedDate ? (
                   <div>

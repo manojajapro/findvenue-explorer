@@ -1,35 +1,30 @@
 
-import { useState, useEffect } from 'react';
-import { Calendar } from '@/components/ui/calendar';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { Calendar as CalendarIcon, Clock, Users, Info } from 'lucide-react';
-import { format, isEqual, isSameDay } from 'date-fns';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { format, addDays, isBefore, isAfter, parse, startOfDay, addMonths } from 'date-fns';
+import { 
+  CalendarIcon, 
+  Users, 
+  CalendarCheck, 
+  CalendarRange,
+  BadgeInfo, 
+  Loader2,
+  CheckCircle
+} from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+} from '@/components/ui/popover';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface MultiDayBookingFormProps {
   venueId: string;
@@ -37,497 +32,371 @@ interface MultiDayBookingFormProps {
   pricePerHour?: number;
   minCapacity?: number;
   maxCapacity?: number;
+  bookedDates?: string[];
+  isLoading?: boolean;
 }
 
-type BookingDay = {
-  date: Date;
-  startTime: string;
-  endTime: string;
-  guests: number;
-};
-
-export default function MultiDayBookingForm({
-  venueId,
-  venueName,
+const MultiDayBookingForm = ({ 
+  venueId, 
+  venueName, 
   pricePerHour = 0,
   minCapacity = 1,
-  maxCapacity = 100
-}: MultiDayBookingFormProps) {
+  maxCapacity = 100,
+  bookedDates = [],
+  isLoading = false
+}: MultiDayBookingFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedDays, setSelectedDays] = useState<BookingDay[]>([]);
-  const [specialRequests, setSpecialRequests] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<Record<string, string[]>>({});
-  const [existingBookings, setExistingBookings] = useState<any[]>([]);
+  
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [displayDate, setDisplayDate] = useState<string>('');
+  const [guests, setGuests] = useState(Math.max(minCapacity, 1));
   const [totalPrice, setTotalPrice] = useState(0);
-  const [disabledDates, setDisabledDates] = useState<Date[]>([]);
-
+  const [specialRequests, setSpecialRequests] = useState('');
+  const [isBooking, setIsBooking] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+  
+  // Base price calculation (assuming daily rate is 8 * hourly rate)
+  const dailyRate = pricePerHour * 8;
+  
+  // Reset form when changing date
   useEffect(() => {
-    if (venueId) {
-      fetchExistingBookings();
+    if (date) {
+      setDisplayDate(format(date, 'EEEE, MMMM d, yyyy'));
+      calculateTotalPrice();
+    } else {
+      setDisplayDate('');
     }
-  }, [venueId]);
-
+  }, [date]);
+  
+  // Calculate price when date or guests change
   useEffect(() => {
-    let newTotal = 0;
-    selectedDays.forEach(day => {
-      const startHour = parseInt(day.startTime.split(':')[0]);
-      const endHour = parseInt(day.endTime.split(':')[0]);
-      const hours = endHour - startHour;
-      newTotal += hours * pricePerHour;
-    });
-    setTotalPrice(newTotal);
-  }, [selectedDays, pricePerHour]);
-
-  const fetchExistingBookings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('venue_id', venueId)
-        .in('status', ['pending', 'confirmed']);
-
-      if (error) throw error;
-      
-      // Update existing bookings
-      setExistingBookings(data || []);
-      
-      // Create a map of dates to their booked hours
-      const dateBookingMap = new Map();
-      
-      data?.forEach(booking => {
-        const date = booking.booking_date;
-        const startHour = parseInt(booking.start_time.split(':')[0]);
-        const endHour = parseInt(booking.end_time.split(':')[0]);
-        
-        if (!dateBookingMap.has(date)) {
-          dateBookingMap.set(date, new Set());
-        }
-        
-        for (let hour = startHour; hour < endHour; hour++) {
-          dateBookingMap.get(date).add(hour);
-        }
-      });
-      
-      // Find fully booked dates (dates where all 24 hours are booked or enough hours that no meaningful booking can be made)
-      const fullyBookedDates: Date[] = [];
-      
-      dateBookingMap.forEach((hours, date) => {
-        // If more than 20 hours are booked, consider the day fully booked
-        if (hours.size >= 20) {
-          fullyBookedDates.push(new Date(date));
-        }
-      });
-      
-      setDisabledDates(fullyBookedDates);
-      
-    } catch (error) {
-      console.error('Error fetching existing bookings:', error);
-    }
-  };
-
-  const generateTimeSlots = () => {
-    const slots = [];
-    // Generate 24 hour time slots
-    for (let i = 0; i <= 23; i++) {
-      slots.push(`${i.toString().padStart(2, '0')}:00`);
-    }
-    return slots;
-  };
-
-  const isTimeSlotAvailable = (date: Date, startTime: string, endTime: string) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    
-    return !existingBookings.some(booking => {
-      if (booking.booking_date !== dateStr) return false;
-      
-      const bookingStart = booking.start_time;
-      const bookingEnd = booking.end_time;
-      
-      return (startTime < bookingEnd && endTime > bookingStart);
-    });
-  };
-
-  const getAvailableEndTimes = (date: Date, startTime: string) => {
-    const startHour = parseInt(startTime.split(':')[0]);
-    const availableEndTimes = [];
-    
-    // Allow up to 24 hour bookings
-    for (let i = startHour + 1; i <= 24; i++) {
-      const endTime = `${i.toString().padStart(2, '0')}:00`;
-      
-      if (isTimeSlotAvailable(date, startTime, endTime)) {
-        availableEndTimes.push(endTime);
-      } else {
-        break;
-      }
-    }
-    
-    return availableEndTimes;
-  };
-
-  const addBookingDay = () => {
-    const today = new Date();
-    
-    // Check if this date is already selected
-    const dateAlreadySelected = selectedDays.some(day => 
-      isSameDay(day.date, today)
-    );
-    
-    // Check if the date is fully booked
-    const isDateFullyBooked = disabledDates.some(disabledDate => 
-      isSameDay(disabledDate, today)
-    );
-    
-    if (isDateFullyBooked) {
-      toast({
-        title: "Date Unavailable",
-        description: "This date is fully booked.",
-        variant: "destructive",
-      });
+    calculateTotalPrice();
+  }, [date, guests, pricePerHour]);
+  
+  const calculateTotalPrice = () => {
+    if (!date || !dailyRate) {
+      setTotalPrice(0);
       return;
     }
     
-    if (!dateAlreadySelected) {
-      setSelectedDays([
-        ...selectedDays, 
-        { date: today, startTime: '10:00', endTime: '12:00', guests: minCapacity }
-      ]);
-    } else {
-      toast({
-        title: "Date Already Selected",
-        description: "This date is already in your booking.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const removeBookingDay = (index: number) => {
-    setSelectedDays(selectedDays.filter((_, i) => i !== index));
-  };
-
-  const updateBookingDay = (index: number, field: keyof BookingDay, value: any) => {
-    // If updating the date, check if it's already selected in another booking
-    if (field === 'date') {
-      const dateAlreadySelected = selectedDays.some((day, i) => 
-        i !== index && isSameDay(day.date, value)
-      );
-      
-      const isDateFullyBooked = disabledDates.some(disabledDate => 
-        isSameDay(disabledDate, value)
-      );
-      
-      if (isDateFullyBooked) {
-        toast({
-          title: "Date Unavailable",
-          description: "This date is fully booked.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (dateAlreadySelected) {
-        toast({
-          title: "Date Already Selected",
-          description: "This date is already in your booking.",
-          variant: "destructive",
-        });
-        return;
-      }
+    // Base price for full day
+    let price = dailyRate;
+    
+    // Extra charge for more guests
+    if (guests > minCapacity) {
+      const extraGuests = guests - minCapacity;
+      const extraCharge = extraGuests * (dailyRate * 0.1); // 10% extra per additional guest
+      price += extraCharge;
     }
     
-    const updatedDays = [...selectedDays];
-    updatedDays[index] = { ...updatedDays[index], [field]: value };
-    
-    if (field === 'date' || field === 'startTime') {
-      const availableEndTimes = getAvailableEndTimes(
-        updatedDays[index].date, 
-        updatedDays[index].startTime
-      );
-      
-      if (availableEndTimes.length > 0 && !availableEndTimes.includes(updatedDays[index].endTime)) {
-        updatedDays[index].endTime = availableEndTimes[0];
-      }
+    // Weekend pricing (Friday and Saturday) - 20% premium
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek === 5 || dayOfWeek === 6) { // Friday or Saturday
+      price *= 1.2;
     }
     
-    setSelectedDays(updatedDays);
+    setTotalPrice(Math.round(price));
   };
 
-  const handleSubmit = async () => {
+  // Handler for submitting the booking
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!user) {
       toast({
-        title: "Login Required",
-        description: "Please login to book this venue",
-      });
-      return;
-    }
-
-    if (selectedDays.length === 0) {
-      toast({
-        title: "No Dates Selected",
-        description: "Please select at least one date to book",
+        title: "Error",
+        description: "You must be logged in to book a venue.",
         variant: "destructive",
       });
       return;
     }
-
-    setIsSubmitting(true);
-
-    try {
-      for (const day of selectedDays) {
-        const bookingDate = format(day.date, 'yyyy-MM-dd');
-        
-        if (!isTimeSlotAvailable(day.date, day.startTime, day.endTime)) {
-          toast({
-            title: "Time Slot Unavailable",
-            description: `The selected time on ${format(day.date, 'MMMM d, yyyy')} is no longer available.`,
-            variant: "destructive",
-          });
-          continue;
-        }
-        
-        const startHour = parseInt(day.startTime.split(':')[0]);
-        const endHour = parseInt(day.endTime.split(':')[0]);
-        const hours = endHour - startHour;
-        const dayPrice = hours * pricePerHour;
-        
-        const { error } = await supabase.from('bookings').insert({
-          user_id: user.id,
-          venue_id: venueId,
-          venue_name: venueName,
-          booking_date: bookingDate,
-          start_time: day.startTime,
-          end_time: day.endTime,
-          status: 'pending',
-          total_price: dayPrice,
-          guests: day.guests,
-          special_requests: specialRequests
-        });
-
-        if (error) throw error;
-      }
-
+    
+    if (!date) {
       toast({
-        title: "Booking Submitted",
-        description: `You have successfully requested ${selectedDays.length} booking${selectedDays.length > 1 ? 's' : ''}.`,
+        title: "Error",
+        description: "Please select a date for your booking.",
+        variant: "destructive",
       });
-
-      setSelectedDays([]);
-      setSpecialRequests('');
+      return;
+    }
+    
+    try {
+      setIsBooking(true);
+      
+      const formattedDate = format(date, 'yyyy-MM-dd');
+      
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([
+          {
+            venue_id: venueId,
+            venue_name: venueName,
+            user_id: user.id,
+            booking_date: formattedDate,
+            start_time: '09:00',
+            end_time: '22:00',
+            guests,
+            total_price: totalPrice,
+            special_requests: specialRequests || null,
+            status: 'pending'
+          }
+        ])
+        .select();
+      
+      if (error) throw error;
+      
+      // Show success message and reset form
+      setBookingSuccess(true);
+      
+      // Create notification for venue owner
+      await supabase
+        .from('notifications')
+        .insert([
+          {
+            user_id: 'owner_id_here', // This should be dynamically set based on the venue owner
+            type: 'booking_request',
+            title: 'New Full-Day Booking Request',
+            message: `You have a new full-day booking request for ${venueName} on ${format(date, 'MMM d, yyyy')}`,
+            data: {
+              venue_id: venueId,
+              venue_name: venueName,
+              booking_date: formattedDate,
+              booking_id: data?.[0]?.id
+            }
+          }
+        ]);
+        
     } catch (error: any) {
-      console.error('Error submitting booking:', error);
       toast({
-        title: "Booking Failed",
-        description: error.message || "Failed to submit booking request.",
+        title: "Error",
+        description: error.message || "Failed to create booking. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsBooking(false);
     }
   };
-
-  const timeSlots = generateTimeSlots();
+  
+  // Reset the form
+  const handleReset = () => {
+    setDate(undefined);
+    setGuests(Math.max(minCapacity, 1));
+    setSpecialRequests('');
+    setBookingSuccess(false);
+  };
+  
+  // Convert booked dates string array to Date objects
+  const disabledDays = (day: Date) => {
+    // Disable past days
+    if (isBefore(day, startOfDay(new Date()))) {
+      return true;
+    }
+    
+    // Disable already booked days
+    const dateStr = format(day, 'yyyy-MM-dd');
+    return bookedDates.includes(dateStr);
+  };
+  
+  // Show success confirmation
+  if (bookingSuccess) {
+    return (
+      <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+        <CardContent className="pt-6 text-center">
+          <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
+          <h3 className="text-xl font-semibold mb-2">Booking Request Sent!</h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            Your full-day booking request for {venueName} on {displayDate} has been sent to the venue owner.
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            You'll receive a notification once the venue owner confirms your booking.
+          </p>
+          <Button
+            onClick={handleReset}
+            className="mt-2"
+          >
+            Make Another Booking
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-3/4 mx-auto" />
+      </div>
+    );
+  }
 
   return (
-    <Card className="glass-card border-white/10 w-full mx-auto">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Day Booking</CardTitle>
-        <CardDescription>
-          Book this venue for one or multiple days
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {selectedDays.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-findvenue-text-muted mb-4">No booking days selected yet</p>
-              <Button onClick={addBookingDay}>Add Booking Day</Button>
-            </div>
-          ) : (
-            <>
-              <Accordion type="multiple" className="w-full">
-                {selectedDays.map((day, index) => (
-                  <AccordionItem key={index} value={`day-${index}`}>
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex items-center gap-4 pl-1">
-                        <span>Day {index + 1}:</span>
-                        <span className="text-findvenue">{format(day.date, 'MMMM d, yyyy')}</span>
-                        <span className="text-findvenue-text-muted">
-                          {day.startTime} -  {day.endTime}
-                        </span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4 p-2">
-                        <div className="grid gap-4">
-                          <div className="grid gap-2">
-                            <Label>Date</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className="w-full justify-start text-left font-normal"
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {format(day.date, 'MMMM d, yyyy')}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={day.date}
-                                  onSelect={(date) => date && updateBookingDay(index, 'date', date)}
-                                  initialFocus
-                                  disabled={(date) => {
-                                    // Disable past dates
-                                    if (date < new Date(new Date().setHours(0,0,0,0))) {
-                                      return true;
-                                    }
-                                    
-                                    // Disable dates that are already fully booked
-                                    if (disabledDates.some(disabledDate => 
-                                      isSameDay(disabledDate, date)
-                                    )) {
-                                      return true;
-                                    }
-                                    
-                                    // Disable dates that are already selected in other booking days
-                                    return selectedDays.some((selectedDay, i) => 
-                                      i !== index && isSameDay(selectedDay.date, date)
-                                    );
-                                  }}
-                                  className="pointer-events-auto"
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                              <Label>Start Time</Label>
-                              <Select
-                                value={day.startTime}
-                                onValueChange={(value) => updateBookingDay(index, 'startTime', value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select start time" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {timeSlots.slice(0, -1).map((time) => (
-                                    <SelectItem 
-                                      key={time} 
-                                      value={time}
-                                      disabled={!isTimeSlotAvailable(day.date, time, time.replace(/^\d+/, hour => `${parseInt(hour) + 1}`))}
-                                    >
-                                      {time}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="grid gap-2">
-                              <Label>End Time</Label>
-                              <Select
-                                value={day.endTime}
-                                onValueChange={(value) => updateBookingDay(index, 'endTime', value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select end time" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {getAvailableEndTimes(day.date, day.startTime).map((time) => (
-                                    <SelectItem key={time} value={time}>
-                                      {time}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div className="grid gap-2">
-                            <Label>Number of Guests</Label>
-                            <Input
-                              type="number"
-                              min={minCapacity}
-                              max={maxCapacity}
-                              value={day.guests}
-                              onChange={(e) => updateBookingDay(index, 'guests', parseInt(e.target.value) || minCapacity)}
-                              className="bg-background"
-                            />
-                          </div>
-
-                          <Button 
-                            variant="destructive" 
-                            onClick={() => removeBookingDay(index)}
-                          >
-                            Remove This Day
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-
-              <div className="flex justify-center">
-                <Button onClick={addBookingDay} variant="outline" className="mt-4">
-                  Add Another Day
-                </Button>
-              </div>
-            </>
-          )}
-
-          {selectedDays.length > 0 && (
-            <>
-              <div className="grid gap-2 mt-6">
-                <Label>Special Requests (Optional)</Label>
-                <Textarea
-                  placeholder="Any special requirements or notes for the venue owner..."
-                  value={specialRequests}
-                  onChange={(e) => setSpecialRequests(e.target.value)}
-                  className="bg-background min-h-24"
-                />
-              </div>
-
-              <div className="bg-findvenue/10 p-4 rounded-md mt-6">
-                <div className="flex items-start gap-3">
-                  <Info className="h-5 w-5 text-findvenue mt-0.5" />
-                  <div>
-                    <h4 className="font-medium mb-1">Booking Summary</h4>
-                    <ul className="space-y-1 text-sm text-findvenue-text-muted">
-                      <li>• {selectedDays.length} day(s) selected</li>
-                      <li>• {pricePerHour} SAR per hour</li>
-                      <li className="font-medium text-findvenue">
-                        Total: {totalPrice} SAR
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Select Date
+          </label>
           
-          {selectedDays.length === 0 && (
-            <Alert className="mt-4 bg-findvenue/10 border-findvenue/20">
-              <AlertDescription>
-                Click "Add Booking Day" to select one or more days for your booking.
-              </AlertDescription>
-            </Alert>
-          )}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarRange className="mr-2 h-4 w-4" />
+                {date ? format(date, 'EEEE, MMMM d, yyyy') : <span>Select a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                disabled={disabledDays}
+                initialFocus
+                fromDate={new Date()}
+                toDate={addMonths(new Date(), 3)}
+              />
+            </PopoverContent>
+          </Popover>
+          
+          <p className="text-xs text-muted-foreground mt-1">
+            Booking available up to 3 months in advance. Grayed out dates are already booked.
+          </p>
         </div>
-      </CardContent>
-      <CardFooter>
-        <Button 
-          onClick={handleSubmit} 
-          className="w-full bg-findvenue hover:bg-findvenue-dark"
-          disabled={isSubmitting || selectedDays.length === 0}
-        >
-          {isSubmitting ? 'Submitting...' : 'Request Booking'}
-        </Button>
-      </CardFooter>
-    </Card>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Number of Guests
+          </label>
+          <div className="flex items-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setGuests(Math.max(minCapacity, guests - 1))}
+              className="rounded-r-none"
+              disabled={guests <= minCapacity}
+            >
+              -
+            </Button>
+            <Input
+              type="number"
+              min={minCapacity}
+              max={maxCapacity}
+              value={guests}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (value >= minCapacity && value <= maxCapacity) {
+                  setGuests(value);
+                }
+              }}
+              className="text-center rounded-none w-16 border-x-0"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setGuests(Math.min(maxCapacity, guests + 1))}
+              className="rounded-l-none"
+              disabled={guests >= maxCapacity}
+            >
+              +
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            This venue accommodates {minCapacity} to {maxCapacity} guests
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Special Requests (Optional)
+          </label>
+          <Textarea
+            placeholder="Any special requirements or setup needs?"
+            value={specialRequests}
+            onChange={(e) => setSpecialRequests(e.target.value)}
+            className="resize-none"
+          />
+        </div>
+      </div>
+
+      {date && (
+        <Card className="mt-4 bg-findvenue-surface/20 dark:bg-findvenue-card-bg border-white/10">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium">Booking Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-2">
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-findvenue-text-muted">Date:</span>
+                <span>{displayDate}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-findvenue-text-muted">Duration:</span>
+                <span>Full Day (9:00 AM - 10:00 PM)</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-findvenue-text-muted">Guests:</span>
+                <span>{guests}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-findvenue-text-muted">Base Rate:</span>
+                <span>SAR {dailyRate} / day</span>
+              </div>
+              
+              {guests > minCapacity && (
+                <div className="flex justify-between items-center">
+                  <span className="text-findvenue-text-muted">Additional Guests:</span>
+                  <span>+SAR {Math.round((guests - minCapacity) * (dailyRate * 0.1))}</span>
+                </div>
+              )}
+              
+              {date && (date.getDay() === 5 || date.getDay() === 6) && (
+                <div className="flex justify-between items-center">
+                  <span className="text-findvenue-text-muted">Weekend Premium:</span>
+                  <span>+20%</span>
+                </div>
+              )}
+              
+              <div className="border-t border-white/10 mt-2 pt-2 flex justify-between items-center font-medium">
+                <span>Total:</span>
+                <span>SAR {totalPrice.toLocaleString()}</span>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="pt-2">
+            <Button 
+              className="w-full bg-findvenue hover:bg-findvenue-dark"
+              type="submit"
+              disabled={isBooking}
+            >
+              {isBooking ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CalendarCheck className="mr-2 h-4 w-4" />
+                  Book Now
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
+    </form>
   );
-}
+};
+
+export default MultiDayBookingForm;
