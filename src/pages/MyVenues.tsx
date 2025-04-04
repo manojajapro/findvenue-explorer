@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Calendar, DollarSign, Users, PlusCircle, Edit } from 'lucide-react';
+import { BarChart3, Calendar, DollarSign, Users, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 import { Helmet } from 'react-helmet';
 import { useToast } from '@/hooks/use-toast';
@@ -179,7 +179,6 @@ const MyVenues = () => {
           revenue: totalRevenue
         });
         
-        // Sort by booking_date in descending order before slicing
         const sortedBookings = [...bookingsData].sort((a, b) => {
           if (a.booking_date > b.booking_date) return -1;
           if (a.booking_date < b.booking_date) return 1;
@@ -212,7 +211,6 @@ const MyVenues = () => {
   const handleDeleteVenue = async (venueId: string, venueName: string) => {
     if (window.confirm(`Are you sure you want to delete "${venueName}"? This action cannot be undone.`)) {
       try {
-        // Check for active bookings first
         const { data: bookings, error: bookingsError } = await supabase
           .from('bookings')
           .select('id, status')
@@ -230,7 +228,6 @@ const MyVenues = () => {
           return;
         }
         
-        // Delete the venue
         const { error: deleteError } = await supabase
           .from('venues')
           .delete()
@@ -238,7 +235,6 @@ const MyVenues = () => {
         
         if (deleteError) throw deleteError;
         
-        // Update venues list
         setVenues(prev => prev.filter(venue => venue.id !== venueId));
         
         toast({
@@ -390,7 +386,6 @@ const MyVenues = () => {
                 </Card>
               </div>
               
-              {/* Add Bookings Calendar */}
               <Card className="glass-card border-white/10">
                 <CardHeader>
                   <CardTitle>Bookings Calendar</CardTitle>
@@ -479,11 +474,7 @@ const MyVenues = () => {
                             className="bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm"
                             onClick={() => handleDeleteVenue(venue.id, venue.name)}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                              <path d="M3 6h18"></path>
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                            </svg>
+                            <Trash2 className="h-4 w-4 text-white" />
                           </Button>
                         </div>
                         {venue.featured ? (
