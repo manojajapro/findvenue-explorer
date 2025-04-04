@@ -58,6 +58,7 @@ export interface Venue {
     }
   };
   additionalServices?: string[];
+  status?: string;
 }
 
 export const useSupabaseVenues = () => {

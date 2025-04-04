@@ -35,6 +35,26 @@ export default function VenueBookingTabs({
   const [fullyBookedDates, setFullyBookedDates] = useState<string[]>([]);
   const [hourlyBookedDates, setHourlyBookedDates] = useState<string[]>([]);
   const [dayBookedDates, setDayBookedDates] = useState<string[]>([]);
+  const [venueStatus, setVenueStatus] = useState<string>('active');
+
+  // Fetch venue status
+  useEffect(() => {
+    if (venueId) {
+      const fetchVenueStatus = async () => {
+        const { data, error } = await supabase
+          .from('venues')
+          .select('status')
+          .eq('id', venueId)
+          .single();
+          
+        if (data && !error) {
+          setVenueStatus(data.status || 'active');
+        }
+      };
+      
+      fetchVenueStatus();
+    }
+  }, [venueId]);
 
   // Fetch existing bookings for this venue to disable already booked dates/times
   useEffect(() => {
@@ -152,6 +172,17 @@ export default function VenueBookingTabs({
       <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
         <p className="text-center text-findvenue-text-muted">
           This is your venue. You cannot book your own venue.
+        </p>
+      </div>
+    );
+  }
+
+  // Don't allow bookings if venue is not confirmed
+  if (venueStatus !== 'confirmed' && venueStatus !== 'active') {
+    return (
+      <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
+        <p className="text-center text-findvenue-text-muted">
+          This venue is not available for booking at the moment.
         </p>
       </div>
     );

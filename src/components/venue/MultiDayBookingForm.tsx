@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -15,7 +16,11 @@ import {
   Loader2,
   CheckCircle,
   Info,
-  AlertCircle
+  AlertCircle,
+  Mail,
+  Phone,
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 import {
   Popover,
@@ -36,6 +41,8 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 interface MultiDayBookingFormProps {
   venueId: string;
@@ -46,6 +53,11 @@ interface MultiDayBookingFormProps {
   bookedDates?: string[];
   isLoading?: boolean;
 }
+
+const PAYMENT_METHODS = [
+  { id: 'credit_card', name: 'Credit Card', icon: <CreditCard className="w-4 h-4" /> },
+  { id: 'cash', name: 'Cash', icon: <Banknote className="w-4 h-4" /> }
+];
 
 const MultiDayBookingForm = ({ 
   venueId, 
@@ -71,6 +83,11 @@ const MultiDayBookingForm = ({
   const [unavailableDatesLoaded, setUnavailableDatesLoaded] = useState(false);
   const [showUnavailableDialog, setShowUnavailableDialog] = useState(false);
   
+  // Customer contact fields
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('credit_card');
+  
   // Base price calculation (assuming daily rate is 8 * hourly rate)
   const dailyRate = pricePerHour * 8;
   
@@ -78,6 +95,26 @@ const MultiDayBookingForm = ({
   useEffect(() => {
     fetchAllBookedDates();
   }, [venueId]);
+  
+  // Get user profile info if logged in
+  useEffect(() => {
+    if (user) {
+      const getUserProfile = async () => {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('email, phone')
+          .eq('id', user.id)
+          .single();
+        
+        if (data && !error) {
+          setCustomerEmail(data.email || '');
+          setCustomerPhone(data.phone || '');
+        }
+      };
+      
+      getUserProfile();
+    }
+  }, [user]);
   
   // Reset form when changing date
   useEffect(() => {
@@ -278,6 +315,15 @@ const MultiDayBookingForm = ({
       return;
     }
     
+    if (!customerEmail || !customerPhone) {
+      toast({
+        title: "Error",
+        description: "Please provide your contact details.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       setIsBooking(true);
       
@@ -293,6 +339,16 @@ const MultiDayBookingForm = ({
         return;
       }
       
+      // Update user profile with contact info if needed
+      if (user.email !== customerEmail || customerPhone) {
+        await supabase
+          .from('user_profiles')
+          .update({
+            phone: customerPhone
+          })
+          .eq('id', user.id);
+      }
+      
       const { data, error } = await supabase
         .from('bookings')
         .insert([
@@ -306,7 +362,10 @@ const MultiDayBookingForm = ({
             guests,
             total_price: totalPrice,
             special_requests: specialRequests || null,
-            status: 'confirmed' // Auto-confirm since we've already checked for conflicts
+            status: 'confirmed', // Auto-confirm since we've already checked for conflicts
+            customer_email: customerEmail,
+            customer_phone: customerPhone,
+            payment_method: paymentMethod
           }
         ])
         .select();
@@ -488,6 +547,70 @@ const MultiDayBookingForm = ({
           <p className="text-xs text-muted-foreground mt-1">
             This venue accommodates {minCapacity} to {maxCapacity} guests
           </p>
+        </div>
+        
+        {/* Customer Contact Information */}
+        <div className="space-y-3">
+          <h4 className="font-medium">Contact Information</h4>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Email
+            </label>
+            <div className="relative">
+              <Input 
+                type="email" 
+                placeholder="Your email address" 
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                required
+                className="pl-9"
+              />
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Phone
+            </label>
+            <div className="relative">
+              <Input 
+                type="tel" 
+                placeholder="Your phone number" 
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                required
+                className="pl-9"
+              />
+              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        </div>
+        
+        {/* Payment Method */}
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            Payment Method
+          </label>
+          <RadioGroup 
+            value={paymentMethod} 
+            onValueChange={setPaymentMethod}
+            className="flex flex-col space-y-2"
+          >
+            {PAYMENT_METHODS.map((method) => (
+              <div key={method.id} className="flex items-center space-x-2">
+                <RadioGroupItem value={method.id} id={`payment-${method.id}`} />
+                <Label 
+                  htmlFor={`payment-${method.id}`}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  {method.icon}
+                  {method.name}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
         </div>
 
         <div>
