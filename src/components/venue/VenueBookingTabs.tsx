@@ -59,8 +59,6 @@ export default function VenueBookingTabs({
             pricePerHour={pricePerHour}
             minCapacity={minCapacity}
             maxCapacity={maxCapacity}
-            ownerId={ownerId}
-            ownerName={ownerName}
           />
         </TabsContent>
       </Tabs>

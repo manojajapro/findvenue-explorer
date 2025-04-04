@@ -50,6 +50,12 @@ export interface Venue {
     contact: string;
     responseTime: string;
     user_id: string;
+    socialLinks?: {
+      facebook?: string;
+      twitter?: string;
+      instagram?: string;
+      linkedin?: string;
+    }
   };
   additionalServices?: string[];
 }
@@ -151,7 +157,8 @@ export const useSupabaseVenues = () => {
                 name: ownerInfo.name || '',
                 contact: ownerInfo.contact || '',
                 responseTime: ownerInfo.response_time || '',
-                user_id: ownerInfo.user_id || ''
+                user_id: ownerInfo.user_id || '',
+                socialLinks: ownerInfo.social_links || {}
               };
             }
           } catch (e) {
