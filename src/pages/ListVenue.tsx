@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,11 +10,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { saudiCities } from '@/data/cities';
 import { categories } from '@/data/categories';
-import { Check, Upload, AlertCircle, ImageIcon, X, MapPin } from 'lucide-react';
+import { Check, Upload, AlertCircle, ImageIcon, X, MapPin, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const ListVenue = () => {
   const { toast } = useToast();
@@ -26,6 +36,22 @@ const ListVenue = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [mapModalOpen, setMapModalOpen] = useState(false);
+  
+  // Verification states
+  const [showVerificationDialog, setShowVerificationDialog] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  
+  // Selection mode tabs
+  const [cityInputMode, setCityInputMode] = useState('dropdown'); // 'dropdown' or 'manual'
+  const [categoryInputMode, setCategoryInputMode] = useState('dropdown'); // 'dropdown' or 'manual'
+  const [manualCity, setManualCity] = useState('');
+  const [manualCategory, setManualCategory] = useState('');
+  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -203,10 +229,44 @@ const ListVenue = () => {
   // Handle next step
   const handleNextStep = () => {
     if (step === 1) {
-      if (!formData.name || !formData.description || !formData.address || !formData.city || !formData.category) {
+      if (!formData.name || !formData.description || !formData.address) {
         toast({
           title: 'Missing Information',
           description: 'Please fill in all required fields before proceeding',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      // Check city input based on mode
+      if (cityInputMode === 'dropdown' && !formData.city) {
+        toast({
+          title: 'Missing Information',
+          description: 'Please select a city before proceeding',
+          variant: 'destructive'
+        });
+        return;
+      } else if (cityInputMode === 'manual' && !manualCity) {
+        toast({
+          title: 'Missing Information',
+          description: 'Please enter a city name before proceeding',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      // Check category input based on mode
+      if (categoryInputMode === 'dropdown' && !formData.category) {
+        toast({
+          title: 'Missing Information',
+          description: 'Please select a venue type before proceeding',
+          variant: 'destructive'
+        });
+        return;
+      } else if (categoryInputMode === 'manual' && !manualCategory) {
+        toast({
+          title: 'Missing Information',
+          description: 'Please enter a venue type before proceeding',
           variant: 'destructive'
         });
         return;
@@ -232,31 +292,88 @@ const ListVenue = () => {
     window.scrollTo(0, 0);
   };
   
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Send verification email with OTP
+  const sendVerificationEmail = async () => {
+    setVerificationLoading(true);
+    setOtpError('');
     
-    // Validate form data
-    const anyAvailability = Object.values(formData.availability).some(value => value);
-    
-    if (!anyAvailability) {
+    try {
+      // For this example, we'll simulate sending an OTP to the user's email
+      // In a real application, you would call an edge function to send the actual email with OTP
+      
+      // Generate a 6-digit OTP
+      const generatedOTP = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Store the OTP in localStorage for verification (in a real app, this would be handled server-side)
+      localStorage.setItem('venueOTP', generatedOTP);
+      localStorage.setItem('venueOTPExpiry', (Date.now() + 10 * 60 * 1000).toString());
+      
+      // In a real application, you would call a Supabase edge function to send the email
+      console.log(`OTP generated for verification: ${generatedOTP}`);
+      
       toast({
-        title: 'Availability Required',
-        description: 'Please select at least one day of availability',
+        title: 'Verification Code Sent',
+        description: `A verification code has been sent to ${profile?.email}. (For demo: ${generatedOTP})`,
+      });
+      
+      setVerificationSent(true);
+    } catch (error: any) {
+      console.error('Error sending verification email:', error);
+      toast({
+        title: 'Error Sending Verification',
+        description: error.message || 'An unexpected error occurred',
         variant: 'destructive'
       });
+    } finally {
+      setVerificationLoading(false);
+    }
+  };
+  
+  // Verify OTP code
+  const verifyOTPCode = () => {
+    setVerificationLoading(true);
+    setOtpError('');
+    
+    // Get stored OTP and expiry time
+    const storedOTP = localStorage.getItem('venueOTP');
+    const expiry = localStorage.getItem('venueOTPExpiry');
+    
+    if (!storedOTP || !expiry) {
+      setOtpError('Verification code expired or not found. Please request a new one.');
+      setVerificationLoading(false);
       return;
     }
     
-    if (uploadedImages.length === 0) {
-      toast({
-        title: 'Images Required',
-        description: 'Please upload at least one venue image',
-        variant: 'destructive'
-      });
+    // Check if OTP has expired
+    if (Date.now() > parseInt(expiry)) {
+      setOtpError('Verification code has expired. Please request a new one.');
+      localStorage.removeItem('venueOTP');
+      localStorage.removeItem('venueOTPExpiry');
+      setVerificationLoading(false);
       return;
     }
     
+    // Verify OTP
+    if (otpCode === storedOTP) {
+      setOtpVerified(true);
+      localStorage.removeItem('venueOTP');
+      localStorage.removeItem('venueOTPExpiry');
+      toast({
+        title: 'Verification Successful',
+        description: 'Your email has been verified successfully.',
+      });
+      
+      // Submit the venue data to Supabase
+      handleVenueSubmission();
+    } else {
+      setOtpError('Incorrect verification code. Please try again.');
+    }
+    
+    setVerificationLoading(false);
+  };
+  
+  // Handle venue form submission after verification
+  const handleVenueSubmission = async () => {
     if (!user || !profile) {
       toast({
         title: 'Authentication Error',
@@ -269,6 +386,29 @@ const ListVenue = () => {
     setIsLoading(true);
     
     try {
+      // Validate required fields
+      const anyAvailability = Object.values(formData.availability).some(value => value);
+      
+      if (!anyAvailability) {
+        toast({
+          title: 'Availability Required',
+          description: 'Please select at least one day of availability',
+          variant: 'destructive'
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      if (uploadedImages.length === 0) {
+        toast({
+          title: 'Images Required',
+          description: 'Please upload at least one venue image',
+          variant: 'destructive'
+        });
+        setIsLoading(false);
+        return;
+      }
+      
       // Convert amenities object to array for Supabase
       const amenitiesArray = Object.entries(formData.amenities)
         .filter(([_, value]) => value)
@@ -285,9 +425,31 @@ const ListVenue = () => {
         .filter(([_, value]) => value)
         .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
       
-      // Find city and category names from IDs
-      const cityName = saudiCities.find(city => city.id === formData.city)?.name || '';
-      const categoryName = categories.find(cat => cat.id === formData.category)?.name || '';
+      // Get city and category information
+      let cityId = '';
+      let cityName = '';
+      let categoryId = '';
+      let categoryName = '';
+      
+      if (cityInputMode === 'dropdown') {
+        const cityObject = saudiCities.find(city => city.id === formData.city);
+        cityId = cityObject?.id || '';
+        cityName = cityObject?.name || '';
+      } else {
+        // For manually entered cities, use the input as both ID and name
+        cityId = manualCity;
+        cityName = manualCity;
+      }
+      
+      if (categoryInputMode === 'dropdown') {
+        const categoryObject = categories.find(cat => cat.id === formData.category);
+        categoryId = categoryObject?.id || '';
+        categoryName = categoryObject?.name || '';
+      } else {
+        // For manually entered categories, use the input as both ID and name
+        categoryId = manualCategory;
+        categoryName = manualCategory;
+      }
       
       // Prepare owner info
       const ownerInfo = {
@@ -305,9 +467,9 @@ const ListVenue = () => {
         name: formData.name,
         description: formData.description,
         address: formData.address,
-        city_id: formData.city,
+        city_id: cityId,
         city_name: cityName,
-        category_id: formData.category,
+        category_id: categoryId,
         category_name: categoryName,
         min_capacity: parseInt(formData.minCapacity),
         max_capacity: parseInt(formData.maxCapacity),
@@ -325,6 +487,8 @@ const ListVenue = () => {
         // Set approval status (venues initially need approval)
         featured: false,
         popular: false,
+        // Set status to pending
+        status: 'pending',
         // Add default values
         currency: 'SAR',
         rating: 0,
@@ -355,8 +519,61 @@ const ListVenue = () => {
       });
     } finally {
       setIsLoading(false);
+      setShowVerificationDialog(false);
     }
   };
+  
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate form data before showing verification dialog
+    const anyAvailability = Object.values(formData.availability).some(value => value);
+    
+    if (!anyAvailability) {
+      toast({
+        title: 'Availability Required',
+        description: 'Please select at least one day of availability',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (uploadedImages.length === 0) {
+      toast({
+        title: 'Images Required',
+        description: 'Please upload at least one venue image',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (!user || !profile) {
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in to add a venue',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Set verification email from user's profile
+    setVerificationEmail(profile.email);
+    
+    // Show verification dialog
+    setShowVerificationDialog(true);
+    setVerificationSent(false);
+    setOtpVerified(false);
+    setOtpCode('');
+    setOtpError('');
+  };
+  
+  // Effect to auto-populate email field
+  useEffect(() => {
+    if (profile && profile.email) {
+      setVerificationEmail(profile.email);
+    }
+  }, [profile]);
   
   return (
     <div className="min-h-screen pt-28 pb-16">
@@ -437,44 +654,78 @@ const ListVenue = () => {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={formData.city}
-                        onValueChange={(value) => updateForm('city', value)}
-                      >
-                        <SelectTrigger id="city" className="bg-findvenue-surface/50 border-white/10">
-                          <SelectValue placeholder="Select a city" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-findvenue-card-bg border-white/10">
-                          {saudiCities.map((city) => (
-                            <SelectItem key={city.id} value={city.id}>
-                              {city.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Venue Type <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={formData.category}
-                        onValueChange={(value) => updateForm('category', value)}
-                      >
-                        <SelectTrigger id="category" className="bg-findvenue-surface/50 border-white/10">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-findvenue-card-bg border-white/10">
-                          {categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  {/* City selection with tabs */}
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City <span className="text-red-500">*</span></Label>
+                    <Tabs value={cityInputMode} onValueChange={setCityInputMode} className="w-full">
+                      <TabsList className="grid grid-cols-2 mb-2">
+                        <TabsTrigger value="dropdown">Select from list</TabsTrigger>
+                        <TabsTrigger value="manual">Enter manually</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="dropdown" className="mt-0">
+                        <Select
+                          value={formData.city}
+                          onValueChange={(value) => updateForm('city', value)}
+                        >
+                          <SelectTrigger id="city" className="bg-findvenue-surface/50 border-white/10">
+                            <SelectValue placeholder="Select a city" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-findvenue-card-bg border-white/10">
+                            {saudiCities.map((city) => (
+                              <SelectItem key={city.id} value={city.id}>
+                                {city.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TabsContent>
+                      <TabsContent value="manual" className="mt-0">
+                        <Input
+                          id="manualCity"
+                          value={manualCity}
+                          onChange={(e) => setManualCity(e.target.value)}
+                          placeholder="Enter city name"
+                          className="bg-findvenue-surface/50 border-white/10"
+                        />
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                  
+                  {/* Venue Type selection with tabs */}
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Venue Type <span className="text-red-500">*</span></Label>
+                    <Tabs value={categoryInputMode} onValueChange={setCategoryInputMode} className="w-full">
+                      <TabsList className="grid grid-cols-2 mb-2">
+                        <TabsTrigger value="dropdown">Select from list</TabsTrigger>
+                        <TabsTrigger value="manual">Enter manually</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="dropdown" className="mt-0">
+                        <Select
+                          value={formData.category}
+                          onValueChange={(value) => updateForm('category', value)}
+                        >
+                          <SelectTrigger id="category" className="bg-findvenue-surface/50 border-white/10">
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-findvenue-card-bg border-white/10">
+                            {categories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TabsContent>
+                      <TabsContent value="manual" className="mt-0">
+                        <Input
+                          id="manualCategory"
+                          value={manualCategory}
+                          onChange={(e) => setManualCategory(e.target.value)}
+                          placeholder="Enter venue type"
+                          className="bg-findvenue-surface/50 border-white/10"
+                        />
+                      </TabsContent>
+                    </Tabs>
                   </div>
                   
                   {/* Location Map */}
@@ -795,6 +1046,90 @@ const ListVenue = () => {
           </Card>
         </div>
       </div>
+      
+      {/* Email Verification Dialog */}
+      <Dialog open={showVerificationDialog} onOpenChange={setShowVerificationDialog}>
+        <DialogContent className="sm:max-w-md bg-findvenue-card-bg border-white/10">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" /> Email Verification Required
+            </DialogTitle>
+            <DialogDescription>
+              We need to verify your email address before listing your venue.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!verificationSent ? (
+            <div className="space-y-4 py-3">
+              <div className="space-y-2">
+                <Label htmlFor="verificationEmail">Your Email</Label>
+                <Input 
+                  id="verificationEmail"
+                  value={verificationEmail}
+                  onChange={(e) => setVerificationEmail(e.target.value)}
+                  disabled={!!profile?.email}
+                  className="bg-findvenue-surface/50 border-white/10"
+                />
+                <p className="text-sm text-findvenue-text-muted">
+                  We'll send a verification code to this email address.
+                </p>
+              </div>
+              
+              <DialogFooter className="sm:justify-start pt-2">
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={sendVerificationEmail}
+                  disabled={verificationLoading || !verificationEmail}
+                  className="bg-findvenue hover:bg-findvenue-dark w-full"
+                >
+                  {verificationLoading ? 'Sending...' : 'Send Verification Code'}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4 py-3">
+              <div className="space-y-2">
+                <Label htmlFor="otpCode">Verification Code</Label>
+                <Input 
+                  id="otpCode"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="Enter 6-digit code"
+                  className="bg-findvenue-surface/50 border-white/10"
+                />
+                {otpError && (
+                  <p className="text-sm text-red-500 mt-1">{otpError}</p>
+                )}
+                <p className="text-sm text-findvenue-text-muted">
+                  Enter the verification code sent to {verificationEmail}
+                </p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={sendVerificationEmail}
+                  disabled={verificationLoading}
+                  className="border-white/20 hover:bg-findvenue-surface/50"
+                >
+                  Resend Code
+                </Button>
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={verifyOTPCode}
+                  disabled={verificationLoading || otpCode.length !== 6}
+                  className="bg-findvenue hover:bg-findvenue-dark w-full sm:w-auto"
+                >
+                  {verificationLoading ? 'Verifying...' : 'Verify & Submit'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
