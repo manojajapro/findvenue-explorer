@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -15,7 +14,8 @@ import {
   BadgeInfo, 
   Loader2,
   CheckCircle,
-  Info
+  Info,
+  AlertCircle
 } from 'lucide-react';
 import {
   Popover,
@@ -27,6 +27,15 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 interface MultiDayBookingFormProps {
   venueId: string;
@@ -58,15 +67,26 @@ const MultiDayBookingForm = ({
   const [isBooking, setIsBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [allBookedDates, setAllBookedDates] = useState<string[]>(bookedDates || []);
+  const [unavailableDatesLoaded, setUnavailableDatesLoaded] = useState(false);
+  const [showUnavailableDialog, setShowUnavailableDialog] = useState(false);
   
   // Base price calculation (assuming daily rate is 8 * hourly rate)
   const dailyRate = pricePerHour * 8;
+  
+  // Load all booked dates on component mount
+  useEffect(() => {
+    fetchAllBookedDates();
+  }, [venueId]);
   
   // Reset form when changing date
   useEffect(() => {
     if (date) {
       setDisplayDate(format(date, 'EEEE, MMMM d, yyyy'));
       calculateTotalPrice();
+
+      // When a date is selected, check availability immediately
+      checkDateAvailability(date);
     } else {
       setDisplayDate('');
     }
@@ -76,6 +96,63 @@ const MultiDayBookingForm = ({
   useEffect(() => {
     calculateTotalPrice();
   }, [date, guests, pricePerHour]);
+
+  // Fetch all booked dates from the venue
+  const fetchAllBookedDates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('booking_date, start_time, end_time')
+        .eq('venue_id', venueId)
+        .in('status', ['confirmed', 'pending']);
+      
+      if (error) throw error;
+      
+      if (data) {
+        // Process the data to get all dates that should be unavailable
+        const unavailableDates = processBookedDates(data);
+        setAllBookedDates(unavailableDates);
+        setUnavailableDatesLoaded(true);
+      }
+    } catch (err) {
+      console.error("Error fetching booked dates:", err);
+    }
+  };
+  
+  // Process booked dates to determine which ones should be unavailable
+  const processBookedDates = (bookings: any[]) => {
+    const fullyBookedDates = new Set<string>();
+    const partiallyBookedDates = new Map<string, number>(); // date -> hours booked
+    
+    bookings.forEach(booking => {
+      const dateStr = booking.booking_date;
+      
+      // Check if it's a full-day booking (9:00-22:00)
+      if (booking.start_time === '09:00' && booking.end_time === '22:00') {
+        fullyBookedDates.add(dateStr);
+      } 
+      // Otherwise add hours to partially booked dates
+      else {
+        const startHour = parseInt(booking.start_time.split(':')[0]);
+        const endHour = parseInt(booking.end_time.split(':')[0]);
+        const hoursBooked = endHour - startHour;
+        
+        const currentHours = partiallyBookedDates.get(dateStr) || 0;
+        partiallyBookedDates.set(dateStr, currentHours + hoursBooked);
+      }
+    });
+    
+    // Check partially booked dates to see if they're effectively fully booked
+    partiallyBookedDates.forEach((hours, dateStr) => {
+      // If more than 50% of available hours (9:00-22:00 = 13 hours) are booked
+      // Consider the day unavailable for full-day booking
+      if (hours > 6) {
+        fullyBookedDates.add(dateStr);
+      }
+    });
+    
+    return Array.from(fullyBookedDates);
+  };
   
   const calculateTotalPrice = () => {
     if (!date || !dailyRate) {
@@ -102,6 +179,44 @@ const MultiDayBookingForm = ({
     setTotalPrice(Math.round(price));
   };
 
+  // Check if the selected date is available
+  const checkDateAvailability = async (selectedDate: Date) => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    
+    // First check if the date is in our allBookedDates array
+    if (allBookedDates.includes(dateStr)) {
+      setShowUnavailableDialog(true);
+      setDate(undefined);
+      return false;
+    }
+    
+    // If not already marked as unavailable, do a real-time check
+    setIsCheckingAvailability(true);
+    
+    try {
+      const { isAvailable } = await checkFullDayBookingConflict(dateStr);
+      
+      if (!isAvailable) {
+        setShowUnavailableDialog(true);
+        setDate(undefined);
+        
+        // Add to our list of unavailable dates
+        if (!allBookedDates.includes(dateStr)) {
+          setAllBookedDates([...allBookedDates, dateStr]);
+        }
+        
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error checking date availability:", error);
+      return false;
+    } finally {
+      setIsCheckingAvailability(false);
+    }
+  };
+
   // Check if the date is already fully booked
   const checkFullDayBookingConflict = async (dateStr: string) => {
     setIsCheckingAvailability(true);
@@ -119,7 +234,6 @@ const MultiDayBookingForm = ({
       if (error) throw error;
       
       // Check if there's a full day booking
-      // Full day bookings would typically have specific start/end times like 9:00-22:00
       const hasFullDayBooking = existingBookings.some(booking => 
         booking.start_time === '09:00' && booking.end_time === '22:00'
       );
@@ -169,16 +283,13 @@ const MultiDayBookingForm = ({
       
       const formattedDate = format(date, 'yyyy-MM-dd');
       
-      // Check if the date is available before creating booking
-      const { isAvailable, existingBookings } = await checkFullDayBookingConflict(formattedDate);
+      // Final availability check before creating booking
+      const { isAvailable } = await checkFullDayBookingConflict(formattedDate);
       
       if (!isAvailable) {
-        toast({
-          title: "Date Unavailable",
-          description: `Sorry, this date is already booked or has conflicting bookings.`,
-          variant: "destructive",
-        });
+        setShowUnavailableDialog(true);
         setIsBooking(false);
+        setDate(undefined);
         return;
       }
       
@@ -201,6 +312,9 @@ const MultiDayBookingForm = ({
         .select();
       
       if (error) throw error;
+      
+      // Add this date to our booked dates list
+      setAllBookedDates([...allBookedDates, formattedDate]);
       
       // Show success message and reset form
       setBookingSuccess(true);
@@ -251,7 +365,7 @@ const MultiDayBookingForm = ({
     
     // Disable already booked days
     const dateStr = format(day, 'yyyy-MM-dd');
-    return bookedDates.includes(dateStr);
+    return allBookedDates.includes(dateStr);
   };
   
   // Show success confirmation
@@ -279,7 +393,7 @@ const MultiDayBookingForm = ({
   }
   
   // Show loading state
-  if (isLoading) {
+  if (isLoading || !unavailableDatesLoaded) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-full" />
@@ -320,6 +434,9 @@ const MultiDayBookingForm = ({
                 initialFocus
                 fromDate={new Date()}
                 toDate={addMonths(new Date(), 3)}
+                modifiers={{ 
+                  booked: (date) => allBookedDates.includes(format(date, 'yyyy-MM-dd')) 
+                }}
               />
             </PopoverContent>
           </Popover>
@@ -458,6 +575,26 @@ const MultiDayBookingForm = ({
           Full day bookings are automatically confirmed when the date is available. You and the venue owner will be notified.
         </AlertDescription>
       </Alert>
+      
+      {/* Unavailable Date Dialog */}
+      <Dialog open={showUnavailableDialog} onOpenChange={setShowUnavailableDialog}>
+        <DialogContent className="sm:max-w-md bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2 text-red-500" />
+              Date Unavailable
+            </DialogTitle>
+          </DialogHeader>
+          <DialogDescription className="text-red-700 dark:text-red-300">
+            Sorry, this date is already booked or has conflicting bookings.
+          </DialogDescription>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" className="w-full">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 };

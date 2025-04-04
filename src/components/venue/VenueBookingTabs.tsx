@@ -54,7 +54,6 @@ export default function VenueBookingTabs({
         const dates: string[] = [];
         const timeSlots: Record<string, string[]> = {};
         const fullyBooked: string[] = [];
-        const allTimeSlots = generateTimeSlots();
         
         // Group bookings by date
         const bookingsByDate: Record<string, any[]> = {};
@@ -71,7 +70,7 @@ export default function VenueBookingTabs({
         Object.entries(bookingsByDate).forEach(([dateStr, bookings]) => {
           // Track day bookings (full day)
           const fullDayBookings = bookings.filter(b => 
-            b.start_time === '00:00' && b.end_time === '23:59'
+            b.start_time === '09:00' && b.end_time === '22:00'
           );
           
           if (fullDayBookings.length > 0) {
@@ -82,9 +81,7 @@ export default function VenueBookingTabs({
             if (!timeSlots[dateStr]) {
               timeSlots[dateStr] = [];
             }
-            allTimeSlots.forEach(slot => {
-              timeSlots[dateStr].push(`${slot} - ${slot}`);
-            });
+            timeSlots[dateStr].push('09:00 - 22:00');
           } else {
             // Track hourly bookings
             if (!timeSlots[dateStr]) {
@@ -98,9 +95,13 @@ export default function VenueBookingTabs({
               }
             });
             
-            // Check if all time slots are booked
-            const bookedTimeCount = getBookedHoursCount(bookings);
-            if (bookedTimeCount >= 18) { // If 18+ hours are booked (full day is 24 hours now), consider it fully booked
+            // Check if all time slots are booked or if there are enough bookings to 
+            // make the day unavailable for full-day booking
+            const bookedHours = getBookedHoursCount(bookings);
+            
+            // If more than 6 hours are booked (considering 13 business hours), 
+            // consider the day unavailable for full-day booking
+            if (bookedHours >= 6) {
               fullyBooked.push(dateStr);
             }
           }
