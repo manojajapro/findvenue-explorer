@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -13,7 +14,8 @@ import {
   CalendarRange,
   BadgeInfo, 
   Loader2,
-  CheckCircle
+  CheckCircle,
+  Info
 } from 'lucide-react';
 import {
   Popover,
@@ -24,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface MultiDayBookingFormProps {
   venueId: string;
@@ -54,6 +57,7 @@ const MultiDayBookingForm = ({
   const [specialRequests, setSpecialRequests] = useState('');
   const [isBooking, setIsBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   
   // Base price calculation (assuming daily rate is 8 * hourly rate)
   const dailyRate = pricePerHour * 8;
@@ -98,6 +102,46 @@ const MultiDayBookingForm = ({
     setTotalPrice(Math.round(price));
   };
 
+  // Check if the date is already fully booked
+  const checkFullDayBookingConflict = async (dateStr: string) => {
+    setIsCheckingAvailability(true);
+    
+    try {
+      // Check for existing full-day bookings
+      const { data: existingBookings, error } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('venue_id', venueId)
+        .eq('booking_date', dateStr)
+        .in('status', ['confirmed', 'pending'])
+        .not('id', 'is', null); // Exclude any null IDs just to be safe
+        
+      if (error) throw error;
+      
+      // Check if there's a full day booking
+      // Full day bookings would typically have specific start/end times like 9:00-22:00
+      const hasFullDayBooking = existingBookings.some(booking => 
+        booking.start_time === '09:00' && booking.end_time === '22:00'
+      );
+      
+      // Check if there are any bookings that would conflict with a full day booking
+      const hasConflictingBookings = existingBookings.length > 0;
+      
+      return { isAvailable: !hasFullDayBooking && !hasConflictingBookings, existingBookings };
+      
+    } catch (error) {
+      console.error("Error checking booking availability:", error);
+      toast({
+        title: "Error",
+        description: "Could not check venue availability. Please try again.",
+        variant: "destructive",
+      });
+      return { isAvailable: false, existingBookings: [] };
+    } finally {
+      setIsCheckingAvailability(false);
+    }
+  };
+
   // Handler for submitting the booking
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +169,19 @@ const MultiDayBookingForm = ({
       
       const formattedDate = format(date, 'yyyy-MM-dd');
       
+      // Check if the date is available before creating booking
+      const { isAvailable, existingBookings } = await checkFullDayBookingConflict(formattedDate);
+      
+      if (!isAvailable) {
+        toast({
+          title: "Date Unavailable",
+          description: `Sorry, this date is already booked or has conflicting bookings.`,
+          variant: "destructive",
+        });
+        setIsBooking(false);
+        return;
+      }
+      
       const { data, error } = await supabase
         .from('bookings')
         .insert([
@@ -138,7 +195,7 @@ const MultiDayBookingForm = ({
             guests,
             total_price: totalPrice,
             special_requests: specialRequests || null,
-            status: 'pending'
+            status: 'confirmed' // Auto-confirm since we've already checked for conflicts
           }
         ])
         .select();
@@ -155,8 +212,8 @@ const MultiDayBookingForm = ({
           {
             user_id: 'owner_id_here', // This should be dynamically set based on the venue owner
             type: 'booking_request',
-            title: 'New Full-Day Booking Request',
-            message: `You have a new full-day booking request for ${venueName} on ${format(date, 'MMM d, yyyy')}`,
+            title: 'New Full-Day Booking',
+            message: `You have a new full-day booking for ${venueName} on ${format(date, 'MMM d, yyyy')}`,
             data: {
               venue_id: venueId,
               venue_name: venueName,
@@ -377,12 +434,12 @@ const MultiDayBookingForm = ({
             <Button 
               className="w-full bg-findvenue hover:bg-findvenue-dark"
               type="submit"
-              disabled={isBooking}
+              disabled={isBooking || isCheckingAvailability}
             >
-              {isBooking ? (
+              {isBooking || isCheckingAvailability ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  {isCheckingAvailability ? "Checking Availability..." : "Processing..."}
                 </>
               ) : (
                 <>
@@ -394,6 +451,13 @@ const MultiDayBookingForm = ({
           </CardFooter>
         </Card>
       )}
+      
+      <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-800">
+        <Info className="h-4 w-4 text-blue-500" />
+        <AlertDescription className="text-sm text-blue-700 dark:text-blue-300">
+          Full day bookings are automatically confirmed when the date is available. You and the venue owner will be notified.
+        </AlertDescription>
+      </Alert>
     </form>
   );
 };

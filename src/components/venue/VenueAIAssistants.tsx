@@ -19,7 +19,7 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
   
   return (
     <>
-      {/* Fixed positioned AI assistant buttons - moved to right bottom */}
+      {/* Fixed positioned AI assistant buttons - right bottom */}
       <div className="fixed right-4 bottom-4 flex flex-col gap-2 z-50">
         <Button
           onClick={() => {
