@@ -32,6 +32,7 @@ export default function VenueBookingTabs({
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [bookedTimeSlots, setBookedTimeSlots] = useState<Record<string, string[]>>({});
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+  const [fullyBookedDates, setFullyBookedDates] = useState<string[]>([]);
 
   // Fetch existing bookings for this venue to disable already booked dates/times
   useEffect(() => {
@@ -42,7 +43,7 @@ export default function VenueBookingTabs({
           .from('bookings')
           .select('booking_date, start_time, end_time, status')
           .eq('venue_id', venueId)
-          .eq('status', 'confirmed');
+          .in('status', ['confirmed', 'pending']);
           
         if (error) {
           console.error('Error fetching bookings:', error);
@@ -52,28 +53,54 @@ export default function VenueBookingTabs({
         // Process confirmed bookings to track booked dates and time slots
         const dates: string[] = [];
         const timeSlots: Record<string, string[]> = {};
+        const fullyBooked: string[] = [];
+        const allTimeSlots = generateTimeSlots();
+        
+        // Group bookings by date
+        const bookingsByDate: Record<string, any[]> = {};
         
         data.forEach(booking => {
           const dateStr = booking.booking_date;
-          const timeSlot = `${booking.start_time} - ${booking.end_time}`;
+          if (!bookingsByDate[dateStr]) {
+            bookingsByDate[dateStr] = [];
+          }
+          bookingsByDate[dateStr].push(booking);
+        });
+        
+        // Process bookings by date
+        Object.entries(bookingsByDate).forEach(([dateStr, bookings]) => {
+          // Track day bookings (full day)
+          const fullDayBookings = bookings.filter(b => 
+            b.start_time === '09:00' && b.end_time === '22:00'
+          );
           
-          // Track fully booked dates for day bookings
-          if (!dates.includes(dateStr)) {
+          if (fullDayBookings.length > 0) {
             dates.push(dateStr);
-          }
-          
-          // Track booked time slots for hourly bookings
-          if (!timeSlots[dateStr]) {
-            timeSlots[dateStr] = [];
-          }
-          
-          if (!timeSlots[dateStr].includes(timeSlot)) {
-            timeSlots[dateStr].push(timeSlot);
+            fullyBooked.push(dateStr);
+          } else {
+            // Track hourly bookings
+            if (!timeSlots[dateStr]) {
+              timeSlots[dateStr] = [];
+            }
+            
+            bookings.forEach(booking => {
+              const timeSlot = `${booking.start_time} - ${booking.end_time}`;
+              if (!timeSlots[dateStr].includes(timeSlot)) {
+                timeSlots[dateStr].push(timeSlot);
+              }
+            });
+            
+            // Check if all time slots are booked
+            const bookedTimeCount = getBookedHoursCount(bookings);
+            if (bookedTimeCount >= 8) { // If 8+ hours are booked, consider it fully booked
+              fullyBooked.push(dateStr);
+            }
           }
         });
         
         setBookedDates(dates);
         setBookedTimeSlots(timeSlots);
+        setFullyBookedDates(fullyBooked);
       } catch (err) {
         console.error('Error processing bookings data:', err);
       } finally {
@@ -85,6 +112,28 @@ export default function VenueBookingTabs({
       fetchBookings();
     }
   }, [venueId]);
+  
+  // Helper function to generate time slots
+  const generateTimeSlots = (): string[] => {
+    const slots = [];
+    for (let i = 9; i <= 21; i++) {
+      slots.push(`${i.toString().padStart(2, '0')}:00`);
+    }
+    return slots;
+  };
+  
+  // Helper function to count booked hours
+  const getBookedHoursCount = (bookings: any[]): number => {
+    let bookedHours = 0;
+    
+    bookings.forEach(booking => {
+      const startHour = parseInt(booking.start_time.split(':')[0]);
+      const endHour = parseInt(booking.end_time.split(':')[0]);
+      bookedHours += (endHour - startHour);
+    });
+    
+    return bookedHours;
+  };
 
   // Don't show booking tabs for the venue owner
   if (isOwner) {
@@ -120,7 +169,7 @@ export default function VenueBookingTabs({
             pricePerHour={pricePerHour} 
             ownerId={ownerId}
             ownerName={ownerName}
-            bookedTimeSlots={bookedTimeSlots}
+            bookedTimeSlots={timeSlots}
             isLoading={isLoadingBookings}
           />
         </TabsContent>
@@ -132,7 +181,7 @@ export default function VenueBookingTabs({
             pricePerHour={pricePerHour}
             minCapacity={minCapacity}
             maxCapacity={maxCapacity}
-            bookedDates={bookedDates}
+            bookedDates={fullyBookedDates}
             isLoading={isLoadingBookings}
           />
         </TabsContent>

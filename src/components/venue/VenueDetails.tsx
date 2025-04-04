@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -176,10 +177,10 @@ const VenueDetails = () => {
         </>
       )}
 
-      {/* AI Assistants for the venue */}
+      {/* AI Assistants moved to floating buttons */}
       <VenueAIAssistants venue={venue} />
     </div>
   );
-}
+};
 
 export default VenueDetails;

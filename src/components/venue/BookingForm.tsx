@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -5,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
-import { format, addDays, isBefore, isAfter, parse, startOfDay } from 'date-fns';
+import { format, addDays, isBefore, isAfter, parse, startOfDay, addMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { 
   CalendarIcon, 
@@ -118,6 +119,13 @@ const BookingForm = ({
   // Update available start times based on bookings
   const updateAvailableStartTimes = (dateStr: string) => {
     const bookedSlots = bookedTimeSlots[dateStr] || [];
+    
+    // If all time slots for the day are booked, we'll return an empty array
+    if (bookedSlots.length >= TIME_SLOTS.length - 1) {
+      setAvailableStartTimes([]);
+      return;
+    }
+    
     const bookedStartTimes = new Set();
     
     // Extract start times from booked slots to exclude them
@@ -283,7 +291,11 @@ const BookingForm = ({
     
     // Disable fully booked days
     const dateStr = format(day, 'yyyy-MM-dd');
-    const isFullyBooked = bookedTimeSlots[dateStr]?.length === TIME_SLOTS.length;
+    const bookedSlots = bookedTimeSlots[dateStr] || [];
+    
+    // If more than 80% of the time slots are booked, consider the day fully booked
+    // This ensures that days with only 1-2 hours available aren't shown as available
+    const isFullyBooked = bookedSlots.length >= TIME_SLOTS.length * 0.8;
     
     return isFullyBooked;
   };
