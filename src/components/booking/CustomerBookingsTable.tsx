@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, MessageCircle } from "lucide-react";
+import { CheckCircle, XCircle, MessageCircle, Mail, Phone, CreditCard } from "lucide-react";
 import { format } from 'date-fns';
 
 interface BookingTableProps {
@@ -106,8 +106,18 @@ export const CustomerBookingsTable = ({
               <TableCell className="font-medium">{booking.user_name}</TableCell>
               <TableCell>
                 <div className="text-xs space-y-1">
-                  {booking.user_email && <div className="text-findvenue-text-muted">📧 {booking.user_email}</div>}
-                  {booking.customer_phone && <div className="text-findvenue-text-muted">📱 {booking.customer_phone}</div>}
+                  {booking.user_email && (
+                    <div className="flex items-center gap-1 text-findvenue-text-muted">
+                      <Mail className="h-3 w-3" />
+                      <span>{booking.user_email}</span>
+                    </div>
+                  )}
+                  {booking.customer_phone && (
+                    <div className="flex items-center gap-1 text-findvenue-text-muted">
+                      <Phone className="h-3 w-3" />
+                      <span>{booking.customer_phone}</span>
+                    </div>
+                  )}
                 </div>
               </TableCell>
               <TableCell>{booking.venue_name}</TableCell>
@@ -116,9 +126,12 @@ export const CustomerBookingsTable = ({
               <TableCell>{booking.guests}</TableCell>
               <TableCell>
                 {booking.payment_method ? (
-                  <span className="text-xs bg-findvenue/10 text-findvenue px-2 py-1 rounded">
-                    {booking.payment_method}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <CreditCard className="h-3 w-3" />
+                    <span className="text-xs bg-findvenue/10 text-findvenue px-2 py-1 rounded">
+                      {booking.payment_method}
+                    </span>
+                  </div>
                 ) : (
                   <span className="text-xs text-findvenue-text-muted">Not specified</span>
                 )}

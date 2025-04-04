@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 
 interface VenueSpecificVoiceAssistantProps {
   venue: Venue | null;
@@ -140,99 +141,108 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   // If venue is not available, show loading or error state
   if (!venue) {
     return (
-      <div className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4 mt-6">
-        <h3 className="text-lg font-medium mb-2">Voice Assistant</h3>
-        <p className="text-findvenue-text-muted">Venue information is loading...</p>
-      </div>
+      <Card className="bg-findvenue-card-bg border border-white/10 mt-6">
+        <CardHeader>
+          <CardTitle>Voice Assistant</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-findvenue-text-muted">Venue information is loading...</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4 mt-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium">Voice Assistant</h3>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className={`${voiceOutputEnabled ? 'border-green-500' : 'border-white/10'}`}
-            onClick={handleVoiceOutputToggle}
-          >
-            {voiceOutputEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-          </Button>
-          <Button
-            variant={isListening ? "default" : "outline"}
-            size="sm"
-            onClick={handleMicToggle}
-            className={isListening ? "bg-green-600 hover:bg-green-700" : "border-white/10"}
-            disabled={isProcessing}
-          >
-            {isProcessing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isListening ? (
-              <Mic className="h-4 w-4" />
-            ) : (
-              <MicOff className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </div>
-      
-      <Separator className="mb-4" />
-      
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-sm text-findvenue-text-muted">Auto-listen mode</span>
-        <Switch 
-          checked={autoListenMode} 
-          onCheckedChange={setAutoListenMode} 
-        />
-      </div>
-      
-      <ScrollArea className="h-60 mb-4 rounded-md border border-white/10 p-4">
-        {transcriptHistory.length === 0 ? (
-          <div className="text-center py-10 text-findvenue-text-muted">
-            <p>No conversation history yet.</p>
-            <p className="text-xs mt-2">Click the microphone to start talking to your AI venue assistant</p>
+    <Card className="bg-findvenue-card-bg border border-white/10 mt-6">
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <CardTitle>Voice Assistant</CardTitle>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`${voiceOutputEnabled ? 'border-green-500 text-green-500' : 'border-white/10'}`}
+              onClick={handleVoiceOutputToggle}
+            >
+              {voiceOutputEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant={isListening ? "default" : "outline"}
+              size="sm"
+              onClick={handleMicToggle}
+              className={isListening ? "bg-green-600 hover:bg-green-700" : "border-white/10"}
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isListening ? (
+                <Mic className="h-4 w-4" />
+              ) : (
+                <MicOff className="h-4 w-4" />
+              )}
+              <span className="ml-2">{isListening ? 'Listening' : 'Start'}</span>
+            </Button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {transcriptHistory.map((item, index) => (
-              <div 
-                key={index} 
-                className={`flex gap-2 p-3 rounded-lg text-sm ${
-                  item.isUser 
-                    ? 'bg-findvenue/20 ml-8' 
-                    : 'bg-gray-700/30 mr-8'
-                }`}
-              >
-                {item.isUser ? (
-                  <User className="h-4 w-4 mt-1 shrink-0" />
-                ) : (
-                  <Bot className="h-4 w-4 mt-1 shrink-0" />
-                )}
-                <div>
-                  <p className="text-xs font-medium mb-1">{item.isUser ? 'You' : 'Assistant'}</p>
-                  <p>{item.text}</p>
+        </div>
+      </CardHeader>
+      
+      <CardContent>
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm text-findvenue-text-muted">Auto-listen mode</span>
+          <Switch 
+            checked={autoListenMode} 
+            onCheckedChange={setAutoListenMode} 
+          />
+        </div>
+        
+        <ScrollArea className="h-60 mb-4 rounded-md border border-white/10 p-4 bg-findvenue-surface/30">
+          {transcriptHistory.length === 0 ? (
+            <div className="text-center py-10 text-findvenue-text-muted">
+              <p>No conversation history yet.</p>
+              <p className="text-xs mt-2">Click the microphone to start talking to your AI venue assistant</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {transcriptHistory.map((item, index) => (
+                <div 
+                  key={index} 
+                  className={`flex gap-2 p-3 rounded-lg text-sm ${
+                    item.isUser 
+                      ? 'bg-findvenue/20 ml-8' 
+                      : 'bg-gray-700/30 mr-8'
+                  }`}
+                >
+                  {item.isUser ? (
+                    <User className="h-4 w-4 mt-1 shrink-0" />
+                  ) : (
+                    <Bot className="h-4 w-4 mt-1 shrink-0" />
+                  )}
+                  <div>
+                    <p className="text-xs font-medium mb-1">{item.isUser ? 'You' : 'Assistant'}</p>
+                    <p>{item.text}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </ScrollArea>
+      </CardContent>
+      
+      <CardFooter className="flex flex-col space-y-2">
+        {isListening && (
+          <div className="text-center w-full py-2 px-4 bg-findvenue/10 rounded-md text-sm border border-dashed border-white/10 animate-pulse">
+            Listening... {transcript ? `"${transcript}"` : "Say something about this venue"}
           </div>
         )}
-      </ScrollArea>
-      
-      {isListening && (
-        <div className="text-center py-2 px-4 bg-findvenue/10 rounded-md text-sm border border-dashed border-white/10 animate-pulse">
-          Listening... {transcript ? `"${transcript}"` : "Say something about this venue"}
-        </div>
-      )}
-      
-      {isProcessing && (
-        <div className="text-center py-2 px-4 bg-green-600/10 rounded-md text-sm border border-dashed border-green-500/30 mt-2">
-          Processing... <Loader2 className="h-3 w-3 inline-block ml-1 animate-spin" />
-        </div>
-      )}
-    </div>
+        
+        {isProcessing && (
+          <div className="text-center w-full py-2 px-4 bg-green-600/10 rounded-md text-sm border border-dashed border-green-500/30">
+            Processing... <Loader2 className="h-3 w-3 inline-block ml-1 animate-spin" />
+          </div>
+        )}
+      </CardFooter>
+    </Card>
   );
 };
 
