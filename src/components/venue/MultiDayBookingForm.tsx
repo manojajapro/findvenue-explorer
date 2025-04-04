@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -204,12 +203,12 @@ const MultiDayBookingForm = ({
       <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
         <CardContent className="pt-6 text-center">
           <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
-          <h3 className="text-xl font-semibold mb-2">Booking Request Sent!</h3>
+          <h3 className="text-xl font-semibold mb-2">Booking Successful!</h3>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Your full-day booking request for {venueName} on {displayDate} has been sent to the venue owner.
+            Your full-day booking for {venueName} on {displayDate} has been automatically confirmed as the date was available.
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            You'll receive a notification once the venue owner confirms your booking.
+            You can view and manage your booking in your bookings page.
           </p>
           <Button
             onClick={handleReset}

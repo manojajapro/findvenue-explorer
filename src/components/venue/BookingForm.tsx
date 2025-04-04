@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -218,6 +217,35 @@ const BookingForm = ({
       
       const formattedDate = format(date, 'yyyy-MM-dd');
       
+      // Check if the time slot is available (not booked already)
+      const { data: existingBookings, error: checkError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('venue_id', venueId)
+        .eq('booking_date', formattedDate)
+        .in('status', ['confirmed', 'pending'])
+        .order('created_at', { ascending: false });
+        
+      if (checkError) throw checkError;
+      
+      // Check if there's any time conflict with existing bookings
+      const hasConflict = existingBookings?.some(booking => {
+        const bookingStartHour = parseInt(booking.start_time.split(':')[0]);
+        const bookingEndHour = parseInt(booking.end_time.split(':')[0]);
+        const newStartHour = parseInt(startTime.split(':')[0]);
+        const newEndHour = parseInt(endTime.split(':')[0]);
+        
+        // Check if there's an overlap
+        return (
+          (newStartHour < bookingEndHour && newEndHour > bookingStartHour) ||
+          (newStartHour === bookingStartHour) ||
+          (newEndHour === bookingEndHour)
+        );
+      });
+      
+      // Auto-confirm if no conflict, otherwise set as pending
+      const bookingStatus = hasConflict ? 'pending' : 'confirmed';
+      
       const { data, error } = await supabase
         .from('bookings')
         .insert([
@@ -231,7 +259,7 @@ const BookingForm = ({
             guests,
             total_price: totalPrice,
             special_requests: specialRequests || null,
-            status: 'pending'
+            status: bookingStatus
           }
         ])
         .select();
@@ -248,8 +276,8 @@ const BookingForm = ({
           {
             user_id: ownerId,
             type: 'booking_request',
-            title: 'New Booking Request',
-            message: `You have a new booking request for ${venueName} on ${format(date, 'MMM d, yyyy')}`,
+            title: bookingStatus === 'confirmed' ? 'New Confirmed Booking' : 'New Booking Request',
+            message: `You have a new ${bookingStatus} booking for ${venueName} on ${format(date, 'MMM d, yyyy')}`,
             data: {
               venue_id: venueId,
               venue_name: venueName,
@@ -306,12 +334,12 @@ const BookingForm = ({
       <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
         <CardContent className="pt-6 text-center">
           <CheckCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
-          <h3 className="text-xl font-semibold mb-2">Booking Request Sent!</h3>
+          <h3 className="text-xl font-semibold mb-2">Booking Successful!</h3>
           <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Your booking request for {venueName} on {displayDate} from {startTime} to {endTime} has been sent to the venue owner.
+            Your booking for {venueName} on {displayDate} from {startTime} to {endTime} has been {startTime && endTime ? 'automatically confirmed' : 'sent to the venue owner for confirmation'}.
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            You'll receive a notification once the venue owner confirms your booking.
+            You can view and manage your booking in your bookings page.
           </p>
           <Button
             onClick={handleReset}
