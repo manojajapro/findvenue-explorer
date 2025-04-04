@@ -20,6 +20,6 @@ export type ChatContact = {
   role?: 'venue-owner' | 'customer';
   status?: string;
   venue_id?: string;
-  venue_name?: string;
+  venue_name?: string; // Changed from venueName to be consistent
   booking_id?: string; // Added to link contacts with specific bookings
 };

@@ -303,6 +303,13 @@ const VenueDetails = () => {
     );
   };
   
+  const socialLinks = {
+    facebook: venue?.ownerInfo?.facebook || '',
+    twitter: venue?.ownerInfo?.twitter || '',
+    instagram: venue?.ownerInfo?.instagram || '',
+    linkedin: venue?.ownerInfo?.linkedin || ''
+  };
+  
   if (loading) {
     return (
       <div className="pt-24 pb-16">
@@ -344,8 +351,6 @@ const VenueDetails = () => {
       </div>
     );
   }
-  
-  const socialLinks = venue?.ownerInfo?.socialLinks || {};
   
   return (
     <div className="pt-24 pb-16">

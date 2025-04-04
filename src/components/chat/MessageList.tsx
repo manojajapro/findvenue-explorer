@@ -27,10 +27,10 @@ const MessageList = ({ messages, userId, contact, messagesEndRef }: MessageListP
 
   return (
     <div className="space-y-4">
-      {contact.venueName && (
+      {contact.venue_name && (
         <div className="text-center mb-4">
           <Badge variant="outline" className="bg-findvenue/10 text-findvenue">
-            Conversation about {contact.venueName}
+            Conversation about {contact.venue_name}
           </Badge>
         </div>
       )}

@@ -45,13 +45,11 @@ const Messages = () => {
         setIsLoading(true);
         
         try {
-          // Extract venue and booking info from URL if available
           const params = new URLSearchParams(window.location.search);
           const venueId = params.get('venueId');
           const venueName = params.get('venueName');
           const bookingId = params.get('bookingId');
           
-          // Fetch user profiles
           const { data: currentUserProfile } = await supabase
             .from('user_profiles')
             .select('*')
@@ -68,7 +66,6 @@ const Messages = () => {
             
           setOtherUserProfile(otherUser);
           
-          // Fetch messages
           const { data, error } = await supabase
             .rpc('get_conversation', {
               current_user_id: user.id,
@@ -77,7 +74,6 @@ const Messages = () => {
             
           if (error) throw error;
           
-          // Format messages
           const formattedMessages = data.map((msg: any) => ({
             id: msg.id,
             content: msg.content,
@@ -94,7 +90,6 @@ const Messages = () => {
           
           setMessages(formattedMessages || []);
           
-          // Mark messages as read
           if (formattedMessages && formattedMessages.length > 0) {
             const unreadMessages = formattedMessages.filter(
               msg => msg.receiver_id === user.id && !msg.read
@@ -110,9 +105,7 @@ const Messages = () => {
             }
           }
           
-          // If this is a new conversation with venue info, add a context message
           if (venueId && venueName && messages.length === 0) {
-            // Create initial venue-related message
             const senderName = currentUserProfile 
               ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}`
               : 'Customer';
@@ -124,11 +117,11 @@ const Messages = () => {
               receiver_name: otherUser ? `${otherUser.first_name} ${otherUser.last_name}` : 'Venue Owner',
               content: `Hi, I'm interested in ${venueName}.`,
               venue_id: venueId,
-              venue_name: venueName
+              venue_name: venueName,
+              booking_id: bookingId || undefined
             };
             
             if (bookingId) {
-              // This is related to a specific booking
               initialMessage.content = `Hi, I have a question about my booking at ${venueName}.`;
               initialMessage.booking_id = bookingId;
             }
@@ -144,7 +137,6 @@ const Messages = () => {
             }
           }
           
-          // Update selected contact
           if (otherUser) {
             const contactInfo: ChatContact = {
               id: otherUser.id,
@@ -153,7 +145,6 @@ const Messages = () => {
               role: otherUser.user_role === 'venue_owner' ? 'venue-owner' : 'customer'
             };
             
-            // Add venue info if available
             if (venueId && venueName) {
               contactInfo.venue_id = venueId;
               contactInfo.venue_name = venueName;
@@ -176,7 +167,6 @@ const Messages = () => {
       
       fetchMessages();
       
-      // Set up real-time subscription for new messages
       const subscription = supabase
         .channel('messages-channel')
         .on('postgres_changes', { 
@@ -185,12 +175,10 @@ const Messages = () => {
           table: 'messages',
           filter: `receiver_id=eq.${user.id}`
         }, (payload) => {
-          // Only add message if it's relevant to this conversation
           const newMsg = payload.new as MessageType;
           if (newMsg.sender_id === userId || newMsg.receiver_id === userId) {
             setMessages(prev => [...prev, newMsg]);
             
-            // Mark as read immediately if we're in the conversation
             supabase
               .from('messages')
               .update({ read: true })
@@ -230,7 +218,6 @@ const Messages = () => {
       
       setContacts(formattedContacts);
       
-      // If we have a userId but no selected contact, find it in the contacts
       if (userId && !selectedContact) {
         const found = formattedContacts.find(c => c.id === userId);
         if (found) setSelectedContact(found);
@@ -271,7 +258,6 @@ const Messages = () => {
         
       if (error) throw error;
       
-      // Add the new message to the list
       setMessages(prev => [...prev, data]);
       setNewMessage('');
       
@@ -305,7 +291,6 @@ const Messages = () => {
     }
   };
   
-  // Group messages by date
   const groupMessagesByDate = () => {
     const groups: { [date: string]: MessageType[] } = {};
     
@@ -351,7 +336,6 @@ const Messages = () => {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Contacts sidebar */}
             <div className="md:col-span-1">
               <Card className="glass-card border-white/10 h-[calc(100vh-240px)] flex flex-col">
                 <CardContent className="p-4 flex-1 overflow-hidden flex flex-col">
@@ -409,7 +393,6 @@ const Messages = () => {
               </Card>
             </div>
             
-            {/* Chat area */}
             <div className="md:col-span-2">
               <Card className="glass-card border-white/10 h-[calc(100vh-240px)] flex flex-col">
                 {!userId ? (
@@ -423,7 +406,6 @@ const Messages = () => {
                   </div>
                 ) : (
                   <>
-                    {/* Chat header */}
                     <div className="p-4 border-b border-white/10 flex items-center gap-3">
                       <Button 
                         variant="ghost" 
@@ -468,7 +450,6 @@ const Messages = () => {
                       )}
                     </div>
                     
-                    {/* Messages */}
                     <div 
                       className="flex-1 overflow-y-auto p-4 space-y-6"
                       ref={messageContainerRef}
@@ -529,7 +510,6 @@ const Messages = () => {
                       <div ref={messagesEndRef} />
                     </div>
                     
-                    {/* Message input */}
                     <div className="p-4 border-t border-white/10">
                       <form onSubmit={handleSendMessage} className="flex gap-2">
                         <Input
