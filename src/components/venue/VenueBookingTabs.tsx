@@ -5,20 +5,7 @@ import BookingForm from '@/components/venue/BookingForm';
 import MultiDayBookingForm from '@/components/venue/MultiDayBookingForm';
 import { Calendar, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { createClient } from '@supabase/supabase-js';
-
-// Use the correct import
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL || '',
-  import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      storage: localStorage
-    }
-  }
-);
+import { supabase } from '@/integrations/supabase/client';
 
 interface VenueBookingTabsProps {
   venueId: string;

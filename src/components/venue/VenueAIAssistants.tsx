@@ -46,11 +46,10 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
         </Button>
       </div>
       
-      {/* Dialog for AI assistants - position updated to left side */}
+      {/* Dialog for AI assistants - positioned on the left side using CSS classes */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent 
-          className="sm:max-w-[425px] p-0 overflow-hidden" 
-          side="left"
+          className="sm:max-w-[425px] p-0 overflow-hidden left-[5%] sm:left-[5%] -translate-x-0"
         >
           <div className="p-4 pb-0">
             <div className="flex items-center justify-between mb-2">
