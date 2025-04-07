@@ -1,7 +1,5 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Session as SupabaseSession, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Define the User type with the properties needed
 type User = {
@@ -55,7 +53,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session as any);
         
         if (sessionUser) {
-          // Add missing properties from profile data
           const enhancedUser = {
             ...sessionUser,
             firstName: profile?.first_name || '',
@@ -78,7 +75,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session as any);
       
       if (sessionUser) {
-        // Add missing properties initially too
         const enhancedUser = {
           ...sessionUser,
           firstName: '',
@@ -112,7 +108,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProfile(data);
       
-      // Update user with profile data
       setUser(prev => {
         if (!prev) return null;
         return {
@@ -229,7 +224,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         ...profileData
       }));
       
-      // Update user with new profile data
       setUser(prev => {
         if (!prev) return null;
         return {

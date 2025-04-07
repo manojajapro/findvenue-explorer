@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Mail, Lock, User, Building } from 'lucide-react';
 import { Helmet } from 'react-helmet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
 
 const Login = () => {
   const { signIn } = useAuth();
