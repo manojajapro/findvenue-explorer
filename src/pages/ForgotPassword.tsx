@@ -21,10 +21,45 @@ const ForgotPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showResetForm, setShowResetForm] = useState(false);
   const [otp, setOtp] = useState('');
+  const [isEmailSending, setIsEmailSending] = useState(false);
 
   const generateOTP = () => {
     // Generate a 6-digit OTP
     return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
+  const sendOtpEmail = async (userEmail: string, otpCode: string) => {
+    setIsEmailSending(true);
+    
+    try {
+      const response = await fetch('https://esdmelfzeszjtbnoajig.supabase.co/functions/v1/send-otp-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email: userEmail,
+          otp: otpCode
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send email');
+      }
+
+      return true;
+    } catch (error: any) {
+      console.error('Error sending OTP email:', error);
+      toast({
+        title: 'Email Error',
+        description: `Failed to send verification email: ${error.message}`,
+        variant: 'destructive'
+      });
+      return false;
+    } finally {
+      setIsEmailSending(false);
+    }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -58,15 +93,17 @@ const ForgotPassword = () => {
       if (error) {
         throw error;
       }
-      
-      setIsSubmitted(true);
-      toast({
-        title: 'Email Sent',
-        description: 'Check your email for the password reset link.',
-      });
 
-      // Display generated OTP for testing purposes (in production, this would be sent via email)
-      console.log('Generated OTP for testing:', generatedOTP);
+      // Send custom email with OTP
+      const emailSent = await sendOtpEmail(email, generatedOTP);
+      
+      if (emailSent) {
+        setIsSubmitted(true);
+        toast({
+          title: 'Email Sent',
+          description: 'Check your email for the password reset code.',
+        });
+      }
       
     } catch (error: any) {
       console.error('Password reset error:', error);
@@ -198,7 +235,7 @@ const ForgotPassword = () => {
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold mb-2">Reset Password</h1>
               <p className="text-findvenue-text-muted">
-                Enter your email to receive a password reset link with OTP verification
+                Enter your email to receive a password reset code
               </p>
             </div>
             
@@ -206,20 +243,11 @@ const ForgotPassword = () => {
               !showResetForm ? (
                 <form onSubmit={handleVerifyOtp} className="space-y-6">
                   <div className="bg-green-500/10 text-green-500 p-4 rounded-lg mb-6">
-                    <p className="font-medium">Reset link sent!</p>
+                    <p className="font-medium">Reset code sent!</p>
                     <p className="text-sm mt-1">
-                      We've sent an email to <span className="font-medium">{email}</span> with a reset link.
+                      We've sent an email to <span className="font-medium">{email}</span> with a verification code.
                     </p>
                   </div>
-                  
-                  <Alert className="bg-amber-500/10 border-amber-500/30 text-amber-500 mb-6">
-                    <InfoIcon className="h-4 w-4" />
-                    <AlertTitle>Important</AlertTitle>
-                    <AlertDescription>
-                      For this demo, the OTP is shown in your browser's console (Press F12 to view). In a production 
-                      environment, this would be sent securely via email or SMS.
-                    </AlertDescription>
-                  </Alert>
                   
                   <div className="space-y-4">
                     <div className="space-y-2">
@@ -306,7 +334,7 @@ const ForgotPassword = () => {
                         className="pl-10"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading}
+                        disabled={isLoading || isEmailSending}
                       />
                     </div>
                   </div>
@@ -314,14 +342,14 @@ const ForgotPassword = () => {
                   <Button 
                     type="submit" 
                     className="w-full bg-findvenue hover:bg-findvenue-dark"
-                    disabled={isLoading}
+                    disabled={isLoading || isEmailSending}
                   >
-                    {isLoading ? 'Sending...' : 'Send Reset Link with OTP'}
+                    {isLoading || isEmailSending ? 'Sending...' : 'Send Reset Code'}
                   </Button>
                 </div>
                 
                 <p className="text-sm mt-4 text-center text-findvenue-text-muted">
-                  You will receive an email with a reset link
+                  You will receive an email with a verification code
                 </p>
               </form>
             )}
