@@ -8,6 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Mail, ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Helmet } from 'react-helmet';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { InfoIcon } from 'lucide-react';
 
 const ForgotPassword = () => {
   const { toast } = useToast();
@@ -60,7 +62,7 @@ const ForgotPassword = () => {
       setIsSubmitted(true);
       toast({
         title: 'Email Sent',
-        description: 'Check your email for the password reset link. We\'ve also included a verification code (OTP) that you\'ll need to enter.',
+        description: 'Check your email for the password reset link.',
       });
 
       // Display generated OTP for testing purposes (in production, this would be sent via email)
@@ -204,14 +206,20 @@ const ForgotPassword = () => {
               !showResetForm ? (
                 <form onSubmit={handleVerifyOtp} className="space-y-6">
                   <div className="bg-green-500/10 text-green-500 p-4 rounded-lg mb-6">
-                    <p className="font-medium">Reset link and OTP sent!</p>
+                    <p className="font-medium">Reset link sent!</p>
                     <p className="text-sm mt-1">
-                      We've sent an email to <span className="font-medium">{email}</span> with a verification code (OTP).
-                    </p>
-                    <p className="text-xs mt-3">
-                      For demo purposes, the OTP is displayed in the browser console (press F12 to view).
+                      We've sent an email to <span className="font-medium">{email}</span> with a reset link.
                     </p>
                   </div>
+                  
+                  <Alert className="bg-amber-500/10 border-amber-500/30 text-amber-500 mb-6">
+                    <InfoIcon className="h-4 w-4" />
+                    <AlertTitle>Important</AlertTitle>
+                    <AlertDescription>
+                      For this demo, the OTP is shown in your browser's console (Press F12 to view). In a production 
+                      environment, this would be sent securely via email or SMS.
+                    </AlertDescription>
+                  </Alert>
                   
                   <div className="space-y-4">
                     <div className="space-y-2">
@@ -313,7 +321,7 @@ const ForgotPassword = () => {
                 </div>
                 
                 <p className="text-sm mt-4 text-center text-findvenue-text-muted">
-                  You will receive an email with a reset link and a one-time password (OTP) to verify your identity
+                  You will receive an email with a reset link
                 </p>
               </form>
             )}
