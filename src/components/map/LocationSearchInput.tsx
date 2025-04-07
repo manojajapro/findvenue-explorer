@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Search, X, MapPin, History, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -57,9 +58,11 @@ const LocationSearchInput = ({
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [recentSearches, setRecentSearches] = useState<SearchSuggestion[]>([]);
-  const debouncedSearchTerm = useDebounce(searchText, 300);
+  const debouncedSearchTerm = useDebounce(searchText, 500); // Increase debounce time to prevent flickering
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const preventNextSearchRef = useRef(false);
 
   // Load recent searches from localStorage
   useEffect(() => {
@@ -85,7 +88,7 @@ const LocationSearchInput = ({
     }
   };
 
-  // Fetch suggestions when search term changes
+  // Fetch suggestions when search term changes - use debounced value
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (debouncedSearchTerm.trim()) {
@@ -122,7 +125,7 @@ const LocationSearchInput = ({
   const handleSelectSuggestion = (suggestion: SearchSuggestion) => {
     setSearchText(suggestion.text);
     setShowSuggestions(false);
-    onSearch(suggestion.text);
+    preventNextSearchRef.current = true;
     
     if (suggestion.coordinates) {
       onLocationSelect(
@@ -133,11 +136,22 @@ const LocationSearchInput = ({
     }
     
     saveToRecentSearches(suggestion);
+    
+    // Use timeout to prevent immediate search that might cause UI flickering
+    setTimeout(() => {
+      onSearch(suggestion.text);
+    }, 50);
   };
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (preventNextSearchRef.current) {
+      preventNextSearchRef.current = false;
+      return;
+    }
+    
     onSearch(searchText);
     setShowSuggestions(false);
     
@@ -152,6 +166,14 @@ const LocationSearchInput = ({
     }
   };
 
+  // Handle input change with throttling
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchText(value);
+    
+    // No need to call onSearch here, let the debounce effect handle it
+  };
+
   return (
     <div className="relative w-full">
       <form onSubmit={handleSubmit} className="relative">
@@ -162,7 +184,7 @@ const LocationSearchInput = ({
           placeholder="Search locations or venues..."
           className="pl-10 pr-8 py-2 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
+          onChange={handleInputChange}
           onFocus={() => setShowSuggestions(true)}
           disabled={isLoading}
         />
@@ -172,7 +194,7 @@ const LocationSearchInput = ({
             className="absolute right-3 top-1/2 transform -translate-y-1/2"
             onClick={() => {
               setSearchText('');
-              onSearch('');
+              setTimeout(() => onSearch(''), 50); // Small delay to prevent flicker
             }}
           >
             <X className="h-4 w-4 text-findvenue-text-muted hover:text-white" />

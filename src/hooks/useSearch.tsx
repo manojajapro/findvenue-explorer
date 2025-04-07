@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { venues, Venue } from '@/data/venues';
 import { categories } from '@/data/categories';
@@ -15,10 +15,12 @@ interface SearchFilters {
 }
 
 export const useSearch = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilters, setActiveFilters] = useState<SearchFilters>({});
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSearchRef = useRef<string | null>(null);
   
   // Extract filters from URL parameters - memoized for performance
   const extractFilters = useCallback(() => {

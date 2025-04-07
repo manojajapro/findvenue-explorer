@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import EnhancedMapSearch from './EnhancedMapSearch';
 import MapControls from './MapControls';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Radius of the earth in km
@@ -120,13 +121,14 @@ const DARK_MAP_STYLE = [
   }
 ];
 
-const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange }: MapViewProps) => {
+const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange }: MapViewProps) => {
   const navigate = useNavigate();
   const mapRef = useRef<google.maps.Map | null>(null);
   const [activeVenue, setActiveVenue] = useState<string | null>(null);
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const [searchParams, setSearchParams] = useSearchParams();
   const [mapSearchTerm, setMapSearchTerm] = useState(searchParams.get('search') || '');
+  const debouncedSearchTerm = useDebounce(mapSearchTerm, 500);
   const [isCompactControls, setIsCompactControls] = useState(false);
   const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [isRadiusActive, setIsRadiusActive] = useState(false);
@@ -138,6 +140,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
   const [mapCursor, setMapCursor] = useState<string>('default');
   const [mapLoaded, setMapLoaded] = useState(false);
   const [memoizedVenues, setMemoizedVenues] = useState<Venue[]>([]);
+  const searchUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoadRef = useRef(true);
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -163,11 +167,37 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
   
   useEffect(() => {
     const searchParam = searchParams.get('search');
+    if (searchParam !== debouncedSearchTerm) {
+      if (!isInitialLoadRef.current && debouncedSearchTerm !== searchParam) {
+        if (searchUpdateTimeoutRef.current) {
+          clearTimeout(searchUpdateTimeoutRef.current);
+        }
+        
+        searchUpdateTimeoutRef.current = setTimeout(() => {
+          const newParams = new URLSearchParams(searchParams);
+          if (debouncedSearchTerm.trim()) {
+            newParams.set('search', debouncedSearchTerm.trim());
+          } else {
+            newParams.delete('search');
+          }
+          setSearchParams(newParams, { replace: true });
+        }, 300);
+      }
+    }
+    
     if (searchParam && searchParam !== mapSearchTerm) {
       setMapSearchTerm(searchParam);
       handleSearch(searchParam);
     }
-  }, [searchParams]);
+    
+    isInitialLoadRef.current = false;
+    
+    return () => {
+      if (searchUpdateTimeoutRef.current) {
+        clearTimeout(searchUpdateTimeoutRef.current);
+      }
+    };
+  }, [debouncedSearchTerm, searchParams]);
   
   useEffect(() => {
     if (searchParams.get('mapTools') === 'radius') {
@@ -190,15 +220,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
   const handleSearch = useCallback((term: string) => {
     setMapSearchTerm(term);
     
-    const newParams = new URLSearchParams(searchParams);
-    if (term.trim()) {
-      newParams.set('search', term.trim());
-    } else {
-      newParams.delete('search');
-    }
-    
-    setSearchParams(newParams, { replace: true });
-    
     if (!term.trim()) {
       setFilteredVenues(memoizedVenues);
       return;
@@ -217,7 +238,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
     );
     
     setFilteredVenues(results);
-  }, [memoizedVenues, searchParams, setSearchParams]);
+  }, [memoizedVenues]);
   
   const handleLocationSelect = useCallback((lat: number, lng: number, address: string) => {
     const newLocation = { lat, lng };
@@ -399,12 +420,12 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
   }, []);
   
   useEffect(() => {
-    if (!mapSearchTerm) {
+    if (!debouncedSearchTerm) {
       setFilteredVenues(memoizedVenues);
     } else {
-      handleSearch(mapSearchTerm);
+      handleSearch(debouncedSearchTerm);
     }
-  }, [memoizedVenues, mapSearchTerm, handleSearch]);
+  }, [memoizedVenues, debouncedSearchTerm, handleSearch]);
   
   const handleRadiusChange = useCallback((value: number) => {
     setRadiusInKm(value);
@@ -488,11 +509,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
     }
     
     setSearchParams(newParams, { replace: true });
-    
-    if (filterType === 'search') {
-      handleSearch('');
-    }
-  }, [searchParams, handleSearch, setSearchParams]);
+  }, [searchParams, setSearchParams]);
   
   const handleClearSearch = useCallback(() => {
     setMapSearchTerm('');
@@ -501,8 +518,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
     newParams.delete('search');
     setSearchParams(newParams, { replace: true });
     
-    handleSearch('');
-  }, [handleSearch, searchParams, setSearchParams]);
+    setFilteredVenues(memoizedVenues);
+  }, [searchParams, setSearchParams, memoizedVenues]);
   
   if (isLoading) {
     return (
@@ -763,6 +780,8 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
       />
     </div>
   );
-};
+});
+
+MapView.displayName = "MapView";
 
 export default MapView;

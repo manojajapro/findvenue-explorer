@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { MapPin, X, Filter, Ruler, Search as SearchIcon, MapIcon, Locate } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -10,6 +10,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { useGeocode } from '@/hooks/useGeocode';
 import { toast } from 'sonner';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface EnhancedMapSearchProps {
   onSearch: (term: string) => void;
@@ -44,15 +45,23 @@ const EnhancedMapSearch = memo(({
   const [pinCode, setPinCode] = useState('');
   const [showPinCodeSearch, setShowPinCodeSearch] = useState(false);
   const { geocodePinCode, isLoading: isGeocodingLoading } = useGeocode();
+  const debouncedSearchText = useDebounce(searchText, 500);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Initialize search text from URL if available
   useEffect(() => {
     const searchFromUrl = searchParams.get('search');
     if (searchFromUrl && !searchText) {
       setSearchText(searchFromUrl);
-      onSearch(searchFromUrl);
     }
-  }, [searchParams, searchText, setSearchText, onSearch]);
+  }, [searchParams, searchText, setSearchText]);
+  
+  // Use debounced effect for search to prevent constant rerenders
+  useEffect(() => {
+    if (debouncedSearchText !== searchText) {
+      onSearch(debouncedSearchText);
+    }
+  }, [debouncedSearchText, onSearch]);
   
   const handlePinCodeSearch = useCallback(async () => {
     if (!pinCode.trim()) {
@@ -66,6 +75,11 @@ const EnhancedMapSearch = memo(({
       toast.success(`Location set to: ${result.formattedAddress}`);
     }
   }, [pinCode, geocodePinCode, onLocationSelect]);
+  
+  // Handle input changes with throttled updates
+  const handleInputChange = useCallback((value: string) => {
+    setSearchText(value);
+  }, [setSearchText]);
   
   return (
     <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md border border-white/5">
@@ -94,7 +108,7 @@ const EnhancedMapSearch = memo(({
           onSearch={onSearch}
           onLocationSelect={onLocationSelect}
           searchText={searchText}
-          setSearchText={setSearchText}
+          setSearchText={handleInputChange}
         />
       </div>
       
