@@ -70,11 +70,13 @@ export const useChat = (contactId?: string) => {
     const fetchMessages = async () => {
       try {
         console.log('Fetching messages between', user.id, 'and', contactId);
+        
+        // Using the get_conversation RPC function to fetch messages
         const { data: messagesData, error: messagesError } = await supabase
-          .from('messages')
-          .select('*')
-          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${user.id})`)
-          .order('created_at', { ascending: true });
+          .rpc('get_conversation', {
+            current_user_id: user.id,
+            other_user_id: contactId
+          });
 
         if (messagesError) throw messagesError;
         
@@ -132,7 +134,7 @@ export const useChat = (contactId?: string) => {
 
     // Cleanup
     return () => {
-      supabase.removeChannel(subscription);
+      subscription.unsubscribe();
     };
   }, [contactId, user, venueId, venueName]);
 

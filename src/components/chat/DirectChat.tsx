@@ -3,11 +3,8 @@ import React, { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useChat } from '@/hooks/useChat';
-import { Card } from '@/components/ui/card';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import ErrorDisplay from './ErrorDisplay';
@@ -62,6 +59,7 @@ const DirectChat = () => {
       chatContainerRef.current.scrollTop = 0;
       lastMessageRef.current = null;
     }
+    // This effect should run when contactId changes
   }, [contactId]);
 
   if (!user) {
@@ -78,7 +76,7 @@ const DirectChat = () => {
   }
 
   if (hasError) {
-    return <ErrorDisplay message={errorMessage} />;
+    return <ErrorDisplay message={errorMessage || "An error occurred"} />;
   }
 
   if (!contact && isLoading) {
@@ -98,6 +96,13 @@ const DirectChat = () => {
       </div>
     );
   }
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newMessage.trim() && !isSending) {
+      sendMessage(e);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -130,7 +135,7 @@ const DirectChat = () => {
         <MessageInput 
           newMessage={newMessage}
           setNewMessage={setNewMessage}
-          sendMessage={sendMessage}
+          sendMessage={handleSendMessage}
           isDisabled={isLoading || hasError}
           isSending={isSending}
         />
