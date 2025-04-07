@@ -23,4 +23,5 @@ export interface ChatContact {
   unreadCount?: number;
   venue_id?: string;
   venue_name?: string;
+  status?: string;
 }
