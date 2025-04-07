@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { Venue } from '@/hooks/useSupabaseVenues';
@@ -138,17 +137,23 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
   const [locationAddress, setLocationAddress] = useState<string>("Custom Location");
   const [mapCursor, setMapCursor] = useState<string>('default');
   const [mapLoaded, setMapLoaded] = useState(false);
-  
+  const [memoizedVenues, setMemoizedVenues] = useState<Venue[]>([]);
+
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     id: 'google-map-script'
   });
 
+  useEffect(() => {
+    if (JSON.stringify(venues) !== JSON.stringify(memoizedVenues)) {
+      setMemoizedVenues(venues);
+    }
+  }, [venues]);
+
   const venuesWithCoordinates = filteredVenues.filter(
     venue => venue.latitude && venue.longitude
   );
 
-  // When filteredVenues or venuesInRadius changes, notify parent component
   useEffect(() => {
     const displayVenues = isRadiusActive ? venuesInRadius : venuesWithCoordinates;
     if (onFilteredVenuesChange) {
@@ -178,9 +183,9 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
     }
   }, [searchParams]);
   
-  const handleVenueClick = (venueId: string) => {
-    navigate(`/venue/${venueId}`);
-  };
+  const handleVenueClick = useCallback((venueId: string) => {
+    navigate(`/venue/${venueId}`, { replace: false });
+  }, [navigate]);
   
   const handleSearch = useCallback((term: string) => {
     setMapSearchTerm(term);
@@ -191,15 +196,16 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
     } else {
       newParams.delete('search');
     }
+    
     setSearchParams(newParams, { replace: true });
     
     if (!term.trim()) {
-      setFilteredVenues(venues);
+      setFilteredVenues(memoizedVenues);
       return;
     }
     
     const searchLower = term.toLowerCase();
-    const results = venues.filter(venue => 
+    const results = memoizedVenues.filter(venue => 
       venue.name.toLowerCase().includes(searchLower) || 
       venue.description.toLowerCase().includes(searchLower) ||
       venue.address.toLowerCase().includes(searchLower) ||
@@ -211,7 +217,7 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
     );
     
     setFilteredVenues(results);
-  }, [venues, searchParams, setSearchParams]);
+  }, [memoizedVenues, searchParams, setSearchParams]);
   
   const handleLocationSelect = useCallback((lat: number, lng: number, address: string) => {
     const newLocation = { lat, lng };
@@ -361,7 +367,6 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
     }
   }, [isRadiusActive, userLocation]);
   
-  // Calculate venues in radius
   useEffect(() => {
     if (userLocation && isRadiusActive) {
       const inRadius = venuesWithCoordinates.filter(venue => {
@@ -393,14 +398,13 @@ const MapView = ({ venues, isLoading, highlightedVenueId, onFilteredVenuesChange
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
-  // Update filtered venues when main venues prop changes
   useEffect(() => {
     if (!mapSearchTerm) {
-      setFilteredVenues(venues);
+      setFilteredVenues(memoizedVenues);
     } else {
       handleSearch(mapSearchTerm);
     }
-  }, [venues, mapSearchTerm, handleSearch]);
+  }, [memoizedVenues, mapSearchTerm, handleSearch]);
   
   const handleRadiusChange = useCallback((value: number) => {
     setRadiusInKm(value);

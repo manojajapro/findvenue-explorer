@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { MapPin, X, Filter, Ruler, Search as SearchIcon, MapIcon, Locate } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -26,7 +26,7 @@ interface EnhancedMapSearchProps {
   onClearFilter: (filter: string) => void;
 }
 
-const EnhancedMapSearch = ({
+const EnhancedMapSearch = memo(({
   onSearch,
   onLocationSelect,
   onRadiusChange,
@@ -54,7 +54,7 @@ const EnhancedMapSearch = ({
     }
   }, [searchParams, searchText, setSearchText, onSearch]);
   
-  const handlePinCodeSearch = async () => {
+  const handlePinCodeSearch = useCallback(async () => {
     if (!pinCode.trim()) {
       toast.error('Please enter a PIN code');
       return;
@@ -65,7 +65,7 @@ const EnhancedMapSearch = ({
       onLocationSelect(result.lat, result.lng, result.formattedAddress);
       toast.success(`Location set to: ${result.formattedAddress}`);
     }
-  };
+  }, [pinCode, geocodePinCode, onLocationSelect]);
   
   return (
     <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md border border-white/5">
@@ -201,6 +201,8 @@ const EnhancedMapSearch = ({
       )}
     </div>
   );
-};
+});
+
+EnhancedMapSearch.displayName = "EnhancedMapSearch";
 
 export default EnhancedMapSearch;

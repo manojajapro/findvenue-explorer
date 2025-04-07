@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue, VenueFilter } from '@/hooks/useSupabaseVenues';
@@ -13,6 +13,7 @@ export const useRealTimeVenues = () => {
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   
+  // Memoize filter extraction to prevent unnecessary rerenders
   const extractFilters = useCallback(() => {
     const filters: VenueFilter = {};
     
@@ -38,15 +39,11 @@ export const useRealTimeVenues = () => {
       filters.amenities = amenitiesParam ? amenitiesParam.split(',') : undefined;
     }
     
-    if (searchParams.has('search')) {
-      const searchTerm = searchParams.get('search') || '';
-      if (searchTerm.trim()) {
-        // This will be handled separately in the query
-      }
-    }
-    
     return filters;
   }, [searchParams]);
+  
+  // Memoize the current filters to use in dependency arrays
+  const currentFilters = useMemo(() => extractFilters(), [extractFilters]);
   
   const transformVenueData = useCallback((data: any[]): Venue[] => {
     return data.map(venue => {
@@ -123,7 +120,7 @@ export const useRealTimeVenues = () => {
       setIsLoading(true);
       setError(null);
       
-      const filters = extractFilters();
+      const filters = currentFilters;
       const searchTerm = searchParams.get('search') || '';
       
       let query = supabase.from('venues').select('*', { count: 'exact' });
@@ -179,7 +176,7 @@ export const useRealTimeVenues = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [extractFilters, searchParams, transformVenueData]);
+  }, [currentFilters, searchParams, transformVenueData]);
   
   const fetchCategories = useCallback(async () => {
     try {
@@ -223,7 +220,7 @@ export const useRealTimeVenues = () => {
     }
   }, []);
   
-  // Set up real-time subscriptions
+  // Set up real-time subscriptions once
   useEffect(() => {
     fetchVenues();
     fetchCategories();
@@ -270,7 +267,7 @@ export const useRealTimeVenues = () => {
       supabase.removeChannel(categoriesChannel);
       supabase.removeChannel(citiesChannel);
     };
-  }, [extractFilters, fetchVenues, fetchCategories, fetchCities]);
+  }, []); // This runs only once on component mount
   
   // Re-fetch data when search params change
   useEffect(() => {

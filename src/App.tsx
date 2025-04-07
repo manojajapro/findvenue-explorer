@@ -26,8 +26,6 @@ import MyVenues from "./pages/MyVenues";
 import EditVenue from "./pages/EditVenue";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
-import ChatBot from "./components/chat/ChatBot";
-import { VoiceAssistant } from "./components/ui";
 import { AuthProvider } from "./hooks/useAuth";
 
 // Protected route wrapper
@@ -152,8 +150,6 @@ function App() {
             </Routes>
           </main>
           <Footer />
-          <ChatBot />
-          <VoiceAssistant />
           <ScrollToTop />
           <RevealOnScroll />
         </TooltipProvider>

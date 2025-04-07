@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { venues, Venue } from '@/data/venues';
 import { categories } from '@/data/categories';
@@ -20,7 +20,7 @@ export const useSearch = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilters, setActiveFilters] = useState<SearchFilters>({});
   
-  // Extract filters from URL parameters
+  // Extract filters from URL parameters - memoized for performance
   const extractFilters = useCallback(() => {
     const filters: SearchFilters = {};
     
@@ -53,11 +53,14 @@ export const useSearch = () => {
     return filters;
   }, [searchParams]);
   
+  // Memoize extracted filters for performance
+  const currentFilters = useMemo(() => extractFilters(), [extractFilters]);
+  
   // Apply filters to venues
   const applyFilters = useCallback((filters: SearchFilters) => {
     setIsLoading(true);
     
-    // Simulate API delay
+    // Simulate API delay with a shorter timeout - 200ms instead of 500ms
     setTimeout(() => {
       let results = [...venues];
       
@@ -112,26 +115,26 @@ export const useSearch = () => {
       
       setFilteredVenues(results);
       setIsLoading(false);
-    }, 500);
+    }, 200); // Reduced from 500ms to 200ms for faster response
   }, []);
   
   // Update filters and results when URL parameters change
   useEffect(() => {
-    const filters = extractFilters();
+    const filters = currentFilters;
     setActiveFilters(filters);
     applyFilters(filters);
-  }, [searchParams, extractFilters, applyFilters]);
+  }, [currentFilters, applyFilters]);
   
   // Get category and city info based on IDs
-  const getCategoryName = (categoryId: string) => {
+  const getCategoryName = useCallback((categoryId: string) => {
     const category = categories.find(c => c.id === categoryId);
     return category ? category.name : '';
-  };
+  }, []);
   
-  const getCityName = (cityId: string) => {
+  const getCityName = useCallback((cityId: string) => {
     const city = saudiCities.find(c => c.id === cityId);
     return city ? city.name : '';
-  };
+  }, []);
   
   return {
     venues: filteredVenues,
