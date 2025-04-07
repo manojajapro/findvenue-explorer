@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,7 +27,6 @@ import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import { AuthProvider } from "./hooks/useAuth";
 
-// Protected route wrapper
 const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element, allowedRoles?: string[] }) => {
   const { user, isLoading, profile } = useAuth();
   
@@ -49,7 +47,6 @@ const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element
   return children;
 };
 
-// Home page route with role-based redirection
 const HomeRoute = () => {
   const { user, isVenueOwner } = useAuth();
   
@@ -60,7 +57,6 @@ const HomeRoute = () => {
   return <Index />;
 };
 
-// Login route with role-based redirection
 const LoginRoute = () => {
   const { user, isVenueOwner } = useAuth();
   
@@ -75,7 +71,6 @@ const LoginRoute = () => {
   return <Login />;
 };
 
-// Scroll to top on route change
 function ScrollToTop() {
   const { pathname } = useLocation();
   
@@ -86,7 +81,6 @@ function ScrollToTop() {
   return null;
 }
 
-// For revealing animations on scroll
 function RevealOnScroll() {
   useEffect(() => {
     function reveal() {
@@ -114,47 +108,48 @@ function RevealOnScroll() {
 
 const queryClient = new QueryClient();
 
-// Main App component as a function component to properly use hooks
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <Navbar />
-          <main className="min-h-screen">
-            <Routes>
-              <Route path="/" element={<HomeRoute />} />
-              <Route path="/venue/:id" element={<VenueDetails />} />
-              <Route path="/login" element={<LoginRoute />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/venues" element={<Venues />} />
-              <Route path="/categories" element={<Categories />} />
-              <Route path="/cities" element={<Cities />} />
-              <Route path="/venue-owner" element={<VenueOwnerPromo />} />
-              
-              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-              <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
-              <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
-              <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-              <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-              
-              <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
-              <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />
-              <Route path="/edit-venue/:id" element={<ProtectedRoute allowedRoles={['venue-owner']}><EditVenue /></ProtectedRoute>} />
-              <Route path="/customer-bookings" element={<ProtectedRoute allowedRoles={['venue-owner']}><CustomerBookings /></ProtectedRoute>} />
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-          <Footer />
-          <ScrollToTop />
-          <RevealOnScroll />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <div className="app">
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <Navbar />
+            <main className="min-h-screen">
+              <Routes>
+                <Route path="/" element={<HomeRoute />} />
+                <Route path="/venue/:id" element={<VenueDetails />} />
+                <Route path="/login" element={<LoginRoute />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/venues" element={<Venues />} />
+                <Route path="/categories" element={<Categories />} />
+                <Route path="/cities" element={<Cities />} />
+                <Route path="/venue-owner" element={<VenueOwnerPromo />} />
+                
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
+                <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
+                <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+                <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+                
+                <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
+                <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />
+                <Route path="/edit-venue/:id" element={<ProtectedRoute allowedRoles={['venue-owner']}><EditVenue /></ProtectedRoute>} />
+                <Route path="/customer-bookings" element={<ProtectedRoute allowedRoles={['venue-owner']}><CustomerBookings /></ProtectedRoute>} />
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </main>
+            <Footer />
+            <ScrollToTop />
+            <RevealOnScroll />
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </div>
   );
 }
 

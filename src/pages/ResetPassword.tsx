@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Lock, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Key, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Helmet } from 'react-helmet';
 
@@ -16,13 +16,14 @@ const ResetPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isValidLink, setIsValidLink] = useState(true);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isInvalidLink, setIsInvalidLink] = useState(false);
 
   useEffect(() => {
-    // Check if the user arrived via a password reset link
+    // Check if this is a valid password recovery request
     const hash = window.location.hash;
-    if (!hash || !hash.includes('access_token=')) {
-      setIsValidLink(false);
+    if (!hash || !hash.startsWith('#access_token=')) {
+      setIsInvalidLink(true);
       toast({
         title: 'Invalid Link',
         description: 'This password reset link is invalid or has expired.',
@@ -31,13 +32,13 @@ const ResetPassword = () => {
     }
   }, [toast]);
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!password || !confirmPassword) {
       toast({
         title: 'Error',
-        description: 'Please fill in all fields',
+        description: 'Please enter and confirm your new password',
         variant: 'destructive'
       });
       return;
@@ -52,10 +53,10 @@ const ResetPassword = () => {
       return;
     }
     
-    if (password.length < 6) {
+    if (password.length < 8) {
       toast({
         title: 'Error',
-        description: 'Password must be at least 6 characters long',
+        description: 'Password must be at least 8 characters',
         variant: 'destructive'
       });
       return;
@@ -70,17 +71,21 @@ const ResetPassword = () => {
         throw error;
       }
       
+      setIsSuccess(true);
       toast({
         title: 'Password Updated',
-        description: 'Your password has been successfully changed.',
+        description: 'Your password has been successfully reset'
       });
       
-      navigate('/login');
+      // Redirect after a short delay
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
     } catch (error: any) {
       console.error('Password reset error:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to reset password. Please try again.',
+        description: error.message || 'Failed to update password. Please try again.',
         variant: 'destructive'
       });
     } finally {
@@ -99,63 +104,75 @@ const ResetPassword = () => {
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold mb-2">Set New Password</h1>
               <p className="text-findvenue-text-muted">
-                Create a new password for your account
+                Create a new secure password for your account
               </p>
             </div>
             
-            {!isValidLink ? (
+            {isInvalidLink ? (
               <div className="text-center space-y-4">
                 <div className="bg-red-500/10 text-red-500 p-4 rounded-lg mb-6">
-                  <p className="font-medium">Invalid or expired link</p>
+                  <p className="font-medium">Invalid Reset Link</p>
                   <p className="text-sm mt-1">
-                    Please request a new password reset link on the forgot password page.
+                    This password reset link is invalid or has expired.
                   </p>
                 </div>
                 
                 <Button 
-                  className="bg-findvenue hover:bg-findvenue-dark"
+                  className="w-full bg-findvenue hover:bg-findvenue-dark"
                   onClick={() => navigate('/forgot-password')}
                 >
-                  Go to Forgot Password
+                  Request New Reset Link
                 </Button>
               </div>
+            ) : isSuccess ? (
+              <div className="text-center space-y-4">
+                <div className="bg-green-500/10 text-green-500 p-6 rounded-lg mb-6 flex flex-col items-center">
+                  <Check className="h-12 w-12 mb-4" />
+                  <p className="font-medium text-lg">Password Updated!</p>
+                  <p className="text-sm mt-1">
+                    Your password has been successfully reset.
+                  </p>
+                </div>
+                
+                <p className="text-sm text-findvenue-text-muted">
+                  You will be redirected to the login page shortly...
+                </p>
+              </div>
             ) : (
-              <form onSubmit={handleResetPassword}>
+              <form onSubmit={handlePasswordReset}>
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label htmlFor="password" className="block text-sm font-medium">New Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-findvenue-text-muted" />
+                      <Key className="absolute left-3 top-3 h-4 w-4 text-findvenue-text-muted" />
                       <Input
                         id="password"
                         type={showPassword ? 'text' : 'password'}
+                        className="pl-10 pr-10"
                         placeholder="••••••••"
-                        className="pl-10"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={isLoading}
                       />
-                      <Button
+                      <button 
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-2 top-2 text-findvenue-text-muted hover:text-findvenue-text"
+                        className="absolute right-3 top-3 text-findvenue-text-muted hover:text-findvenue"
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
+                      </button>
                     </div>
                   </div>
                   
                   <div className="space-y-2">
                     <label htmlFor="confirmPassword" className="block text-sm font-medium">Confirm Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-findvenue-text-muted" />
+                      <Key className="absolute left-3 top-3 h-4 w-4 text-findvenue-text-muted" />
                       <Input
                         id="confirmPassword"
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="••••••••"
                         className="pl-10"
+                        placeholder="••••••••"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         disabled={isLoading}
@@ -168,7 +185,7 @@ const ResetPassword = () => {
                     className="w-full bg-findvenue hover:bg-findvenue-dark"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Updating...' : 'Set New Password'}
+                    {isLoading ? 'Updating Password...' : 'Reset Password'}
                   </Button>
                 </div>
               </form>

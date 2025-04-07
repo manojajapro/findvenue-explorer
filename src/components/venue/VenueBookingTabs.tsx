@@ -26,7 +26,7 @@ export default function VenueBookingTabs({
   ownerId,
   ownerName
 }: VenueBookingTabsProps) {
-  const [activeTab, setActiveTab] = useState('hourly');
+  const [activeTab, setActiveTab] = useState('booking');
   const { user } = useAuth();
   const isOwner = user?.id === ownerId;
   const [bookedDates, setBookedDates] = useState<string[]>([]);
@@ -36,6 +36,7 @@ export default function VenueBookingTabs({
   const [hourlyBookedDates, setHourlyBookedDates] = useState<string[]>([]);
   const [dayBookedDates, setDayBookedDates] = useState<string[]>([]);
   const [venueStatus, setVenueStatus] = useState<string>('active');
+  const [bookingType, setBookingType] = useState<'hourly' | 'full-day'>('hourly');
 
   // Fetch venue status
   useEffect(() => {
@@ -198,43 +199,58 @@ export default function VenueBookingTabs({
     <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
       <h3 className="text-lg font-semibold mb-4">Book this venue</h3>
       
-      <Tabs defaultValue="hourly" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-2 mb-4">
-          <TabsTrigger value="hourly" className="text-xs sm:text-sm flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            <span>Hourly Booking</span>
-          </TabsTrigger>
-          <TabsTrigger value="daily" className="text-xs sm:text-sm flex items-center gap-1">
-            <CalendarIcon className="h-3 w-3" />
-            <span>Day Booking</span>
-          </TabsTrigger>
+      <Tabs defaultValue="booking" value={activeTab} onValueChange={setActiveTab as any} className="w-full">
+        <TabsList className="grid grid-cols-1 mb-4">
+          <div className="flex items-center justify-between p-2 bg-findvenue-surface/30 rounded-lg">
+            <div className="font-medium">Booking Type:</div>
+            <div className="flex items-center rounded-md overflow-hidden">
+              <button 
+                className={`px-3 py-1 flex items-center text-sm ${bookingType === 'hourly' 
+                  ? 'bg-findvenue text-white' 
+                  : 'bg-findvenue-card-bg text-findvenue-text hover:bg-findvenue-surface/50'}`}
+                onClick={() => setBookingType('hourly')}
+              >
+                <Clock className="h-3 w-3 mr-1" />
+                Hourly
+              </button>
+              <button 
+                className={`px-3 py-1 flex items-center text-sm ${bookingType === 'full-day' 
+                  ? 'bg-findvenue text-white' 
+                  : 'bg-findvenue-card-bg text-findvenue-text hover:bg-findvenue-surface/50'}`}
+                onClick={() => setBookingType('full-day')}
+              >
+                <CalendarIcon className="h-3 w-3 mr-1" />
+                Full Day
+              </button>
+            </div>
+          </div>
         </TabsList>
         
-        <TabsContent value="hourly">
-          <BookingForm 
-            venueId={venueId} 
-            venueName={venueName} 
-            pricePerHour={pricePerHour} 
-            ownerId={ownerId}
-            ownerName={ownerName}
-            bookedTimeSlots={bookedTimeSlots}
-            isLoading={isLoadingBookings}
-            fullyBookedDates={[...fullyBookedDates, ...dayBookedDates]} // Disable dates with full-day bookings for hourly booking
-            availableTimeSlots={generateTimeSlots()}
-          />
-        </TabsContent>
-        
-        <TabsContent value="daily">
-          <MultiDayBookingForm 
-            venueId={venueId} 
-            venueName={venueName} 
-            pricePerHour={pricePerHour}
-            minCapacity={minCapacity}
-            maxCapacity={maxCapacity}
-            bookedDates={[...fullyBookedDates, ...hourlyBookedDates]} // Disable dates with hourly bookings for day booking
-            isLoading={isLoadingBookings}
-          />
-        </TabsContent>
+        <div className="mt-4">
+          {bookingType === 'hourly' ? (
+            <BookingForm 
+              venueId={venueId} 
+              venueName={venueName} 
+              pricePerHour={pricePerHour} 
+              ownerId={ownerId}
+              ownerName={ownerName}
+              bookedTimeSlots={bookedTimeSlots}
+              isLoading={isLoadingBookings}
+              fullyBookedDates={[...fullyBookedDates, ...dayBookedDates]} // Disable dates with full-day bookings for hourly booking
+              availableTimeSlots={generateTimeSlots()}
+            />
+          ) : (
+            <MultiDayBookingForm 
+              venueId={venueId} 
+              venueName={venueName} 
+              pricePerHour={pricePerHour}
+              minCapacity={minCapacity}
+              maxCapacity={maxCapacity}
+              bookedDates={[...fullyBookedDates, ...hourlyBookedDates]} // Disable dates with hourly bookings for day booking
+              isLoading={isLoadingBookings}
+            />
+          )}
+        </div>
       </Tabs>
     </div>
   );

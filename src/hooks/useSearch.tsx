@@ -23,6 +23,7 @@ export const useSearch = () => {
   const lastSearchRef = useRef<string | null>(null);
   const isInitialMount = useRef(true);
   const isSearchInProgress = useRef(false);
+  const prevFiltersRef = useRef<string | null>(null);
   
   // Extract filters from URL parameters - memoized for performance
   const extractFilters = useCallback(() => {
@@ -60,7 +61,33 @@ export const useSearch = () => {
   // Memoize extracted filters for performance
   const currentFilters = useMemo(() => extractFilters(), [extractFilters]);
   
-  // Apply filters to venues with debounce mechanism to prevent blinking
+  // Function to update search params without causing a route change
+  const updateSearchParams = useCallback((filters: SearchFilters) => {
+    const newParams = new URLSearchParams(searchParams);
+    
+    // Compare current filters with previous filters
+    const filtersStr = JSON.stringify(filters);
+    if (filtersStr === prevFiltersRef.current) {
+      return; // Skip if filters haven't changed
+    }
+    prevFiltersRef.current = filtersStr;
+    
+    // Update all params at once to avoid multiple history entries
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value === undefined || (Array.isArray(value) && value.length === 0)) {
+        newParams.delete(key);
+      } else if (Array.isArray(value)) {
+        newParams.set(key, value.join(','));
+      } else {
+        newParams.set(key, String(value));
+      }
+    });
+    
+    // Use replace state to avoid creating new history entries
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+  
+  // Apply filters to venues with improved debounce mechanism
   const applyFilters = useCallback((filters: SearchFilters) => {
     // Prevent multiple concurrent searches
     if (isSearchInProgress.current) {
@@ -85,7 +112,7 @@ export const useSearch = () => {
     
     lastSearchRef.current = searchKey;
     
-    // Use a minimal delay for better UX
+    // Use a longer delay for better debounce
     searchTimeoutRef.current = setTimeout(() => {
       let results = [...venues];
       
@@ -141,8 +168,11 @@ export const useSearch = () => {
       setFilteredVenues(results);
       setIsLoading(false);
       isSearchInProgress.current = false;
-    }, 150);
-  }, []);
+      
+      // Update search params after filtering is complete
+      updateSearchParams(filters);
+    }, 500); // Increased debounce delay
+  }, [updateSearchParams]);
   
   // Update filters and results when URL parameters change
   useEffect(() => {

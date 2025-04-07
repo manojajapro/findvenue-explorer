@@ -51,16 +51,39 @@ const VenueDetails = () => {
   return (
     <div className="container mx-auto p-4">
       <div className="md:flex md:gap-8">
-        {/* Image Gallery */}
-        <div className="md:w-2/3">
-          <img src={venue.imageUrl} alt={venue.name} className="w-full rounded-lg object-cover h-64 md:h-96" />
-          <ScrollArea className="relative w-full overflow-x-auto mt-4">
-            <div className="flex gap-2">
-              {venue.galleryImages && venue.galleryImages.map((image, index) => (
-                <img key={index} src={image} alt={`${venue.name} Gallery ${index + 1}`} className="w-32 h-20 rounded-md object-cover" />
+        {/* New Image Gallery Layout */}
+        <div className="md:w-2/3 space-y-4">
+          <div className="grid grid-cols-12 gap-4 h-96">
+            {/* Main large image */}
+            <div className="col-span-8 h-full">
+              <img src={venue.imageUrl} alt={venue.name} className="w-full h-full rounded-lg object-cover" />
+            </div>
+            
+            {/* Side gallery - 2 columns x 2 rows */}
+            <div className="col-span-4 grid grid-rows-2 gap-4 h-full">
+              {venue.galleryImages && venue.galleryImages.slice(0, 2).map((image, index) => (
+                <div key={index} className="relative rounded-lg overflow-hidden">
+                  <img src={image} alt={`${venue.name} Gallery ${index + 1}`} className="w-full h-full object-cover" />
+                  {index === 1 && venue.galleryImages && venue.galleryImages.length > 2 && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                      <span className="text-white text-lg font-medium">+{venue.galleryImages.length - 2} photos</span>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
-          </ScrollArea>
+          </div>
+          
+          <div className="flex overflow-x-auto gap-2 pb-2">
+            {venue.galleryImages && venue.galleryImages.map((image, index) => (
+              <img 
+                key={index} 
+                src={image} 
+                alt={`${venue.name} Gallery ${index + 1}`} 
+                className="w-20 h-20 rounded-md object-cover flex-shrink-0"
+              />
+            ))}
+          </div>
         </div>
         
         {/* Venue Details */}
@@ -128,6 +151,35 @@ const VenueDetails = () => {
       
       <Separator className="my-4" />
       
+      {/* Rules and Regulations */}
+      <div className="mb-4">
+        <h4 className="text-lg font-semibold">Rules and Regulations</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+          <div className="bg-findvenue-surface/10 p-4 rounded-lg">
+            <h5 className="font-medium mb-2">General Rules</h5>
+            <ul className="list-disc list-inside text-gray-700 space-y-1">
+              <li>No smoking indoors</li>
+              <li>No pets allowed</li>
+              <li>No outside food or beverages</li>
+              <li>All decorations must be approved by management</li>
+              <li>Noise levels must be kept reasonable after 10 PM</li>
+            </ul>
+          </div>
+          <div className="bg-findvenue-surface/10 p-4 rounded-lg">
+            <h5 className="font-medium mb-2">Booking Terms</h5>
+            <ul className="list-disc list-inside text-gray-700 space-y-1">
+              <li>50% advance payment required to confirm booking</li>
+              <li>Cancellations within 48 hours are non-refundable</li>
+              <li>Venue must be vacated at agreed time</li>
+              <li>Damage to property will incur additional charges</li>
+              <li>COVID safety protocols must be followed</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <Separator className="my-4" />
+      
       {/* Venue Booking Tabs - Only show if user is not the owner */}
       {!isOwner && (
         <VenueBookingTabs 
@@ -145,10 +197,35 @@ const VenueDetails = () => {
       {venue.ownerInfo && (
         <>
           <Separator className="my-4" />
-          <div className="mb-4">
-            <h4 className="text-lg font-semibold">Venue Host</h4>
-            <p className="text-gray-700">Contact: {venue.ownerInfo.contact}</p>
-            <p className="text-gray-700">Response Time: {venue.ownerInfo.responseTime}</p>
+          <div className="mb-4 bg-findvenue-surface/10 p-4 rounded-lg">
+            <div className="flex items-center mb-3">
+              <div className="w-12 h-12 bg-findvenue rounded-full flex items-center justify-center text-white text-lg font-bold mr-3">
+                {venue.ownerInfo.name.charAt(0)}
+              </div>
+              <div>
+                <h4 className="text-lg font-semibold">{venue.ownerInfo.name}</h4>
+                <div className="flex items-center gap-2 text-sm text-findvenue-text-muted">
+                  <span className="inline-flex items-center">
+                    <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                    Active 3h 10 min ago
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-findvenue-text-muted mb-1">Contact</p>
+                <p className="text-gray-700">{venue.ownerInfo.contact}</p>
+              </div>
+              <div>
+                <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
+                <p className="text-gray-700">{venue.ownerInfo.responseTime}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm text-findvenue-text-muted mb-1">Response Rate</p>
+                <p className="text-gray-700">100%</p>
+              </div>
+            </div>
             {venue.ownerInfo.socialLinks && (
               <div className="mt-4 flex space-x-3">
                 {venue.ownerInfo.socialLinks.facebook && (

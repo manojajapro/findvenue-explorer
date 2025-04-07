@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Mail } from 'lucide-react';
+import { Mail, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Helmet } from 'react-helmet';
 
@@ -62,6 +62,11 @@ const ForgotPassword = () => {
       </Helmet>
       <div className="container mx-auto px-4">
         <div className="max-w-md mx-auto">
+          <Link to="/login" className="inline-flex items-center mb-4 text-findvenue hover:text-findvenue-dark">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to login
+          </Link>
+          
           <Card className="p-8 glass-card border-white/10">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold mb-2">Reset Password</h1>
@@ -78,6 +83,11 @@ const ForgotPassword = () => {
                     We've sent an email to <span className="font-medium">{email}</span> with instructions to reset your password.
                   </p>
                 </div>
+                
+                <p className="text-sm text-findvenue-text-muted">
+                  Please check your inbox and follow the instructions in the email.
+                  The link will expire in 24 hours.
+                </p>
                 
                 <div className="text-center mt-6">
                   <Link to="/login" className="text-findvenue hover:text-findvenue-light transition-colors">
@@ -111,12 +121,6 @@ const ForgotPassword = () => {
                   >
                     {isLoading ? 'Sending...' : 'Send Reset Link'}
                   </Button>
-                  
-                  <div className="text-center mt-6">
-                    <Link to="/login" className="text-findvenue hover:text-findvenue-light transition-colors">
-                      Back to login
-                    </Link>
-                  </div>
                 </div>
               </form>
             )}
