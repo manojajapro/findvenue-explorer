@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,6 +27,7 @@ import EditVenue from "./pages/EditVenue";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import { AuthProvider } from "./hooks/useAuth";
+import DirectChat from '@/components/chat/DirectChat';
 
 const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element, allowedRoles?: string[] }) => {
   const { user, isLoading, profile } = useAuth();
@@ -137,7 +137,7 @@ function App() {
                 <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
                 <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
                 <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-                <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+                <Route path="/messages/:contactId" element={<DirectChat />} />
                 
                 <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
                 <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />

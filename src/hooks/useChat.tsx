@@ -1,11 +1,13 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useLocation } from 'react-router-dom';
 import { Message, ChatContact } from '@/components/chat/types';
+import { useAuth } from '@/hooks/useAuth';
 
 export const useChat = (contactId?: string) => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [contact, setContact] = useState<ChatContact | null>(null);
@@ -23,27 +25,30 @@ export const useChat = (contactId?: string) => {
   const bookingId = searchParams.get('bookingId');
 
   useEffect(() => {
-    if (!contactId) {
+    if (!contactId || !user) {
       setIsLoading(false);
       return;
     }
 
     const fetchContactInfo = async () => {
       try {
+        console.log('Fetching contact info for:', contactId);
         const { data: userData, error: userError } = await supabase
           .from('user_profiles')
-          .select('id, first_name, last_name, user_role, avatar_url')
+          .select('id, first_name, last_name, user_role, profile_image')
           .eq('id', contactId)
           .single();
 
         if (userError) throw userError;
 
+        console.log('Contact data:', userData);
+        
         // Set contact information
         setContact({
           id: userData.id,
           name: `${userData.first_name} ${userData.last_name}`,
-          role: userData.user_role,
-          image: userData.avatar_url || '',
+          role: userData.user_role === 'venue_owner' ? 'venue-owner' : 'customer',
+          image: userData.profile_image || '',
           venue_id: venueId || undefined,
           venue_name: venueName ? decodeURIComponent(venueName) : undefined,
         });
@@ -64,14 +69,16 @@ export const useChat = (contactId?: string) => {
 
     const fetchMessages = async () => {
       try {
+        console.log('Fetching messages between', user.id, 'and', contactId);
         const { data: messagesData, error: messagesError } = await supabase
-          .rpc('get_conversation', { 
-            current_user_id: (await supabase.auth.getUser()).data.user?.id,
-            other_user_id: contactId 
-          });
+          .from('messages')
+          .select('*')
+          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${user.id})`)
+          .order('created_at', { ascending: true });
 
         if (messagesError) throw messagesError;
-
+        
+        console.log('Messages data:', messagesData);
         setMessages(messagesData || []);
         setIsLoading(false);
       } catch (error: any) {
@@ -84,12 +91,10 @@ export const useChat = (contactId?: string) => {
 
     const updateMessageReadStatus = async () => {
       try {
-        const currentUserId = (await supabase.auth.getUser()).data.user?.id;
-        
         await supabase
           .from('messages')
           .update({ read: true })
-          .eq('receiver_id', currentUserId)
+          .eq('receiver_id', user.id)
           .eq('sender_id', contactId);
       } catch (error) {
         console.error('Error marking messages as read:', error);
@@ -100,7 +105,7 @@ export const useChat = (contactId?: string) => {
     fetchContactInfo();
 
     // Subscribe to new messages
-    const channel = supabase
+    const subscription = supabase
       .channel('messages-channel')
       .on(
         'postgres_changes',
@@ -108,9 +113,10 @@ export const useChat = (contactId?: string) => {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `sender_id=eq.${contactId}`,
+          filter: `receiver_id=eq.${user.id}`
         },
         (payload) => {
+          console.log('New message received:', payload);
           const newMessage = payload.new as Message;
           
           // Only add message to state if it's for this conversation
@@ -126,23 +132,19 @@ export const useChat = (contactId?: string) => {
 
     // Cleanup
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(subscription);
     };
-  }, [contactId, venueId, venueName]);
+  }, [contactId, user, venueId, venueName]);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !contactId || !contact) return;
+    if (!newMessage.trim() || !contactId || !user || isSending) return;
     
     setIsSending(true);
     
     try {
-      const user = (await supabase.auth.getUser()).data.user;
-      
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
+      console.log('Sending message to:', contactId);
       
       // Get the user profile to get the name
       const { data: userProfile } = await supabase
@@ -160,19 +162,25 @@ export const useChat = (contactId?: string) => {
         receiver_id: contactId,
         content: newMessage.trim(),
         sender_name: senderName,
-        receiver_name: contact.name,
-        venue_id: contact.venue_id,
-        venue_name: contact.venue_name,
+        receiver_name: contact?.name || 'User',
+        venue_id: contact?.venue_id || venueId || null,
+        venue_name: contact?.venue_name || venueName || null,
         booking_id: bookingId || null,
         read: false
       };
       
-      const { error } = await supabase
+      console.log('Message data:', messageData);
+      
+      const { data, error } = await supabase
         .from('messages')
-        .insert(messageData);
+        .insert(messageData)
+        .select()
+        .single();
         
       if (error) throw error;
       
+      console.log('Message sent successfully:', data);
+      setMessages(prev => [...prev, data]);
       setNewMessage('');
       
       // Scroll to bottom after sending
