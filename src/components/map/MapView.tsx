@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { MapPin, ArrowRight, Star, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import EnhancedMapSearch from './EnhancedMapSearch';
 import MapControls from './MapControls';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -140,6 +139,7 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
   const [mapCursor, setMapCursor] = useState<string>('default');
   const [mapLoaded, setMapLoaded] = useState(false);
   const [memoizedVenues, setMemoizedVenues] = useState<Venue[]>([]);
+  const [isDraggingCircle, setIsDraggingCircle] = useState(false);
   const searchUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef(true);
   const isUpdatingSearchParams = useRef(false);
@@ -219,7 +219,7 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
       setUserLocation(DEFAULT_LOCATION);
       
       setTimeout(() => {
-        toast.info("Click anywhere on the map to set your location for radius search", {
+        toast.info("Click and drag to adjust the radius or move the center point", {
           duration: 5000,
           id: "map-instruction",
         });
@@ -286,43 +286,7 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
     toast.success(`Location set to: ${address}`);
   }, []);
   
-  const handleManualLocationSetting = useCallback(() => {
-    setIsSettingManualLocation(true);
-    setMapCursor('crosshair');
-    
-    if (!userLocation) {
-      setUserLocation(DEFAULT_LOCATION);
-      setLocationAddress("Default Location (Riyadh)");
-    }
-    
-    toast.info("Click on the map to set your location", {
-      description: "Click anywhere on the map to set your location for radius search",
-      position: "top-center",
-      duration: 5000
-    });
-    
-    setIsRadiusActive(true);
-  }, [userLocation]);
-  
-  const handleCurrentLocation = useCallback(() => {
-    if (navigator.geolocation) {
-      toast.info("Getting your current location...");
-      
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          handleLocationSelect(latitude, longitude, "Your Current Location");
-        },
-        (error) => {
-          console.error("Error getting user location:", error);
-          toast.error("Could not access your location. Please try setting location manually.");
-        }
-      );
-    } else {
-      toast.error("Your browser doesn't support geolocation");
-    }
-  }, []);
-  
+  // Modified to support drag functionality
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (isSettingManualLocation && e.latLng) {
       const newLocation = {
@@ -351,7 +315,6 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
       
       if (mapRef.current) {
         mapRef.current.panTo(newLocation);
-        mapRef.current.setZoom(15);
       }
     }
   }, [isSettingManualLocation]);
@@ -365,6 +328,28 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
       setUserLocation(previewLocation);
     }
   }, [isSettingManualLocation]);
+
+  // New handler for circle drag
+  const handleCircleDrag = useCallback((e: google.maps.MapMouseEvent) => {
+    if (e.latLng && isRadiusActive) {
+      const newLocation = {
+        lat: e.latLng.lat(),
+        lng: e.latLng.lng()
+      };
+      setUserLocation(newLocation);
+      
+      if (window.google && window.google.maps) {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: newLocation }, (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            setLocationAddress(results[0].formatted_address);
+          } else {
+            setLocationAddress("Custom Location");
+          }
+        });
+      }
+    }
+  }, [isRadiusActive]);
   
   const resetToDefaultLocation = useCallback(() => {
     setUserLocation(DEFAULT_LOCATION);
@@ -559,41 +544,9 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
   const displayVenues = isRadiusActive ? venuesInRadius : venuesWithCoordinates;
   
   return (
-    <div className={`h-full flex flex-col relative ${mapLoaded ? 'animate-fade-in' : 'opacity-0'}`}>
-      <div className="absolute top-4 left-4 right-4 z-[1000] animate-fade-in">
-        <EnhancedMapSearch 
-          onSearch={handleSearch}
-          onLocationSelect={handleLocationSelect}
-          onRadiusChange={setRadiusInKm}
-          onManualLocation={() => setIsSettingManualLocation(true)}
-          onCurrentLocation={() => {
-            if (navigator.geolocation) {
-              toast.info("Getting your current location...");
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  const { latitude, longitude } = position.coords;
-                  handleLocationSelect(latitude, longitude, "Your Current Location");
-                },
-                (error) => {
-                  toast.error("Could not access your location. Please try setting location manually.");
-                }
-              );
-            } else {
-              toast.error("Your browser doesn't support geolocation");
-            }
-          }}
-          venueCount={displayVenues.length}
-          radiusInKm={radiusInKm}
-          isRadiusActive={isRadiusActive}
-          searchText={mapSearchTerm}
-          setSearchText={setMapSearchTerm}
-          appliedFilters={appliedFilters}
-          onClearFilter={handleClearFilter}
-        />
-      </div>
-      
+    <div className={`h-full flex flex-col relative ${mapLoaded ? 'animate-fade-in' : 'opacity-0'}`}>      
       {isSettingManualLocation && (
-        <div className="absolute top-20 left-4 right-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md text-center border border-white/10 animate-scale-in">
+        <div className="absolute top-4 left-4 right-4 z-[1000] bg-findvenue-surface/90 backdrop-blur-md p-3 rounded-md text-center border border-white/10 animate-scale-in">
           <p className="text-sm font-medium">Click anywhere on the map to set your location</p>
           <p className="text-xs text-findvenue-text-muted mb-2">Move your cursor to preview location</p>
           <Button
@@ -670,24 +623,55 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
             <>
               <Circle 
                 center={userLocation} 
-                radius={radiusInKm * 1000} 
+                radius={radiusInKm * 1000}
+                draggable={true}
+                onDragStart={() => setIsDraggingCircle(true)}
+                onDragEnd={(e) => {
+                  if (e.latLng) {
+                    handleCircleDrag(e);
+                  }
+                  setIsDraggingCircle(false);
+                }}
                 options={{
                   fillColor: '#10B981',
                   fillOpacity: 0.15,
                   strokeColor: '#10B981',
                   strokeOpacity: 0.8,
                   strokeWeight: 2,
+                  editable: true, // Allow radius editing
                 }}
               />
               <Marker
                 position={userLocation}
+                draggable={true}
+                onDragEnd={(e) => {
+                  if (e.latLng) {
+                    const newLoc = {
+                      lat: e.latLng.lat(),
+                      lng: e.latLng.lng()
+                    };
+                    setUserLocation(newLoc);
+                    
+                    // Reverse geocode to get address
+                    if (window.google && window.google.maps) {
+                      const geocoder = new google.maps.Geocoder();
+                      geocoder.geocode({ location: newLoc }, (results, status) => {
+                        if (status === 'OK' && results && results[0]) {
+                          setLocationAddress(results[0].formatted_address);
+                        } else {
+                          setLocationAddress("Custom Location");
+                        }
+                      });
+                    }
+                  }
+                }}
                 icon={{
                   url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
                   scaledSize: new google.maps.Size(40, 40)
                 }}
                 animation={google.maps.Animation.DROP}
               >
-                {selectedVenue === null && (
+                {selectedVenue === null && !isDraggingCircle && (
                   <InfoWindow
                     position={userLocation}
                     onCloseClick={() => setSelectedVenue(null)}
@@ -696,6 +680,9 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
                       <h3 className="font-bold text-base mb-1">{locationAddress}</h3>
                       <p className="text-xs text-gray-600">
                         Showing venues within {radiusInKm.toFixed(1)} km
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Drag marker or circle to move. Resize circle to change radius.
                       </p>
                     </div>
                   </InfoWindow>
@@ -799,7 +786,11 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
         isCompactControls={isCompactControls}
         isRadiusActive={isRadiusActive}
         toggleRadiusSearch={toggleRadiusSearch}
-        handleManualLocationSetting={handleManualLocationSetting}
+        handleManualLocationSetting={() => {
+          setIsSettingManualLocation(true);
+          setMapCursor('crosshair');
+          toast.info("Click on the map to set your location");
+        }}
         handleClearSearch={handleClearSearch}
         fitBoundsToMarkers={fitBoundsToMarkers}
         resetToDefaultLocation={resetToDefaultLocation}

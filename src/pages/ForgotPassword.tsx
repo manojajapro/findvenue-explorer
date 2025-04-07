@@ -71,7 +71,7 @@ const ForgotPassword = () => {
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold mb-2">Reset Password</h1>
               <p className="text-findvenue-text-muted">
-                Enter your email to receive a password reset link
+                Enter your email to receive a password reset link with OTP verification
               </p>
             </div>
             
@@ -80,7 +80,7 @@ const ForgotPassword = () => {
                 <div className="bg-green-500/10 text-green-500 p-4 rounded-lg mb-6">
                   <p className="font-medium">Reset link sent!</p>
                   <p className="text-sm mt-1">
-                    We've sent an email to <span className="font-medium">{email}</span> with instructions to reset your password.
+                    We've sent an email to <span className="font-medium">{email}</span> with a verification code.
                   </p>
                 </div>
                 
@@ -119,9 +119,13 @@ const ForgotPassword = () => {
                     className="w-full bg-findvenue hover:bg-findvenue-dark"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Sending...' : 'Send Reset Link'}
+                    {isLoading ? 'Sending...' : 'Send Reset Link with OTP'}
                   </Button>
                 </div>
+                
+                <p className="text-sm mt-4 text-center text-findvenue-text-muted">
+                  You will receive an email with a one-time password (OTP) to verify your identity
+                </p>
               </form>
             )}
           </Card>

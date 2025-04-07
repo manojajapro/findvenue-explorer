@@ -1,14 +1,20 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+// Define the User type with the properties needed
 type User = {
   id: string;
   email?: string;
   app_metadata: any;
   user_metadata: any;
   aud: string;
+  firstName?: string;
+  lastName?: string;
+  profileImage?: string;
 };
 
+// Define the Session type
 type Session = {
   access_token: string;
   refresh_token: string;
@@ -44,25 +50,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        const sessionUser = session?.user as any;
         setSession(session as any);
-        setUser(session?.user as any ?? null);
         
-        if (session?.user) {
+        if (sessionUser) {
+          // Add missing properties from profile data
+          const enhancedUser = {
+            ...sessionUser,
+            firstName: profile?.first_name || '',
+            lastName: profile?.last_name || '',
+            profileImage: profile?.avatar_url || '',
+          };
+          setUser(enhancedUser);
+          
           setTimeout(() => {
-            fetchUserProfile(session.user.id);
+            fetchUserProfile(sessionUser.id);
           }, 0);
+        } else {
+          setUser(null);
         }
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      const sessionUser = session?.user as any;
       setSession(session as any);
-      setUser(session?.user as any ?? null);
       
-      if (session?.user) {
-        fetchUserProfile(session.user.id);
+      if (sessionUser) {
+        // Add missing properties initially too
+        const enhancedUser = {
+          ...sessionUser,
+          firstName: '',
+          lastName: '',
+          profileImage: '',
+        };
+        setUser(enhancedUser);
+        fetchUserProfile(sessionUser.id);
       } else {
         setIsLoading(false);
+        setUser(null);
       }
     });
 
@@ -84,6 +110,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       setProfile(data);
+      
+      // Update user with profile data
+      setUser(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          firstName: data?.first_name || '',
+          lastName: data?.last_name || '',
+          profileImage: data?.avatar_url || '',
+        };
+      });
+      
       setIsVenueOwner(data?.user_role === 'venue-owner');
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -189,6 +227,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         ...prev,
         ...profileData
       }));
+      
+      // Update user with new profile data
+      setUser(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          firstName: profileData.first_name || prev.firstName,
+          lastName: profileData.last_name || prev.lastName,
+          profileImage: profileData.avatar_url || prev.profileImage,
+        };
+      });
     } catch (error) {
       console.error('Error updating profile:', error);
       throw error;
