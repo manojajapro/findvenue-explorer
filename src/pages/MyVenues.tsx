@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -303,10 +302,8 @@ const MyVenues = () => {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDayOfMonth = new Date(year, month, 1).getDay();
     
-    // Create days array
     const days = [];
     
-    // Add previous month's days
     for (let i = 0; i < firstDayOfMonth; i++) {
       const prevMonthDate = new Date(year, month, -i);
       days.unshift({
@@ -316,7 +313,6 @@ const MyVenues = () => {
       });
     }
     
-    // Add current month's days
     for (let i = 1; i <= daysInMonth; i++) {
       const currentDate = new Date(year, month, i);
       days.push({
@@ -327,8 +323,7 @@ const MyVenues = () => {
       });
     }
     
-    // Add next month's days to fill remaining cells
-    const remainingCells = 42 - days.length; // 6 rows of 7 days
+    const remainingCells = 42 - days.length;
     for (let i = 1; i <= remainingCells; i++) {
       const nextMonthDate = new Date(year, month + 1, i);
       days.push({
@@ -572,10 +567,10 @@ const MyVenues = () => {
                         <div className="flex justify-between items-center mb-2">
                           <h4 className="font-medium">{formatDate(selectedBooking.booking_date)}</h4>
                           <Badge className={
-                            selectedBooking.status === 'confirmed' ? 'bg-green-500' :
-                            selectedBooking.status === 'pending' ? 'bg-yellow-500' :
-                            selectedBooking.status === 'cancelled' ? 'bg-red-500' :
-                            'bg-blue-500'
+                            selectedBooking.status === 'confirmed' ? 'bg-green-500 text-xs py-0.5' :
+                            selectedBooking.status === 'pending' ? 'bg-yellow-500 text-xs py-0.5' :
+                            selectedBooking.status === 'cancelled' ? 'bg-red-500 text-xs py-0.5' :
+                            'bg-blue-500 text-xs py-0.5'
                           }>
                             {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
                           </Badge>
@@ -644,10 +639,10 @@ const MyVenues = () => {
                             <div key={booking.id} className="p-3 bg-findvenue-surface/30 border border-white/5 rounded-lg">
                               <div className="flex justify-between items-center">
                                 <Badge className={
-                                  booking.status === 'confirmed' ? 'bg-green-500' :
-                                  booking.status === 'pending' ? 'bg-yellow-500' :
-                                  'bg-blue-500'
-                                } size="sm">
+                                  booking.status === 'confirmed' ? 'bg-green-500 text-xs py-0.5' :
+                                  booking.status === 'pending' ? 'bg-yellow-500 text-xs py-0.5' :
+                                  'bg-blue-500 text-xs py-0.5'
+                                }>
                                   {booking.status}
                                 </Badge>
                                 <span className="text-xs text-findvenue-text-muted">{booking.start_time} - {booking.end_time}</span>
@@ -673,11 +668,11 @@ const MyVenues = () => {
                             <div className="flex justify-between items-center">
                               <span className="text-xs">{formatDate(booking.booking_date)}</span>
                               <Badge className={
-                                booking.status === 'confirmed' ? 'bg-green-500' :
-                                booking.status === 'pending' ? 'bg-yellow-500' :
-                                booking.status === 'cancelled' ? 'bg-red-500' :
-                                'bg-blue-500'
-                              } size="sm">
+                                booking.status === 'confirmed' ? 'bg-green-500 text-xs py-0.5' :
+                                booking.status === 'pending' ? 'bg-yellow-500 text-xs py-0.5' :
+                                booking.status === 'cancelled' ? 'bg-red-500 text-xs py-0.5' :
+                                'bg-blue-500 text-xs py-0.5'
+                              }>
                                 {booking.status}
                               </Badge>
                             </div>
