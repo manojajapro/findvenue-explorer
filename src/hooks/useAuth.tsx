@@ -1,6 +1,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { Session as SupabaseSession, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Define the User type with the properties needed
 type User = {

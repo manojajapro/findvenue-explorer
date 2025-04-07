@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +9,7 @@ import { useAuth } from "./hooks/useAuth";
 import Index from "./pages/Index";
 import VenueDetails from "./pages/VenueDetails";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ListVenue from "./pages/ListVenue";
@@ -122,6 +124,7 @@ function App() {
                 <Route path="/" element={<HomeRoute />} />
                 <Route path="/venue/:id" element={<VenueDetails />} />
                 <Route path="/login" element={<LoginRoute />} />
+                <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/venues" element={<Venues />} />
