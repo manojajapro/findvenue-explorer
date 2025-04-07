@@ -1,951 +1,814 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { Venue } from '@/hooks/useSupabaseVenues';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { toast } from '@/hooks/use-toast';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { CalendarIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { format } from "date-fns"
-import { Separator } from "@/components/ui/separator"
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
-import { ReloadIcon } from "@radix-ui/react-icons"
+import { 
+  BarChart3, Calendar, DollarSign, Users, PlusCircle, Edit, 
+  Trash2, Activity, ChevronLeft, ChevronRight
+} from 'lucide-react';
+import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 import { Helmet } from 'react-helmet';
-
-interface Venue {
-  id: string;
-  name: string;
-  description: string;
-  address: string;
-  city: string;
-  category: string;
-  images: string[];
-  price: number;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-  is_published: boolean;
-}
-
-interface Booking {
-  id: string;
-  venue_id: string;
-  user_id: string;
-  start_date: string;
-  end_date: string;
-  number_of_guests: number;
-  total_price: number;
-  status: 'pending' | 'confirmed' | 'cancelled';
-  created_at: string;
-}
+import { useToast } from '@/hooks/use-toast';
 
 const MyVenues = () => {
-  const { user, profile } = useAuth();
+  const { user, isVenueOwner, profile } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const location = useLocation();
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [stats, setStats] = useState({
+    totalVenues: 0,
+    activeBookings: 0,
+    completedBookings: 0,
+    revenue: 0
+  });
+  const [recentBookings, setRecentBookings] = useState<any[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
+  const { toast } = useToast();
 
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
-  const [editVenueId, setEditVenueId] = useState<string | null>(null);
-  const [venueDetails, setVenueDetails] = useState<Venue | null>(null);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [isUnpublishing, setIsUnpublishing] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [isBookingDrawerOpen, setIsBookingDrawerOpen] = useState(false);
-  const [isConfirming, setIsConfirming] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isLoadingVenues, setIsLoadingVenues] = useState(false);
-  const [isLoadingBookings, setIsLoadingBookings] = useState(false);
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get('tab');
+    
+    if (tab === 'venues' || tab === 'bookings') {
+      setActiveTab(tab);
+    } else {
+      setActiveTab('dashboard');
+      
+      if (!searchParams.has('tab') || searchParams.get('tab') !== 'dashboard') {
+        navigate('/my-venues?tab=dashboard', { replace: true });
+      }
+    }
+  }, [location.search, navigate]);
 
-  // State for venue form
-  const [venueName, setVenueName] = useState('');
-  const [venueDescription, setVenueDescription] = useState('');
-  const [venueAddress, setVenueAddress] = useState('');
-  const [venueCity, setVenueCity] = useState('');
-  const [venueCategory, setVenueCategory] = useState('');
-  const [venuePrice, setVenuePrice] = useState<number | undefined>(undefined);
-  const [venueImages, setVenueImages] = useState<string[]>([]);
-
-  // State for edit venue form
-  const [editVenueName, setEditVenueName] = useState('');
-  const [editVenueDescription, setEditVenueDescription] = useState('');
-  const [editVenueAddress, setEditVenueAddress] = useState('');
-  const [editVenueCity, setEditVenueCity] = useState('');
-  const [editVenueCategory, setEditVenueCategory] = useState('');
-  const [editVenuePrice, setEditVenuePrice] = useState<number | undefined>(undefined);
-  const [editVenueImages, setEditVenueImages] = useState<string[]>([]);
-
-  // State for bookings filter
-  const [date, setDate] = useState<Date | undefined>(undefined);
-
-  // Fetch venues owned by the current user
-  const { data: venues, refetch: refetchVenues } = useQuery<Venue[]>(
-    ['myVenues', user?.id],
-    async () => {
-      setIsLoadingVenues(true);
-      if (!user?.id) return [];
+  const fetchVenues = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      console.log("Fetching venues for user ID:", user.id);
+      
       const { data, error } = await supabase
         .from('venues')
-        .select('*')
-        .eq('user_id', user.id);
-      setIsLoadingVenues(false);
-      if (error) {
-        console.error('Error fetching venues:', error);
-        throw error;
+        .select('*');
+      
+      if (error) throw error;
+      
+      if (data) {
+        console.log("Venues data received:", data);
+        
+        const userVenues = data.filter(venue => {
+          if (!venue.owner_info) return false;
+          
+          try {
+            const ownerInfo = typeof venue.owner_info === 'string' 
+              ? JSON.parse(venue.owner_info) 
+              : venue.owner_info;
+              
+            return ownerInfo.user_id === user.id;
+          } catch (e) {
+            console.error("Error parsing owner_info", e);
+            return false;
+          }
+        });
+        
+        console.log("Filtered user venues:", userVenues);
+        
+        const transformedVenues = userVenues.map(venue => {
+          let ownerInfoData = undefined;
+          
+          try {
+            if (venue.owner_info) {
+              const ownerInfo = typeof venue.owner_info === 'string'
+                ? JSON.parse(venue.owner_info)
+                : venue.owner_info;
+                
+              ownerInfoData = {
+                name: ownerInfo.name || '',
+                contact: ownerInfo.contact || '',
+                responseTime: ownerInfo.response_time || '',
+                user_id: ownerInfo.user_id || '',
+                socialLinks: ownerInfo.socialLinks || {
+                  facebook: '',
+                  twitter: '',
+                  instagram: '',
+                  linkedin: ''
+                }
+              };
+            }
+          } catch (e) {
+            console.error("Error parsing owner_info for venue", venue.id, e);
+          }
+          
+          return {
+            id: venue.id,
+            name: venue.name,
+            description: venue.description || '',
+            imageUrl: venue.image_url || '',
+            galleryImages: venue.gallery_images || [],
+            address: venue.address || '',
+            city: venue.city_name || '',
+            cityId: venue.city_id || '',
+            category: venue.category_name || '',
+            categoryId: venue.category_id || '',
+            capacity: {
+              min: venue.min_capacity || 0,
+              max: venue.max_capacity || 0
+            },
+            pricing: {
+              currency: venue.currency || 'SAR',
+              startingPrice: venue.starting_price || 0,
+              pricePerPerson: venue.price_per_person,
+              hourlyRate: venue.hourly_rate || 0
+            },
+            amenities: venue.amenities || [],
+            rating: venue.rating || 0,
+            reviews: venue.reviews_count || 0,
+            featured: venue.featured || false,
+            popular: venue.popular || false,
+            availability: venue.availability || [],
+            ownerInfo: ownerInfoData
+          } as Venue;
+        });
+        
+        console.log("Transformed venues:", transformedVenues);
+        setVenues(transformedVenues);
+        setStats(prev => ({...prev, totalVenues: transformedVenues.length}));
       }
-      return data || [];
-    },
-    {
-      enabled: !!user?.id,
+    } catch (error) {
+      console.error('Error fetching venues:', error);
+    } finally {
+      setIsLoading(false);
     }
-  );
+  };
 
-  // Fetch bookings for venues owned by the current user
-  const { data: bookings, refetch: refetchBookings } = useQuery<Booking[]>(
-    ['myBookings', user?.id],
-    async () => {
-      setIsLoadingBookings(true);
-      if (!user?.id) return [];
-      const venueIds = venues?.map((venue) => venue.id) || [];
-      if (venueIds.length === 0) return [];
-
-      let query = supabase
+  const fetchBookingStats = async () => {
+    if (!user) return;
+    
+    try {
+      const venueIds = venues.map(venue => venue.id);
+      
+      if (venueIds.length === 0) return;
+      
+      console.log("Fetching bookings for venue IDs:", venueIds);
+      
+      const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select('*')
-        .in('venue_id', venueIds);
-
-      if (date) {
-        const formattedDate = format(date, 'yyyy-MM-dd');
-        query = query.gte('start_date', formattedDate).lte('end_date', formattedDate);
+        .in('venue_id', venueIds)
+        .order('booking_date', { ascending: false });
+      
+      if (bookingsError) throw bookingsError;
+      
+      if (bookingsData) {
+        console.log("Bookings data:", bookingsData);
+        
+        const activeCount = bookingsData.filter(b => b.status === 'confirmed' || b.status === 'pending').length;
+        const completedCount = bookingsData.filter(b => b.status === 'completed').length;
+        const totalRevenue = bookingsData
+          .filter(b => b.status !== 'cancelled')
+          .reduce((sum, booking) => sum + (booking.total_price || 0), 0);
+        
+        setStats({
+          totalVenues: venues.length,
+          activeBookings: activeCount,
+          completedBookings: completedCount,
+          revenue: totalRevenue
+        });
+        
+        const sortedBookings = [...bookingsData].sort((a, b) => {
+          if (a.booking_date > b.booking_date) return -1;
+          if (a.booking_date < b.booking_date) return 1;
+          return 0;
+        });
+        
+        setRecentBookings(sortedBookings.slice(0, 5));
       }
-
-      const { data, error } = await query;
-      setIsLoadingBookings(false);
-      if (error) {
-        console.error('Error fetching bookings:', error);
-        throw error;
-      }
-      return data || [];
-    },
-    {
-      enabled: !!user?.id && !!venues,
+    } catch (error) {
+      console.error('Error fetching booking stats:', error);
     }
-  );
-
-  // Mutation to publish a venue
-  const publishVenueMutation = useMutation(
-    async (venueId: string) => {
-      const { data, error } = await supabase
-        .from('venues')
-        .update({ is_published: true })
-        .eq('id', venueId);
-      if (error) {
-        console.error('Error publishing venue:', error);
-        throw error;
-      }
-      return data;
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['myVenues', user?.id]);
-        toast({
-          title: 'Venue Published',
-          description: 'The venue has been successfully published.',
-        });
-      },
-      onError: (error: any) => {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to publish the venue. Please try again.',
-          variant: 'destructive',
-        });
-      },
-      onSettled: () => {
-        setIsPublishing(false);
-      },
-    }
-  );
-
-  // Mutation to unpublish a venue
-  const unpublishVenueMutation = useMutation(
-    async (venueId: string) => {
-      const { data, error } = await supabase
-        .from('venues')
-        .update({ is_published: false })
-        .eq('id', venueId);
-      if (error) {
-        console.error('Error unpublishing venue:', error);
-        throw error;
-      }
-      return data;
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['myVenues', user?.id]);
-        toast({
-          title: 'Venue Unpublished',
-          description: 'The venue has been successfully unpublished.',
-        });
-      },
-      onError: (error: any) => {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to unpublish the venue. Please try again.',
-          variant: 'destructive',
-        });
-      },
-      onSettled: () => {
-        setIsUnpublishing(false);
-      },
-    }
-  );
-
-  // Mutation to delete a venue
-  const deleteVenueMutation = useMutation(
-    async (venueId: string) => {
-      const { data, error } = await supabase
-        .from('venues')
-        .delete()
-        .eq('id', venueId);
-      if (error) {
-        console.error('Error deleting venue:', error);
-        throw error;
-      }
-      return data;
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['myVenues', user?.id]);
-        toast({
-          title: 'Venue Deleted',
-          description: 'The venue has been successfully deleted.',
-        });
-        setIsDrawerOpen(false);
-      },
-      onError: (error: any) => {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to delete the venue. Please try again.',
-          variant: 'destructive',
-        });
-      },
-      onSettled: () => {
-        setIsDeleting(false);
-      },
-    }
-  );
-
-  // Mutation to confirm a booking
-  const confirmBookingMutation = useMutation(
-    async (bookingId: string) => {
-      const { data, error } = await supabase
-        .from('bookings')
-        .update({ status: 'confirmed' })
-        .eq('id', bookingId);
-      if (error) {
-        console.error('Error confirming booking:', error);
-        throw error;
-      }
-      return data;
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['myBookings', user?.id]);
-        toast({
-          title: 'Booking Confirmed',
-          description: 'The booking has been successfully confirmed.',
-        });
-        setIsBookingDrawerOpen(false);
-      },
-      onError: (error: any) => {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to confirm the booking. Please try again.',
-          variant: 'destructive',
-        });
-      },
-      onSettled: () => {
-        setIsConfirming(false);
-      },
-    }
-  );
-
-  // Mutation to cancel a booking
-  const cancelBookingMutation = useMutation(
-    async (bookingId: string) => {
-      const { data, error } = await supabase
-        .from('bookings')
-        .update({ status: 'cancelled' })
-        .eq('id', bookingId);
-      if (error) {
-        console.error('Error cancelling booking:', error);
-        throw error;
-      }
-      return data;
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['myBookings', user?.id]);
-        toast({
-          title: 'Booking Cancelled',
-          description: 'The booking has been successfully cancelled.',
-        });
-        setIsBookingDrawerOpen(false);
-      },
-      onError: (error: any) => {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to cancel the booking. Please try again.',
-          variant: 'destructive',
-        });
-      },
-      onSettled: () => {
-        setIsCancelling(false);
-      },
-    }
-  );
-
-  // Mutation to update a venue
-  const updateVenueMutation = useMutation(
-    async (venue: Venue) => {
-      const { data, error } = await supabase
-        .from('venues')
-        .update({
-          name: venue.name,
-          description: venue.description,
-          address: venue.address,
-          city: venue.city,
-          category: venue.category,
-          price: venue.price,
-          images: venue.images,
-        })
-        .eq('id', venue.id);
-      if (error) {
-        console.error('Error updating venue:', error);
-        throw error;
-      }
-      return data;
-    },
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['myVenues', user?.id]);
-        toast({
-          title: 'Venue Updated',
-          description: 'The venue has been successfully updated.',
-        });
-        setEditVenueId(null);
-        setIsDrawerOpen(false);
-      },
-      onError: (error: any) => {
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to update the venue. Please try again.',
-          variant: 'destructive',
-        });
-      },
-    }
-  );
-
-  // Handlers
-  const handleVenueClick = async (venueId: string) => {
-    setSelectedVenueId(venueId);
-    setEditVenueId(null);
-    setIsDrawerOpen(true);
-
-    // Fetch venue details
-    if (venues) {
-      const selectedVenue = venues.find((venue) => venue.id === venueId);
-      if (selectedVenue) {
-        setVenueDetails(selectedVenue);
-      }
-    }
-  };
-
-  const handleBookingClick = (bookingId: string) => {
-    const selected = bookings?.find((booking) => booking.id === bookingId);
-    if (selected) {
-      setSelectedBooking(selected);
-      setIsBookingDrawerOpen(true);
-    }
-  };
-
-  const handlePublish = async (venueId: string) => {
-    setIsPublishing(true);
-    await publishVenueMutation.mutateAsync(venueId);
-  };
-
-  const handleUnpublish = async (venueId: string) => {
-    setIsUnpublishing(true);
-    await unpublishVenueMutation.mutateAsync(venueId);
-  };
-
-  const handleDelete = async (venueId: string) => {
-    setIsDeleting(true);
-    await deleteVenueMutation.mutateAsync(venueId);
-  };
-
-  const handleConfirmBooking = async (bookingId: string) => {
-    setIsConfirming(true);
-    await confirmBookingMutation.mutateAsync(bookingId);
-  };
-
-  const handleCancelBooking = async (bookingId: string) => {
-    setIsCancelling(true);
-    await cancelBookingMutation.mutateAsync(bookingId);
-  };
-
-  const handleEditVenue = (venueId: string) => {
-    setEditVenueId(venueId);
-    setSelectedVenueId(null);
-
-    // Populate the edit form with the venue details
-    if (venues) {
-      const selectedVenue = venues.find((venue) => venue.id === venueId);
-      if (selectedVenue) {
-        setEditVenueName(selectedVenue.name);
-        setEditVenueDescription(selectedVenue.description);
-        setEditVenueAddress(selectedVenue.address);
-        setEditVenueCity(selectedVenue.city);
-        setEditVenueCategory(selectedVenue.category);
-        setEditVenuePrice(selectedVenue.price);
-        setEditVenueImages(selectedVenue.images);
-        setVenueDetails(selectedVenue);
-      }
-    }
-  };
-
-  const handleUpdateVenue = async () => {
-    if (!venueDetails) return;
-
-    // Validate the form
-    if (!editVenueName || !editVenueDescription || !editVenueAddress || !editVenueCity || !editVenueCategory || !editVenuePrice || !editVenueImages) {
-      toast({
-        title: 'Error',
-        description: 'Please fill in all fields.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Create a new venue object with the updated values
-    const updatedVenue: Venue = {
-      id: venueDetails.id,
-      name: editVenueName,
-      description: editVenueDescription,
-      address: editVenueAddress,
-      city: editVenueCity,
-      category: editVenueCategory,
-      price: editVenuePrice,
-      images: editVenueImages,
-      user_id: venueDetails.user_id,
-      created_at: venueDetails.created_at,
-      updated_at: venueDetails.updated_at,
-      is_published: venueDetails.is_published,
-    };
-
-    // Call the update venue mutation
-    await updateVenueMutation.mutateAsync(updatedVenue);
-  };
-
-  const handleCloseDrawer = () => {
-    setIsDrawerOpen(false);
-    setEditVenueId(null);
-    setSelectedVenueId(null);
-  };
-
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    navigate(`/my-venues?tab=${tab}`);
   };
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tab = urlParams.get('tab');
-    if (tab) {
-      setActiveTab(tab);
+    if (user) {
+      fetchVenues();
     }
-  }, [window.location.search]);
+  }, [user]);
+
+  useEffect(() => {
+    if (venues.length > 0) {
+      fetchBookingStats();
+    }
+  }, [venues]);
+
+  const handleEditVenue = (venueId: string) => {
+    navigate(`/edit-venue/${venueId}`);
+  };
+
+  const handleDeleteVenue = async (venueId: string, venueName: string) => {
+    if (window.confirm(`Are you sure you want to delete "${venueName}"? This action cannot be undone.`)) {
+      try {
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('id, status')
+          .eq('venue_id', venueId)
+          .neq('status', 'cancelled');
+        
+        if (bookingsError) throw bookingsError;
+        
+        if (bookings && bookings.length > 0) {
+          toast({
+            title: 'Cannot Delete Venue',
+            description: `This venue has ${bookings.length} active booking(s). Please cancel all bookings before deleting.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+        
+        const { error: deleteError } = await supabase
+          .from('venues')
+          .delete()
+          .eq('id', venueId);
+        
+        if (deleteError) throw deleteError;
+        
+        setVenues(prev => prev.filter(venue => venue.id !== venueId));
+        
+        toast({
+          title: 'Venue Deleted',
+          description: `"${venueName}" has been successfully deleted.`
+        });
+      } catch (error) {
+        console.error('Error deleting venue:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to delete venue. Please try again.',
+          variant: 'destructive'
+        });
+      }
+    }
+  };
+
+  const handleAddVenue = () => {
+    navigate('/list-venue');
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    
+    if (value === "bookings") {
+      navigate('/customer-bookings');
+    } else {
+      navigate(`/my-venues?tab=${value}`, { replace: true });
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const handlePrevMonth = () => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() - 1);
+      return newDate;
+    });
+  };
+
+  const handleNextMonth = () => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() + 1);
+      return newDate;
+    });
+  };
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    
+    // Create days array
+    const days = [];
+    
+    // Add previous month's days
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      const prevMonthDate = new Date(year, month, -i);
+      days.unshift({
+        date: prevMonthDate.getDate(),
+        fullDate: prevMonthDate,
+        isCurrentMonth: false
+      });
+    }
+    
+    // Add current month's days
+    for (let i = 1; i <= daysInMonth; i++) {
+      const currentDate = new Date(year, month, i);
+      days.push({
+        date: i,
+        fullDate: currentDate,
+        isCurrentMonth: true,
+        isToday: currentDate.toDateString() === new Date().toDateString()
+      });
+    }
+    
+    // Add next month's days to fill remaining cells
+    const remainingCells = 42 - days.length; // 6 rows of 7 days
+    for (let i = 1; i <= remainingCells; i++) {
+      const nextMonthDate = new Date(year, month + 1, i);
+      days.push({
+        date: i,
+        fullDate: nextMonthDate,
+        isCurrentMonth: false
+      });
+    }
+    
+    return days;
+  };
+
+  const getBookingsForDate = (date: Date) => {
+    const dateString = date.toISOString().split('T')[0];
+    return recentBookings.filter(booking => booking.booking_date === dateString);
+  };
+
+  const getTodayBookings = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return recentBookings.filter(booking => booking.booking_date === today);
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen pt-28 pb-16 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <p className="text-center">Please log in to access this page.</p>
+            <Button 
+              className="mt-4 w-full bg-findvenue hover:bg-findvenue-dark"
+              onClick={() => navigate('/login')}
+            >
+              Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isVenueOwner) {
+    return (
+      <div className="min-h-screen pt-28 pb-16 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <p className="text-center">You don't have permission to access this page.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen pt-28 pb-16">
+    <>
       <Helmet>
-        <title>My Venues | FindVenue</title>
+        <title>Venue Owner Dashboard | FindVenue</title>
+        <meta name="description" content="Manage your venues, bookings and revenue in one place." />
       </Helmet>
-      <div className="container mx-auto px-4">
-        <Tabs defaultValue={activeTab} className="w-full">
-          <TabsList>
-            <TabsTrigger value="dashboard" onClick={() => handleTabChange('dashboard')}>Dashboard</TabsTrigger>
-            <TabsTrigger value="bookings" onClick={() => handleTabChange('bookings')}>Bookings</TabsTrigger>
-          </TabsList>
-          <TabsContent value="dashboard" className="mt-6">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">My Venues</h1>
-              <p className="text-findvenue-text-muted">Manage your venues and their details.</p>
+      
+      <div className="min-h-screen pt-24 pb-16 bg-gradient-to-b from-[#0f172a] to-[#020617]">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold">Venue Owner Dashboard</h1>
+              {profile && (
+                <p className="text-findvenue-text-muted">
+                  Welcome, {profile.first_name} {profile.last_name}
+                </p>
+              )}
             </div>
+            <Button 
+              className="mt-4 sm:mt-0 bg-findvenue hover:bg-findvenue-dark flex items-center gap-2"
+              onClick={handleAddVenue}
+            >
+              <PlusCircle className="h-4 w-4" />
+              List New Venue
+            </Button>
+          </div>
 
-            {isLoadingVenues ? (
-              <div className="flex items-center justify-center">
-                <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                Loading venues...
+          <Tabs 
+            defaultValue="dashboard" 
+            value={activeTab} 
+            onValueChange={handleTabChange} 
+            className="space-y-6"
+          >
+            <TabsList className="flex justify-center mb-6 bg-findvenue-surface/50 p-1 rounded-lg">
+              <TabsTrigger value="dashboard" className="flex-1">Dashboard</TabsTrigger>
+              <TabsTrigger value="venues" className="flex-1">My Venues</TabsTrigger>
+              <TabsTrigger value="bookings" className="flex-1">Bookings</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dashboard" className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 hover:border-white/20 transition-all">
+                  <CardContent className="flex items-center p-6">
+                    <div className="mr-4 p-3 rounded-full bg-findvenue/10">
+                      <BarChart3 className="h-6 w-6 text-findvenue" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted">Total Venues</p>
+                      <h3 className="text-2xl font-bold">{stats.totalVenues}</h3>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 hover:border-white/20 transition-all">
+                  <CardContent className="flex items-center p-6">
+                    <div className="mr-4 p-3 rounded-full bg-indigo-500/10">
+                      <Activity className="h-6 w-6 text-indigo-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted">Active Bookings</p>
+                      <h3 className="text-2xl font-bold">{stats.activeBookings}</h3>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 hover:border-white/20 transition-all">
+                  <CardContent className="flex items-center p-6">
+                    <div className="mr-4 p-3 rounded-full bg-green-500/10">
+                      <Users className="h-6 w-6 text-green-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted">Completed Bookings</p>
+                      <h3 className="text-2xl font-bold">{stats.completedBookings}</h3>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 hover:border-white/20 transition-all">
+                  <CardContent className="flex items-center p-6">
+                    <div className="mr-4 p-3 rounded-full bg-yellow-500/10">
+                      <DollarSign className="h-6 w-6 text-yellow-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-findvenue-text-muted">Total Revenue</p>
+                      <h3 className="text-2xl font-bold">SAR {stats.revenue.toLocaleString()}</h3>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            ) : venues && venues.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {venues.map((venue) => (
-                  <Card key={venue.id} className="glass-card border-white/10">
-                    <CardHeader>
-                      <CardTitle>{venue.name}</CardTitle>
-                      <CardDescription>{venue.city}, {venue.category}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-findvenue-text-muted">{venue.description.substring(0, 100)}...</p>
-                      <div className="mt-4">
-                        {venue.is_published ? (
-                          <Badge className="bg-green-500 text-white">Published</Badge>
-                        ) : (
-                          <Badge className="bg-red-500 text-white">Unpublished</Badge>
-                        )}
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 lg:col-span-2">
+                  <CardHeader className="border-b border-white/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-findvenue" />
+                        <CardTitle>Bookings Calendar</CardTitle>
                       </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <Button variant="secondary" onClick={() => handleVenueClick(venue.id)}>
-                        View Details
-                      </Button>
-                      {venue.is_published ? (
-                        <Button
-                          variant="destructive"
-                          disabled={isUnpublishing}
-                          onClick={() => handleUnpublish(venue.id)}
-                        >
-                          {isUnpublishing ? (
-                            <>
-                              <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                              Unpublishing...
-                            </>
-                          ) : (
-                            'Unpublish'
-                          )}
-                        </Button>
-                      ) : (
-                        <Button
-                          className="bg-findvenue hover:bg-findvenue-dark"
-                          disabled={isPublishing}
-                          onClick={() => handlePublish(venue.id)}
-                        >
-                          {isPublishing ? (
-                            <>
-                              <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                              Publishing...
-                            </>
-                          ) : (
-                            'Publish'
-                          )}
-                        </Button>
-                      )}
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center">
-                <p className="text-findvenue-text-muted">No venues found. <Link to="/list-venue" className="text-findvenue hover:text-findvenue-light transition-colors">List your venue now!</Link></p>
-              </div>
-            )}
-          </TabsContent>
-          <TabsContent value="bookings" className="mt-6">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">My Bookings</h1>
-              <p className="text-findvenue-text-muted">Manage bookings for your venues.</p>
-            </div>
-
-            <div className="flex items-center space-x-4 mb-4">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    disabled={(date) =>
-                      date > new Date()
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <Button onClick={() => {
-                setDate(undefined);
-                refetchBookings();
-              }}>Clear Date</Button>
-              <Button onClick={() => refetchBookings()}>Apply Filter</Button>
-            </div>
-
-            {isLoadingBookings ? (
-              <div className="flex items-center justify-center">
-                <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                Loading bookings...
-              </div>
-            ) : bookings && bookings.length > 0 ? (
-              <ScrollArea>
-                <Table>
-                  <TableCaption>A list of your recent bookings.</TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[100px]">Booking ID</TableHead>
-                      <TableHead>Venue</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead>Guests</TableHead>
-                      <TableHead>Total Price</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bookings.map((booking) => (
-                      <TableRow key={booking.id}>
-                        <TableCell className="font-medium">{booking.id}</TableCell>
-                        <TableCell>
-                          {venues?.find((venue) => venue.id === booking.venue_id)?.name || 'Unknown'}
-                        </TableCell>
-                        <TableCell>{format(new Date(booking.start_date), 'PPP')}</TableCell>
-                        <TableCell>{format(new Date(booking.end_date), 'PPP')}</TableCell>
-                        <TableCell>{booking.number_of_guests}</TableCell>
-                        <TableCell>${booking.total_price}</TableCell>
-                        <TableCell>
-                          {booking.status === 'pending' && (
-                            <Badge className="bg-amber-500 text-white text-xs">{booking.status}</Badge>
-                          )}
-                          {booking.status === 'confirmed' && (
-                            <Badge className="bg-green-500 text-white text-xs">{booking.status}</Badge>
-                          )}
-                          {booking.status === 'cancelled' && (
-                            <Badge className="bg-red-500 text-white text-xs">cancelled</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="secondary" onClick={() => handleBookingClick(booking.id)}>
-                            View Details
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center text-sm">
+                          <span className="h-2 w-2 rounded-full bg-green-500 mr-1"></span>
+                          <span className="text-findvenue-text-muted">1-3</span>
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <span className="h-2 w-2 rounded-full bg-yellow-500 mr-1"></span>
+                          <span className="text-findvenue-text-muted">3-6</span>
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <span className="h-2 w-2 rounded-full bg-findvenue mr-1"></span>
+                          <span className="text-findvenue-text-muted">6+</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-medium">
+                          {selectedDate.toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            year: 'numeric'
+                          })}
+                        </h3>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            className="h-8 w-8 border-white/10"
+                            onClick={handlePrevMonth}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
-            ) : (
-              <div className="text-center">
-                <p className="text-findvenue-text-muted">No bookings found for your venues.</p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            className="h-8 w-8 border-white/10"
+                            onClick={handleNextMonth}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-7 gap-1">
+                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day, index) => (
+                          <div key={index} className="text-center text-xs text-findvenue-text-muted py-2">
+                            {day}
+                          </div>
+                        ))}
+                        
+                        {getDaysInMonth(selectedDate).map((day, index) => {
+                          const dateBookings = getBookingsForDate(day.fullDate);
+                          const bookingCount = dateBookings.length;
+                          let bgColor = '';
+                          
+                          if (bookingCount > 6) {
+                            bgColor = 'bg-findvenue hover:bg-findvenue-dark';
+                          } else if (bookingCount > 3) {
+                            bgColor = 'bg-yellow-600 hover:bg-yellow-700';
+                          } else if (bookingCount > 0) {
+                            bgColor = 'bg-green-600 hover:bg-green-700';
+                          }
+                          
+                          return (
+                            <Button
+                              key={index}
+                              variant="ghost"
+                              className={`h-10 w-full rounded p-0 ${
+                                day.isCurrentMonth 
+                                  ? day.isToday
+                                    ? 'border border-findvenue/50'
+                                    : 'hover:bg-findvenue/10'
+                                  : 'text-findvenue-text-muted/50 hover:bg-findvenue/5'
+                              } ${bgColor ? `${bgColor} text-white` : ''}`}
+                              onClick={() => setSelectedBooking(bookingCount > 0 ? dateBookings[0] : null)}
+                            >
+                              <span>{day.date}</span>
+                              {bookingCount > 0 && !bgColor && (
+                                <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 h-1 w-1 bg-findvenue rounded-full"></div>
+                              )}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {selectedBooking && (
+                      <div className="p-4 border-t border-white/10">
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="font-medium">{formatDate(selectedBooking.booking_date)}</h4>
+                          <Badge className={
+                            selectedBooking.status === 'confirmed' ? 'bg-green-500' :
+                            selectedBooking.status === 'pending' ? 'bg-yellow-500' :
+                            selectedBooking.status === 'cancelled' ? 'bg-red-500' :
+                            'bg-blue-500'
+                          }>
+                            {selectedBooking.status.charAt(0).toUpperCase() + selectedBooking.status.slice(1)}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-sm">
+                          <div className="sm:col-span-2">
+                            <span className="text-findvenue-text-muted block text-xs">Venue</span>
+                            <span>{selectedBooking.venue_name}</span>
+                          </div>
+                          <div>
+                            <span className="text-findvenue-text-muted block text-xs">Time</span>
+                            <span>{selectedBooking.start_time} - {selectedBooking.end_time}</span>
+                          </div>
+                          <div>
+                            <span className="text-findvenue-text-muted block text-xs">Guests</span>
+                            <span>{selectedBooking.guests}</span>
+                          </div>
+                          <div>
+                            <span className="text-findvenue-text-muted block text-xs">Amount</span>
+                            <span className="font-medium">SAR {selectedBooking.total_price.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        {selectedBooking.customer_email && (
+                          <div className="mt-2 text-sm">
+                            <span className="text-findvenue-text-muted block text-xs">Customer</span>
+                            <span>{selectedBooking.customer_email} • {selectedBooking.customer_phone || 'No phone'}</span>
+                          </div>
+                        )}
+                        {selectedBooking.special_requests && (
+                          <div className="mt-2 text-sm">
+                            <span className="text-findvenue-text-muted block text-xs">Special Requests</span>
+                            <span>{selectedBooking.special_requests}</span>
+                          </div>
+                        )}
+                        <Button 
+                          className="mt-4 bg-findvenue hover:bg-findvenue-dark"
+                          size="sm"
+                          onClick={() => navigate('/customer-bookings')}
+                        >
+                          View All Bookings
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-        {/* Venue Details Drawer */}
-        <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-          <DrawerTrigger asChild>
-            <Button>Open</Button>
-          </DrawerTrigger>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>{editVenueId ? 'Edit Venue' : 'Venue Details'}</DrawerTitle>
-              <DrawerDescription>
-                {editVenueId
-                  ? 'Make changes to your venue details here. Click update when you\'re done. '
-                  : 'View details of your venue.'}
-              </DrawerDescription>
-            </DrawerHeader>
-            <Separator />
-
-            {venueDetails && (
-              <div className="p-4">
-                {editVenueId ? (
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="name">Name</Label>
-                      <Input
-                        id="name"
-                        placeholder="Venue Name"
-                        value={editVenueName}
-                        onChange={(e) => setEditVenueName(e.target.value)}
-                      />
+                <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10">
+                  <CardHeader className="border-b border-white/10 pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Recent Bookings</CardTitle>
+                      <Button 
+                        variant="link" 
+                        className="text-findvenue p-0 h-auto"
+                        onClick={() => navigate('/customer-bookings')}
+                      >
+                        View Stats
+                      </Button>
                     </div>
-                    <div>
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        placeholder="Venue Description"
-                        value={editVenueDescription}
-                        onChange={(e) => setEditVenueDescription(e.target.value)}
-                      />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4 mt-2">
+                      <h4 className="text-sm font-medium mb-3">Today's Bookings</h4>
+                      {getTodayBookings().length > 0 ? (
+                        <div className="space-y-2">
+                          {getTodayBookings().map((booking) => (
+                            <div key={booking.id} className="p-3 bg-findvenue-surface/30 border border-white/5 rounded-lg">
+                              <div className="flex justify-between items-center">
+                                <Badge className={
+                                  booking.status === 'confirmed' ? 'bg-green-500' :
+                                  booking.status === 'pending' ? 'bg-yellow-500' :
+                                  'bg-blue-500'
+                                } size="sm">
+                                  {booking.status}
+                                </Badge>
+                                <span className="text-xs text-findvenue-text-muted">{booking.start_time} - {booking.end_time}</span>
+                              </div>
+                              <p className="text-sm font-medium mt-1">{booking.venue_name}</p>
+                              <div className="flex justify-between items-center mt-1">
+                                <span className="text-xs text-findvenue-text-muted">{booking.guests} guests</span>
+                                <span className="text-sm font-medium">SAR {booking.total_price}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-center py-3 text-findvenue-text-muted text-sm">No bookings today</p>
+                      )}
                     </div>
-                    <div>
-                      <Label htmlFor="address">Address</Label>
-                      <Input
-                        id="address"
-                        placeholder="Venue Address"
-                        value={editVenueAddress}
-                        onChange={(e) => setEditVenueAddress(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        placeholder="Venue City"
-                        value={editVenueCity}
-                        onChange={(e) => setEditVenueCity(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="category">Category</Label>
-                      <Select value={editVenueCategory} onValueChange={setEditVenueCategory}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Restaurant">Restaurant</SelectItem>
-                          <SelectItem value="Hotel">Hotel</SelectItem>
-                          <SelectItem value="Event Space">Event Space</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="price">Price per night</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        placeholder="Venue Price"
-                        value={editVenuePrice !== undefined ? editVenuePrice.toString() : ''}
-                        onChange={(e) => setEditVenuePrice(e.target.value ? parseFloat(e.target.value) : undefined)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="images">Images (comma-separated URLs)</Label>
-                      <Input
-                        id="images"
-                        placeholder="Image URLs"
-                        value={editVenueImages.join(',')}
-                        onChange={(e) => setEditVenueImages(e.target.value.split(','))}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-semibold">Name</h3>
-                      <p>{venueDetails.name}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Description</h3>
-                      <p>{venueDetails.description}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Address</h3>
-                      <p>{venueDetails.address}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">City</h3>
-                      <p>{venueDetails.city}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Category</h3>
-                      <p>{venueDetails.category}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Price per night</h3>
-                      <p>${venueDetails.price}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Images</h3>
-                      <div className="flex space-x-2">
-                        {venueDetails.images.map((image, index) => (
-                          <img key={index} src={image} alt={`Venue ${index + 1}`} className="w-20 h-20 object-cover rounded-md" />
+                    
+                    {recentBookings.length > 0 ? (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium">Upcoming Bookings</h4>
+                        {recentBookings.slice(0, 5).map((booking) => (
+                          <div key={booking.id} className="flex flex-col p-3 bg-findvenue-surface/30 border border-white/5 rounded-lg hover:bg-findvenue-surface/50 transition-colors">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs">{formatDate(booking.booking_date)}</span>
+                              <Badge className={
+                                booking.status === 'confirmed' ? 'bg-green-500' :
+                                booking.status === 'pending' ? 'bg-yellow-500' :
+                                booking.status === 'cancelled' ? 'bg-red-500' :
+                                'bg-blue-500'
+                              } size="sm">
+                                {booking.status}
+                              </Badge>
+                            </div>
+                            <p className="font-medium mt-1">{booking.venue_name}</p>
+                            <div className="flex justify-between items-center mt-1">
+                              <span className="text-xs text-findvenue-text-muted">
+                                {booking.start_time} - {booking.end_time} • {booking.guests} guests
+                              </span>
+                              <span className="font-medium">SAR {booking.total_price}</span>
+                            </div>
+                          </div>
                         ))}
                       </div>
-                    </div>
-                  </div>
-                )}
+                    ) : (
+                      <p className="text-center py-6 text-findvenue-text-muted">No recent bookings</p>
+                    )}
+                    
+                    <Button 
+                      variant="outline"
+                      className="w-full mt-4 border-white/10"
+                      onClick={() => navigate('/customer-bookings')}
+                    >
+                      View All Bookings
+                    </Button>
+                  </CardContent>
+                </Card>
               </div>
-            )}
+            </TabsContent>
 
-            <DrawerFooter>
-              {editVenueId ? (
-                <div className="space-x-2">
-                  <Button variant="secondary" onClick={() => {
-                    setEditVenueId(null);
-                    handleCloseDrawer();
-                  }}>
-                    Cancel
-                  </Button>
-                  <Button className="bg-findvenue hover:bg-findvenue-dark" onClick={handleUpdateVenue}>
-                    Update Venue
-                  </Button>
+            <TabsContent value="venues">
+              {isLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(3)].map((_, i) => (
+                    <Card key={i} className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10">
+                      <Skeleton className="h-48 w-full" />
+                      <div className="p-4 space-y-3">
+                        <Skeleton className="h-6 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                        <Skeleton className="h-20 w-full" />
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : venues.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {venues.map((venue) => (
+                    <Card key={venue.id} className="bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10 overflow-hidden hover:border-white/20 transition-all">
+                      <div className="relative">
+                        <img 
+                          src={venue.imageUrl} 
+                          alt={venue.name} 
+                          className="w-full h-48 object-cover"
+                        />
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="bg-black/40 hover:bg-black/60 backdrop-blur-sm"
+                            onClick={() => handleEditVenue(venue.id)}
+                          >
+                            <Edit className="h-4 w-4 text-white" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm"
+                            onClick={() => handleDeleteVenue(venue.id, venue.name)}
+                          >
+                            <Trash2 className="h-4 w-4 text-white" />
+                          </Button>
+                        </div>
+                        {venue.featured ? (
+                          <Badge className="absolute top-2 left-2 bg-findvenue-gold text-black">
+                            Featured
+                          </Badge>
+                        ) : venue.popular ? (
+                          <Badge className="absolute top-2 left-2 bg-findvenue text-white">
+                            Popular
+                          </Badge>
+                        ) : (
+                          <Badge className="absolute top-2 left-2 bg-gray-500/80 text-white">
+                            Regular
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <h3 className="text-xl font-semibold mb-2">{venue.name}</h3>
+                        <p className="text-sm text-findvenue-text-muted mb-3">
+                          {venue.city} • {venue.category}
+                        </p>
+                        <p className="text-sm text-findvenue-text-muted mb-4 line-clamp-2">
+                          {venue.description}
+                        </p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm">
+                            {venue.capacity.min}-{venue.capacity.max} guests
+                          </span>
+                          <span className="font-semibold">
+                            SAR {venue.pricing.startingPrice.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               ) : (
-                <div className="space-x-2">
-                  <Button variant="secondary" onClick={() => {
-                    handleEditVenue(venueDetails?.id || '');
-                  }}>
-                    Edit Venue
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    disabled={isDeleting}
-                    onClick={() => handleDelete(venueDetails?.id || '')}
+                <Card className="p-8 text-center bg-findvenue-card-bg/80 backdrop-blur-sm border-white/10">
+                  <h3 className="text-xl font-semibold mb-4">No Venues Added Yet</h3>
+                  <p className="text-findvenue-text-muted mb-6">
+                    You haven't added any venues yet. Start by listing your first venue.
+                  </p>
+                  <Button 
+                    className="bg-findvenue hover:bg-findvenue-dark flex items-center gap-2 mx-auto"
+                    onClick={handleAddVenue}
                   >
-                    {isDeleting ? (
-                      <>
-                        <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      'Delete Venue'
-                    )}
+                    <PlusCircle className="h-4 w-4" />
+                    List Venue
                   </Button>
-                </div>
+                </Card>
               )}
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
+            </TabsContent>
 
-        {/* Booking Details Drawer */}
-        <Drawer open={isBookingDrawerOpen} onOpenChange={setIsBookingDrawerOpen}>
-          <DrawerTrigger asChild>
-            <Button>Open</Button>
-          </DrawerTrigger>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Booking Details</DrawerTitle>
-              <DrawerDescription>
-                View details of the booking and manage its status.
-              </DrawerDescription>
-            </DrawerHeader>
-            <Separator />
-
-            {selectedBooking && (
-              <div className="p-4">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">Venue</h3>
-                    <p>{venues?.find((venue) => venue.id === selectedBooking.venue_id)?.name || 'Unknown'}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Start Date</h3>
-                    <p>{format(new Date(selectedBooking.start_date), 'PPP')}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">End Date</h3>
-                    <p>{format(new Date(selectedBooking.end_date), 'PPP')}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Number of Guests</h3>
-                    <p>{selectedBooking.number_of_guests}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Total Price</h3>
-                    <p>${selectedBooking.total_price}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">Status</h3>
-                    <Badge className="bg-amber-500 text-white">{selectedBooking.status}</Badge>
-                  </div>
-                </div>
+            <TabsContent value="bookings">
+              <div className="text-center py-10">
+                <p className="text-findvenue-text-muted mb-4">Redirecting to customer bookings...</p>
               </div>
-            )}
-
-            <DrawerFooter>
-              <div className="space-x-2">
-                {selectedBooking?.status === 'pending' && (
-                  <>
-                    <Button
-                      className="bg-green-500 hover:bg-green-700 text-white"
-                      disabled={isConfirming}
-                      onClick={() => handleConfirmBooking(selectedBooking.id)}
-                    >
-                      {isConfirming ? (
-                        <>
-                          <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                          Confirming...
-                        </>
-                      ) : (
-                        'Confirm Booking'
-                      )}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      disabled={isCancelling}
-                      onClick={() => handleCancelBooking(selectedBooking.id)}
-                    >
-                      {isCancelling ? (
-                        <>
-                          <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                          Cancelling...
-                        </>
-                      ) : (
-                        'Cancel Booking'
-                      )}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
