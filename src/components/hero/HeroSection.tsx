@@ -87,19 +87,14 @@ const HeroSection = () => {
   
   return (
     <section className="relative min-h-screen flex items-center justify-center py-20 overflow-hidden">
-      {/* Background Image */}
+      {/* Background Image - Using a high-quality venue image */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-findvenue-dark-bg/70 via-findvenue-dark-bg/90 to-findvenue-dark-bg z-10" />
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
+        <img 
+          src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=80&w=2798&auto=format&fit=crop"
+          alt="Luxury venue background"
           className="absolute inset-0 w-full h-full object-cover"
-        >
-          <source src="https://player.vimeo.com/external/370331493.hd.mp4?s=ce49c8c6d8e28a89298ffb4c53a2e842df6d344d&profile_id=175&oauth2_token_id=57447761" type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
+        />
       </div>
       
       <div className="container mx-auto px-4 relative z-10">
