@@ -1,7 +1,21 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Session, User } from '@supabase/supabase-js';
+
+type User = {
+  id: string;
+  email?: string;
+  app_metadata: any;
+  user_metadata: any;
+  aud: string;
+};
+
+type Session = {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  expires_at: number;
+  user: User;
+};
 
 interface AuthContextType {
   user: User | null;
@@ -11,7 +25,11 @@ interface AuthContextType {
   isVenueOwner: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  // Add other auth methods as needed
+  checkIsFavorite: (venueId: string) => boolean;
+  toggleFavoriteVenue: (venueId: string) => Promise<boolean>;
+  getUserFavorites: () => Promise<string[]>;
+  updateProfile: (profileData: any) => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,13 +42,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isVenueOwner, setIsVenueOwner] = useState(false);
 
   useEffect(() => {
-    // First set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+        setSession(session as any);
+        setUser(session?.user as any ?? null);
         
-        // If we have a user, fetch their profile
         if (session?.user) {
           setTimeout(() => {
             fetchUserProfile(session.user.id);
@@ -39,10 +55,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      setSession(session as any);
+      setUser(session?.user as any ?? null);
       
       if (session?.user) {
         fetchUserProfile(session.user.id);
@@ -98,6 +113,108 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setProfile(null);
   };
 
+  const checkIsFavorite = (venueId: string) => {
+    if (!profile || !profile.favorites) return false;
+    return profile.favorites.includes(venueId);
+  };
+
+  const toggleFavoriteVenue = async (venueId: string) => {
+    if (!user) throw new Error('User must be logged in to favorite venues');
+    
+    try {
+      const currentFavorites = profile?.favorites || [];
+      const isFavorite = currentFavorites.includes(venueId);
+      
+      let updatedFavorites;
+      if (isFavorite) {
+        updatedFavorites = currentFavorites.filter((id: string) => id !== venueId);
+      } else {
+        updatedFavorites = [...currentFavorites, venueId];
+      }
+      
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ favorites: updatedFavorites })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      setProfile(prev => ({
+        ...prev,
+        favorites: updatedFavorites
+      }));
+      
+      return !isFavorite;
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      throw error;
+    }
+  };
+
+  const getUserFavorites = async () => {
+    if (!user) return [];
+    
+    if (profile && profile.favorites) {
+      return profile.favorites;
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('favorites')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      
+      return data.favorites || [];
+    } catch (error) {
+      console.error('Error getting favorites:', error);
+      return [];
+    }
+  };
+
+  const updateProfile = async (profileData: any) => {
+    if (!user) throw new Error('User must be logged in to update profile');
+    
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update(profileData)
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      setProfile(prev => ({
+        ...prev,
+        ...profileData
+      }));
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  };
+
+  const updatePassword = async (currentPassword: string, newPassword: string) => {
+    if (!user) throw new Error('User must be logged in to change password');
+    
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email || '',
+        password: currentPassword
+      });
+      
+      if (signInError) throw new Error('Current password is incorrect');
+      
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Error updating password:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     session,
@@ -106,6 +223,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isVenueOwner,
     signIn,
     signOut,
+    checkIsFavorite,
+    toggleFavoriteVenue,
+    getUserFavorites,
+    updateProfile,
+    updatePassword
   };
 
   return (
