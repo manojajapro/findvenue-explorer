@@ -133,7 +133,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
             <Button
               variant="outline"
               size="sm"
-              className={`${voiceOutputEnabled ? 'border-green-500 text-green-500' : 'border-white/10'}`}
+              className={`${audioEnabled ? 'border-green-500 text-green-500' : 'border-white/10'}`}
               onClick={handleVoiceOutputToggle}
             >
               {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
