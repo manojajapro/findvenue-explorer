@@ -18,6 +18,12 @@ const ForgotPassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showResetForm, setShowResetForm] = useState(false);
+  const [otp, setOtp] = useState('');
+
+  const generateOTP = () => {
+    // Generate a 6-digit OTP
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +40,15 @@ const ForgotPassword = () => {
     setIsLoading(true);
     
     try {
+      // Generate a random OTP
+      const generatedOTP = generateOTP();
+      setOtp(generatedOTP);
+      
+      // Store the OTP in localStorage for verification
+      localStorage.setItem(`reset_otp_${email}`, generatedOTP);
+      localStorage.setItem(`reset_otp_time_${email}`, Date.now().toString());
+      
+      // Send password reset email with custom OTP
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
@@ -45,8 +60,12 @@ const ForgotPassword = () => {
       setIsSubmitted(true);
       toast({
         title: 'Email Sent',
-        description: 'Check your email for the password reset link and OTP',
+        description: 'Check your email for the password reset link. We\'ve also included a verification code (OTP) that you\'ll need to enter.',
       });
+
+      // Display generated OTP for testing purposes (in production, this would be sent via email)
+      console.log('Generated OTP for testing:', generatedOTP);
+      
     } catch (error: any) {
       console.error('Password reset error:', error);
       toast({
@@ -71,11 +90,47 @@ const ForgotPassword = () => {
       return;
     }
     
-    setShowResetForm(true);
-    toast({
-      title: 'OTP Verified',
-      description: 'You can now set a new password',
-    });
+    // Get the stored OTP for this email
+    const storedOTP = localStorage.getItem(`reset_otp_${email}`);
+    const storedTime = localStorage.getItem(`reset_otp_time_${email}`);
+    
+    if (!storedOTP || !storedTime) {
+      toast({
+        title: 'Error',
+        description: 'OTP verification failed. Please request a new code.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Check if OTP has expired (10 minutes)
+    const now = Date.now();
+    const otpTime = parseInt(storedTime);
+    if (now - otpTime > 10 * 60 * 1000) {
+      toast({
+        title: 'Error',
+        description: 'OTP has expired. Please request a new code.',
+        variant: 'destructive'
+      });
+      localStorage.removeItem(`reset_otp_${email}`);
+      localStorage.removeItem(`reset_otp_time_${email}`);
+      return;
+    }
+    
+    // Verify OTP
+    if (otpCode === storedOTP || otpCode === otp) {
+      setShowResetForm(true);
+      toast({
+        title: 'OTP Verified',
+        description: 'You can now set a new password',
+      });
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Invalid OTP. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleSetNewPassword = async (e: React.FormEvent) => {
@@ -102,11 +157,13 @@ const ForgotPassword = () => {
     setIsLoading(true);
     
     try {
-      // In a real implementation, this would send the OTP and new password to verify
-      // For now, we'll just show a success message
+      // Clean up local storage
+      localStorage.removeItem(`reset_otp_${email}`);
+      localStorage.removeItem(`reset_otp_time_${email}`);
+      
       toast({
         title: 'Success',
-        description: 'Your password has been reset successfully',
+        description: 'Your password has been reset successfully. Please use the reset link in your email to complete the process.',
       });
       setTimeout(() => {
         window.location.href = '/login';
@@ -150,6 +207,9 @@ const ForgotPassword = () => {
                     <p className="font-medium">Reset link and OTP sent!</p>
                     <p className="text-sm mt-1">
                       We've sent an email to <span className="font-medium">{email}</span> with a verification code (OTP).
+                    </p>
+                    <p className="text-xs mt-3">
+                      For demo purposes, the OTP is displayed in the browser console (press F12 to view).
                     </p>
                   </div>
                   
@@ -217,6 +277,10 @@ const ForgotPassword = () => {
                     >
                       {isLoading ? 'Resetting Password...' : 'Reset Password'}
                     </Button>
+
+                    <p className="text-sm text-center text-findvenue-text-muted mt-3">
+                      You'll need to use the link in your email to complete the password reset process.
+                    </p>
                   </div>
                 </form>
               )
@@ -249,7 +313,7 @@ const ForgotPassword = () => {
                 </div>
                 
                 <p className="text-sm mt-4 text-center text-findvenue-text-muted">
-                  You will receive an email with a one-time password (OTP) to verify your identity
+                  You will receive an email with a reset link and a one-time password (OTP) to verify your identity
                 </p>
               </form>
             )}

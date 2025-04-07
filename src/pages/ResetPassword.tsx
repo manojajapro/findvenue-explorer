@@ -37,7 +37,7 @@ const ResetPassword = () => {
     // Verify the access token is valid
     const verifyToken = async () => {
       try {
-        const { error } = await supabase.auth.getUser(accessToken);
+        const { data, error } = await supabase.auth.getUser(accessToken);
         
         if (error) {
           throw error;
@@ -128,7 +128,7 @@ const ResetPassword = () => {
             <Card className="p-8 glass-card border-white/10">
               <div className="text-center mb-6">
                 <div className="bg-red-500/10 text-red-500 h-16 w-16 flex items-center justify-center rounded-full mx-auto mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="h-8 w-8">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8">
                     <path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>
                   </svg>
                 </div>
