@@ -1,284 +1,190 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'react-router-dom';
 import { Message, ChatContact } from '@/components/chat/types';
 
-export const useChat = (contactId: string | undefined) => {
-  const { user, profile } = useAuth();
-  const { toast } = useToast();
-  
-  const [contact, setContact] = useState<ChatContact>({
-    id: '',
-    name: 'Contact',
-  });
+export const useChat = (contactId?: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [contact, setContact] = useState<ChatContact | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const location = useLocation();
+
+  const searchParams = new URLSearchParams(location.search);
+  const venueId = searchParams.get('venueId');
+  const venueName = searchParams.get('venueName');
+  const bookingId = searchParams.get('bookingId');
 
   useEffect(() => {
-    if (!contactId || contactId === 'undefined') {
-      console.error('Invalid contactId:', contactId);
-      setHasError(true);
-      setErrorMessage('Invalid contact ID. Please go back to messages and select a valid contact.');
+    if (!contactId) {
       setIsLoading(false);
-    } else {
-      setHasError(false);
-      setErrorMessage('');
+      return;
     }
-  }, [contactId]);
 
-  useEffect(() => {
-    if (!user || !contactId || hasError || contactId === 'undefined') return;
-    
-    const handleMessages = async () => {
+    const fetchContactInfo = async () => {
       try {
-        setIsLoading(true);
-        console.log("Fetching messages for contact:", contactId);
-        
-        const { data: contactData, error: contactError } = await supabase
+        const { data: userData, error: userError } = await supabase
           .from('user_profiles')
-          .select('first_name, last_name, user_role, profile_image')
+          .select('id, first_name, last_name, user_role, avatar_url')
           .eq('id', contactId)
           .single();
-          
-        if (contactError) {
-          console.error('Error fetching contact data:', contactError);
-          setHasError(true);
-          setErrorMessage('Could not find the selected contact. They may no longer exist or you may not have permission to view this conversation.');
-          throw contactError;
-        }
-        
-        if (contactData) {
-          setContact({
-            id: contactId,
-            name: `${contactData.first_name} ${contactData.last_name}`,
-            role: contactData.user_role,
-            image: contactData.profile_image
-          });
-          console.log("Contact data fetched:", contactData);
-        } else {
-          setHasError(true);
-          setErrorMessage('Contact not found. Please try again or select a different contact.');
-          throw new Error('Contact not found');
-        }
-        
-        const { data: messagesData, error: messagesError } = await supabase
-          .from('messages')
-          .select('*')
-          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${user.id})`)
-          .order('created_at', { ascending: true });
-            
-        if (messagesError) {
-          console.error('Error fetching messages:', messagesError);
-          throw messagesError;
-        }
 
-        if (messagesData && messagesData.length > 0) {
-          console.log("Fetched messages:", messagesData.length);
-          setMessages(messagesData);
-          
-          const venueMessage = messagesData.find(msg => msg.venue_id && msg.venue_name);
-          if (venueMessage) {
-            setContact(prev => ({
-              ...prev,
-              venueId: venueMessage.venue_id || null,
-              venueName: venueMessage.venue_name || null
-            }));
-          }
-          
-          const unreadMessageIds = messagesData
-            .filter(msg => !msg.read && msg.sender_id === contactId && msg.receiver_id === user.id)
-            .map(msg => msg.id);
-            
-          if (unreadMessageIds.length > 0) {
-            console.log("Marking messages as read:", unreadMessageIds.length);
-            await supabase
-              .from('messages')
-              .update({ read: true })
-              .in('id', unreadMessageIds);
-          }
-        } else {
-          console.log("No messages found between users");
-          setMessages([]);
-          
-          if (profile) {
-            sendWelcomeMessage(contactData.first_name);
-          }
-        }
+        if (userError) throw userError;
+
+        // Set contact information
+        setContact({
+          id: userData.id,
+          name: `${userData.first_name} ${userData.last_name}`,
+          role: userData.user_role,
+          image: userData.avatar_url || '',
+          venue_id: venueId || undefined,
+          venue_name: venueName ? decodeURIComponent(venueName) : undefined,
+        });
+
+        // Start fetching messages
+        fetchMessages();
+
+        // Mark messages as read
+        updateMessageReadStatus();
+
       } catch (error: any) {
-        console.error('Error loading messages:', error);
+        console.error('Error fetching contact info:', error);
         setHasError(true);
-        setErrorMessage('Failed to load messages. Please try again later.');
-      } finally {
+        setErrorMessage('Failed to fetch contact information');
         setIsLoading(false);
       }
     };
-    
-    handleMessages();
-  }, [contactId, user, hasError, profile]);
 
-  const sendWelcomeMessage = async (contactFirstName: string) => {
-    if (!user || !profile || !contactId) return;
-    
-    try {
-      console.log("Sending welcome message to", contactFirstName);
-      const welcomeMessage = `Hello ${contactFirstName}! I'm interested in discussing more. Can you please provide more information?`;
-      
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user.id,
-          receiver_id: contactId,
-          content: welcomeMessage,
-          sender_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined,
-          receiver_name: contact.name || undefined,
-          venue_id: contact.venueId || undefined,
-          venue_name: contact.venueName || undefined,
-          read: false
-        })
-        .select()
-        .single();
-        
-      if (error) {
-        console.error("Error sending welcome message:", error);
-        return;
-      }
-      
-      if (data) {
-        console.log("Welcome message sent:", data);
-        setMessages(prev => [...prev, data]);
-      }
-      
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: contactId,
-          title: 'New Message',
-          message: `${profile?.first_name || 'Someone'} started a conversation with you`,
-          type: 'message',
-          read: false,
-          link: `/messages/${user.id}`,
-          data: {
-            sender_id: user.id,
-            venue_id: contact.venueId || null
-          }
-        });
-    } catch (error) {
-      console.error("Error sending welcome message:", error);
-    }
-  };
+    const fetchMessages = async () => {
+      try {
+        const { data: messagesData, error: messagesError } = await supabase
+          .rpc('get_conversation', { 
+            current_user_id: (await supabase.auth.getUser()).data.user?.id,
+            other_user_id: contactId 
+          });
 
-  useEffect(() => {
-    if (!user || !contactId || hasError || contactId === 'undefined') return;
-    
-    console.log("Setting up realtime subscription for chat between", user.id, "and", contactId);
-    
-    const channel = supabase
-      .channel('direct_chat')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `sender_id=eq.${contactId},receiver_id=eq.${user.id}`
-      }, async (payload) => {
-        console.log('New message received:', payload);
-        
-        const newMessage = payload.new as Message;
+        if (messagesError) throw messagesError;
+
+        setMessages(messagesData || []);
+        setIsLoading(false);
+      } catch (error: any) {
+        console.error('Error fetching messages:', error);
+        setHasError(true);
+        setErrorMessage('Failed to fetch messages');
+        setIsLoading(false);
+      }
+    };
+
+    const updateMessageReadStatus = async () => {
+      try {
+        const currentUserId = (await supabase.auth.getUser()).data.user?.id;
         
         await supabase
           .from('messages')
           .update({ read: true })
-          .eq('id', newMessage.id);
+          .eq('receiver_id', currentUserId)
+          .eq('sender_id', contactId);
+      } catch (error) {
+        console.error('Error marking messages as read:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchContactInfo();
+
+    // Subscribe to new messages
+    const channel = supabase
+      .channel('messages-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${contactId}`,
+        },
+        (payload) => {
+          const newMessage = payload.new as Message;
           
-        setMessages(prev => [...prev, newMessage]);
-      })
+          // Only add message to state if it's for this conversation
+          if (
+            (newMessage.sender_id === contactId || newMessage.receiver_id === contactId)
+          ) {
+            setMessages((prev) => [...prev, newMessage]);
+            updateMessageReadStatus();
+          }
+        }
+      )
       .subscribe();
-      
+
+    // Cleanup
     return () => {
-      console.log("Removing realtime subscription");
       supabase.removeChannel(channel);
     };
-  }, [user, contactId, hasError]);
-
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    }
-  }, [messages]);
+  }, [contactId, venueId, venueName]);
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !user || !contactId || hasError || contactId === 'undefined') {
-      console.log("Cannot send message:", {
-        hasMessage: !!newMessage.trim(),
-        hasUser: !!user,
-        hasContactId: !!contactId,
-        hasError
-      });
-      return;
-    }
+    if (!newMessage.trim() || !contactId || !contact) return;
+    
+    setIsSending(true);
     
     try {
-      setIsSending(true);
-      console.log("Sending message to", contactId);
+      const user = (await supabase.auth.getUser()).data.user;
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Get the user profile to get the name
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
+        
+      const senderName = userProfile 
+        ? `${userProfile.first_name} ${userProfile.last_name}`
+        : 'User';
       
       const messageData = {
         sender_id: user.id,
         receiver_id: contactId,
         content: newMessage.trim(),
-        sender_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined,
-        receiver_name: contact.name || undefined,
-        venue_id: contact.venueId || undefined,
-        venue_name: contact.venueName || undefined,
+        sender_name: senderName,
+        receiver_name: contact.name,
+        venue_id: contact.venue_id,
+        venue_name: contact.venue_name,
+        booking_id: bookingId || null,
         read: false
       };
       
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('messages')
-        .insert(messageData)
-        .select()
-        .single();
+        .insert(messageData);
         
-      if (error) {
-        console.error("Error sending message:", error);
-        throw error;
-      }
-      
-      if (data) {
-        console.log("Message sent successfully:", data);
-        setMessages(prev => [...prev, data]);
-      }
-      
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: contactId,
-          title: 'New Message',
-          message: `${profile?.first_name || 'Someone'} sent you a message`,
-          type: 'message',
-          read: false,
-          link: `/messages/${user.id}`,
-          data: {
-            sender_id: user.id,
-            venue_id: contact.venueId || null
-          }
-        });
+      if (error) throw error;
       
       setNewMessage('');
+      
+      // Scroll to bottom after sending
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+      
     } catch (error: any) {
       console.error('Error sending message:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to send message. Please try again.',
+        title: 'Failed to send message',
+        description: error.message || 'Please try again',
         variant: 'destructive',
       });
     } finally {
@@ -287,15 +193,15 @@ export const useChat = (contactId: string | undefined) => {
   };
 
   return {
-    contact,
     messages,
     newMessage,
     setNewMessage,
+    contact,
     isLoading,
     isSending,
     hasError,
     errorMessage,
     messagesEndRef,
-    sendMessage
+    sendMessage,
   };
 };

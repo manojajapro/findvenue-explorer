@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -340,7 +339,7 @@ const CustomerBookings = () => {
               </CardContent>
             </Card>
           ) : (
-            <Tabs defaultValue={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'calendar')}>
+            <Tabs defaultValue="table" value={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'calendar')}>
               <TabsContent value="table">
                 <Card className="glass-card border-white/10 overflow-hidden">
                   <CardContent className="p-0">

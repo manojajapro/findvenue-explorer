@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,7 +24,6 @@ const Login = () => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [userRole, setUserRole] = useState('customer');
   
-  // For registration
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

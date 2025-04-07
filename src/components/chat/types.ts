@@ -1,32 +1,26 @@
 
-export type Message = {
+export interface Message {
   id: string;
+  created_at: string;
+  content: string;
   sender_id: string;
   receiver_id: string;
-  content: string;
-  created_at: string;
   read: boolean;
-  sender_name?: string;
-  receiver_name?: string;
+  sender_name: string;
+  receiver_name: string;
   venue_id?: string;
   venue_name?: string;
-  booking_id?: string; // Added to link messages with specific bookings
-};
+  booking_id?: string;
+}
 
-export type ChatContact = {
+export interface ChatContact {
   id: string;
   name: string;
+  role?: string;
   image?: string;
-  role?: 'venue-owner' | 'customer';
-  status?: string;
+  lastMessage?: string;
+  lastMessageTime?: string;
+  unreadCount?: number;
   venue_id?: string;
-  venue_name?: string; // Changed from venueName to be consistent
-  booking_id?: string; // Added to link contacts with specific bookings
-};
-
-export type SocialLinks = {
-  facebook?: string;
-  twitter?: string;
-  instagram?: string;
-  linkedin?: string;
-};
+  venue_name?: string;
+}
