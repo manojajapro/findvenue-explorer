@@ -21,6 +21,8 @@ export const useSearch = () => {
   const [activeFilters, setActiveFilters] = useState<SearchFilters>({});
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSearchRef = useRef<string | null>(null);
+  const isInitialMount = useRef(true);
+  const isSearchInProgress = useRef(false);
   
   // Extract filters from URL parameters - memoized for performance
   const extractFilters = useCallback(() => {
@@ -58,12 +60,33 @@ export const useSearch = () => {
   // Memoize extracted filters for performance
   const currentFilters = useMemo(() => extractFilters(), [extractFilters]);
   
-  // Apply filters to venues
+  // Apply filters to venues with debounce mechanism to prevent blinking
   const applyFilters = useCallback((filters: SearchFilters) => {
+    // Prevent multiple concurrent searches
+    if (isSearchInProgress.current) {
+      return;
+    }
+    
+    isSearchInProgress.current = true;
     setIsLoading(true);
     
-    // Simulate API delay with a shorter timeout - 200ms instead of 500ms
-    setTimeout(() => {
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Use a stable search key to prevent duplicate searches
+    const searchKey = JSON.stringify(filters);
+    if (searchKey === lastSearchRef.current) {
+      setIsLoading(false);
+      isSearchInProgress.current = false;
+      return;
+    }
+    
+    lastSearchRef.current = searchKey;
+    
+    // Use a minimal delay for better UX
+    searchTimeoutRef.current = setTimeout(() => {
       let results = [...venues];
       
       if (filters.city) {
@@ -117,11 +140,21 @@ export const useSearch = () => {
       
       setFilteredVenues(results);
       setIsLoading(false);
-    }, 200); // Reduced from 500ms to 200ms for faster response
+      isSearchInProgress.current = false;
+    }, 150);
   }, []);
   
   // Update filters and results when URL parameters change
   useEffect(() => {
+    // Skip the first render to prevent unnecessary searches on mount
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      const filters = currentFilters;
+      setActiveFilters(filters);
+      applyFilters(filters);
+      return;
+    }
+    
     const filters = currentFilters;
     setActiveFilters(filters);
     applyFilters(filters);

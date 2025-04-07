@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import VenuesList from '@/components/venues/VenuesList';
 import MapView from '@/components/map/MapView';
@@ -20,7 +20,10 @@ const Venues = () => {
   const [viewMode, setViewMode] = useState<'list' | 'map'>(searchParams.get('view') as 'list' | 'map' || 'map');
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedSearchTerm = useDebounce(searchTerm, 800); // Increased debounce time
+  const isSearchUpdatingRef = useRef(false);
+  const lastSearchTermRef = useRef<string>(searchTerm);
+  const isInitialRenderRef = useRef(true);
 
   const categoryId = searchParams.get('categoryId');
   const cityId = searchParams.get('cityId');
@@ -46,20 +49,45 @@ const Venues = () => {
     }
   }, [categoryName, cityName]);
 
+  // Handle search term URL updates with debouncing and reference checks
   useEffect(() => {
-    if (debouncedSearchTerm !== searchParams.get('search')) {
-      const newParams = new URLSearchParams(searchParams);
+    // Skip initial render to prevent double searches
+    if (isInitialRenderRef.current) {
+      isInitialRenderRef.current = false;
+      return;
+    }
+    
+    // Prevent updating if we're currently in search update cycle
+    if (isSearchUpdatingRef.current) {
+      isSearchUpdatingRef.current = false;
+      return;
+    }
+    
+    // Only update URL if search term has changed
+    if (debouncedSearchTerm !== searchParams.get('search') && 
+        debouncedSearchTerm !== lastSearchTermRef.current) {
       
-      if (debouncedSearchTerm.trim()) {
-        newParams.set('search', debouncedSearchTerm.trim());
-      } else {
-        newParams.delete('search');
-      }
+      lastSearchTermRef.current = debouncedSearchTerm;
       
-      setSearchParams(newParams, { replace: true });
+      // Delayed URL update to prevent flickering
+      const timer = setTimeout(() => {
+        isSearchUpdatingRef.current = true;
+        const newParams = new URLSearchParams(searchParams);
+        
+        if (debouncedSearchTerm.trim()) {
+          newParams.set('search', debouncedSearchTerm.trim());
+        } else {
+          newParams.delete('search');
+        }
+        
+        setSearchParams(newParams, { replace: true });
+      }, 250);
+      
+      return () => clearTimeout(timer);
     }
   }, [debouncedSearchTerm, searchParams, setSearchParams]);
 
+  // Sync view mode with URL
   useEffect(() => {
     const currentViewInUrl = searchParams.get('view');
     if (viewMode !== currentViewInUrl && (viewMode === 'list' || viewMode === 'map')) {
@@ -69,22 +97,32 @@ const Venues = () => {
     }
   }, [viewMode, searchParams, setSearchParams]);
 
+  // Initialize from URL on first load
   useEffect(() => {
     const viewFromUrl = searchParams.get('view') as 'list' | 'map' | null;
-    if (viewFromUrl && (viewFromUrl === 'list' || viewFromUrl === 'map')) {
+    const searchFromUrl = searchParams.get('search');
+    
+    if (viewFromUrl && (viewFromUrl === 'list' || viewFromUrl === 'map') && viewMode !== viewFromUrl) {
       setViewMode(viewFromUrl);
-    } else {
+    } else if (viewMode !== 'map') {
       setViewMode('map');
       const newParams = new URLSearchParams(searchParams);
       newParams.set('view', 'map');
       setSearchParams(newParams, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+    
+    if (searchFromUrl && searchFromUrl !== searchTerm) {
+      setSearchTerm(searchFromUrl);
+    }
+  }, []); // Run only once on component mount
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (searchTerm.trim()) {
+    if (searchTerm.trim() && searchTerm !== searchParams.get('search')) {
+      isSearchUpdatingRef.current = true;
+      lastSearchTermRef.current = searchTerm;
+      
       const newParams = new URLSearchParams(searchParams);
       newParams.set('search', searchTerm.trim());
       setSearchParams(newParams, { replace: true });

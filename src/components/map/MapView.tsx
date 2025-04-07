@@ -128,7 +128,7 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
   const [searchParams, setSearchParams] = useSearchParams();
   const [mapSearchTerm, setMapSearchTerm] = useState(searchParams.get('search') || '');
-  const debouncedSearchTerm = useDebounce(mapSearchTerm, 500);
+  const debouncedSearchTerm = useDebounce(mapSearchTerm, 800);
   const [isCompactControls, setIsCompactControls] = useState(false);
   const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [isRadiusActive, setIsRadiusActive] = useState(false);
@@ -142,6 +142,9 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
   const [memoizedVenues, setMemoizedVenues] = useState<Venue[]>([]);
   const searchUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef(true);
+  const isUpdatingSearchParams = useRef(false);
+  const isSearchInProgress = useRef(false);
+  const lastSearchQuery = useRef<string>('');
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -166,30 +169,41 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
   }, [venuesInRadius, venuesWithCoordinates, isRadiusActive, onFilteredVenuesChange]);
   
   useEffect(() => {
+    if (isInitialLoadRef.current || isUpdatingSearchParams.current) {
+      isUpdatingSearchParams.current = false;
+      return;
+    }
+
     const searchParam = searchParams.get('search');
-    if (searchParam !== debouncedSearchTerm) {
-      if (!isInitialLoadRef.current && debouncedSearchTerm !== searchParam) {
-        if (searchUpdateTimeoutRef.current) {
-          clearTimeout(searchUpdateTimeoutRef.current);
+    
+    if (debouncedSearchTerm !== searchParam && debouncedSearchTerm !== lastSearchQuery.current) {
+      lastSearchQuery.current = debouncedSearchTerm;
+      
+      if (searchUpdateTimeoutRef.current) {
+        clearTimeout(searchUpdateTimeoutRef.current);
+      }
+      
+      searchUpdateTimeoutRef.current = setTimeout(() => {
+        isUpdatingSearchParams.current = true;
+        
+        const newParams = new URLSearchParams(searchParams);
+        if (debouncedSearchTerm.trim()) {
+          newParams.set('search', debouncedSearchTerm.trim());
+        } else {
+          newParams.delete('search');
         }
         
-        searchUpdateTimeoutRef.current = setTimeout(() => {
-          const newParams = new URLSearchParams(searchParams);
-          if (debouncedSearchTerm.trim()) {
-            newParams.set('search', debouncedSearchTerm.trim());
-          } else {
-            newParams.delete('search');
-          }
-          setSearchParams(newParams, { replace: true });
-        }, 300);
-      }
+        setSearchParams(newParams, { replace: true });
+      }, 250);
     }
     
     if (searchParam && searchParam !== mapSearchTerm) {
       setMapSearchTerm(searchParam);
       handleSearch(searchParam);
     }
-    
+  }, [debouncedSearchTerm, searchParams, setSearchParams, mapSearchTerm]);
+  
+  useEffect(() => {
     isInitialLoadRef.current = false;
     
     return () => {
@@ -197,7 +211,7 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
         clearTimeout(searchUpdateTimeoutRef.current);
       }
     };
-  }, [debouncedSearchTerm, searchParams]);
+  }, []);
   
   useEffect(() => {
     if (searchParams.get('mapTools') === 'radius') {
@@ -211,33 +225,51 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
         });
       }, 500);
     }
-  }, [searchParams]);
-  
+    
+    const searchFromUrl = searchParams.get('search');
+    if (searchFromUrl) {
+      setMapSearchTerm(searchFromUrl);
+      handleSearch(searchFromUrl);
+    }
+  }, []);
+
   const handleVenueClick = useCallback((venueId: string) => {
     navigate(`/venue/${venueId}`, { replace: false });
   }, [navigate]);
   
   const handleSearch = useCallback((term: string) => {
-    setMapSearchTerm(term);
-    
-    if (!term.trim()) {
-      setFilteredVenues(memoizedVenues);
+    if (term === lastSearchQuery.current || isSearchInProgress.current) {
       return;
     }
     
-    const searchLower = term.toLowerCase();
-    const results = memoizedVenues.filter(venue => 
-      venue.name.toLowerCase().includes(searchLower) || 
-      venue.description.toLowerCase().includes(searchLower) ||
-      venue.address.toLowerCase().includes(searchLower) ||
-      venue.city.toLowerCase().includes(searchLower) ||
-      venue.category.toLowerCase().includes(searchLower) ||
-      venue.amenities.some(amenity => 
-        amenity.toLowerCase().includes(searchLower)
-      )
-    );
+    lastSearchQuery.current = term;
+    isSearchInProgress.current = true;
     
-    setFilteredVenues(results);
+    if (!term.trim()) {
+      setFilteredVenues(memoizedVenues);
+      setMapSearchTerm('');
+      isSearchInProgress.current = false;
+      return;
+    }
+    
+    setMapSearchTerm(term);
+    
+    setTimeout(() => {
+      const searchLower = term.toLowerCase();
+      const results = memoizedVenues.filter(venue => 
+        venue.name.toLowerCase().includes(searchLower) || 
+        venue.description.toLowerCase().includes(searchLower) ||
+        venue.address.toLowerCase().includes(searchLower) ||
+        venue.city.toLowerCase().includes(searchLower) ||
+        venue.category.toLowerCase().includes(searchLower) ||
+        venue.amenities.some(amenity => 
+          amenity.toLowerCase().includes(searchLower)
+        )
+      );
+      
+      setFilteredVenues(results);
+      isSearchInProgress.current = false;
+    }, 10);
   }, [memoizedVenues]);
   
   const handleLocationSelect = useCallback((lat: number, lng: number, address: string) => {
@@ -279,34 +311,11 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          const newLocation = { lat: latitude, lng: longitude };
-          setUserLocation(newLocation);
-          setIsRadiusActive(true);
-          
-          if (window.google && window.google.maps) {
-            const geocoder = new google.maps.Geocoder();
-            geocoder.geocode({ location: newLocation }, (results, status) => {
-              if (status === 'OK' && results && results[0]) {
-                setLocationAddress(results[0].formatted_address);
-                toast.success(`Location set to: ${results[0].formatted_address}`);
-              } else {
-                setLocationAddress("Your Current Location");
-                toast.success("Current location detected");
-              }
-            });
-          } else {
-            setLocationAddress("Your Current Location");
-            toast.success("Current location detected");
-          }
-          
-          if (mapRef.current) {
-            mapRef.current.panTo(newLocation);
-            mapRef.current.setZoom(14);
-          }
+          handleLocationSelect(latitude, longitude, "Your Current Location");
         },
         (error) => {
           console.error("Error getting user location:", error);
-          toast.error("Could not access your location. Please allow location access in your browser settings or try setting location manually.");
+          toast.error("Could not access your location. Please try setting location manually.");
         }
       );
     } else {
@@ -473,7 +482,8 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
     setSelectedVenue(venue);
   }, []);
   
-  const getAppliedFilters = useCallback(() => {
+  const getAppliedFilters = () => {
+    const searchParams = new URL(window.location.href).searchParams;
     const filters: string[] = [];
     
     if (searchParams.has('search')) {
@@ -491,25 +501,26 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
     }
     
     return filters;
-  }, [searchParams]);
+  };
   
   const appliedFilters = getAppliedFilters();
   
-  const handleClearFilter = useCallback((filter: string) => {
+  const handleClearFilter = (filter: string) => {
     const filterType = filter.split(':')[0].trim().toLowerCase();
+    const searchParams = new URL(window.location.href).searchParams;
     const newParams = new URLSearchParams(searchParams);
     
     if (filterType === 'search') {
       newParams.delete('search');
-      setMapSearchTerm('');
     } else if (filterType === 'category') {
       newParams.delete('categoryId');
     } else if (filterType === 'city') {
       newParams.delete('cityId');
     }
     
-    setSearchParams(newParams, { replace: true });
-  }, [searchParams, setSearchParams]);
+    window.history.replaceState(null, '', `?${newParams.toString()}`);
+    window.location.reload();
+  };
   
   const handleClearSearch = useCallback(() => {
     setMapSearchTerm('');
@@ -553,9 +564,24 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
         <EnhancedMapSearch 
           onSearch={handleSearch}
           onLocationSelect={handleLocationSelect}
-          onRadiusChange={handleRadiusChange}
-          onManualLocation={handleManualLocationSetting}
-          onCurrentLocation={handleCurrentLocation}
+          onRadiusChange={setRadiusInKm}
+          onManualLocation={() => setIsSettingManualLocation(true)}
+          onCurrentLocation={() => {
+            if (navigator.geolocation) {
+              toast.info("Getting your current location...");
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  const { latitude, longitude } = position.coords;
+                  handleLocationSelect(latitude, longitude, "Your Current Location");
+                },
+                (error) => {
+                  toast.error("Could not access your location. Please try setting location manually.");
+                }
+              );
+            } else {
+              toast.error("Your browser doesn't support geolocation");
+            }
+          }}
           venueCount={displayVenues.length}
           radiusInKm={radiusInKm}
           isRadiusActive={isRadiusActive}

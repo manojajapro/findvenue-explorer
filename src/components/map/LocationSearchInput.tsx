@@ -58,11 +58,12 @@ const LocationSearchInput = ({
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [recentSearches, setRecentSearches] = useState<SearchSuggestion[]>([]);
-  const debouncedSearchTerm = useDebounce(searchText, 500); // Increase debounce time to prevent flickering
+  const debouncedSearchTerm = useDebounce(searchText, 800); // Increased debounce time
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const preventNextSearchRef = useRef(false);
+  const isMountedRef = useRef(false);
 
   // Load recent searches from localStorage
   useEffect(() => {
@@ -74,6 +75,8 @@ const LocationSearchInput = ({
     } catch (e) {
       console.error("Error loading recent searches", e);
     }
+    
+    isMountedRef.current = true;
   }, []);
 
   // Save a search to recent searches
@@ -90,6 +93,8 @@ const LocationSearchInput = ({
 
   // Fetch suggestions when search term changes - use debounced value
   useEffect(() => {
+    if (!isMountedRef.current) return;
+    
     const fetchSuggestions = async () => {
       if (debouncedSearchTerm.trim()) {
         const results = await getSearchSuggestions(debouncedSearchTerm);
@@ -140,7 +145,7 @@ const LocationSearchInput = ({
     // Use timeout to prevent immediate search that might cause UI flickering
     setTimeout(() => {
       onSearch(suggestion.text);
-    }, 50);
+    }, 100);
   };
 
   // Handle form submission
@@ -152,7 +157,11 @@ const LocationSearchInput = ({
       return;
     }
     
-    onSearch(searchText);
+    // Add a small delay to allow UI to stabilize
+    setTimeout(() => {
+      onSearch(searchText);
+    }, 10);
+    
     setShowSuggestions(false);
     
     // Save current search to history if not empty
@@ -166,12 +175,16 @@ const LocationSearchInput = ({
     }
   };
 
-  // Handle input change with throttling
+  // Handle input change with minimal re-renders
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setSearchText(value);
     
-    // No need to call onSearch here, let the debounce effect handle it
+    // Clear any existing timeout to prevent multiple rapid updates
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    setSearchText(value);
   };
 
   return (
@@ -193,8 +206,15 @@ const LocationSearchInput = ({
             type="button"
             className="absolute right-3 top-1/2 transform -translate-y-1/2"
             onClick={() => {
+              // Prevent default search behavior
+              preventNextSearchRef.current = true;
               setSearchText('');
-              setTimeout(() => onSearch(''), 50); // Small delay to prevent flicker
+              
+              // Add delay to ensure UI updates before search
+              setTimeout(() => {
+                onSearch('');
+                preventNextSearchRef.current = false;
+              }, 100);
             }}
           >
             <X className="h-4 w-4 text-findvenue-text-muted hover:text-white" />

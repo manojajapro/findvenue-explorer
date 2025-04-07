@@ -45,21 +45,29 @@ const EnhancedMapSearch = memo(({
   const [pinCode, setPinCode] = useState('');
   const [showPinCodeSearch, setShowPinCodeSearch] = useState(false);
   const { geocodePinCode, isLoading: isGeocodingLoading } = useGeocode();
-  const debouncedSearchText = useDebounce(searchText, 500);
+  const debouncedSearchText = useDebounce(searchText, 800); // Increased debounce time
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialMount = useRef(true);
+  const preventNextSearchRef = useRef(false);
   
   // Initialize search text from URL if available
   useEffect(() => {
-    const searchFromUrl = searchParams.get('search');
-    if (searchFromUrl && !searchText) {
-      setSearchText(searchFromUrl);
+    if (isInitialMount.current) {
+      const searchFromUrl = searchParams.get('search');
+      if (searchFromUrl && !searchText) {
+        setSearchText(searchFromUrl);
+      }
+      isInitialMount.current = false;
     }
   }, [searchParams, searchText, setSearchText]);
   
   // Use debounced effect for search to prevent constant rerenders
   useEffect(() => {
-    if (debouncedSearchText !== searchText) {
-      onSearch(debouncedSearchText);
+    if (!isInitialMount.current && debouncedSearchText !== '') {
+      if (!preventNextSearchRef.current) {
+        onSearch(debouncedSearchText);
+      }
+      preventNextSearchRef.current = false;
     }
   }, [debouncedSearchText, onSearch]);
   
@@ -78,7 +86,14 @@ const EnhancedMapSearch = memo(({
   
   // Handle input changes with throttled updates
   const handleInputChange = useCallback((value: string) => {
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
     setSearchText(value);
+    
+    // We'll let the debounced effect handle the search
   }, [setSearchText]);
   
   return (
@@ -94,8 +109,13 @@ const EnhancedMapSearch = memo(({
             size="sm"
             className="h-6 px-2 text-xs"
             onClick={() => {
+              preventNextSearchRef.current = true;
               setSearchText('');
-              onSearch('');
+              
+              // Add small delay to ensure UI updates before search
+              setTimeout(() => {
+                onSearch('');
+              }, 10);
             }}
           >
             Clear <X className="h-3 w-3 ml-1" />
@@ -109,6 +129,7 @@ const EnhancedMapSearch = memo(({
           onLocationSelect={onLocationSelect}
           searchText={searchText}
           setSearchText={handleInputChange}
+          isLoading={false}
         />
       </div>
       
