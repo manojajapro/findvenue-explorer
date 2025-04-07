@@ -50,7 +50,7 @@ const Login = () => {
         title: 'Success',
         description: 'Logged in successfully',
       });
-      navigate('/account');
+      // We'll let the App.tsx routing handle the redirect based on user role
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
@@ -87,7 +87,7 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await supabase.auth.signUp({ 
+      const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
