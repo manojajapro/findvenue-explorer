@@ -15,7 +15,7 @@ interface UseVenueVoiceAssistantProps {
 
 export const useVenueVoiceAssistant = ({
   venue,
-  autoRestart = false, // Changed to false by default
+  autoRestart = false,
   onTranscript,
   onAnswer,
   onSpeechStart,
@@ -25,7 +25,7 @@ export const useVenueVoiceAssistant = ({
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(false); // Changed to false by default
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const [isWelcomePlayed, setIsWelcomePlayed] = useState(false);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -165,7 +165,7 @@ export const useVenueVoiceAssistant = ({
         processingRef.current = false;
         setTranscript('');
       
-        if (autoRestart && !error && isMountedRef.current) {
+        if (autoRestart && !error && isMountedRef.current && audioEnabled) {
           setTimeout(() => {
             startListening();
           }, 1000);
