@@ -1,14 +1,13 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Mic, MicOff, Send, X, User, Bot, Volume2, VolumeX, Loader2, MessageSquare } from 'lucide-react';
+import { Mic, MicOff, Send, X, User, Bot, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import { useChat } from '@/hooks/useChatWithVenue';
+import { useChatWithVenue } from '@/hooks/useChatWithVenue';
 import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,7 +18,6 @@ interface VenueUnifiedChatAssistantProps {
 }
 
 const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistantProps) => {
-  const [activeTab, setActiveTab] = useState<string>('unified');
   const [textInput, setTextInput] = useState<string>('');
   const [micPermission, setMicPermission] = useState<boolean | null>(null);
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
@@ -68,7 +66,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       // Add the assistant's response to unified messages
       setUnifiedMessages(prev => [...prev, { text: response, isUser: false, mode: 'voice' }]);
       
-      // Play audio response here - it's handled in the hook
+      // Audio is handled in the hook
     },
     onSpeechStart: () => {
       setIsSpeaking(true);
@@ -78,11 +76,11 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     }
   });
 
-  // Chat integration
+  // Chat integration - use the correctly named hook
   const {
     submitMessage,
     isLoading: chatIsLoading,
-  } = useChat();
+  } = useChatWithVenue();
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -136,8 +134,6 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
   const processAIRequest = async (message: string) => {
     if (!venue) return;
     
-    setUnifiedMessages(prev => [...prev, { text: message, isUser: true, mode: 'text' }]);
-    
     try {
       // Call the venue assistant API
       const { data, error } = await supabase.functions.invoke('venue-assistant', {
@@ -181,6 +177,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     const message = textInput.trim();
     if (!message) return;
     
+    setUnifiedMessages(prev => [...prev, { text: message, isUser: true, mode: 'text' }]);
     await processAIRequest(message);
   };
 
@@ -236,26 +233,28 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
 
   if (!venue) {
     return (
-      <Card className="bg-findvenue-card-bg border border-white/10 mt-6">
+      <Card className="bg-black/80 backdrop-blur-sm border border-white/10">
         <CardHeader>
           <CardTitle>Venue Assistant</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-findvenue-text-muted">Venue information is loading...</p>
+          <p className="text-gray-400">Venue information is loading...</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border border-white/10 shadow-lg overflow-hidden">
-      <CardHeader className="pb-2 border-b border-white/10">
+    <Card className="bg-black/80 backdrop-blur-sm border border-white/10 shadow-lg overflow-hidden">
+      <CardHeader className="pb-3 border-b border-white/10">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <CardTitle>Venue Assistant</CardTitle>
-            <Badge variant="outline" className="bg-green-500/20 text-green-500">
-              Ready
-            </Badge>
+            <CardTitle className="text-lg">Chat with Venue Assistant</CardTitle>
+            {audioEnabled && (
+              <Badge variant="outline" className="bg-green-500/20 text-green-500">
+                Voice Enabled
+              </Badge>
+            )}
           </div>
           <div className="flex gap-2">
             <Button
@@ -263,6 +262,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
               size="sm"
               className={`${audioEnabled ? 'border-green-500 text-green-500' : 'border-white/10'}`}
               onClick={toggleAudio}
+              title={audioEnabled ? "Disable voice responses" : "Enable voice responses"}
             >
               {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </Button>
@@ -280,122 +280,112 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
         </div>
       </CardHeader>
       
-      <TabsContent value="unified" className="p-0 m-0">
-        <CardContent className="p-4">
-          <div className="flex justify-end mb-4">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className="text-xs hover:bg-red-500/10 text-red-400"
-              onClick={handleClearConversation}
-            >
-              <X className="h-3 w-3 mr-1" /> Clear Chat
-            </Button>
-          </div>
-          
-          <ScrollArea className="h-[240px] mb-4 rounded-md border border-white/10 p-4 bg-black/20 backdrop-blur-sm">
-            {unifiedMessages.length === 0 ? (
-              <div className="text-center py-10 text-findvenue-text-muted">
-                <p>No conversation history yet.</p>
-                <p className="text-xs mt-2">Type or speak to start talking with your venue assistant</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {unifiedMessages.map((item, index) => (
-                  <div 
-                    key={index} 
-                    className={`flex gap-2 p-3 rounded-lg text-sm ${
-                      item.isUser 
-                        ? 'bg-findvenue/20 ml-8 border border-findvenue/30' 
-                        : 'bg-gray-700/30 mr-8 border border-white/5'
-                    }`}
-                  >
-                    <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 
-                      ${item.isUser ? 'bg-findvenue/30 text-white' : 'bg-gray-700 text-white'}`}>
-                      {item.isUser ? (
-                        <User className="h-3.5 w-3.5" />
-                      ) : (
-                        <Bot className="h-3.5 w-3.5" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-medium">{item.isUser ? 'You' : 'Assistant'}</p>
-                        <Badge variant="outline" className="text-[10px] h-4 px-1">
-                          {item.mode === 'voice' ? 'Voice' : 'Text'}
-                        </Badge>
-                      </div>
-                      <p className="mt-1">{item.text}</p>
-                    </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </ScrollArea>
-        </CardContent>
+      <CardContent className="p-4">
+        <div className="flex justify-end mb-4">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="text-xs hover:bg-red-500/10 text-red-400"
+            onClick={handleClearConversation}
+          >
+            <X className="h-3 w-3 mr-1" /> Clear Chat
+          </Button>
+        </div>
         
-        <CardFooter className="border-t border-white/10 pt-4 px-4 pb-4 flex flex-col space-y-2">
-          {isSpeaking && (
-            <div className="text-center w-full py-2 px-4 bg-blue-600/20 rounded-md text-sm border border-dashed border-blue-500/50 flex items-center justify-center">
-              <Volume2 className="h-3 w-3 mr-2 text-blue-500 animate-pulse" />
-              <span>Speaking... </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-2 h-6 py-0 px-2 text-xs border border-blue-500/30 hover:bg-blue-500/20"
-                onClick={handleStopSpeaking}
-              >
-                <X className="h-3 w-3 mr-1 text-blue-300" /> Stop
-              </Button>
+        <ScrollArea className="h-[300px] mb-4 rounded-md border border-white/10 p-3 bg-black/40 backdrop-blur-sm">
+          {unifiedMessages.length === 0 ? (
+            <div className="text-center py-10 text-gray-400">
+              <p>Ask anything about {venue.name}</p>
+              <p className="text-xs mt-2">Type a message or click the microphone to start speaking</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {unifiedMessages.map((item, index) => (
+                <div 
+                  key={index} 
+                  className={`flex gap-2 p-2 rounded-lg text-sm ${
+                    item.isUser 
+                      ? 'bg-blue-900/30 ml-8 border border-blue-700/30' 
+                      : 'bg-gray-800/30 mr-8 border border-white/5'
+                  }`}
+                >
+                  <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 
+                    ${item.isUser ? 'bg-blue-700/50' : 'bg-gray-700'}`}>
+                    {item.isUser ? (
+                      <User className="h-3.5 w-3.5" />
+                    ) : (
+                      <Bot className="h-3.5 w-3.5" />
+                    )}
+                  </div>
+                  <div>
+                    <p>{item.text}</p>
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
             </div>
           )}
-          
-          {isListening && (
-            <div className="text-center w-full py-2 px-4 bg-green-600/20 rounded-md text-sm border border-dashed border-green-500/50 animate-pulse flex items-center justify-center">
-              <Mic className="h-3 w-3 mr-2 text-green-500" />
-              <span>Listening...</span> 
-              {transcript && <span className="font-medium ml-1">"<span className="text-green-400">{transcript}</span>"</span>}
-            </div>
-          )}
-          
-          {(voiceIsProcessing || chatIsLoading) && (
-            <div className="text-center w-full py-2 px-4 bg-blue-600/10 rounded-md text-sm border border-dashed border-blue-500/30 flex items-center justify-center">
-              <Loader2 className="h-3 w-3 inline-block mr-2 animate-spin text-blue-500" />
-              <span>Processing your request...</span>
-            </div>
-          )}
-
-          <div className="flex gap-2 w-full mt-4">
-            <form onSubmit={handleTextSubmit} className="flex gap-2 w-full">
-              <Input
-                placeholder="Type your message..."
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                className="flex-1"
-                disabled={isListening || voiceIsProcessing || chatIsLoading}
-              />
-              <Button 
-                type="submit" 
-                size="icon"
-                disabled={!textInput.trim() || isListening || voiceIsProcessing || chatIsLoading}
-                className="bg-findvenue hover:bg-findvenue-dark"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
+        </ScrollArea>
+      </CardContent>
+      
+      <CardFooter className="border-t border-white/10 pt-3 px-4 pb-4 flex flex-col space-y-2">
+        {isSpeaking && (
+          <div className="text-center w-full py-2 px-3 bg-blue-600/20 rounded-md text-sm border border-dashed border-blue-500/50 flex items-center justify-center">
+            <Volume2 className="h-3 w-3 mr-2 text-blue-500 animate-pulse" />
+            <span>Speaking... </span>
             <Button
-              type="button"
-              size="icon"
-              onClick={handleVoiceToggle}
-              disabled={voiceIsProcessing || chatIsLoading}
-              className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-findvenue hover:bg-findvenue-dark"}
+              variant="ghost"
+              size="sm"
+              className="ml-2 h-6 py-0 px-2 text-xs border border-blue-500/30 hover:bg-blue-500/20"
+              onClick={handleStopSpeaking}
             >
-              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              <X className="h-3 w-3 mr-1 text-blue-300" /> Stop
             </Button>
           </div>
-        </CardFooter>
-      </TabsContent>
+        )}
+        
+        {isListening && (
+          <div className="text-center w-full py-2 px-3 bg-green-600/20 rounded-md text-sm border border-dashed border-green-500/50 animate-pulse flex items-center justify-center">
+            <Mic className="h-3 w-3 mr-2 text-green-500" />
+            <span>Listening...</span> 
+            {transcript && <span className="font-medium ml-1">"<span className="text-green-400">{transcript}</span>"</span>}
+          </div>
+        )}
+        
+        {(voiceIsProcessing || chatIsLoading) && (
+          <div className="text-center w-full py-2 px-3 bg-blue-600/10 rounded-md text-sm border border-dashed border-blue-500/30 flex items-center justify-center">
+            <Loader2 className="h-3 w-3 inline-block mr-2 animate-spin text-blue-500" />
+            <span>Processing your request...</span>
+          </div>
+        )}
+
+        <form onSubmit={handleTextSubmit} className="flex gap-2 w-full mt-2">
+          <Input
+            placeholder="Type your message..."
+            value={textInput}
+            onChange={(e) => setTextInput(e.target.value)}
+            className="flex-1 bg-gray-900/50 border-gray-700"
+            disabled={isListening || voiceIsProcessing || chatIsLoading}
+          />
+          <Button 
+            type="submit" 
+            size="icon"
+            disabled={!textInput.trim() || isListening || voiceIsProcessing || chatIsLoading}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            onClick={handleVoiceToggle}
+            disabled={voiceIsProcessing || chatIsLoading}
+            className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-blue-600 hover:bg-blue-700"}
+          >
+            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          </Button>
+        </form>
+      </CardFooter>
     </Card>
   );
 };

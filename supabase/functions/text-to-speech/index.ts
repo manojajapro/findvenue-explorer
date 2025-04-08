@@ -31,7 +31,7 @@ serve(async (req) => {
     console.log(`Converting text to speech using voice ${voice}`);
     
     // Using Eleven Labs API for high-quality TTS
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream`, {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
       method: 'POST',
       headers: {
         'xi-api-key': apiKey,
@@ -41,9 +41,9 @@ serve(async (req) => {
         text: text,
         model_id: 'eleven_multilingual_v2',
         voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.0,
+          stability: 0.7,
+          similarity_boost: 0.8,
+          style: 0.1,
           use_speaker_boost: true
         }
       }),

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import { Mic, MessageSquare } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import VenueUnifiedChatAssistant from '@/components/chat/VenueUnifiedChatAssistant';
 
@@ -20,14 +20,14 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
         <Button
           onClick={() => setIsOpen(true)}
           size="icon"
-          className="bg-findvenue hover:bg-findvenue-dark rounded-full h-12 w-12 shadow-lg"
+          className="bg-blue-600 hover:bg-blue-700 rounded-full h-14 w-14 shadow-xl flex items-center justify-center"
           aria-label="AI Assistant"
         >
-          <MessageSquare className="h-5 w-5" />
+          <MessageSquare className="h-7 w-7" />
         </Button>
       </div>
       
-      {/* Dialog for AI assistant - positioned on the right side using CSS classes */}
+      {/* Dialog for AI assistant */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent 
           className="sm:max-w-[450px] p-0 overflow-hidden right-[5%] sm:right-[5%] translate-x-0"
