@@ -40,9 +40,9 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
       {/* Dialog for AI assistant */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent 
-          className="sm:max-w-[460px] p-0 overflow-hidden right-[5%] sm:right-[5%] translate-x-0 bg-gradient-to-b from-slate-950 to-slate-900 border border-white/10 shadow-2xl"
+          className="sm:max-w-[480px] p-0 overflow-hidden right-[5%] sm:right-[5%] translate-x-0 bg-gradient-to-b from-slate-950 to-slate-900 border border-white/10 shadow-2xl rounded-xl"
         >
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-2 right-2 z-10">
             <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="rounded-full h-8 w-8 hover:bg-white/10">
               <X className="h-4 w-4 text-gray-400" />
             </Button>

@@ -3,7 +3,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Mic, MicOff, Send, User, Bot, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Venue } from '@/hooks/useSupabaseVenues';
@@ -12,6 +11,9 @@ import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 interface VenueUnifiedChatAssistantProps {
   venue: Venue | null;
@@ -25,6 +27,9 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
   const [unifiedMessages, setUnifiedMessages] = useState<Array<{ text: string; isUser: boolean; mode: 'text' | 'voice' }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  // Start with voice disabled by default
+  const [audioEnabled, setAudioEnabled] = useState<boolean>(false);
 
   // Initialize audio element
   useEffect(() => {
@@ -54,11 +59,11 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     stopListening,
     stopSpeaking,
     isProcessing: voiceIsProcessing,
-    audioEnabled,
     toggleAudio,
     error: voiceError
   } = useVenueVoiceAssistant({
     venue,
+    // Disable auto restart of voice
     autoRestart: false,
     onTranscript: (text) => {
       // We'll handle this in the component
@@ -67,10 +72,12 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       // Add the assistant's response to unified messages
       setUnifiedMessages(prev => [...prev, { text: response, isUser: false, mode: 'voice' }]);
       
-      // Audio is handled in the hook
+      // Audio is handled by the audioEnabled state
     },
     onSpeechStart: () => {
-      setIsSpeaking(true);
+      if (audioEnabled) {
+        setIsSpeaking(true);
+      }
     },
     onSpeechEnd: () => {
       setIsSpeaking(false);
@@ -150,7 +157,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       const assistantResponse = data.answer || "I'm sorry, I couldn't process your request at this time.";
       setUnifiedMessages(prev => [...prev, { text: assistantResponse, isUser: false, mode: 'text' }]);
       
-      // Convert to speech if audio is enabled
+      // Convert to speech only if audio is enabled
       if (audioEnabled) {
         await speakText(assistantResponse);
       }
@@ -224,6 +231,23 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     setIsSpeaking(false);
   };
 
+  // Toggle audio responses
+  const handleAudioToggle = () => {
+    setAudioEnabled(prev => !prev);
+    
+    // If turning off audio while speaking, stop it
+    if (audioEnabled && isSpeaking) {
+      handleStopSpeaking();
+    }
+    
+    toast.success(
+      audioEnabled ? 'Voice responses disabled' : 'Voice responses enabled', 
+      { 
+        description: audioEnabled ? 'Assistant will respond with text only' : 'Assistant will speak responses aloud'
+      }
+    );
+  };
+
   // Clear conversation history
   const handleClearConversation = () => {
     setUnifiedMessages([]);
@@ -231,8 +255,6 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       description: 'Your chat history has been cleared.'
     });
   };
-
-  const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   if (!venue) {
     return (
@@ -252,7 +274,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
   return (
     <div className="flex flex-col h-[600px] max-h-[80vh]">
       {/* Header */}
-      <div className="p-6 pb-4 bg-gradient-to-r from-blue-800 to-blue-900 rounded-t-lg flex items-center justify-between">
+      <div className="p-6 pb-4 bg-gradient-to-r from-blue-800 to-indigo-800 rounded-t-lg flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="h-10 w-10 bg-blue-700 rounded-full flex items-center justify-center border border-blue-500/30 shadow-lg">
             <Bot className="h-5 w-5 text-white" />
@@ -263,30 +285,22 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
           </div>
         </div>
         
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleAudio}
-                className={`rounded-full w-8 h-8 p-0 ${
-                  audioEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : 
-                  'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                }`}
-              >
-                {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="bg-slate-900 text-white border-slate-700">
-              {audioEnabled ? "Disable voice responses" : "Enable voice responses"}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-blue-200">Voice</span>
+            <Switch
+              checked={audioEnabled}
+              onCheckedChange={handleAudioToggle}
+              className={`${
+                audioEnabled ? 'bg-green-600' : 'bg-slate-700'
+              }`}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Chat Content */}
-      <div className="flex-1 overflow-hidden p-6 pt-3">
+      <div className="flex-1 overflow-hidden p-6 pt-3 bg-slate-900">
         <div className="flex justify-end mb-3">
           <Button 
             variant="ghost" 
@@ -326,13 +340,26 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
                     className={`max-w-[75%] rounded-2xl p-4 ${
                       item.isUser 
                         ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white ml-4' 
-                        : 'bg-slate-800/80 border border-slate-700/50'
+                        : 'bg-slate-800/80 border border-slate-700/50 text-white'
                     }`}
                   >
                     <p className="text-sm">{item.text}</p>
-                    <span className="text-xs block mt-1 opacity-70">
-                      {item.mode === 'voice' ? '🎙️ Voice' : '✍️ Text'}
-                    </span>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs block opacity-70">
+                        {item.mode === 'voice' ? '🎙️ Voice' : '✍️ Text'}
+                      </span>
+                      
+                      {!item.isUser && audioEnabled && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0 text-blue-300 hover:text-blue-200 hover:bg-blue-900/30"
+                          onClick={() => speakText(item.text)}
+                        >
+                          <Volume2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   
                   {item.isUser && (
@@ -349,7 +376,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       </div>
       
       {/* Status Indicators */}
-      <div className="px-6">
+      <div className="px-6 bg-slate-900">
         {isSpeaking && (
           <div className="text-center w-full p-2 mb-2 bg-blue-900/30 rounded-lg text-sm border border-blue-800/50 flex items-center justify-center">
             <Volume2 className="h-3 w-3 mr-2 text-blue-400 animate-pulse" />
@@ -382,7 +409,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       </div>
 
       {/* Input Area */}
-      <CardFooter className="p-4 border-t border-slate-800 bg-slate-900/50">
+      <CardFooter className="p-4 border-t border-slate-800 bg-slate-900/90 rounded-b-lg">
         <form onSubmit={handleTextSubmit} className="flex gap-2 w-full">
           <Input
             placeholder="Type your message..."
@@ -392,13 +419,22 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
             disabled={isListening || voiceIsProcessing || chatIsLoading}
           />
           
-          <Button 
-            type="submit" 
-            disabled={!textInput.trim() || isListening || voiceIsProcessing || chatIsLoading}
-            className="bg-blue-700 hover:bg-blue-800"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  type="submit" 
+                  disabled={!textInput.trim() || isListening || voiceIsProcessing || chatIsLoading}
+                  className="bg-blue-700 hover:bg-blue-800"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="bg-slate-900 text-white border-slate-700">
+                Send message
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           
           <TooltipProvider>
             <Tooltip>
