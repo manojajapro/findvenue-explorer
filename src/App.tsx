@@ -28,7 +28,6 @@ import EditVenue from "./pages/EditVenue";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import { AuthProvider } from "./hooks/useAuth";
-import DirectChat from '@/components/chat/DirectChat';
 
 const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element, allowedRoles?: string[] }) => {
   const { user, isLoading, profile } = useAuth();
@@ -138,17 +137,15 @@ function App() {
                 <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
                 <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
                 
-                {/* Updated routes for messaging */}
-                <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+                {/* Updated routes for messaging - using a single Messages component for both views */}
+                <Route path="/messages" element={
+                  <ProtectedRoute>
+                    <Messages />
+                  </ProtectedRoute>
+                } />
                 <Route path="/messages/:contactId" element={
                   <ProtectedRoute>
-                    <div className="min-h-screen pt-28 pb-16">
-                      <div className="container mx-auto px-4">
-                        <div className="max-w-6xl mx-auto glass-card border-white/10 h-[calc(100vh-240px)]">
-                          <DirectChat />
-                        </div>
-                      </div>
-                    </div>
+                    <Messages />
                   </ProtectedRoute>
                 } />
                 

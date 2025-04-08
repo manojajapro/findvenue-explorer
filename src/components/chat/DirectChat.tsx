@@ -30,25 +30,12 @@ const DirectChat = () => {
     sendMessage
   } = useChat(contactId);
 
-  // When component mounts, check for valid contactId
-  useEffect(() => {
-    if (!contactId) {
-      navigate('/messages');
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newMessage.trim() && !isSending) {
+      sendMessage(e);
     }
-  }, [contactId, navigate]);
-
-  if (!user) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center p-8">
-          <p className="text-lg font-medium mb-4 text-findvenue-text-muted">Please log in to chat</p>
-          <Button onClick={() => navigate('/login')} className="bg-findvenue hover:bg-findvenue-dark">
-            Log In
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  };
 
   if (hasError) {
     return <ErrorDisplay message={errorMessage || "An error occurred"} />;
@@ -78,13 +65,6 @@ const DirectChat = () => {
     );
   }
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newMessage.trim() && !isSending) {
-      sendMessage(e);
-    }
-  };
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Chat Header */}
@@ -101,7 +81,7 @@ const DirectChat = () => {
             {contact && (
               <MessageList 
                 messages={messages} 
-                userId={user.id} 
+                userId={user?.id || ''} 
                 contact={contact}
                 messagesEndRef={messagesEndRef}
               />
