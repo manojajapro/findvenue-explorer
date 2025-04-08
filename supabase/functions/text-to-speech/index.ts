@@ -28,6 +28,8 @@ serve(async (req) => {
     // Use a default voice ID if none provided
     const voice = voiceId || 'EXAVITQu4vr4xnSDxMaL'; // Sarah voice
     
+    console.log(`Converting text to speech using voice ${voice}`);
+    
     // Using Eleven Labs API for high-quality TTS
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream`, {
       method: 'POST',

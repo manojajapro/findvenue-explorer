@@ -1,6 +1,6 @@
 
 import { Button } from '@/components/ui/button';
-import { Search, MapPin, ZoomIn, RefreshCcw, Volume2, MapIcon } from 'lucide-react';
+import { Search, MapPin, ZoomIn, RefreshCcw, Volume2, MapIcon, Plus, Minus, Navigation } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState, useRef, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -8,23 +8,29 @@ import { useIsMobile } from '@/hooks/use-mobile';
 interface MapControlsProps {
   isCompactControls: boolean;
   isRadiusActive: boolean;
+  radiusSize?: number;
   toggleRadiusSearch: () => void;
   handleManualLocationSetting: () => void;
   handleClearSearch: () => void;
   fitBoundsToMarkers: () => void;
   resetToDefaultLocation: () => void;
   getCurrentLocation?: () => void;
+  increaseRadius?: () => void;
+  decreaseRadius?: () => void;
 }
 
 const MapControls = ({
   isCompactControls,
   isRadiusActive,
+  radiusSize = 0,
   toggleRadiusSearch,
   handleManualLocationSetting,
   handleClearSearch,
   fitBoundsToMarkers,
   resetToDefaultLocation,
-  getCurrentLocation
+  getCurrentLocation,
+  increaseRadius,
+  decreaseRadius
 }: MapControlsProps) => {
   const [showControls, setShowControls] = useState(!isCompactControls);
   const isMobile = useIsMobile();
@@ -71,19 +77,54 @@ const MapControls = ({
           </Button>
 
           {isRadiusActive && (
-            <Button
-              className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
-              size={isCompactControls ? 'icon' : 'default'}
-              onClick={handleManualLocationSetting}
-            >
-              {isCompactControls ? (
-                <MapPin className="h-4 w-4" />
-              ) : (
-                <>
-                  <MapPin className="h-4 w-4 mr-2" /> Set Location
-                </>
+            <>
+              <Button
+                className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
+                size={isCompactControls ? 'icon' : 'default'}
+                onClick={handleManualLocationSetting}
+              >
+                {isCompactControls ? (
+                  <MapPin className="h-4 w-4" />
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4 mr-2" /> Set Location
+                  </>
+                )}
+              </Button>
+              
+              {increaseRadius && (
+                <Button
+                  className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
+                  size={isCompactControls ? 'icon' : 'default'}
+                  onClick={increaseRadius}
+                >
+                  {isCompactControls ? (
+                    <Plus className="h-4 w-4" />
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" /> Increase Radius
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
+              
+              {decreaseRadius && (
+                <Button
+                  className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
+                  size={isCompactControls ? 'icon' : 'default'}
+                  onClick={decreaseRadius}
+                  disabled={radiusSize <= 1}
+                >
+                  {isCompactControls ? (
+                    <Minus className="h-4 w-4" />
+                  ) : (
+                    <>
+                      <Minus className="h-4 w-4 mr-2" /> Decrease Radius
+                    </>
+                  )}
+                </Button>
+              )}
+            </>
           )}
           
           {getCurrentLocation && (
@@ -93,10 +134,10 @@ const MapControls = ({
               onClick={handleGetCurrentLocation}
             >
               {isCompactControls ? (
-                <Volume2 className="h-4 w-4" />
+                <Navigation className="h-4 w-4" />
               ) : (
                 <>
-                  <Volume2 className="h-4 w-4 mr-2" /> My Location
+                  <Navigation className="h-4 w-4 mr-2" /> My Location
                 </>
               )}
             </Button>
