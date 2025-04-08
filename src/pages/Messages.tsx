@@ -63,6 +63,18 @@ const Messages = () => {
     navigate(`/messages/${contact.id}`);
   };
   
+  // Function to display the proper role label
+  const getRoleLabel = (role?: string) => {
+    if (!role) return null;
+    
+    // Convert database role to display label
+    if (role === 'venue-owner' || role === 'venue_owner') {
+      return 'Venue Owner';
+    } else {
+      return 'Customer';
+    }
+  };
+  
   if (!user) {
     return (
       <div className="min-h-screen pt-28 pb-16">
@@ -128,7 +140,7 @@ const Messages = () => {
                               </div>
                               {contact.role && (
                                 <p className="text-xs text-findvenue-text-muted">
-                                  {contact.role === 'venue-owner' ? 'Venue Owner' : 'Customer'}
+                                  {getRoleLabel(contact.role)}
                                 </p>
                               )}
                               {contact.venue_name && (

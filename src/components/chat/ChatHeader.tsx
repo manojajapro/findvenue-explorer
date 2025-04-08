@@ -10,6 +10,18 @@ type ChatHeaderProps = {
 }
 
 const ChatHeader = ({ contact }: ChatHeaderProps) => {
+  // Function to display the proper role label
+  const getRoleLabel = (role?: string) => {
+    if (!role) return null;
+    
+    // Convert database role to display label
+    if (role === 'venue-owner' || role === 'venue_owner') {
+      return 'Venue Owner';
+    } else {
+      return 'Customer';
+    }
+  };
+
   return (
     <div className="p-3 border-b border-white/10 flex items-center gap-3">
       <Avatar>
@@ -21,7 +33,7 @@ const ChatHeader = ({ contact }: ChatHeaderProps) => {
         <h3 className="font-medium truncate">{contact.name}</h3>
         {contact.role && (
           <p className="text-xs text-findvenue-text-muted">
-            {contact.role === 'venue-owner' ? 'Venue Owner' : 'Customer'}
+            {getRoleLabel(contact.role)}
           </p>
         )}
       </div>

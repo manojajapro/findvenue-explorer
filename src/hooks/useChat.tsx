@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,7 +23,7 @@ export const useChat = (contactId?: string) => {
   const venueName = queryParams.get('venueName');
   const bookingId = queryParams.get('bookingId');
 
-  // Fetch contact info
+  // Effect to fetch contact info
   useEffect(() => {
     if (!user || !contactId) return;
     
@@ -43,11 +42,13 @@ export const useChat = (contactId?: string) => {
         console.log('Contact data:', contactData);
         
         if (contactData) {
+          const userRole = contactData.user_role === 'venue_owner' ? 'venue-owner' : 'customer';
+          
           const contactInfo: ChatContact = {
             id: contactData.id,
             name: `${contactData.first_name} ${contactData.last_name}`,
             image: contactData.profile_image || undefined,
-            role: contactData.user_role === 'venue_owner' ? 'venue-owner' : 'customer'
+            role: userRole
           };
           
           if (venueId && venueName) {
