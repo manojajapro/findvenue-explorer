@@ -17,7 +17,7 @@ interface VenueSpecificVoiceAssistantProps {
 
 const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
-  const [autoListenMode, setAutoListenMode] = useState(false); // Changed to false by default
+  const [autoListenMode, setAutoListenMode] = useState(false);
   const [lastTranscript, setLastTranscript] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -144,7 +144,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   // If venue is not available, show loading or error state
   if (!venue) {
     return (
-      <Card className="bg-findvenue-card-bg border border-white/10 mt-6">
+      <Card className="bg-findvenue-card-bg border border-white/10">
         <CardHeader>
           <CardTitle>Voice Assistant</CardTitle>
         </CardHeader>
@@ -156,7 +156,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   }
 
   return (
-    <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border border-white/10 mt-6 shadow-lg">
+    <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border border-white/10 shadow-lg">
       <CardHeader className="pb-2 border-b border-white/10">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">

@@ -2,10 +2,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import { Bot, X } from 'lucide-react';
+import { Bot, Mic, X } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import VenueUnifiedChatAssistant from '@/components/chat/VenueUnifiedChatAssistant';
+import VenueSpecificVoiceAssistant from '@/components/voice/VenueSpecificVoiceAssistant';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface VenueAIAssistantsProps {
   venue: Venue | null;
@@ -13,6 +15,7 @@ interface VenueAIAssistantsProps {
 
 const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("chat");
   
   return (
     <>
@@ -47,10 +50,27 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
               <X className="h-4 w-4 text-gray-400" />
             </Button>
           </div>
-          <VenueUnifiedChatAssistant 
-            venue={venue} 
-            onClose={() => setIsOpen(false)} 
-          />
+          
+          <Tabs defaultValue="chat" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-2 w-full mb-2 p-1 bg-slate-900/70 border-b border-white/5">
+              <TabsTrigger value="chat" className="data-[state=active]:bg-blue-700/30 data-[state=active]:text-blue-400">
+                <Bot className="h-4 w-4 mr-2" /> Text Chat
+              </TabsTrigger>
+              <TabsTrigger value="voice" className="data-[state=active]:bg-blue-700/30 data-[state=active]:text-blue-400">
+                <Mic className="h-4 w-4 mr-2" /> Voice Assistant
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="chat" className="p-0 m-0">
+              <VenueUnifiedChatAssistant venue={venue} onClose={() => setIsOpen(false)} />
+            </TabsContent>
+            
+            <TabsContent value="voice" className="p-0 m-0">
+              <div className="p-4">
+                <VenueSpecificVoiceAssistant venue={venue} />
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </>

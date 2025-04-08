@@ -99,7 +99,7 @@ export const useVenueVoiceAssistant = ({
       recognitionRef.current.onend = () => {
         if (isMountedRef.current) setIsListening(false);
         
-        if (autoRestart && !processingRef.current && isMountedRef.current) {
+        if (autoRestart && !processingRef.current && isMountedRef.current && audioEnabled) {
           setTimeout(() => {
             if (recognitionRef.current && !processingRef.current && isMountedRef.current) {
               try {
@@ -114,7 +114,7 @@ export const useVenueVoiceAssistant = ({
     } else {
       setError('Speech recognition not supported in this browser.');
     }
-  }, [autoRestart, onTranscript]);
+  }, [autoRestart, onTranscript, audioEnabled]);
   
   const handleFinalTranscript = useCallback(async (text: string) => {
     if (!text.trim() || !venue || processingRef.current || !isMountedRef.current) return;
@@ -131,6 +131,8 @@ export const useVenueVoiceAssistant = ({
         }
       }
       
+      console.log('Processing voice query:', text);
+      
       const { data, error } = await supabase.functions.invoke('venue-assistant', {
         body: {
           query: text,
@@ -142,6 +144,8 @@ export const useVenueVoiceAssistant = ({
       if (error) throw new Error(error.message);
       
       if (data?.answer && isMountedRef.current) {
+        console.log('Voice assistant response:', data.answer);
+        
         if (onAnswer) {
           onAnswer(data.answer);
         }
@@ -180,6 +184,8 @@ export const useVenueVoiceAssistant = ({
     try {
       if (onSpeechStart) onSpeechStart();
       
+      console.log('Calling text-to-speech with text:', text.substring(0, 50) + '...');
+      
       const { data, error } = await supabase.functions.invoke('text-to-speech', {
         body: {
           text: text,
@@ -190,6 +196,8 @@ export const useVenueVoiceAssistant = ({
       if (error) throw new Error(error.message);
       
       if (!data?.audio) throw new Error('No audio received from TTS service');
+      
+      console.log('Audio data received, length:', data.audio.length);
       
       if (audioElementRef.current) {
         audioElementRef.current.pause();
@@ -304,6 +312,7 @@ export const useVenueVoiceAssistant = ({
     
     if (recognitionRef.current) {
       try {
+        console.log('Starting speech recognition');
         await recognitionRef.current.start();
       } catch (err) {
         console.error('Error starting speech recognition:', err);
