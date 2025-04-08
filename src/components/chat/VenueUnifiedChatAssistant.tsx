@@ -1,16 +1,17 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Mic, MicOff, Send, X, User, Bot, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Send, User, Bot, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useChatWithVenue } from '@/hooks/useChatWithVenue';
 import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface VenueUnifiedChatAssistantProps {
   venue: Venue | null;
@@ -27,10 +28,10 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
 
   // Initialize audio element
   useEffect(() => {
-    audioRef.current = new Audio();
-    audioRef.current.onplay = () => setIsSpeaking(true);
-    audioRef.current.onended = () => setIsSpeaking(false);
-    audioRef.current.onerror = () => setIsSpeaking(false);
+    audioElementRef.current = new Audio();
+    audioElementRef.current.onplay = () => setIsSpeaking(true);
+    audioElementRef.current.onended = () => setIsSpeaking(false);
+    audioElementRef.current.onerror = () => setIsSpeaking(false);
     
     // Check for microphone permissions
     navigator.mediaDevices.getUserMedia({ audio: true })
@@ -38,9 +39,9 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       .catch(() => setMicPermission(false));
       
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current = null;
       }
     };
   }, []);
@@ -76,7 +77,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     }
   });
 
-  // Chat integration - use the correctly named hook
+  // Chat integration
   const {
     submitMessage,
     isLoading: chatIsLoading,
@@ -201,10 +202,10 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       if (!data?.audio) throw new Error('No audio received from TTS service');
       
       // Play the audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = `data:audio/mp3;base64,${data.audio}`;
-        await audioRef.current.play();
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current.src = `data:audio/mp3;base64,${data.audio}`;
+        await audioElementRef.current.play();
       }
     } catch (err: any) {
       console.error('Text-to-speech error:', err);
@@ -216,9 +217,9 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
   // Stop speaking
   const handleStopSpeaking = () => {
     stopSpeaking();
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.currentTime = 0;
     }
     setIsSpeaking(false);
   };
@@ -231,162 +232,197 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     });
   };
 
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+
   if (!venue) {
     return (
-      <Card className="bg-black/80 backdrop-blur-sm border border-white/10">
-        <CardHeader>
-          <CardTitle>Venue Assistant</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-400">Venue information is loading...</p>
+      <Card className="bg-gradient-to-b from-slate-950 to-slate-900 border-none shadow-xl">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center h-40">
+            <div className="animate-pulse flex flex-col items-center">
+              <Bot className="h-12 w-12 text-blue-500 mb-4" />
+              <p className="text-gray-400">Loading venue information...</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-black/80 backdrop-blur-sm border border-white/10 shadow-lg overflow-hidden">
-      <CardHeader className="pb-3 border-b border-white/10">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">Chat with Venue Assistant</CardTitle>
-            {audioEnabled && (
-              <Badge variant="outline" className="bg-green-500/20 text-green-500">
-                Voice Enabled
-              </Badge>
-            )}
+    <div className="flex flex-col h-[600px] max-h-[80vh]">
+      {/* Header */}
+      <div className="p-6 pb-4 bg-gradient-to-r from-blue-800 to-blue-900 rounded-t-lg flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="h-10 w-10 bg-blue-700 rounded-full flex items-center justify-center border border-blue-500/30 shadow-lg">
+            <Bot className="h-5 w-5 text-white" />
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className={`${audioEnabled ? 'border-green-500 text-green-500' : 'border-white/10'}`}
-              onClick={toggleAudio}
-              title={audioEnabled ? "Disable voice responses" : "Enable voice responses"}
-            >
-              {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            </Button>
-            {onClose && (
+          <div>
+            <h2 className="font-medium text-lg text-white">Venue Assistant</h2>
+            <p className="text-xs text-blue-200">Ask anything about {venue.name}</p>
+          </div>
+        </div>
+        
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onClose}
-                className="border-white/10"
+                onClick={toggleAudio}
+                className={`rounded-full w-8 h-8 p-0 ${
+                  audioEnabled ? 'bg-green-600 hover:bg-green-700 text-white' : 
+                  'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
               >
-                <X className="h-4 w-4" />
+                {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </Button>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      
-      <CardContent className="p-4">
-        <div className="flex justify-end mb-4">
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="bg-slate-900 text-white border-slate-700">
+              {audioEnabled ? "Disable voice responses" : "Enable voice responses"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Chat Content */}
+      <div className="flex-1 overflow-hidden p-6 pt-3">
+        <div className="flex justify-end mb-3">
           <Button 
             variant="ghost" 
             size="sm"
             className="text-xs hover:bg-red-500/10 text-red-400"
             onClick={handleClearConversation}
           >
-            <X className="h-3 w-3 mr-1" /> Clear Chat
+            Clear history
           </Button>
         </div>
         
-        <ScrollArea className="h-[300px] mb-4 rounded-md border border-white/10 p-3 bg-black/40 backdrop-blur-sm">
+        <ScrollArea className="h-[calc(100%-40px)] pr-2">
           {unifiedMessages.length === 0 ? (
-            <div className="text-center py-10 text-gray-400">
-              <p>Ask anything about {venue.name}</p>
-              <p className="text-xs mt-2">Type a message or click the microphone to start speaking</p>
+            <div className="flex flex-col items-center justify-center h-full py-8 space-y-4">
+              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center animate-pulse">
+                <Bot className="h-8 w-8 text-white" />
+              </div>
+              <div className="text-center space-y-2">
+                <p className="text-gray-300 font-medium">How can I help you with {venue.name}?</p>
+                <p className="text-xs text-gray-500">Ask about amenities, pricing, or booking details</p>
+              </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 py-2">
               {unifiedMessages.map((item, index) => (
                 <div 
                   key={index} 
-                  className={`flex gap-2 p-2 rounded-lg text-sm ${
-                    item.isUser 
-                      ? 'bg-blue-900/30 ml-8 border border-blue-700/30' 
-                      : 'bg-gray-800/30 mr-8 border border-white/5'
-                  }`}
+                  className={`flex gap-3 ${item.isUser ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 
-                    ${item.isUser ? 'bg-blue-700/50' : 'bg-gray-700'}`}>
-                    {item.isUser ? (
-                      <User className="h-3.5 w-3.5" />
-                    ) : (
-                      <Bot className="h-3.5 w-3.5" />
-                    )}
+                  {!item.isUser && (
+                    <div className="w-8 h-8 rounded-full bg-blue-700 flex-shrink-0 flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-white" />
+                    </div>
+                  )}
+                  
+                  <div 
+                    className={`max-w-[75%] rounded-2xl p-4 ${
+                      item.isUser 
+                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white ml-4' 
+                        : 'bg-slate-800/80 border border-slate-700/50'
+                    }`}
+                  >
+                    <p className="text-sm">{item.text}</p>
+                    <span className="text-xs block mt-1 opacity-70">
+                      {item.mode === 'voice' ? '🎙️ Voice' : '✍️ Text'}
+                    </span>
                   </div>
-                  <div>
-                    <p>{item.text}</p>
-                  </div>
+                  
+                  {item.isUser && (
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex-shrink-0 flex items-center justify-center">
+                      <User className="h-4 w-4 text-white" />
+                    </div>
+                  )}
                 </div>
               ))}
               <div ref={messagesEndRef} />
             </div>
           )}
         </ScrollArea>
-      </CardContent>
+      </div>
       
-      <CardFooter className="border-t border-white/10 pt-3 px-4 pb-4 flex flex-col space-y-2">
+      {/* Status Indicators */}
+      <div className="px-6">
         {isSpeaking && (
-          <div className="text-center w-full py-2 px-3 bg-blue-600/20 rounded-md text-sm border border-dashed border-blue-500/50 flex items-center justify-center">
-            <Volume2 className="h-3 w-3 mr-2 text-blue-500 animate-pulse" />
-            <span>Speaking... </span>
+          <div className="text-center w-full p-2 mb-2 bg-blue-900/30 rounded-lg text-sm border border-blue-800/50 flex items-center justify-center">
+            <Volume2 className="h-3 w-3 mr-2 text-blue-400 animate-pulse" />
+            <span className="text-blue-300">Speaking...</span>
             <Button
               variant="ghost"
               size="sm"
-              className="ml-2 h-6 py-0 px-2 text-xs border border-blue-500/30 hover:bg-blue-500/20"
+              className="ml-2 h-6 py-0 px-2 text-xs text-blue-300 hover:bg-blue-800/30"
               onClick={handleStopSpeaking}
             >
-              <X className="h-3 w-3 mr-1 text-blue-300" /> Stop
+              Stop
             </Button>
           </div>
         )}
         
         {isListening && (
-          <div className="text-center w-full py-2 px-3 bg-green-600/20 rounded-md text-sm border border-dashed border-green-500/50 animate-pulse flex items-center justify-center">
-            <Mic className="h-3 w-3 mr-2 text-green-500" />
-            <span>Listening...</span> 
-            {transcript && <span className="font-medium ml-1">"<span className="text-green-400">{transcript}</span>"</span>}
+          <div className="text-center w-full p-2 mb-2 bg-green-900/30 rounded-lg text-sm border border-green-800/50 animate-pulse flex items-center justify-center">
+            <Mic className="h-3 w-3 mr-2 text-green-400" />
+            <span className="text-green-300">Listening...</span> 
+            {transcript && <span className="ml-1 text-green-300">"{transcript}"</span>}
           </div>
         )}
         
         {(voiceIsProcessing || chatIsLoading) && (
-          <div className="text-center w-full py-2 px-3 bg-blue-600/10 rounded-md text-sm border border-dashed border-blue-500/30 flex items-center justify-center">
-            <Loader2 className="h-3 w-3 inline-block mr-2 animate-spin text-blue-500" />
-            <span>Processing your request...</span>
+          <div className="text-center w-full p-2 mb-2 bg-slate-800/50 rounded-lg text-sm border border-slate-700/50 flex items-center justify-center">
+            <Loader2 className="h-3 w-3 inline-block mr-2 animate-spin text-slate-400" />
+            <span className="text-slate-300">Processing your request...</span>
           </div>
         )}
+      </div>
 
-        <form onSubmit={handleTextSubmit} className="flex gap-2 w-full mt-2">
+      {/* Input Area */}
+      <CardFooter className="p-4 border-t border-slate-800 bg-slate-900/50">
+        <form onSubmit={handleTextSubmit} className="flex gap-2 w-full">
           <Input
             placeholder="Type your message..."
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
-            className="flex-1 bg-gray-900/50 border-gray-700"
+            className="flex-1 bg-slate-800 border-slate-700 focus:border-blue-700 text-white placeholder-gray-400"
             disabled={isListening || voiceIsProcessing || chatIsLoading}
           />
+          
           <Button 
             type="submit" 
-            size="icon"
             disabled={!textInput.trim() || isListening || voiceIsProcessing || chatIsLoading}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-blue-700 hover:bg-blue-800"
           >
             <Send className="h-4 w-4" />
           </Button>
-          <Button
-            type="button"
-            size="icon"
-            onClick={handleVoiceToggle}
-            disabled={voiceIsProcessing || chatIsLoading}
-            className={isListening ? "bg-red-500 hover:bg-red-600" : "bg-blue-600 hover:bg-blue-700"}
-          >
-            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-          </Button>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  onClick={handleVoiceToggle}
+                  disabled={voiceIsProcessing || chatIsLoading}
+                  className={isListening ? 
+                    "bg-red-600 hover:bg-red-700" : 
+                    "bg-slate-800 hover:bg-slate-700 border border-slate-700"
+                  }
+                >
+                  {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="bg-slate-900 text-white border-slate-700">
+                {isListening ? "Stop listening" : "Start voice input"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </form>
       </CardFooter>
-    </Card>
+    </div>
   );
 };
 
