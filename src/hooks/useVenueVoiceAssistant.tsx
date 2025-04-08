@@ -1,507 +1,371 @@
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { toast } from 'sonner';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Venue } from '@/hooks/useSupabaseVenues';
 import { supabase } from '@/integrations/supabase/client';
 
-type VenueVoiceAssistantProps = {
-  venue?: any;
+interface UseVenueVoiceAssistantProps {
+  venue: Venue | null;
   autoRestart?: boolean;
-  onListeningChange?: (isListening: boolean) => void;
   onTranscript?: (text: string) => void;
   onAnswer?: (text: string) => void;
-};
+  onSpeechStart?: () => void;
+  onSpeechEnd?: () => void;
+}
 
 export const useVenueVoiceAssistant = ({
   venue,
-  autoRestart = false,
-  onListeningChange,
+  autoRestart = true,
   onTranscript,
-  onAnswer
-}: VenueVoiceAssistantProps) => {
+  onAnswer,
+  onSpeechStart,
+  onSpeechEnd
+}: UseVenueVoiceAssistantProps) => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [answer, setAnswer] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [isWelcomePlayed, setIsWelcomePlayed] = useState(false);
   
-  const recognition = useRef<SpeechRecognition | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const retryCount = useRef(0);
-  const autoRestartTimeout = useRef<number | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const welcomeTextRef = useRef<string>('');
+  const processingRef = useRef<boolean>(false);
   
-  // Initialize audio element for playing responses
-  useEffect(() => {
-    audioRef.current = new Audio();
-    audioRef.current.onended = () => {
-      console.log('Audio playback ended');
-      if (autoRestart) {
-        // Auto restart listening after audio ends
-        const timer = setTimeout(() => {
-          console.log('Auto-restarting voice recognition after audio...');
-          startListening();
-        }, 1000);
-        autoRestartTimeout.current = timer as unknown as number;
-      }
-    };
-    
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (autoRestartTimeout.current) {
-        clearTimeout(autoRestartTimeout.current);
-      }
-    };
-  }, [autoRestart]);
-  
-  const handleSpeechStart = useCallback(() => {
-    setIsListening(true);
-    setTranscript('');
-    setError(null);
-    
-    if (onListeningChange) {
-      onListeningChange(true);
-    }
-  }, [onListeningChange]);
-  
-  const handleSpeechEnd = useCallback(() => {
-    setIsListening(false);
-    
-    if (onListeningChange) {
-      onListeningChange(false);
+  // Initialize speech recognition
+  const initSpeechRecognition = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
     }
     
-    if (transcript.trim() && !isProcessing) {
-      processVoiceQuery(transcript);
-    }
-  }, [transcript, isProcessing, onListeningChange]);
-  
-  // Function to play welcome message
-  const playWelcomeMessage = useCallback(async () => {
-    if (!venue || isWelcomePlayed) return;
-    
-    const welcomeMessage = `Welcome to ${venue.name}! This ${venue.category || 'venue'} is located in ${venue.city} and can accommodate ${venue.capacity.min}-${venue.capacity.max} people. How can I help you today?`;
-    
-    setIsProcessing(true);
-    
-    try {
-      console.log("Playing welcome message:", welcomeMessage);
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
       
-      if (onAnswer) {
-        onAnswer(welcomeMessage);
-      }
+      recognitionRef.current.onstart = () => {
+        setIsListening(true);
+      };
       
-      // Only try text-to-speech if audio is enabled
-      if (audioEnabled) {
-        try {
-          console.log('Starting text-to-speech conversion for welcome message...');
-          const response = await supabase.functions.invoke('text-to-speech', {
-            body: {
-              text: welcomeMessage,
-              voice: 'alloy' // You can customize the voice here
-            },
-            responseType: 'arraybuffer'
-          });
-          
-          if (response.error) {
-            throw new Error(response.error.message);
-          }
-          
-          console.log('Received audio data for welcome message, creating audio element...');
-          // Create blob from array buffer
-          const blob = new Blob([response.data], { type: 'audio/mpeg' });
-          const url = URL.createObjectURL(blob);
-          
-          if (audioRef.current) {
-            audioRef.current.src = url;
-            audioRef.current.oncanplaythrough = () => {
-              if (audioRef.current) {
-                console.log('Welcome audio ready to play');
-                audioRef.current.play()
-                  .catch(e => {
-                    console.error('Error playing welcome audio:', e);
-                    // Fall back to browser TTS
-                    useBrowserTTS(welcomeMessage);
-                  });
-                
-                // Clean up blob URL when audio is done
-                audioRef.current.onended = () => {
-                  URL.revokeObjectURL(url);
-                  console.log('Welcome audio playback completed');
-                  setIsWelcomePlayed(true);
-                  
-                  // Auto restart listening after response
-                  if (autoRestart) {
-                    console.log('Setting up auto-restart after welcome audio...');
-                    const timer = setTimeout(() => {
-                      console.log('Auto-restarting voice recognition...');
-                      startListening();
-                    }, 1000);
-                    autoRestartTimeout.current = timer as unknown as number;
-                  }
-                };
+      recognitionRef.current.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('');
+        
+        setTranscript(transcript);
+        
+        if (onTranscript) {
+          onTranscript(transcript);
+        }
+        
+        // Final result handling
+        if (event.results[0].isFinal) {
+          handleFinalTranscript(transcript);
+        }
+      };
+      
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setError(`Speech recognition error: ${event.error}`);
+        setIsListening(false);
+      };
+      
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+        
+        // Only auto-restart if not currently processing a query
+        if (autoRestart && !processingRef.current) {
+          setTimeout(() => {
+            if (recognitionRef.current && !processingRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) {
+                console.error('Failed to restart recognition:', e);
               }
-            };
-            
-            audioRef.current.onerror = () => {
-              console.error('Audio element error for welcome message');
-              URL.revokeObjectURL(url);
-              // Fall back to browser TTS
-              useBrowserTTS(welcomeMessage);
-              setIsWelcomePlayed(true);
-            };
-          }
-        } catch (speechError) {
-          console.error('Error generating welcome speech:', speechError);
-          // Fallback to browser's speech synthesis
-          useBrowserTTS(welcomeMessage);
-          setIsWelcomePlayed(true);
+            }
+          }, 1000);
         }
-      } else {
-        setIsWelcomePlayed(true);
-        if (autoRestart) {
-          // If audio is disabled but autoRestart is enabled, restart after a delay
-          const timer = setTimeout(() => {
-            console.log('Auto-restarting voice recognition (audio disabled)...');
-            startListening();
-          }, 3000); // Longer delay when audio is disabled
-          autoRestartTimeout.current = timer as unknown as number;
-        }
-      }
-    } catch (err: any) {
-      console.error('Error processing welcome message:', err);
-      setIsWelcomePlayed(true);
-    } finally {
-      setIsProcessing(false);
+      };
+    } else {
+      setError('Speech recognition not supported in this browser.');
     }
-  }, [venue, isWelcomePlayed, onAnswer, audioEnabled, autoRestart]);
-
-  // Call playWelcomeMessage when venue data is available
-  useEffect(() => {
-    if (venue && !isWelcomePlayed) {
-      console.log("Venue data available, playing welcome message");
-      playWelcomeMessage();
-    }
-  }, [venue, isWelcomePlayed, playWelcomeMessage]);
+  }, [autoRestart, onTranscript]);
   
-  const processVoiceQuery = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      return;
-    }
-    
-    setIsProcessing(true);
+  // Handle final transcript and send to AI
+  const handleFinalTranscript = useCallback(async (text: string) => {
+    if (!text.trim() || !venue || processingRef.current) return;
     
     try {
-      console.log(`Processing voice query: "${query}"`);
+      setIsProcessing(true);
+      processingRef.current = true;
       
-      // 1. Call venue-assistant to get text response
+      // Stop listening while processing
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.error('Error stopping recognition:', e);
+        }
+      }
+      
       const { data, error } = await supabase.functions.invoke('venue-assistant', {
         body: {
-          query,
-          venueId: venue?.id,
+          query: text,
+          venueId: venue.id,
           type: 'voice'
         }
       });
       
-      if (error) {
-        console.error('Error calling venue-assistant:', error);
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
       
-      if (data && data.answer) {
-        console.log('AI response:', data.answer);
-        setAnswer(data.answer);
-        
+      if (data?.answer) {
         if (onAnswer) {
           onAnswer(data.answer);
         }
         
-        // Only try text-to-speech if audio is enabled
         if (audioEnabled) {
-          // 2. Call text-to-speech to convert response to audio
-          try {
-            console.log('Starting text-to-speech conversion...');
-            const response = await supabase.functions.invoke('text-to-speech', {
-              body: {
-                text: data.answer,
-                voice: 'alloy' // You can customize the voice here
-              },
-              responseType: 'arraybuffer'
-            });
-            
-            if (response.error) {
-              throw new Error(response.error.message);
-            }
-            
-            console.log('Received audio data, creating audio element...');
-            // Create blob from array buffer
-            const blob = new Blob([response.data], { type: 'audio/mpeg' });
-            const url = URL.createObjectURL(blob);
-            
-            if (audioRef.current) {
-              audioRef.current.src = url;
-              audioRef.current.oncanplaythrough = () => {
-                if (audioRef.current) {
-                  console.log('Audio ready to play');
-                  audioRef.current.play()
-                    .catch(e => {
-                      console.error('Error playing audio:', e);
-                      // Fall back to browser TTS
-                      useBrowserTTS(data.answer);
-                    });
-                  
-                  // Clean up blob URL when audio is done
-                  audioRef.current.onended = () => {
-                    URL.revokeObjectURL(url);
-                    console.log('Audio playback completed');
-                    
-                    // Auto restart listening after response
-                    if (autoRestart) {
-                      console.log('Setting up auto-restart after audio...');
-                      const timer = setTimeout(() => {
-                        console.log('Auto-restarting voice recognition...');
-                        startListening();
-                      }, 1000);
-                      autoRestartTimeout.current = timer as unknown as number;
-                    }
-                  };
-                }
-              };
-              
-              audioRef.current.onerror = () => {
-                console.error('Audio element error');
-                URL.revokeObjectURL(url);
-                // Fall back to browser TTS
-                useBrowserTTS(data.answer);
-              };
-            }
-          } catch (speechError) {
-            console.error('Error generating speech:', speechError);
-            // Fallback to browser's speech synthesis
-            useBrowserTTS(data.answer);
-          }
-        } else if (autoRestart) {
-          // If audio is disabled but autoRestart is enabled, restart after a delay
-          const timer = setTimeout(() => {
-            console.log('Auto-restarting voice recognition (audio disabled)...');
-            startListening();
-          }, 3000); // Longer delay when audio is disabled
-          autoRestartTimeout.current = timer as unknown as number;
+          speakText(data.answer);
         }
-      } else {
-        throw new Error('No answer received from AI assistant');
       }
     } catch (err: any) {
       console.error('Error processing voice query:', err);
-      setError(err.message);
-      toast.error('Error processing your request', {
-        description: err.message || 'Please try again later'
-      });
+      setError(err.message || 'Failed to process your request');
       
-      // If we encounter an error and have retry attempts left
-      if (retryCount.current < 2) {
-        retryCount.current++;
-        console.log(`Retrying (${retryCount.current}/2)...`);
-        setTimeout(() => processVoiceQuery(query), 1000);
-        return;
-      }
-      
-      retryCount.current = 0;
-      
-      // Auto restart listening after error
-      if (autoRestart) {
-        const timer = setTimeout(() => {
-          console.log('Auto-restarting voice recognition after error...');
-          startListening();
-        }, 3000); // Longer delay after error
-        autoRestartTimeout.current = timer as unknown as number;
+      if (onAnswer) {
+        onAnswer("I'm sorry, I encountered an error processing your request. Please try again.");
       }
     } finally {
       setIsProcessing(false);
-    }
-  }, [venue?.id, onAnswer, audioEnabled, autoRestart]);
-  
-  // Helper function to use browser's built-in TTS as fallback
-  const useBrowserTTS = (text: string) => {
-    if ('speechSynthesis' in window) {
-      console.log('Using browser TTS as fallback');
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = 1.0;
+      processingRef.current = false;
+      setTranscript('');
       
-      // Set callback to restart listening after speech ends
-      if (autoRestart) {
-        utterance.onend = () => {
-          console.log('Browser TTS playback ended, auto-restarting...');
-          const timer = setTimeout(() => {
-            startListening();
-          }, 1000);
-          autoRestartTimeout.current = timer as unknown as number;
-        };
-      }
-      
-      window.speechSynthesis.speak(utterance);
-    } else {
-      console.warn('Browser TTS not available');
-      
-      // Even without TTS, restart listening if enabled
-      if (autoRestart) {
-        const timer = setTimeout(() => {
-          console.log('Auto-restarting voice recognition (no TTS)...');
+      // Only restart if autoRestart is enabled and we're not in an error state
+      if (autoRestart && !error) {
+        setTimeout(() => {
           startListening();
-        }, 3000);
-        autoRestartTimeout.current = timer as unknown as number;
+        }, 1000);
       }
     }
-  };
+  }, [venue, audioEnabled, onAnswer, autoRestart]);
   
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (SpeechRecognition) {
-      recognition.current = new SpeechRecognition();
-      recognition.current.continuous = false;
-      recognition.current.interimResults = false;
-      recognition.current.lang = 'en-US';
-    } else {
-      setError('Speech recognition is not supported in your browser.');
+  // Speak text using speech synthesis
+  const speakText = useCallback((text: string) => {
+    if (!('speechSynthesis' in window)) {
+      console.error('Speech synthesis not supported');
+      setError('Speech synthesis not supported in this browser.');
+      return;
     }
     
-    return () => {
-      if (recognition.current) {
-        try {
-          if (isListening) {
-            recognition.current.stop();
-          }
-        } catch (e) {
-          console.error('Error stopping speech recognition:', e);
-        }
-      }
-      
-      // Clear any pending auto-restart timers
-      if (autoRestartTimeout.current) {
-        clearTimeout(autoRestartTimeout.current);
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    speechSynthesisRef.current = utterance;
+    
+    // Get available voices
+    const voices = window.speechSynthesis.getVoices();
+    
+    // Try to find a good English voice
+    const preferredVoice = voices.find(voice => 
+      voice.lang.includes('en') && 
+      (voice.name.includes('Female') || voice.name.includes('Google') || voice.name.includes('Samantha'))
+    );
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // Add event handlers
+    utterance.onstart = () => {
+      if (onSpeechStart) {
+        onSpeechStart();
       }
     };
-  }, [isListening]);
+    
+    utterance.onend = () => {
+      if (onSpeechEnd) {
+        onSpeechEnd();
+      }
+      speechSynthesisRef.current = null;
+    };
+    
+    utterance.onerror = (event) => {
+      console.error('Speech synthesis error:', event);
+      if (onSpeechEnd) {
+        onSpeechEnd();
+      }
+      speechSynthesisRef.current = null;
+    };
+    
+    window.speechSynthesis.speak(utterance);
+  }, [onSpeechStart, onSpeechEnd]);
   
-  const startListening = useCallback(() => {
-    // Clear any existing auto-restart timers
-    if (autoRestartTimeout.current) {
-      clearTimeout(autoRestartTimeout.current);
-      autoRestartTimeout.current = null;
+  // Play welcome message when venue is loaded
+  useEffect(() => {
+    if (venue && !isWelcomePlayed && audioEnabled && !welcomeTextRef.current) {
+      const fetchWelcomeMessage = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('venue-assistant', {
+            body: {
+              query: 'welcome',
+              venueId: venue.id,
+              type: 'welcome'
+            }
+          });
+          
+          if (error) throw new Error(error.message);
+          
+          if (data?.welcome) {
+            welcomeTextRef.current = data.welcome;
+            speakText(data.welcome);
+            setIsWelcomePlayed(true);
+            
+            if (onAnswer) {
+              onAnswer(data.welcome);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch welcome message:', err);
+          welcomeTextRef.current = "Welcome to the venue assistant. How can I help you today?";
+          speakText(welcomeTextRef.current);
+          setIsWelcomePlayed(true);
+          
+          if (onAnswer) {
+            onAnswer(welcomeTextRef.current);
+          }
+        }
+      };
+      
+      fetchWelcomeMessage();
     }
+  }, [venue, isWelcomePlayed, audioEnabled, speakText, onAnswer]);
+  
+  // Initialize speech recognition on mount
+  useEffect(() => {
+    initSpeechRecognition();
     
-    if (!recognition.current) {
-      setError('Speech recognition is not supported in your browser.');
-      return Promise.reject(new Error('Speech recognition not supported'));
-    }
-    
-    try {
-      recognition.current.onstart = () => {
-        handleSpeechStart();
-      };
-      
-      recognition.current.onresult = (event: SpeechRecognitionEvent) => {
-        const text = event.results[0][0].transcript;
-        console.log('Speech recognized:', text);
-        setTranscript(text);
-        
-        if (onTranscript) {
-          onTranscript(text);
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // Ignore errors on cleanup
         }
-      };
-      
-      recognition.current.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
-        setError(`Speech recognition error: ${event.error}`);
-        setIsListening(false);
-        
-        if (onListeningChange) {
-          onListeningChange(false);
-        }
-        
-        // Auto restart listening after error
-        if (autoRestart) {
-          const timer = setTimeout(() => {
-            console.log('Auto-restarting voice recognition after error...');
-            startListening();
-          }, 3000); // Longer delay after error
-          autoRestartTimeout.current = timer as unknown as number;
-        }
-      };
-      
-      recognition.current.onend = () => {
-        handleSpeechEnd();
-      };
-      
-      recognition.current.start();
-      
-      // Reset retry counter on new listening session
-      retryCount.current = 0;
-      return Promise.resolve();
-    } catch (err: any) {
-      console.error('Error starting speech recognition:', err);
-      setError(err.message);
-      setIsListening(false);
-      
-      if (onListeningChange) {
-        onListeningChange(false);
       }
       
-      return Promise.reject(err);
-    }
-  }, [handleSpeechStart, handleSpeechEnd, onTranscript, onListeningChange, autoRestart]);
+      // Cancel any ongoing speech
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [initSpeechRecognition]);
   
-  const stopListening = useCallback(() => {
-    // Clear any existing auto-restart timers
-    if (autoRestartTimeout.current) {
-      clearTimeout(autoRestartTimeout.current);
-      autoRestartTimeout.current = null;
+  // Start listening function
+  const startListening = useCallback(async () => {
+    setError(null);
+    
+    if (!recognitionRef.current) {
+      initSpeechRecognition();
     }
     
-    if (recognition.current) {
+    if (recognitionRef.current) {
       try {
-        recognition.current.stop();
-      } catch (e) {
-        console.error('Error stopping speech recognition:', e);
+        await recognitionRef.current.start();
+      } catch (err) {
+        console.error('Error starting speech recognition:', err);
+        setError('Could not access microphone. Please ensure you have granted the necessary permissions.');
+        throw err;
+      }
+    } else {
+      setError('Speech recognition is not available in your browser.');
+    }
+  }, [initSpeechRecognition]);
+  
+  // Stop listening function
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.error('Error stopping speech recognition:', err);
       }
     }
-    
     setIsListening(false);
-    
-    if (onListeningChange) {
-      onListeningChange(false);
-    }
-  }, [onListeningChange]);
-  
-  const toggleAudio = useCallback(() => {
-    setAudioEnabled(prev => !prev);
   }, []);
   
-  // Force welcome message to play
-  const forcePlayWelcome = () => {
-    setIsWelcomePlayed(false);
-    playWelcomeMessage();
-  };
+  // Toggle audio function
+  const toggleAudio = useCallback(() => {
+    setAudioEnabled(prev => !prev);
+    
+    // If turning off audio and currently speaking, stop it
+    if (audioEnabled && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      if (onSpeechEnd) {
+        onSpeechEnd();
+      }
+    }
+  }, [audioEnabled, onSpeechEnd]);
+  
+  // Force play welcome message function
+  const forcePlayWelcome = useCallback(() => {
+    if (welcomeTextRef.current && audioEnabled) {
+      speakText(welcomeTextRef.current);
+      
+      if (onAnswer) {
+        onAnswer("Let me reintroduce myself. " + welcomeTextRef.current);
+      }
+    } else if (venue) {
+      // Fetch welcome message if not available
+      const fetchWelcomeMessage = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('venue-assistant', {
+            body: {
+              query: 'welcome',
+              venueId: venue.id,
+              type: 'welcome'
+            }
+          });
+          
+          if (error) throw new Error(error.message);
+          
+          if (data?.welcome) {
+            welcomeTextRef.current = data.welcome;
+            
+            if (audioEnabled) {
+              speakText(data.welcome);
+            }
+            
+            setIsWelcomePlayed(true);
+            
+            if (onAnswer) {
+              onAnswer(data.welcome);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch welcome message:', err);
+        }
+      };
+      
+      fetchWelcomeMessage();
+    }
+  }, [venue, audioEnabled, speakText, onAnswer]);
   
   return {
     isListening,
     transcript,
-    answer,
+    startListening,
+    stopListening,
     error,
     isProcessing,
     audioEnabled,
-    isWelcomePlayed,
-    startListening,
-    stopListening,
-    setTranscript,
     toggleAudio,
+    isWelcomePlayed,
     forcePlayWelcome
   };
 };
-
-export default useVenueVoiceAssistant;

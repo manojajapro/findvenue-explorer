@@ -6,16 +6,10 @@ interface GeocodeResult {
   lat: number;
   lng: number;
   formattedAddress: string;
-  isLoading: boolean;
 }
 
 export const useGeocode = () => {
-  const [result, setResult] = useState<GeocodeResult>({
-    lat: 0,
-    lng: 0,
-    formattedAddress: '',
-    isLoading: false
-  });
+  const [isLoading, setIsLoading] = useState(false);
 
   const geocodePinCode = async (pinCode: string, country: string = 'Saudi Arabia') => {
     if (!pinCode) {
@@ -23,7 +17,7 @@ export const useGeocode = () => {
       return null;
     }
 
-    setResult(prev => ({ ...prev, isLoading: true }));
+    setIsLoading(true);
 
     try {
       // Use Google Geocoding API to convert PIN code to coordinates
@@ -40,12 +34,7 @@ export const useGeocode = () => {
         const location = data.results[0].geometry.location;
         const formattedAddress = data.results[0].formatted_address;
         
-        setResult({
-          lat: location.lat,
-          lng: location.lng,
-          formattedAddress,
-          isLoading: false
-        });
+        setIsLoading(false);
         
         return {
           lat: location.lat,
@@ -55,19 +44,19 @@ export const useGeocode = () => {
       } else {
         toast.error(`Could not find location for PIN code: ${pinCode}`);
         console.error('Geocoding error:', data.status, data);
-        setResult(prev => ({ ...prev, isLoading: false }));
+        setIsLoading(false);
         return null;
       }
     } catch (error) {
       console.error('Error geocoding PIN code:', error);
       toast.error('Error finding location. Please try again.');
-      setResult(prev => ({ ...prev, isLoading: false }));
+      setIsLoading(false);
       return null;
     }
   };
 
   return {
-    ...result,
-    geocodePinCode
+    geocodePinCode,
+    isLoading
   };
 };

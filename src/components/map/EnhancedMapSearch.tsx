@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback, memo, useRef } from 'react';
-import { MapPin, X, Filter, Ruler, Locate, MapIcon } from 'lucide-react';
+import { MapPin, X, Filter, Ruler, Locate, MapIcon, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +57,18 @@ const EnhancedMapSearch = memo(({
       toast.success(`Location set to: ${result.formattedAddress}`);
     }
   }, [pinCode, geocodePinCode, onLocationSelect]);
+
+  // Function to increase radius
+  const increaseRadius = () => {
+    const newRadius = Math.min(radiusInKm + 1, 25);
+    onRadiusChange(newRadius);
+  };
+
+  // Function to decrease radius
+  const decreaseRadius = () => {
+    const newRadius = Math.max(radiusInKm - 1, 0.5);
+    onRadiusChange(newRadius);
+  };
   
   return (
     <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md border border-white/5">
@@ -145,14 +157,36 @@ const EnhancedMapSearch = memo(({
             </div>
           )}
           
-          <Slider
-            value={[radiusInKm]}
-            min={0.5}
-            max={25}
-            step={0.5}
-            onValueChange={(values) => onRadiusChange(values[0])}
-            className="py-1"
-          />
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="h-6 w-6 p-0"
+              onClick={decreaseRadius}
+              disabled={radiusInKm <= 0.5}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            
+            <Slider
+              value={[radiusInKm]}
+              min={0.5}
+              max={25}
+              step={0.5}
+              onValueChange={(values) => onRadiusChange(values[0])}
+              className="py-1 flex-1"
+            />
+            
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="h-6 w-6 p-0"
+              onClick={increaseRadius}
+              disabled={radiusInKm >= 25}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       )}
       

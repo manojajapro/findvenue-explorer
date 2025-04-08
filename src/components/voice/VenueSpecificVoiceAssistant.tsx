@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Loader2, User, Bot, RefreshCw } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Loader2, User, Bot, RefreshCw, StopCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 interface VenueSpecificVoiceAssistantProps {
   venue: Venue | null;
@@ -18,6 +19,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
   const [autoListenMode, setAutoListenMode] = useState(true);
   const [lastTranscript, setLastTranscript] = useState("");
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -46,7 +48,20 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
       }
       
       // Add the assistant's response
-      setTranscriptHistory(prev => [...prev, { text: response, isUser: false }]);
+      setTranscriptHistory(prev => {
+        const lastMessage = prev[prev.length - 1];
+        // Prevent duplicate assistant responses
+        if (lastMessage && !lastMessage.isUser && lastMessage.text === response) {
+          return prev;
+        }
+        return [...prev, { text: response, isUser: false }];
+      });
+    },
+    onSpeechStart: () => {
+      setIsSpeaking(true);
+    },
+    onSpeechEnd: () => {
+      setIsSpeaking(false);
     }
   });
   
@@ -102,6 +117,23 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
       description: audioEnabled 
         ? "The assistant will respond with text only" 
         : "The assistant will respond with voice and text",
+    });
+  };
+  
+  const handleStopSpeaking = () => {
+    // This stops the current speech
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+  
+  const handleClearConversation = () => {
+    setTranscriptHistory([]);
+    setLastTranscript("");
+    toast({
+      title: "Conversation Cleared",
+      description: "Your conversation history has been cleared",
     });
   };
 
@@ -168,14 +200,25 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
             />
           </div>
           
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="text-xs hover:bg-findvenue/10"
-            onClick={forcePlayWelcome}
-          >
-            <RefreshCw className="h-3 w-3 mr-1" /> Replay Welcome
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="text-xs hover:bg-findvenue/10"
+              onClick={forcePlayWelcome}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" /> Replay Welcome
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="text-xs hover:bg-red-500/10 text-red-400"
+              onClick={handleClearConversation}
+            >
+              <X className="h-3 w-3 mr-1" /> Clear Chat
+            </Button>
+          </div>
         </div>
         
         <ScrollArea className="h-[240px] mb-4 rounded-md border border-white/10 p-4 bg-black/20 backdrop-blur-sm">
@@ -216,6 +259,21 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
       </CardContent>
       
       <CardFooter className="border-t border-white/10 pt-4 flex flex-col space-y-2">
+        {isSpeaking && (
+          <div className="text-center w-full py-2 px-4 bg-blue-600/20 rounded-md text-sm border border-dashed border-blue-500/50 flex items-center justify-center">
+            <Volume2 className="h-3 w-3 mr-2 text-blue-500 animate-pulse" />
+            <span>Speaking... </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-2 h-6 py-0 px-2 text-xs border border-blue-500/30 hover:bg-blue-500/20"
+              onClick={handleStopSpeaking}
+            >
+              <StopCircle className="h-3 w-3 mr-1 text-blue-300" /> Stop
+            </Button>
+          </div>
+        )}
+        
         {isListening && (
           <div className="text-center w-full py-2 px-4 bg-green-600/20 rounded-md text-sm border border-dashed border-green-500/50 animate-pulse flex items-center justify-center">
             <Mic className="h-3 w-3 mr-2 text-green-500" />
@@ -231,7 +289,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
           </div>
         )}
         
-        {!isListening && !isProcessing && (
+        {!isListening && !isProcessing && !isSpeaking && (
           <div className="text-center text-sm text-findvenue-text-muted">
             Ask anything about <span className="text-findvenue font-medium">{venue.name}</span> - click the mic to start
           </div>

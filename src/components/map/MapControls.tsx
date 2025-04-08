@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface MapControlsProps {
-  isCompactControls: boolean;
+  isCompactControls?: boolean;
   isRadiusActive: boolean;
   toggleRadiusSearch: () => void;
   handleManualLocationSetting: () => void;
@@ -14,7 +14,7 @@ interface MapControlsProps {
 }
 
 const MapControls = ({
-  isCompactControls,
+  isCompactControls = false,
   isRadiusActive,
   toggleRadiusSearch,
   handleManualLocationSetting,
