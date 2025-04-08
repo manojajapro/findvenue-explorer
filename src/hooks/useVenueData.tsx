@@ -9,7 +9,6 @@ export const useVenueData = () => {
   const [venue, setVenue] = useState<Venue | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [ownerLastActive, setOwnerLastActive] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchVenueData = async () => {
@@ -58,29 +57,6 @@ export const useVenueData = () => {
                   linkedin: ownerInfo.linkedin_url || ownerInfo.linkedin || ''
                 }
               };
-              
-              // Fetch owner's last active status if user_id is available
-              if (ownerInfo.user_id) {
-                const { data: userProfile } = await supabase
-                  .from('user_profiles')
-                  .select('updated_at')
-                  .eq('id', ownerInfo.user_id)
-                  .maybeSingle();
-                  
-                if (userProfile?.updated_at) {
-                  const lastActiveDate = new Date(userProfile.updated_at);
-                  const now = new Date();
-                  const diffMs = now.getTime() - lastActiveDate.getTime();
-                  const diffMins = Math.floor(diffMs / 60000);
-                  const diffHrs = Math.floor(diffMins / 60);
-                  
-                  if (diffMins < 60) {
-                    setOwnerLastActive(`${diffMins} min ago`);
-                  } else {
-                    setOwnerLastActive(`${diffHrs}h ${diffMins % 60}m ago`);
-                  }
-                }
-              }
             }
           } catch (e) {
             console.error("Error parsing owner_info for venue", data.id, e);
@@ -149,5 +125,5 @@ export const useVenueData = () => {
     fetchVenueData();
   }, [id]);
 
-  return { venue, isLoading, error, ownerLastActive };
+  return { venue, isLoading, error };
 };

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -34,7 +33,6 @@ import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import VenueRating from '@/components/venue/VenueRating';
 import { getVenueOwnerId } from '@/utils/venueHelpers';
-import { useVenueData } from '@/hooks/useVenueData';
 
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
@@ -50,10 +48,8 @@ const VenueDetails = () => {
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState<string>('');
   const [similarVenues, setSimilarVenues] = useState<Venue[]>([]);
-  const [ownerLastActive, setOwnerLastActive] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { venue: venueData, isLoading, error } = useVenueData();
   
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -79,32 +75,8 @@ const VenueDetails = () => {
             ownerInfoData = {
               name: ownerInfo.name as string,
               contact: ownerInfo.contact as string,
-              responseTime: ownerInfo.response_time as string,
-              user_id: ownerInfo.user_id || ''
+              responseTime: ownerInfo.response_time as string
             };
-            
-            // If we have owner_id, fetch their last active status
-            if (ownerInfo.user_id) {
-              const { data: userProfile } = await supabase
-                .from('user_profiles')
-                .select('updated_at')
-                .eq('id', ownerInfo.user_id)
-                .maybeSingle();
-                
-              if (userProfile?.updated_at) {
-                const lastActiveDate = new Date(userProfile.updated_at);
-                const now = new Date();
-                const diffMs = now.getTime() - lastActiveDate.getTime();
-                const diffMins = Math.floor(diffMs / 60000);
-                const diffHrs = Math.floor(diffMins / 60);
-                
-                if (diffMins < 60) {
-                  setOwnerLastActive(`Active ${diffMins} min ago`);
-                } else {
-                  setOwnerLastActive(`Active ${diffHrs}h ${diffMins % 60}m ago`);
-                }
-              }
-            }
           }
           
           let openingHoursData = undefined;
@@ -464,35 +436,6 @@ const VenueDetails = () => {
               </Badge>
             </div>
             
-            {/* Owner profile card - Show at the top for customers */}
-            {venue?.ownerInfo && (
-              <div className="mb-8 bg-findvenue-card-bg rounded-lg border border-white/10 p-4">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-findvenue rounded-full flex items-center justify-center text-white text-xl font-bold mr-3">
-                    {venue.ownerInfo.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="flex items-center">
-                      <h3 className="font-semibold text-lg mr-2">{venue.ownerInfo.name}</h3>
-                      <Badge variant="outline" className="bg-findvenue/10 text-findvenue border-findvenue/20">
-                        Venue Owner
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      {ownerLastActive && (
-                        <span className="text-findvenue-text-muted flex items-center">
-                          <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                          {ownerLastActive}
-                        </span>
-                      )}
-                      <span className="text-findvenue-text-muted">•</span>
-                      <span className="text-findvenue-text-muted">Response time: {venue.ownerInfo.responseTime || 'Usually within 1 hour'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-3">About this venue</h2>
               <p className="text-findvenue-text-muted mb-4">{venue?.description}</p>
@@ -527,63 +470,6 @@ const VenueDetails = () => {
                     </span>
                   </div>
                 )}
-              </div>
-            </div>
-            
-            {/* Add Rules and Regulations Section */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold mb-4">Rules and Regulations</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-findvenue-card-bg rounded-lg border border-white/10 p-4">
-                  <h3 className="font-semibold mb-3">General Rules</h3>
-                  <ul className="space-y-2 text-sm text-findvenue-text-muted">
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      No smoking indoors
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      Noise levels must be kept reasonable after 10 PM
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      All decorations must be approved by management
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      No outside food or beverages without prior approval
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      All guests must adhere to the venue's code of conduct
-                    </li>
-                  </ul>
-                </div>
-                <div className="bg-findvenue-card-bg rounded-lg border border-white/10 p-4">
-                  <h3 className="font-semibold mb-3">Booking Terms</h3>
-                  <ul className="space-y-2 text-sm text-findvenue-text-muted">
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      50% deposit required to confirm booking
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      Cancellations within 48 hours are non-refundable
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      Venue must be vacated at the agreed time
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      Damage to property will incur additional charges
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="w-4 h-4 mr-2 text-findvenue" /> 
-                      Full payment due 7 days before the event
-                    </li>
-                  </ul>
-                </div>
               </div>
             </div>
             
@@ -670,7 +556,7 @@ const VenueDetails = () => {
                 </div>
               )}
               
-              {venue && user ? (
+              {venue && (
                 <VenueBookingTabs
                   venueId={venue.id}
                   venueName={venue.name}
@@ -680,37 +566,16 @@ const VenueDetails = () => {
                   ownerId={getVenueOwnerId(venue) || ''}
                   ownerName={venue.ownerInfo?.name || 'Venue Host'}
                 />
-              ) : venue ? (
-                <div className="py-4 text-center">
-                  <p className="text-findvenue-text-muted mb-4">Please sign in to book this venue</p>
-                  <Button 
-                    onClick={() => navigate('/login')}
-                    className="w-full bg-findvenue hover:bg-findvenue-dark"
-                  >
-                    Sign In to Book
-                  </Button>
-                </div>
-              ) : null}
+              )}
               
               <div className="mt-4">
-                {venue?.ownerInfo && user && (
+                {venue?.ownerInfo && (
                   <ContactVenueOwner 
                     venueId={venue.id}
                     venueName={venue.name}
                     ownerId={getVenueOwnerId(venue) || ''}
                     ownerName={venue.ownerInfo.name || 'Venue Host'}
                   />
-                )}
-                
-                {venue?.ownerInfo && !user && (
-                  <Button
-                    variant="outline"
-                    className="w-full mt-2"
-                    onClick={() => navigate('/login')}
-                  >
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Sign In to Contact Host
-                  </Button>
                 )}
               </div>
               
