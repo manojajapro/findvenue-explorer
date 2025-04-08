@@ -8,6 +8,7 @@ import VenueUnifiedChatAssistant from '@/components/chat/VenueUnifiedChatAssista
 import VenueSpecificVoiceAssistant from '@/components/voice/VenueSpecificVoiceAssistant';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import { toast } from 'sonner';
 
 interface VenueAIAssistantsProps {
   venue: Venue | null;
@@ -16,6 +17,16 @@ interface VenueAIAssistantsProps {
 const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  
+  const handleOpenChatDialog = () => {
+    setIsChatOpen(true);
+    toast.success("Chat assistant activated");
+  };
+  
+  const handleOpenVoiceDialog = () => {
+    setIsVoiceOpen(true);
+    toast.success("Voice assistant activated");
+  };
   
   const handleCloseChatDialog = () => setIsChatOpen(false);
   const handleCloseVoiceDialog = () => setIsVoiceOpen(false);
@@ -29,7 +40,7 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                onClick={() => setIsChatOpen(true)}
+                onClick={handleOpenChatDialog}
                 size="icon"
                 className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-full h-14 w-14 shadow-xl flex items-center justify-center border border-blue-500/20 transition-transform duration-200 hover:scale-105"
                 aria-label="Chat Assistant"
@@ -48,7 +59,7 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                onClick={() => setIsVoiceOpen(true)}
+                onClick={handleOpenVoiceDialog}
                 size="icon"
                 className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 rounded-full h-14 w-14 shadow-xl flex items-center justify-center border border-purple-500/20 transition-transform duration-200 hover:scale-105"
                 aria-label="Voice Assistant"

@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { toast } from 'sonner';
 
 interface VenueSpecificVoiceAssistantProps {
   venue: Venue | null;
@@ -21,7 +22,6 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   const [lastTranscript, setLastTranscript] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
   
   const { 
     isListening,
@@ -76,49 +76,34 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   // Error handling
   useEffect(() => {
     if (error) {
-      toast({
-        title: "Error",
-        description: error || "There was an error with the voice assistant",
-        variant: "destructive"
-      });
+      toast.error(error || "There was an error with the voice assistant");
     }
-  }, [error, toast]);
+  }, [error]);
   
   const handleMicToggle = async () => {
     try {
       if (isListening) {
         stopListening();
-        toast({
-          title: "Voice Assistant Stopped",
-          description: "Stopped listening",
+        toast.info("Voice Assistant Stopped", {
+          description: "Stopped listening"
         });
       } else {
         await startListening();
-        toast({
-          title: "Voice Assistant Active",
+        toast.success("Voice Assistant Active", {
           description: autoListenMode 
             ? "Continuous mode enabled - I'll keep listening after each response" 
-            : "Press the mic button again when you finish speaking",
+            : "Press the mic button again when you finish speaking"
         });
       }
     } catch (err) {
-      toast({
-        title: "Error",
-        description: "Could not access microphone. Please ensure microphone permissions are granted.",
-        variant: "destructive"
+      toast.error("Microphone Error", {
+        description: "Could not access microphone. Please ensure microphone permissions are granted."
       });
     }
   };
   
   const handleVoiceOutputToggle = () => {
     toggleAudio();
-    
-    toast({
-      title: audioEnabled ? "Voice Output Disabled" : "Voice Output Enabled",
-      description: audioEnabled 
-        ? "The assistant will respond with text only" 
-        : "The assistant will respond with voice and text",
-    });
   };
   
   const handleStopSpeaking = () => {
@@ -126,18 +111,16 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     stopSpeaking();
     setIsSpeaking(false);
     
-    toast({
-      title: "Playback Stopped",
-      description: "Voice assistant playback stopped",
+    toast.info("Playback Stopped", {
+      description: "Voice assistant playback stopped"
     });
   };
   
   const handleClearConversation = () => {
     setTranscriptHistory([]);
     setLastTranscript("");
-    toast({
-      title: "Conversation Cleared",
-      description: "Your conversation history has been cleared",
+    toast.success("Conversation Cleared", {
+      description: "Your conversation history has been cleared"
     });
   };
 
