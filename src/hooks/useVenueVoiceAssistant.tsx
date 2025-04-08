@@ -98,7 +98,10 @@ export const useVenueVoiceAssistant = ({
         if (isMountedRef.current) {
           setError(`Speech recognition error: ${event.error}`);
           setIsListening(false);
-          toast.error(`Microphone error: ${event.error}`);
+          
+          if (event.error !== 'no-speech') {
+            toast.error(`Microphone error: ${event.error}`);
+          }
         }
       };
       

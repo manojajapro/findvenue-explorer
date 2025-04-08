@@ -6,7 +6,6 @@ import { Venue } from '@/hooks/useSupabaseVenues';
 import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/hooks/use-toast';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
