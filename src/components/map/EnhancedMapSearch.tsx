@@ -1,11 +1,10 @@
 
 import { useState, useEffect, useCallback, memo, useRef } from 'react';
-import { MapPin, X, Filter, Ruler, Search as SearchIcon, MapIcon, Locate } from 'lucide-react';
+import { MapPin, X, Filter, Ruler, Locate, MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import LocationSearchInput from './LocationSearchInput';
 import { useSearchParams } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { useGeocode } from '@/hooks/useGeocode';
@@ -45,31 +44,6 @@ const EnhancedMapSearch = memo(({
   const [pinCode, setPinCode] = useState('');
   const [showPinCodeSearch, setShowPinCodeSearch] = useState(false);
   const { geocodePinCode, isLoading: isGeocodingLoading } = useGeocode();
-  const debouncedSearchText = useDebounce(searchText, 800); // Increased debounce time
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialMount = useRef(true);
-  const preventNextSearchRef = useRef(false);
-  
-  // Initialize search text from URL if available
-  useEffect(() => {
-    if (isInitialMount.current) {
-      const searchFromUrl = searchParams.get('search');
-      if (searchFromUrl && !searchText) {
-        setSearchText(searchFromUrl);
-      }
-      isInitialMount.current = false;
-    }
-  }, [searchParams, searchText, setSearchText]);
-  
-  // Use debounced effect for search to prevent constant rerenders
-  useEffect(() => {
-    if (!isInitialMount.current && debouncedSearchText !== '') {
-      if (!preventNextSearchRef.current) {
-        onSearch(debouncedSearchText);
-      }
-      preventNextSearchRef.current = false;
-    }
-  }, [debouncedSearchText, onSearch]);
   
   const handlePinCodeSearch = useCallback(async () => {
     if (!pinCode.trim()) {
@@ -84,18 +58,6 @@ const EnhancedMapSearch = memo(({
     }
   }, [pinCode, geocodePinCode, onLocationSelect]);
   
-  // Handle input changes with throttled updates
-  const handleInputChange = useCallback((value: string) => {
-    // Clear any existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    setSearchText(value);
-    
-    // We'll let the debounced effect handle the search
-  }, [setSearchText]);
-  
   return (
     <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md border border-white/5">
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
@@ -109,28 +71,13 @@ const EnhancedMapSearch = memo(({
             size="sm"
             className="h-6 px-2 text-xs"
             onClick={() => {
-              preventNextSearchRef.current = true;
               setSearchText('');
-              
-              // Add small delay to ensure UI updates before search
-              setTimeout(() => {
-                onSearch('');
-              }, 10);
+              onSearch('');
             }}
           >
             Clear <X className="h-3 w-3 ml-1" />
           </Button>
         )}
-      </div>
-      
-      <div className="px-3 py-2 border-b border-white/10">
-        <LocationSearchInput
-          onSearch={onSearch}
-          onLocationSelect={onLocationSelect}
-          searchText={searchText}
-          setSearchText={handleInputChange}
-          isLoading={false}
-        />
       </div>
       
       {isRadiusActive && (

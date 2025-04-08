@@ -3,9 +3,11 @@ import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import BookingForm from '@/components/venue/BookingForm';
 import MultiDayBookingForm from '@/components/venue/MultiDayBookingForm';
-import { Calendar, Clock, Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar, Clock, Calendar as CalendarIcon, LogIn } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -28,6 +30,7 @@ export default function VenueBookingTabs({
 }: VenueBookingTabsProps) {
   const [activeTab, setActiveTab] = useState('booking');
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isOwner = user?.id === ownerId;
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [bookedTimeSlots, setBookedTimeSlots] = useState<Record<string, string[]>>({});
@@ -180,6 +183,27 @@ export default function VenueBookingTabs({
         <p className="text-center text-findvenue-text-muted">
           This is your venue. You cannot book your own venue.
         </p>
+      </div>
+    );
+  }
+
+  // If user is not logged in, show login prompt
+  if (!user) {
+    return (
+      <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
+        <h3 className="text-lg font-semibold mb-4">Book this venue</h3>
+        <div className="text-center py-8">
+          <p className="text-findvenue-text-muted mb-4">
+            You need to be logged in to book this venue.
+          </p>
+          <Button 
+            onClick={() => navigate('/login')} 
+            className="bg-findvenue hover:bg-findvenue-dark"
+          >
+            <LogIn className="w-4 h-4 mr-2" />
+            Login to Book
+          </Button>
+        </div>
       </div>
     );
   }

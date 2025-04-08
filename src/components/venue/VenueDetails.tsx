@@ -130,7 +130,7 @@ const VenueDetails = () => {
           </div>
           
           {/* Contact Venue Owner - Only show if user is not the owner */}
-          {venue.ownerInfo && !isOwner && (
+          {venue.ownerInfo && !isOwner && user && (
             <ContactVenueOwner 
               venueId={venue.id}
               venueName={venue.name}
@@ -181,17 +181,15 @@ const VenueDetails = () => {
       <Separator className="my-4" />
       
       {/* Venue Booking Tabs - Only show if user is not the owner */}
-      {!isOwner && (
-        <VenueBookingTabs 
-          venueId={venue.id}
-          venueName={venue.name}
-          pricePerHour={venue.pricing.hourlyRate}
-          minCapacity={venue.capacity.min}
-          maxCapacity={venue.capacity.max}
-          ownerId={venue.ownerInfo?.user_id || ''}
-          ownerName={venue.ownerInfo?.name || ''}
-        />
-      )}
+      <VenueBookingTabs 
+        venueId={venue.id}
+        venueName={venue.name}
+        pricePerHour={venue.pricing.hourlyRate}
+        minCapacity={venue.capacity.min}
+        maxCapacity={venue.capacity.max}
+        ownerId={venue.ownerInfo?.user_id || ''}
+        ownerName={venue.ownerInfo?.name || ''}
+      />
       
       {/* Owner Information */}
       {venue.ownerInfo && (
