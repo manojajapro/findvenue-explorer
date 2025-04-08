@@ -1,9 +1,10 @@
 
 import { Button } from '@/components/ui/button';
-import { Search, MapPin, ZoomIn, RefreshCcw, Volume2, MapIcon, Plus, Minus, Navigation } from 'lucide-react';
+import { Search, MapPin, ZoomIn, RefreshCcw, Volume2, MapIcon, Plus, Minus, Navigation, Target } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useState, useRef, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface MapControlsProps {
   isCompactControls: boolean;
@@ -48,132 +49,138 @@ const MapControls = ({
   
   return (
     <div className="absolute right-4 top-4 z-10 flex flex-col gap-2">
-      {isCompactControls && (
-        <Button
-          className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
-          size="icon"
-          onClick={() => setShowControls(!showControls)}
-        >
-          <MapIcon className="h-4 w-4" />
-        </Button>
-      )}
-      
-      {(showControls || !isCompactControls) && (
-        <div className={`flex ${isCompactControls ? 'flex-col' : 'flex-row'} gap-2`}>
-          <Button
-            className={`bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md ${
-              isRadiusActive ? 'border-green-500 text-green-500' : ''
-            }`}
-            size={isCompactControls ? 'icon' : 'default'}
-            onClick={toggleRadiusSearch}
-          >
-            {isCompactControls ? (
-              <MapPin className="h-4 w-4" />
-            ) : (
-              <>
-                <MapPin className="h-4 w-4 mr-2" /> {isRadiusActive ? 'Disable Radius' : 'Enable Radius'}
-              </>
-            )}
-          </Button>
+      <TooltipProvider delayDuration={300}>
+        <div className="flex flex-col gap-2 bg-black/70 backdrop-blur-md rounded-lg p-2 border border-white/10 shadow-lg">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`hover:bg-white/10 ${
+                  isRadiusActive ? 'text-green-500 border-green-500/50 bg-green-500/10' : 'text-white/80'
+                }`}
+                onClick={toggleRadiusSearch}
+              >
+                <Target className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="bg-black/90 text-white border-white/10">
+              {isRadiusActive ? 'Disable Radius Search' : 'Enable Radius Search'}
+            </TooltipContent>
+          </Tooltip>
 
           {isRadiusActive && (
             <>
-              <Button
-                className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
-                size={isCompactControls ? 'icon' : 'default'}
-                onClick={handleManualLocationSetting}
-              >
-                {isCompactControls ? (
-                  <MapPin className="h-4 w-4" />
-                ) : (
-                  <>
-                    <MapPin className="h-4 w-4 mr-2" /> Set Location
-                  </>
-                )}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-white/10 text-white/80"
+                    onClick={handleManualLocationSetting}
+                  >
+                    <MapPin className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="bg-black/90 text-white border-white/10">
+                  Set Location
+                </TooltipContent>
+              </Tooltip>
               
               {increaseRadius && (
-                <Button
-                  className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
-                  size={isCompactControls ? 'icon' : 'default'}
-                  onClick={increaseRadius}
-                >
-                  {isCompactControls ? (
-                    <Plus className="h-4 w-4" />
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4 mr-2" /> Increase Radius
-                    </>
-                  )}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-white/10 text-white/80"
+                      onClick={increaseRadius}
+                    >
+                      <Plus className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="bg-black/90 text-white border-white/10">
+                    Increase Radius
+                  </TooltipContent>
+                </Tooltip>
               )}
               
               {decreaseRadius && (
-                <Button
-                  className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
-                  size={isCompactControls ? 'icon' : 'default'}
-                  onClick={decreaseRadius}
-                  disabled={radiusSize <= 1}
-                >
-                  {isCompactControls ? (
-                    <Minus className="h-4 w-4" />
-                  ) : (
-                    <>
-                      <Minus className="h-4 w-4 mr-2" /> Decrease Radius
-                    </>
-                  )}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hover:bg-white/10 text-white/80"
+                      onClick={decreaseRadius}
+                      disabled={radiusSize <= 1}
+                    >
+                      <Minus className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="bg-black/90 text-white border-white/10">
+                    Decrease Radius
+                  </TooltipContent>
+                </Tooltip>
               )}
             </>
           )}
           
+          <div className="w-full h-px bg-white/10 my-1"></div>
+          
           {getCurrentLocation && (
-            <Button
-              className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
-              size={isCompactControls ? 'icon' : 'default'}
-              onClick={handleGetCurrentLocation}
-            >
-              {isCompactControls ? (
-                <Navigation className="h-4 w-4" />
-              ) : (
-                <>
-                  <Navigation className="h-4 w-4 mr-2" /> My Location
-                </>
-              )}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:bg-white/10 text-white/80"
+                  onClick={handleGetCurrentLocation}
+                >
+                  <Navigation className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="bg-black/90 text-white border-white/10">
+                My Location
+              </TooltipContent>
+            </Tooltip>
           )}
           
-          <Button
-            className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
-            size={isCompactControls ? 'icon' : 'default'}
-            onClick={fitBoundsToMarkers}
-          >
-            {isCompactControls ? (
-              <ZoomIn className="h-4 w-4" />
-            ) : (
-              <>
-                <ZoomIn className="h-4 w-4 mr-2" /> Fit to Markers
-              </>
-            )}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hover:bg-white/10 text-white/80"
+                onClick={fitBoundsToMarkers}
+              >
+                <ZoomIn className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="bg-black/90 text-white border-white/10">
+              Fit to Markers
+            </TooltipContent>
+          </Tooltip>
 
           {isRadiusActive && (
-            <Button
-              className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
-              size={isCompactControls ? 'icon' : 'default'}
-              onClick={resetToDefaultLocation}
-            >
-              {isCompactControls ? (
-                <RefreshCcw className="h-4 w-4" />
-              ) : (
-                <>
-                  <RefreshCcw className="h-4 w-4 mr-2" /> Reset Location
-                </>
-              )}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:bg-white/10 text-white/80"
+                  onClick={resetToDefaultLocation}
+                >
+                  <RefreshCcw className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="bg-black/90 text-white border-white/10">
+                Reset Location
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
-      )}
+      </TooltipProvider>
     </div>
   );
 };
