@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -136,8 +137,20 @@ function App() {
                 <Route path="/account" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
                 <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
+                
+                {/* Updated routes for messaging */}
                 <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-                <Route path="/messages/:contactId" element={<DirectChat />} />
+                <Route path="/messages/:contactId" element={
+                  <ProtectedRoute>
+                    <div className="min-h-screen pt-28 pb-16">
+                      <div className="container mx-auto px-4">
+                        <div className="max-w-6xl mx-auto glass-card border-white/10 h-[calc(100vh-240px)]">
+                          <DirectChat />
+                        </div>
+                      </div>
+                    </div>
+                  </ProtectedRoute>
+                } />
                 
                 <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
                 <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />

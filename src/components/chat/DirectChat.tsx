@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useChat } from '@/hooks/useChat';
@@ -9,13 +9,13 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import ErrorDisplay from './ErrorDisplay';
 import ChatHeader from './ChatHeader';
+import { useToast } from '@/components/ui/use-toast';
 
 const DirectChat = () => {
   const { contactId } = useParams<{ contactId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const lastMessageRef = useRef<string | null>(null);
+  const { toast } = useToast();
   
   const { 
     contact,
@@ -30,37 +30,12 @@ const DirectChat = () => {
     sendMessage
   } = useChat(contactId);
 
-  // Only scroll to bottom for new messages in current chat
+  // When component mounts, check for valid contactId
   useEffect(() => {
-    if (!messages.length || !chatContainerRef.current) return;
-
-    const lastMessage = messages[messages.length - 1];
-    const isNewMessage = lastMessage?.id !== lastMessageRef.current;
-    const isUserMessage = lastMessage?.sender_id === user?.id;
-
-    // Only auto-scroll if it's a new message and either:
-    // 1. It's sent by the current user
-    // 2. The user is already at the bottom of the chat
-    if (isNewMessage) {
-      const { scrollHeight, scrollTop, clientHeight } = chatContainerRef.current;
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-
-      if (isUserMessage || isAtBottom) {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }
-
-      lastMessageRef.current = lastMessage?.id;
+    if (!contactId) {
+      navigate('/messages');
     }
-  }, [messages, user?.id]);
-
-  // Reset scroll position when switching chats
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = 0;
-      lastMessageRef.current = null;
-    }
-    // This effect should run when contactId changes
-  }, [contactId]);
+  }, [contactId, navigate]);
 
   if (!user) {
     return (
@@ -87,11 +62,17 @@ const DirectChat = () => {
     );
   }
 
-  if (!contact) {
+  if (!contact && !isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center p-8">
           <p className="text-lg font-medium text-findvenue-text-muted">Contact not found</p>
+          <Button 
+            onClick={() => navigate('/messages')} 
+            className="mt-4 bg-findvenue hover:bg-findvenue-dark"
+          >
+            Back to Messages
+          </Button>
         </div>
       </div>
     );
@@ -107,7 +88,7 @@ const DirectChat = () => {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Chat Header */}
-      <ChatHeader contact={contact} />
+      {contact && <ChatHeader contact={contact} />}
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-hidden relative">
@@ -116,16 +97,15 @@ const DirectChat = () => {
             <Loader2 className="h-8 w-8 animate-spin text-findvenue" />
           </div>
         ) : (
-          <div 
-            ref={chatContainerRef}
-            className="absolute inset-0 overflow-y-auto p-4 scroll-smooth"
-          >
-            <MessageList 
-              messages={messages} 
-              userId={user.id} 
-              contact={contact}
-              messagesEndRef={messagesEndRef}
-            />
+          <div className="absolute inset-0 overflow-y-auto p-4 scroll-smooth">
+            {contact && (
+              <MessageList 
+                messages={messages} 
+                userId={user.id} 
+                contact={contact}
+                messagesEndRef={messagesEndRef}
+              />
+            )}
           </div>
         )}
       </div>
@@ -136,7 +116,7 @@ const DirectChat = () => {
           newMessage={newMessage}
           setNewMessage={setNewMessage}
           sendMessage={handleSendMessage}
-          isDisabled={isLoading || hasError}
+          isDisabled={isLoading || hasError || !contact}
           isSending={isSending}
         />
       </div>

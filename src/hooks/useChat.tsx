@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Message, ChatContact } from '@/components/chat/types';
+import { useToast } from '@/components/ui/use-toast';
 
 export const useChat = (contactId?: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -15,6 +16,7 @@ export const useChat = (contactId?: string) => {
   const [contact, setContact] = useState<ChatContact | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  const { toast } = useToast();
   const { user } = useAuth();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -59,11 +61,16 @@ export const useChat = (contactId?: string) => {
         console.error('Error fetching contact:', error);
         setHasError(true);
         setErrorMessage('Failed to load contact information');
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load contact information"
+        });
       }
     };
     
     fetchContactInfo();
-  }, [contactId, user, venueId, venueName]);
+  }, [contactId, user, venueId, venueName, toast]);
 
   // Fetch messages and subscribe to new ones
   useEffect(() => {
@@ -80,12 +87,12 @@ export const useChat = (contactId?: string) => {
       try {
         console.log('Fetching messages between', user.id, 'and', contactId);
         
-        // Using the get_conversation RPC function to fetch messages
+        // Get conversation messages
         const { data: messagesData, error: messagesError } = await supabase
-          .rpc('get_conversation', {
-            current_user_id: user.id,
-            other_user_id: contactId
-          });
+          .from('messages')
+          .select('*')
+          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${user.id})`)
+          .order('created_at', { ascending: true });
 
         if (messagesError) throw messagesError;
         
@@ -109,6 +116,11 @@ export const useChat = (contactId?: string) => {
         console.error('Error fetching messages:', error);
         setHasError(true);
         setErrorMessage('Failed to load messages');
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load messages"
+        });
       } finally {
         setIsLoading(false);
       }
@@ -117,26 +129,26 @@ export const useChat = (contactId?: string) => {
     fetchMessages();
     
     // Subscribe to new messages
-    const subscription = supabase
+    const channel = supabase
       .channel('messages-channel')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'messages',
+        filter: `or(and(sender_id.eq.${user.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${user.id}))`
       }, (payload) => {
         const newMsg = payload.new as Message;
+        console.log('New message received:', newMsg);
         
-        if ((newMsg.sender_id === contactId && newMsg.receiver_id === user.id) || 
-            (newMsg.sender_id === user.id && newMsg.receiver_id === contactId)) {
-          setMessages(prev => [...prev, newMsg]);
+        // Add message to state
+        setMessages(prev => [...prev, newMsg]);
           
-          // Mark received messages as read automatically
-          if (newMsg.receiver_id === user.id && !newMsg.read) {
-            supabase
-              .from('messages')
-              .update({ read: true })
-              .eq('id', newMsg.id);
-          }
+        // Mark message as read if it's for current user
+        if (newMsg.receiver_id === user.id && !newMsg.read) {
+          supabase
+            .from('messages')
+            .update({ read: true })
+            .eq('id', newMsg.id);
         }
       })
       .subscribe();
@@ -175,9 +187,14 @@ export const useChat = (contactId?: string) => {
 
     // Cleanup
     return () => {
-      subscription.unsubscribe();
+      channel.unsubscribe();
     };
-  }, [contactId, user, venueId, venueName, bookingId]);
+  }, [contactId, user, venueId, venueName, bookingId, toast]);
+
+  // Effect to scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const sendMessageToDatabase = async (messageContent: string, bookingId?: string) => {
     if (!user || !contactId) return null;
@@ -227,6 +244,11 @@ export const useChat = (contactId?: string) => {
     } catch (error) {
       console.error('Error sending message:', error);
       setErrorMessage('Failed to send message');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to send message"
+      });
     } finally {
       setIsSending(false);
     }

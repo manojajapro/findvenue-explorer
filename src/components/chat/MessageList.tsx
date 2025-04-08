@@ -3,6 +3,7 @@ import React from 'react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Message, ChatContact } from './types';
+import { MessageSquare } from 'lucide-react';
 
 type MessageListProps = {
   messages: Message[];
@@ -19,9 +20,13 @@ const MessageList = ({ messages, userId, contact, messagesEndRef }: MessageListP
 
   if (messages.length === 0) {
     return (
-      <p className="text-center text-findvenue-text-muted py-4">
-        No messages yet. Start the conversation!
-      </p>
+      <div className="h-full flex flex-col items-center justify-center text-center py-12">
+        <MessageSquare className="h-12 w-12 text-findvenue-text-muted mb-4 opacity-50" />
+        <p className="text-xl font-medium mb-2">No messages yet</p>
+        <p className="text-findvenue-text-muted max-w-md">
+          Send a message to start your conversation with {contact.name}
+        </p>
+      </div>
     );
   }
 
