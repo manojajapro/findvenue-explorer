@@ -47,7 +47,7 @@ const EnhancedMapSearch = memo(({
   
   const handlePinCodeSearch = useCallback(async () => {
     if (!pinCode.trim()) {
-      toast.error('Please enter a PIN code');
+      toast.error('Please enter a city, ZIP, or postal code');
       return;
     }
     
@@ -114,7 +114,7 @@ const EnhancedMapSearch = memo(({
                 onClick={() => setShowPinCodeSearch(!showPinCodeSearch)}
               >
                 <MapIcon className="h-3 w-3 mr-1" />
-                {showPinCodeSearch ? 'Hide PIN Search' : 'PIN Search'}
+                {showPinCodeSearch ? 'Hide Search' : 'City/ZIP Search'}
               </Button>
               
               <Button 
@@ -143,7 +143,7 @@ const EnhancedMapSearch = memo(({
             <div className="mt-2 mb-2 flex gap-1">
               <Input
                 type="text"
-                placeholder="Enter PIN Code..."
+                placeholder="Enter city, ZIP or postal code..."
                 className="h-7 text-xs"
                 value={pinCode}
                 onChange={(e) => setPinCode(e.target.value)}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +33,6 @@ export const useVenueVoiceAssistant = ({
   const processingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
   
-  // Initialize audio element
   useEffect(() => {
     audioElementRef.current = new Audio();
     audioElementRef.current.onplay = () => {
@@ -57,7 +55,6 @@ export const useVenueVoiceAssistant = ({
     };
   }, [onSpeechStart, onSpeechEnd]);
   
-  // Initialize speech recognition
   const initSpeechRecognition = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
@@ -85,7 +82,6 @@ export const useVenueVoiceAssistant = ({
           onTranscript(transcript);
         }
         
-        // Final result handling
         if (event.results[0].isFinal && isMountedRef.current) {
           handleFinalTranscript(transcript);
         }
@@ -102,7 +98,6 @@ export const useVenueVoiceAssistant = ({
       recognitionRef.current.onend = () => {
         if (isMountedRef.current) setIsListening(false);
         
-        // Only auto-restart if not currently processing a query
         if (autoRestart && !processingRef.current && isMountedRef.current) {
           setTimeout(() => {
             if (recognitionRef.current && !processingRef.current && isMountedRef.current) {
@@ -120,7 +115,6 @@ export const useVenueVoiceAssistant = ({
     }
   }, [autoRestart, onTranscript]);
   
-  // Handle final transcript and send to AI
   const handleFinalTranscript = useCallback(async (text: string) => {
     if (!text.trim() || !venue || processingRef.current || !isMountedRef.current) return;
     
@@ -128,7 +122,6 @@ export const useVenueVoiceAssistant = ({
       setIsProcessing(true);
       processingRef.current = true;
       
-      // Stop listening while processing
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -171,7 +164,6 @@ export const useVenueVoiceAssistant = ({
         processingRef.current = false;
         setTranscript('');
       
-        // Only restart if autoRestart is enabled and we're not in an error state
         if (autoRestart && !error && isMountedRef.current) {
           setTimeout(() => {
             startListening();
@@ -181,14 +173,12 @@ export const useVenueVoiceAssistant = ({
     }
   }, [venue, audioEnabled, onAnswer, autoRestart]);
   
-  // Speak text using Eleven Labs API
   const speakText = useCallback(async (text: string): Promise<void> => {
     if (!text || !audioEnabled || !isMountedRef.current) return;
     
     try {
       if (onSpeechStart) onSpeechStart();
       
-      // Call our Edge Function for ElevenLabs TTS
       const { data, error } = await supabase.functions.invoke('text-to-speech', {
         body: {
           text: text,
@@ -200,17 +190,14 @@ export const useVenueVoiceAssistant = ({
       
       if (!data?.audio) throw new Error('No audio received from TTS service');
       
-      // Stop any currently playing audio
       if (audioElementRef.current) {
         audioElementRef.current.pause();
         audioElementRef.current.currentTime = 0;
       }
       
-      // Play the new audio
       const audio = audioElementRef.current || new Audio();
       audio.src = `data:audio/mp3;base64,${data.audio}`;
       
-      // Create a promise that resolves when the audio finishes playing
       return new Promise((resolve, reject) => {
         const handleEnd = () => {
           if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
@@ -230,7 +217,6 @@ export const useVenueVoiceAssistant = ({
         audio.addEventListener('ended', handleEnd);
         audio.addEventListener('error', handleError);
         
-        // Play the audio
         audio.play().catch(err => {
           console.error('Error playing audio:', err);
           if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
@@ -245,7 +231,6 @@ export const useVenueVoiceAssistant = ({
     }
   }, [audioEnabled, onSpeechStart, onSpeechEnd]);
   
-  // Play welcome message when venue is loaded
   useEffect(() => {
     if (venue && !isWelcomePlayed && audioEnabled && !welcomeTextRef.current && isMountedRef.current) {
       const fetchWelcomeMessage = async () => {
@@ -287,7 +272,6 @@ export const useVenueVoiceAssistant = ({
     }
   }, [venue, isWelcomePlayed, audioEnabled, speakText, onAnswer]);
   
-  // Initialize speech recognition on mount
   useEffect(() => {
     initSpeechRecognition();
     
@@ -301,7 +285,6 @@ export const useVenueVoiceAssistant = ({
         }
       }
       
-      // Cancel any ongoing speech
       if (audioElementRef.current) {
         audioElementRef.current.pause();
         audioElementRef.current = null;
@@ -309,7 +292,6 @@ export const useVenueVoiceAssistant = ({
     };
   }, [initSpeechRecognition]);
   
-  // Start listening function
   const startListening = useCallback(async () => {
     if (!isMountedRef.current) return;
     
@@ -334,7 +316,6 @@ export const useVenueVoiceAssistant = ({
     }
   }, [initSpeechRecognition]);
   
-  // Stop listening function
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
       try {
@@ -346,7 +327,6 @@ export const useVenueVoiceAssistant = ({
     if (isMountedRef.current) setIsListening(false);
   }, []);
   
-  // Stop speaking function
   const stopSpeaking = useCallback(() => {
     if (audioElementRef.current) {
       audioElementRef.current.pause();
@@ -355,17 +335,14 @@ export const useVenueVoiceAssistant = ({
     }
   }, [onSpeechEnd]);
   
-  // Toggle audio function
   const toggleAudio = useCallback(() => {
     setAudioEnabled(prev => !prev);
     
-    // If turning off audio and currently speaking, stop it
     if (audioEnabled && audioElementRef.current) {
       stopSpeaking();
     }
   }, [audioEnabled, stopSpeaking]);
   
-  // Force play welcome message function
   const forcePlayWelcome = useCallback(async () => {
     if (welcomeTextRef.current && audioEnabled && isMountedRef.current) {
       await speakText(welcomeTextRef.current);
@@ -374,7 +351,6 @@ export const useVenueVoiceAssistant = ({
         onAnswer("Let me reintroduce myself. " + welcomeTextRef.current);
       }
     } else if (venue && isMountedRef.current) {
-      // Fetch welcome message if not available
       try {
         const { data, error } = await supabase.functions.invoke('venue-assistant', {
           body: {

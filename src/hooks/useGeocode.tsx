@@ -13,14 +13,14 @@ export const useGeocode = () => {
 
   const geocodePinCode = async (pinCode: string, country: string = 'Saudi Arabia') => {
     if (!pinCode) {
-      toast.error('Please enter a PIN code');
+      toast.error('Please enter a city, ZIP or postal code');
       return null;
     }
 
     setIsLoading(true);
 
     try {
-      // Use Google Geocoding API to convert PIN code to coordinates
+      // Use Google Geocoding API to convert PIN/ZIP/Postal code to coordinates
       const searchQuery = `${pinCode}, ${country}`;
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
@@ -42,13 +42,13 @@ export const useGeocode = () => {
           formattedAddress
         };
       } else {
-        toast.error(`Could not find location for PIN code: ${pinCode}`);
+        toast.error(`Could not find location for: ${pinCode}`);
         console.error('Geocoding error:', data.status, data);
         setIsLoading(false);
         return null;
       }
     } catch (error) {
-      console.error('Error geocoding PIN code:', error);
+      console.error('Error geocoding:', error);
       toast.error('Error finding location. Please try again.');
       setIsLoading(false);
       return null;
