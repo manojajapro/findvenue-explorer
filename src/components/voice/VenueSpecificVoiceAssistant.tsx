@@ -18,6 +18,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
   const [autoListenMode, setAutoListenMode] = useState(true);
   const [lastTranscript, setLastTranscript] = useState("");
+  const [assistantReady, setAssistantReady] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -36,19 +37,49 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     venue,
     autoRestart: autoListenMode,
     onTranscript: (text) => {
-      // Save the latest transcript to prevent repetition
-      setLastTranscript(text);
+      if (text && text.trim() !== lastTranscript) {
+        // Only update if the transcript has actually changed
+        setLastTranscript(text);
+      }
     },
     onAnswer: (response) => {
       // Only add the user's transcript if it's different from the last one added
-      if (lastTranscript && !transcriptHistory.some(item => item.isUser && item.text === lastTranscript)) {
+      // and if we have a valid transcript
+      if (lastTranscript && lastTranscript.trim() && 
+          !transcriptHistory.some(item => item.isUser && item.text === lastTranscript)) {
         setTranscriptHistory(prev => [...prev, { text: lastTranscript, isUser: true }]);
       }
       
-      // Add the assistant's response
-      setTranscriptHistory(prev => [...prev, { text: response, isUser: false }]);
+      // Only add the assistant's response if it's not already in the history
+      // or if it's not empty
+      if (response && response.trim() && 
+          !transcriptHistory.some(item => !item.isUser && item.text === response)) {
+        setTranscriptHistory(prev => [...prev, { text: response, isUser: false }]);
+      }
     }
   });
+  
+  // Mark assistant as ready when welcome is played
+  useEffect(() => {
+    if (isWelcomePlayed && !assistantReady) {
+      setAssistantReady(true);
+    }
+  }, [isWelcomePlayed]);
+  
+  // Reset assistant when venue changes
+  useEffect(() => {
+    if (venue) {
+      setTranscriptHistory([]);
+      setLastTranscript("");
+      setAssistantReady(false);
+      // Give a slight delay before forcing welcome to play for the new venue
+      const timer = setTimeout(() => {
+        forcePlayWelcome();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [venue?.id]);
   
   // Scroll to bottom when transcript history updates
   useEffect(() => {
@@ -77,6 +108,8 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
           description: "Stopped listening",
         });
       } else {
+        // Clear last transcript before starting a new listening session
+        setLastTranscript("");
         await startListening();
         toast({
           title: "Voice Assistant Active",
@@ -102,6 +135,16 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
       description: audioEnabled 
         ? "The assistant will respond with text only" 
         : "The assistant will respond with voice and text",
+    });
+  };
+
+  const handleResetConversation = () => {
+    setTranscriptHistory([]);
+    setLastTranscript("");
+    forcePlayWelcome();
+    toast({
+      title: "Conversation Reset",
+      description: "The conversation has been reset",
     });
   };
 
@@ -143,7 +186,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
               size="sm"
               onClick={handleMicToggle}
               className={isListening ? "bg-green-600 hover:bg-green-700" : "border-white/10"}
-              disabled={isProcessing}
+              disabled={isProcessing || !assistantReady}
             >
               {isProcessing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -168,14 +211,25 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
             />
           </div>
           
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="text-xs hover:bg-findvenue/10"
-            onClick={forcePlayWelcome}
-          >
-            <RefreshCw className="h-3 w-3 mr-1" /> Replay Welcome
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="text-xs hover:bg-findvenue/10"
+              onClick={forcePlayWelcome}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" /> Replay Welcome
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="text-xs hover:bg-red-500/10 text-red-400"
+              onClick={handleResetConversation}
+            >
+              Reset Conversation
+            </Button>
+          </div>
         </div>
         
         <ScrollArea className="h-[240px] mb-4 rounded-md border border-white/10 p-4 bg-black/20 backdrop-blur-sm">
@@ -234,6 +288,12 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
         {!isListening && !isProcessing && (
           <div className="text-center text-sm text-findvenue-text-muted">
             Ask anything about <span className="text-findvenue font-medium">{venue.name}</span> - click the mic to start
+          </div>
+        )}
+        
+        {!assistantReady && (
+          <div className="text-center text-sm text-yellow-400">
+            Voice assistant is initializing... Please wait.
           </div>
         )}
       </CardFooter>
