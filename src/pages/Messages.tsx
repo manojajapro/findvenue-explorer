@@ -21,12 +21,34 @@ const Messages = () => {
   const navigate = useNavigate();
   
   const [contacts, setContacts] = useState<ChatContact[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
   
   useEffect(() => {
     if (user) {
+      fetchUserRole();
       fetchContacts();
     }
   }, [user]);
+  
+  const fetchUserRole = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('user_role')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setUserRole(data.user_role);
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+    }
+  };
   
   const fetchContacts = async () => {
     if (!user) return;
@@ -75,6 +97,15 @@ const Messages = () => {
     }
   };
   
+  // Function to determine if we should show the description based on the current user's role
+  const getPageDescription = () => {
+    if (userRole === 'venue_owner') {
+      return 'Chat with customers';
+    } else {
+      return 'Chat with venue owners';
+    }
+  };
+  
   if (!user) {
     return (
       <div className="min-h-screen pt-28 pb-16">
@@ -96,7 +127,7 @@ const Messages = () => {
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl font-bold mb-2">Messages</h1>
           <p className="text-findvenue-text-muted mb-8">
-            Chat with venue owners and customers
+            {getPageDescription()}
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
