@@ -28,6 +28,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     transcript,
     startListening,
     stopListening,
+    stopSpeaking,
     isProcessing,
     audioEnabled,
     toggleAudio,
@@ -121,11 +122,14 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   };
   
   const handleStopSpeaking = () => {
-    // This stops the current speech
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    }
+    // Stop the current speech
+    stopSpeaking();
+    setIsSpeaking(false);
+    
+    toast({
+      title: "Playback Stopped",
+      description: "Voice assistant playback stopped",
+    });
   };
   
   const handleClearConversation = () => {

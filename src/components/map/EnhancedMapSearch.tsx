@@ -62,13 +62,20 @@ const EnhancedMapSearch = memo(({
   const increaseRadius = () => {
     const newRadius = Math.min(radiusInKm + 1, 25);
     onRadiusChange(newRadius);
+    toast.success(`Radius increased to ${newRadius.toFixed(1)} km`);
   };
 
   // Function to decrease radius
   const decreaseRadius = () => {
     const newRadius = Math.max(radiusInKm - 1, 0.5);
     onRadiusChange(newRadius);
+    toast.success(`Radius decreased to ${newRadius.toFixed(1)} km`);
   };
+  
+  // Get the user's current location
+  const handleGetCurrentLocation = useCallback(() => {
+    onCurrentLocation();
+  }, [onCurrentLocation]);
   
   return (
     <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md border border-white/5">
@@ -114,7 +121,7 @@ const EnhancedMapSearch = memo(({
                 variant="ghost" 
                 size="sm" 
                 className="h-6 px-2 text-xs"
-                onClick={onCurrentLocation}
+                onClick={handleGetCurrentLocation}
               >
                 <Locate className="h-3 w-3 mr-1" />
                 My Location
@@ -161,7 +168,7 @@ const EnhancedMapSearch = memo(({
             <Button 
               variant="outline" 
               size="icon"
-              className="h-6 w-6 p-0"
+              className="h-6 w-6 p-0 bg-findvenue-surface/50 border-white/10 hover:bg-findvenue-surface"
               onClick={decreaseRadius}
               disabled={radiusInKm <= 0.5}
             >
@@ -173,14 +180,17 @@ const EnhancedMapSearch = memo(({
               min={0.5}
               max={25}
               step={0.5}
-              onValueChange={(values) => onRadiusChange(values[0])}
               className="py-1 flex-1"
+              onValueChange={(values) => {
+                const newRadius = values[0];
+                onRadiusChange(newRadius);
+              }}
             />
             
             <Button 
               variant="outline" 
               size="icon"
-              className="h-6 w-6 p-0"
+              className="h-6 w-6 p-0 bg-findvenue-surface/50 border-white/10 hover:bg-findvenue-surface"
               onClick={increaseRadius}
               disabled={radiusInKm >= 25}
             >

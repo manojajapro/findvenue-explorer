@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface UseVenueVoiceAssistantProps {
   venue: Venue | null;
@@ -28,9 +29,33 @@ export const useVenueVoiceAssistant = ({
   const [isWelcomePlayed, setIsWelcomePlayed] = useState(false);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const welcomeTextRef = useRef<string>('');
   const processingRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(true);
+  
+  // Initialize audio element
+  useEffect(() => {
+    audioElementRef.current = new Audio();
+    audioElementRef.current.onplay = () => {
+      if (onSpeechStart && isMountedRef.current) onSpeechStart();
+    };
+    audioElementRef.current.onended = () => {
+      if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+    };
+    audioElementRef.current.onerror = () => {
+      console.error('Audio playback error');
+      if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+    };
+    
+    return () => {
+      isMountedRef.current = false;
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current = null;
+      }
+    };
+  }, [onSpeechStart, onSpeechEnd]);
   
   // Initialize speech recognition
   const initSpeechRecognition = useCallback(() => {
@@ -46,7 +71,7 @@ export const useVenueVoiceAssistant = ({
       recognitionRef.current.lang = 'en-US';
       
       recognitionRef.current.onstart = () => {
-        setIsListening(true);
+        if (isMountedRef.current) setIsListening(true);
       };
       
       recognitionRef.current.onresult = (event) => {
@@ -54,31 +79,33 @@ export const useVenueVoiceAssistant = ({
           .map(result => result[0].transcript)
           .join('');
         
-        setTranscript(transcript);
+        if (isMountedRef.current) setTranscript(transcript);
         
-        if (onTranscript) {
+        if (onTranscript && isMountedRef.current) {
           onTranscript(transcript);
         }
         
         // Final result handling
-        if (event.results[0].isFinal) {
+        if (event.results[0].isFinal && isMountedRef.current) {
           handleFinalTranscript(transcript);
         }
       };
       
       recognitionRef.current.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
-        setError(`Speech recognition error: ${event.error}`);
-        setIsListening(false);
+        if (isMountedRef.current) {
+          setError(`Speech recognition error: ${event.error}`);
+          setIsListening(false);
+        }
       };
       
       recognitionRef.current.onend = () => {
-        setIsListening(false);
+        if (isMountedRef.current) setIsListening(false);
         
         // Only auto-restart if not currently processing a query
-        if (autoRestart && !processingRef.current) {
+        if (autoRestart && !processingRef.current && isMountedRef.current) {
           setTimeout(() => {
-            if (recognitionRef.current && !processingRef.current) {
+            if (recognitionRef.current && !processingRef.current && isMountedRef.current) {
               try {
                 recognitionRef.current.start();
               } catch (e) {
@@ -95,7 +122,7 @@ export const useVenueVoiceAssistant = ({
   
   // Handle final transcript and send to AI
   const handleFinalTranscript = useCallback(async (text: string) => {
-    if (!text.trim() || !venue || processingRef.current) return;
+    if (!text.trim() || !venue || processingRef.current || !isMountedRef.current) return;
     
     try {
       setIsProcessing(true);
@@ -120,95 +147,107 @@ export const useVenueVoiceAssistant = ({
       
       if (error) throw new Error(error.message);
       
-      if (data?.answer) {
+      if (data?.answer && isMountedRef.current) {
         if (onAnswer) {
           onAnswer(data.answer);
         }
         
         if (audioEnabled) {
-          speakText(data.answer);
+          await speakText(data.answer);
         }
       }
     } catch (err: any) {
       console.error('Error processing voice query:', err);
-      setError(err.message || 'Failed to process your request');
+      if (isMountedRef.current) {
+        setError(err.message || 'Failed to process your request');
       
-      if (onAnswer) {
-        onAnswer("I'm sorry, I encountered an error processing your request. Please try again.");
+        if (onAnswer) {
+          onAnswer("I'm sorry, I encountered an error processing your request. Please try again.");
+        }
       }
     } finally {
-      setIsProcessing(false);
-      processingRef.current = false;
-      setTranscript('');
+      if (isMountedRef.current) {
+        setIsProcessing(false);
+        processingRef.current = false;
+        setTranscript('');
       
-      // Only restart if autoRestart is enabled and we're not in an error state
-      if (autoRestart && !error) {
-        setTimeout(() => {
-          startListening();
-        }, 1000);
+        // Only restart if autoRestart is enabled and we're not in an error state
+        if (autoRestart && !error && isMountedRef.current) {
+          setTimeout(() => {
+            startListening();
+          }, 1000);
+        }
       }
     }
   }, [venue, audioEnabled, onAnswer, autoRestart]);
   
-  // Speak text using speech synthesis
-  const speakText = useCallback((text: string) => {
-    if (!('speechSynthesis' in window)) {
-      console.error('Speech synthesis not supported');
-      setError('Speech synthesis not supported in this browser.');
-      return;
+  // Speak text using Eleven Labs API
+  const speakText = useCallback(async (text: string): Promise<void> => {
+    if (!text || !audioEnabled || !isMountedRef.current) return;
+    
+    try {
+      if (onSpeechStart) onSpeechStart();
+      
+      // Call our Edge Function for ElevenLabs TTS
+      const { data, error } = await supabase.functions.invoke('text-to-speech', {
+        body: {
+          text: text,
+          voiceId: 'EXAVITQu4vr4xnSDxMaL' // Sarah voice by default
+        }
+      });
+      
+      if (error) throw new Error(error.message);
+      
+      if (!data?.audio) throw new Error('No audio received from TTS service');
+      
+      // Stop any currently playing audio
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current.currentTime = 0;
+      }
+      
+      // Play the new audio
+      const audio = audioElementRef.current || new Audio();
+      audio.src = `data:audio/mp3;base64,${data.audio}`;
+      
+      // Create a promise that resolves when the audio finishes playing
+      return new Promise((resolve, reject) => {
+        const handleEnd = () => {
+          if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+          audio.removeEventListener('ended', handleEnd);
+          audio.removeEventListener('error', handleError);
+          resolve();
+        };
+        
+        const handleError = (e: Event) => {
+          console.error('Audio playback error:', e);
+          if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+          audio.removeEventListener('ended', handleEnd);
+          audio.removeEventListener('error', handleError);
+          reject(new Error('Audio playback failed'));
+        };
+        
+        audio.addEventListener('ended', handleEnd);
+        audio.addEventListener('error', handleError);
+        
+        // Play the audio
+        audio.play().catch(err => {
+          console.error('Error playing audio:', err);
+          if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+          reject(err);
+        });
+      });
+    } catch (err: any) {
+      console.error('Text-to-speech error:', err);
+      if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+      toast.error('Failed to play audio response');
+      throw err;
     }
-    
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    speechSynthesisRef.current = utterance;
-    
-    // Get available voices
-    const voices = window.speechSynthesis.getVoices();
-    
-    // Try to find a good English voice
-    const preferredVoice = voices.find(voice => 
-      voice.lang.includes('en') && 
-      (voice.name.includes('Female') || voice.name.includes('Google') || voice.name.includes('Samantha'))
-    );
-    
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
-    
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    
-    // Add event handlers
-    utterance.onstart = () => {
-      if (onSpeechStart) {
-        onSpeechStart();
-      }
-    };
-    
-    utterance.onend = () => {
-      if (onSpeechEnd) {
-        onSpeechEnd();
-      }
-      speechSynthesisRef.current = null;
-    };
-    
-    utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
-      if (onSpeechEnd) {
-        onSpeechEnd();
-      }
-      speechSynthesisRef.current = null;
-    };
-    
-    window.speechSynthesis.speak(utterance);
-  }, [onSpeechStart, onSpeechEnd]);
+  }, [audioEnabled, onSpeechStart, onSpeechEnd]);
   
   // Play welcome message when venue is loaded
   useEffect(() => {
-    if (venue && !isWelcomePlayed && audioEnabled && !welcomeTextRef.current) {
+    if (venue && !isWelcomePlayed && audioEnabled && !welcomeTextRef.current && isMountedRef.current) {
       const fetchWelcomeMessage = async () => {
         try {
           const { data, error } = await supabase.functions.invoke('venue-assistant', {
@@ -221,9 +260,9 @@ export const useVenueVoiceAssistant = ({
           
           if (error) throw new Error(error.message);
           
-          if (data?.welcome) {
+          if (data?.welcome && isMountedRef.current) {
             welcomeTextRef.current = data.welcome;
-            speakText(data.welcome);
+            await speakText(data.welcome);
             setIsWelcomePlayed(true);
             
             if (onAnswer) {
@@ -232,12 +271,14 @@ export const useVenueVoiceAssistant = ({
           }
         } catch (err) {
           console.error('Failed to fetch welcome message:', err);
-          welcomeTextRef.current = "Welcome to the venue assistant. How can I help you today?";
-          speakText(welcomeTextRef.current);
-          setIsWelcomePlayed(true);
-          
-          if (onAnswer) {
-            onAnswer(welcomeTextRef.current);
+          if (isMountedRef.current) {
+            welcomeTextRef.current = "Welcome to the venue assistant. How can I help you today?";
+            await speakText(welcomeTextRef.current);
+            setIsWelcomePlayed(true);
+            
+            if (onAnswer) {
+              onAnswer(welcomeTextRef.current);
+            }
           }
         }
       };
@@ -251,6 +292,7 @@ export const useVenueVoiceAssistant = ({
     initSpeechRecognition();
     
     return () => {
+      isMountedRef.current = false;
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -260,14 +302,17 @@ export const useVenueVoiceAssistant = ({
       }
       
       // Cancel any ongoing speech
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current = null;
       }
     };
   }, [initSpeechRecognition]);
   
   // Start listening function
   const startListening = useCallback(async () => {
+    if (!isMountedRef.current) return;
+    
     setError(null);
     
     if (!recognitionRef.current) {
@@ -279,7 +324,9 @@ export const useVenueVoiceAssistant = ({
         await recognitionRef.current.start();
       } catch (err) {
         console.error('Error starting speech recognition:', err);
-        setError('Could not access microphone. Please ensure you have granted the necessary permissions.');
+        if (isMountedRef.current) {
+          setError('Could not access microphone. Please ensure you have granted the necessary permissions.');
+        }
         throw err;
       }
     } else {
@@ -296,63 +343,65 @@ export const useVenueVoiceAssistant = ({
         console.error('Error stopping speech recognition:', err);
       }
     }
-    setIsListening(false);
+    if (isMountedRef.current) setIsListening(false);
   }, []);
+  
+  // Stop speaking function
+  const stopSpeaking = useCallback(() => {
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.currentTime = 0;
+      if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+    }
+  }, [onSpeechEnd]);
   
   // Toggle audio function
   const toggleAudio = useCallback(() => {
     setAudioEnabled(prev => !prev);
     
     // If turning off audio and currently speaking, stop it
-    if (audioEnabled && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      if (onSpeechEnd) {
-        onSpeechEnd();
-      }
+    if (audioEnabled && audioElementRef.current) {
+      stopSpeaking();
     }
-  }, [audioEnabled, onSpeechEnd]);
+  }, [audioEnabled, stopSpeaking]);
   
   // Force play welcome message function
-  const forcePlayWelcome = useCallback(() => {
-    if (welcomeTextRef.current && audioEnabled) {
-      speakText(welcomeTextRef.current);
+  const forcePlayWelcome = useCallback(async () => {
+    if (welcomeTextRef.current && audioEnabled && isMountedRef.current) {
+      await speakText(welcomeTextRef.current);
       
       if (onAnswer) {
         onAnswer("Let me reintroduce myself. " + welcomeTextRef.current);
       }
-    } else if (venue) {
+    } else if (venue && isMountedRef.current) {
       // Fetch welcome message if not available
-      const fetchWelcomeMessage = async () => {
-        try {
-          const { data, error } = await supabase.functions.invoke('venue-assistant', {
-            body: {
-              query: 'welcome',
-              venueId: venue.id,
-              type: 'welcome'
-            }
-          });
-          
-          if (error) throw new Error(error.message);
-          
-          if (data?.welcome) {
-            welcomeTextRef.current = data.welcome;
-            
-            if (audioEnabled) {
-              speakText(data.welcome);
-            }
-            
-            setIsWelcomePlayed(true);
-            
-            if (onAnswer) {
-              onAnswer(data.welcome);
-            }
+      try {
+        const { data, error } = await supabase.functions.invoke('venue-assistant', {
+          body: {
+            query: 'welcome',
+            venueId: venue.id,
+            type: 'welcome'
           }
-        } catch (err) {
-          console.error('Failed to fetch welcome message:', err);
+        });
+        
+        if (error) throw new Error(error.message);
+        
+        if (data?.welcome && isMountedRef.current) {
+          welcomeTextRef.current = data.welcome;
+          
+          if (audioEnabled) {
+            await speakText(data.welcome);
+          }
+          
+          setIsWelcomePlayed(true);
+          
+          if (onAnswer) {
+            onAnswer(data.welcome);
+          }
         }
-      };
-      
-      fetchWelcomeMessage();
+      } catch (err) {
+        console.error('Failed to fetch welcome message:', err);
+      }
     }
   }, [venue, audioEnabled, speakText, onAnswer]);
   
@@ -361,6 +410,7 @@ export const useVenueVoiceAssistant = ({
     transcript,
     startListening,
     stopListening,
+    stopSpeaking,
     error,
     isProcessing,
     audioEnabled,

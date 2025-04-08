@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import MapControls from './MapControls';
 import { useDebounce } from '@/hooks/useDebounce';
+import EnhancedMapSearch from './EnhancedMapSearch';
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Radius of the earth in km
@@ -286,7 +287,6 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
     toast.success(`Location set to: ${address}`);
   }, []);
   
-  // Modified to support drag functionality
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (isSettingManualLocation && e.latLng) {
       const newLocation = {
@@ -329,7 +329,6 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
     }
   }, [isSettingManualLocation]);
 
-  // New handler for circle drag
   const handleCircleDrag = useCallback((e: google.maps.MapMouseEvent) => {
     if (e.latLng && isRadiusActive) {
       const newLocation = {
@@ -517,6 +516,69 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
     setFilteredVenues(memoizedVenues);
   }, [searchParams, setSearchParams, memoizedVenues]);
   
+  const getCurrentLocation = useCallback(() => {
+    if (navigator.geolocation) {
+      toast.info("Getting your location...", { duration: 2000 });
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          
+          setUserLocation(newLocation);
+          setIsRadiusActive(true);
+          
+          if (window.google && window.google.maps) {
+            const geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ location: newLocation }, (results, status) => {
+              if (status === 'OK' && results && results[0]) {
+                setLocationAddress(results[0].formatted_address);
+                toast.success(`Location set to: ${results[0].formatted_address}`);
+              } else {
+                setLocationAddress("Current Location");
+                toast.success("Using your current location");
+              }
+            });
+          } else {
+            setLocationAddress("Current Location");
+            toast.success("Using your current location");
+          }
+          
+          if (mapRef.current) {
+            mapRef.current.panTo(newLocation);
+            mapRef.current.setZoom(14);
+          }
+        },
+        (error) => {
+          console.error('Error getting current location:', error);
+          
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              toast.error("You denied the geolocation request. Please enable location permissions in your browser settings.");
+              break;
+            case error.POSITION_UNAVAILABLE:
+              toast.error("Location information is unavailable.");
+              break;
+            case error.TIMEOUT:
+              toast.error("The request to get your location timed out.");
+              break;
+            default:
+              toast.error("An unknown error occurred while trying to get your location.");
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    } else {
+      toast.error("Geolocation is not supported by this browser.");
+    }
+  }, []);
+  
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center bg-findvenue-surface/50">
@@ -571,6 +633,34 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
         </div>
       )}
       
+      <div className="absolute top-4 left-4 right-20 z-10">
+        <EnhancedMapSearch
+          onSearch={handleSearch}
+          onLocationSelect={handleLocationSelect}
+          onRadiusChange={handleRadiusChange}
+          onManualLocation={() => {
+            setIsSettingManualLocation(true);
+            setMapCursor('crosshair');
+            toast.info("Click on the map to set your location");
+          }}
+          onCurrentLocation={getCurrentLocation}
+          venueCount={
+            isRadiusActive 
+              ? venuesInRadius.length 
+              : venuesWithCoordinates.length
+          }
+          radiusInKm={radiusInKm}
+          isRadiusActive={isRadiusActive}
+          searchText={mapSearchTerm}
+          setSearchText={(text) => {
+            setMapSearchTerm(text);
+            handleSearch(text);
+          }}
+          appliedFilters={appliedFilters}
+          onClearFilter={handleClearFilter}
+        />
+      </div>
+      
       {displayVenues.length === 0 ? (
         <div className="h-full flex items-center justify-center bg-findvenue-surface/50 p-6 text-center animate-fade-in">
           <div>
@@ -585,9 +675,9 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
               <Button 
                 variant="outline" 
                 className="mt-3"
-                onClick={() => setRadiusInKm(Math.min(radiusInKm + 1, 10))}
+                onClick={() => setRadiusInKm(Math.min(radiusInKm + 1, 25))}
               >
-                Increase radius to {Math.min(radiusInKm + 1, 10).toFixed(1)} km
+                Increase radius to {Math.min(radiusInKm + 1, 25).toFixed(1)} km
               </Button>
             )}
           </div>
@@ -794,6 +884,7 @@ const MapView = memo(({ venues, isLoading, highlightedVenueId, onFilteredVenuesC
         handleClearSearch={handleClearSearch}
         fitBoundsToMarkers={fitBoundsToMarkers}
         resetToDefaultLocation={resetToDefaultLocation}
+        getCurrentLocation={getCurrentLocation}
       />
     </div>
   );

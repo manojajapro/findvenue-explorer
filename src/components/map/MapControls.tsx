@@ -1,113 +1,139 @@
 
-import { Locate, MapIcon, Navigation, ZoomIn, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Search, MapPin, ZoomIn, RefreshCcw, Volume2, MapIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useState, useRef, useEffect } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MapControlsProps {
-  isCompactControls?: boolean;
+  isCompactControls: boolean;
   isRadiusActive: boolean;
   toggleRadiusSearch: () => void;
   handleManualLocationSetting: () => void;
   handleClearSearch: () => void;
   fitBoundsToMarkers: () => void;
   resetToDefaultLocation: () => void;
+  getCurrentLocation?: () => void;
 }
 
 const MapControls = ({
-  isCompactControls = false,
+  isCompactControls,
   isRadiusActive,
   toggleRadiusSearch,
   handleManualLocationSetting,
   handleClearSearch,
   fitBoundsToMarkers,
-  resetToDefaultLocation
+  resetToDefaultLocation,
+  getCurrentLocation
 }: MapControlsProps) => {
+  const [showControls, setShowControls] = useState(!isCompactControls);
+  const isMobile = useIsMobile();
+  
+  // When controls change from compact to full, show them
+  useEffect(() => {
+    setShowControls(!isCompactControls);
+  }, [isCompactControls]);
+  
+  const handleGetCurrentLocation = () => {
+    if (!getCurrentLocation) return;
+    
+    getCurrentLocation();
+  };
+  
   return (
-    <TooltipProvider>
-      <div className={`absolute ${isCompactControls ? 'bottom-4 right-4' : 'top-20 right-4'} z-[1000] flex ${isCompactControls ? 'flex-row' : 'flex-col'} gap-2 animate-fade-in`}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className={`h-8 w-8 ${isRadiusActive ? 'bg-findvenue text-white' : 'bg-findvenue-surface/80'} backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md transition-all hover-scale`}
-              onClick={toggleRadiusSearch}
+    <div className="absolute right-4 top-4 z-10 flex flex-col gap-2">
+      {isCompactControls && (
+        <Button
+          className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
+          size="icon"
+          onClick={() => setShowControls(!showControls)}
+        >
+          <MapIcon className="h-4 w-4" />
+        </Button>
+      )}
+      
+      {(showControls || !isCompactControls) && (
+        <div className={`flex ${isCompactControls ? 'flex-col' : 'flex-row'} gap-2`}>
+          <Button
+            className={`bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md ${
+              isRadiusActive ? 'border-green-500 text-green-500' : ''
+            }`}
+            size={isCompactControls ? 'icon' : 'default'}
+            onClick={toggleRadiusSearch}
+          >
+            {isCompactControls ? (
+              <MapPin className="h-4 w-4" />
+            ) : (
+              <>
+                <MapPin className="h-4 w-4 mr-2" /> {isRadiusActive ? 'Disable Radius' : 'Enable Radius'}
+              </>
+            )}
+          </Button>
+
+          {isRadiusActive && (
+            <Button
+              className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
+              size={isCompactControls ? 'icon' : 'default'}
+              onClick={handleManualLocationSetting}
             >
-              <Locate className="h-3.5 w-3.5" />
+              {isCompactControls ? (
+                <MapPin className="h-4 w-4" />
+              ) : (
+                <>
+                  <MapPin className="h-4 w-4 mr-2" /> Set Location
+                </>
+              )}
             </Button>
-          </TooltipTrigger>
-          <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-            <p>{isRadiusActive ? 'Disable radius search' : 'Enable radius search'}</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        {isRadiusActive && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md transition-all hover-scale animate-scale-in"
-                onClick={handleManualLocationSetting}
-              >
-                <MapIcon className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-              <p>Set location manually (click on map)</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md transition-all hover-scale"
+          )}
+          
+          {getCurrentLocation && (
+            <Button
+              className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
+              size={isCompactControls ? 'icon' : 'default'}
+              onClick={handleGetCurrentLocation}
+            >
+              {isCompactControls ? (
+                <Volume2 className="h-4 w-4" />
+              ) : (
+                <>
+                  <Volume2 className="h-4 w-4 mr-2" /> My Location
+                </>
+              )}
+            </Button>
+          )}
+          
+          <Button
+            className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
+            size={isCompactControls ? 'icon' : 'default'}
+            onClick={fitBoundsToMarkers}
+          >
+            {isCompactControls ? (
+              <ZoomIn className="h-4 w-4" />
+            ) : (
+              <>
+                <ZoomIn className="h-4 w-4 mr-2" /> Fit to Markers
+              </>
+            )}
+          </Button>
+
+          {isRadiusActive && (
+            <Button
+              className="bg-black/70 backdrop-blur-md hover:bg-black/80 border border-white/10 shadow-md"
+              size={isCompactControls ? 'icon' : 'default'}
               onClick={resetToDefaultLocation}
             >
-              <Navigation className="h-3.5 w-3.5" />
+              {isCompactControls ? (
+                <RefreshCcw className="h-4 w-4" />
+              ) : (
+                <>
+                  <RefreshCcw className="h-4 w-4 mr-2" /> Reset Location
+                </>
+              )}
             </Button>
-          </TooltipTrigger>
-          <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-            <p>Use default location (Riyadh)</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md transition-all hover-scale"
-              onClick={handleClearSearch}
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-            <p>Clear filters</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-8 w-8 bg-findvenue-surface/80 backdrop-blur-md border-white/10 hover:bg-findvenue shadow-md transition-all hover-scale"
-              onClick={fitBoundsToMarkers}
-            >
-              <ZoomIn className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side={isCompactControls ? "left" : "left"} className="text-xs">
-            <p>Zoom to fit all venues</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-    </TooltipProvider>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 
