@@ -1,148 +1,190 @@
 
-import { useState } from 'react';
-import { Search, MapPin, Navigation, Plus, Minus } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { useState, useEffect, useCallback, memo, useRef } from 'react';
+import { MapPin, X, Filter, Ruler, Locate, MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Badge } from '@/components/ui/badge';
+import { Venue } from '@/hooks/useSupabaseVenues';
+import { useSearchParams } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
 import { useGeocode } from '@/hooks/useGeocode';
 import { toast } from 'sonner';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface EnhancedMapSearchProps {
-  onSearchLocation: (lat: number, lng: number) => void;
-  onRadiusChange: (radius: number) => void;
-  initialRadius?: number;
+  onSearch: (term: string) => void;
+  onLocationSelect: (lat: number, lng: number, address: string) => void;
+  onRadiusChange: (value: number) => void;
+  onManualLocation: () => void;
+  onCurrentLocation: () => void;
+  venueCount: number;
+  radiusInKm: number;
+  isRadiusActive: boolean;
+  searchText: string;
+  setSearchText: (text: string) => void;
+  appliedFilters: string[];
+  onClearFilter: (filter: string) => void;
 }
 
-const EnhancedMapSearch = ({ 
-  onSearchLocation, 
+const EnhancedMapSearch = memo(({
+  onSearch,
+  onLocationSelect,
   onRadiusChange,
-  initialRadius = 10
+  onManualLocation,
+  onCurrentLocation,
+  venueCount,
+  radiusInKm,
+  isRadiusActive,
+  searchText,
+  setSearchText,
+  appliedFilters,
+  onClearFilter
 }: EnhancedMapSearchProps) => {
+  const [searchParams] = useSearchParams();
   const [pinCode, setPinCode] = useState('');
-  const [radius, setRadius] = useState(initialRadius);
+  const [showPinCodeSearch, setShowPinCodeSearch] = useState(false);
   const { geocodePinCode, isLoading: isGeocodingLoading } = useGeocode();
-
-  const handlePinCodeSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  
+  const handlePinCodeSearch = useCallback(async () => {
     if (!pinCode.trim()) {
       toast.error('Please enter a PIN code');
       return;
     }
     
-    const location = await geocodePinCode(pinCode);
-    if (location) {
-      onSearchLocation(location.lat, location.lng);
-      toast.success(`Found location: ${location.formattedAddress}`);
+    const result = await geocodePinCode(pinCode);
+    if (result) {
+      onLocationSelect(result.lat, result.lng, result.formattedAddress);
+      toast.success(`Location set to: ${result.formattedAddress}`);
     }
-  };
-
-  const getCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported by your browser');
-      return;
-    }
-
-    toast.info('Getting your current location...');
-    
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        onSearchLocation(latitude, longitude);
-        toast.success('Using your current location');
-      },
-      () => {
-        toast.error('Unable to retrieve your location');
-      },
-      { enableHighAccuracy: true }
-    );
-  };
-
-  const handleRadiusChange = (value: number[]) => {
-    const newRadius = value[0];
-    setRadius(newRadius);
-    onRadiusChange(newRadius);
-  };
-
-  const increaseRadius = () => {
-    const newRadius = Math.min(25, radius + 5);
-    setRadius(newRadius);
-    onRadiusChange(newRadius);
-  };
-
-  const decreaseRadius = () => {
-    const newRadius = Math.max(1, radius - 5);
-    setRadius(newRadius);
-    onRadiusChange(newRadius);
-  };
-
+  }, [pinCode, geocodePinCode, onLocationSelect]);
+  
   return (
-    <div className="bg-findvenue-surface/80 border border-white/10 rounded-lg p-3 shadow-lg w-full">
-      <form onSubmit={handlePinCodeSearch} className="flex gap-2 mb-3">
-        <div className="relative flex-grow">
-          <MapPin className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
-          <Input 
-            type="text"
-            placeholder="Search by PIN code..."
-            className="pl-9 bg-findvenue-surface/50 border-white/10"
-            value={pinCode}
-            onChange={(e) => setPinCode(e.target.value)}
+    <div className="bg-findvenue-surface/90 backdrop-blur-md rounded-md overflow-hidden shadow-md border border-white/5">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+        <span className="text-sm font-medium flex items-center">
+          <MapPin className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
+          {venueCount > 0 ? `${venueCount} venues on map` : 'No venues found'}
+        </span>
+        {searchText && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => {
+              setSearchText('');
+              onSearch('');
+            }}
+          >
+            Clear <X className="h-3 w-3 ml-1" />
+          </Button>
+        )}
+      </div>
+      
+      {isRadiusActive && (
+        <div className="px-3 py-2 border-t border-white/10">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center">
+              <Ruler className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
+              <span className="text-xs font-medium">Search radius: {radiusInKm.toFixed(1)} km</span>
+            </div>
+            <div className="flex gap-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-xs"
+                onClick={() => setShowPinCodeSearch(!showPinCodeSearch)}
+              >
+                <MapIcon className="h-3 w-3 mr-1" />
+                {showPinCodeSearch ? 'Hide PIN Search' : 'PIN Search'}
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-xs"
+                onClick={onCurrentLocation}
+              >
+                <Locate className="h-3 w-3 mr-1" />
+                My Location
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-xs"
+                onClick={onManualLocation}
+              >
+                <MapPin className="h-3 w-3 mr-1" />
+                Set Location
+              </Button>
+            </div>
+          </div>
+          
+          {showPinCodeSearch && (
+            <div className="mt-2 mb-2 flex gap-1">
+              <Input
+                type="text"
+                placeholder="Enter PIN Code..."
+                className="h-7 text-xs"
+                value={pinCode}
+                onChange={(e) => setPinCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handlePinCodeSearch();
+                  }
+                }}
+              />
+              <Button 
+                size="sm" 
+                className="h-7 px-2 bg-findvenue text-white text-xs"
+                onClick={handlePinCodeSearch}
+                disabled={isGeocodingLoading}
+              >
+                {isGeocodingLoading ? 'Searching...' : 'Search'}
+              </Button>
+            </div>
+          )}
+          
+          <Slider
+            value={[radiusInKm]}
+            min={0.5}
+            max={25}
+            step={0.5}
+            onValueChange={(values) => onRadiusChange(values[0])}
+            className="py-1"
           />
         </div>
-        <Button 
-          type="submit" 
-          className="bg-findvenue hover:bg-findvenue-dark"
-          disabled={isGeocodingLoading}
-        >
-          <Search className="h-4 w-4 mr-1" />
-          {isGeocodingLoading ? 'Searching...' : 'Search'}
-        </Button>
-        <Button 
-          type="button" 
-          variant="outline" 
-          className="border-white/10"
-          onClick={getCurrentLocation}
-          title="Use current location"
-        >
-          <Navigation className="h-4 w-4" />
-        </Button>
-      </form>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span>Search Radius: {radius} km</span>
-          <div className="flex gap-1">
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              className="h-6 w-6 p-0"
-              onClick={decreaseRadius}
-              disabled={radius <= 1}
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              className="h-6 w-6 p-0"
-              onClick={increaseRadius}
-              disabled={radius >= 25}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
+      )}
+      
+      {appliedFilters.length > 0 && (
+        <div className="px-3 py-2 border-t border-white/10">
+          <div className="flex items-center">
+            <Filter className="h-3.5 w-3.5 mr-1.5 text-findvenue" />
+            <span className="text-xs font-medium mr-2">Applied filters:</span>
+            <div className="flex flex-wrap gap-1">
+              {appliedFilters.map((filter, index) => (
+                <Badge 
+                  key={index} 
+                  variant="outline" 
+                  className="text-xs py-0 px-1 bg-findvenue-surface/50 border-white/20"
+                >
+                  {filter}
+                  <button 
+                    className="ml-1"
+                    onClick={() => onClearFilter(filter)}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
           </div>
         </div>
-        <Slider
-          value={[radius]}
-          min={1}
-          max={25}
-          step={1}
-          onValueChange={handleRadiusChange}
-        />
-      </div>
+      )}
     </div>
   );
-};
+});
+
+EnhancedMapSearch.displayName = "EnhancedMapSearch";
 
 export default EnhancedMapSearch;
