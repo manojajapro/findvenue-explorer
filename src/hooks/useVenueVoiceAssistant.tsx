@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +15,7 @@ interface UseVenueVoiceAssistantProps {
 
 export const useVenueVoiceAssistant = ({
   venue,
-  autoRestart = true,
+  autoRestart = false, // Changed to false by default
   onTranscript,
   onAnswer,
   onSpeechStart,
@@ -24,7 +25,7 @@ export const useVenueVoiceAssistant = ({
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [audioEnabled, setAudioEnabled] = useState(false); // Changed to false by default
   const [isWelcomePlayed, setIsWelcomePlayed] = useState(false);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);

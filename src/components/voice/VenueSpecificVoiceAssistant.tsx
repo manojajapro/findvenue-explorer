@@ -17,7 +17,7 @@ interface VenueSpecificVoiceAssistantProps {
 
 const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
-  const [autoListenMode, setAutoListenMode] = useState(true);
+  const [autoListenMode, setAutoListenMode] = useState(false); // Changed to false by default
   const [lastTranscript, setLastTranscript] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -173,6 +173,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
               onClick={handleVoiceOutputToggle}
             >
               {audioEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              <span className="ml-1 hidden sm:inline">{audioEnabled ? "Voice On" : "Voice Off"}</span>
             </Button>
             <Button
               variant={isListening ? "default" : "outline"}
@@ -210,6 +211,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
               size="sm"
               className="text-xs hover:bg-findvenue/10"
               onClick={forcePlayWelcome}
+              disabled={!audioEnabled}
             >
               <RefreshCw className="h-3 w-3 mr-1" /> Replay Welcome
             </Button>

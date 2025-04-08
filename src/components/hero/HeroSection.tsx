@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ const HeroSection = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [cities, setCities] = useState<{id: string, name: string}[]>([]);
+  const [date, setDate] = useState<Date | undefined>(undefined);
   
   // Fetch categories from Supabase
   useEffect(() => {
@@ -74,6 +77,7 @@ const HeroSection = () => {
     if (eventType) params.append('categoryId', eventType);
     if (guests) params.append('guests', guests);
     if (location) params.append('cityId', location);
+    if (date) params.append('date', format(date, 'yyyy-MM-dd'));
     
     // Navigate to venues page with map view
     navigate(`/venues?view=map&${params.toString()}`);
@@ -83,6 +87,7 @@ const HeroSection = () => {
     setEventType('');
     setGuests('');
     setLocation('');
+    setDate(undefined);
   };
   
   return (
@@ -115,9 +120,9 @@ const HeroSection = () => {
           onSubmit={handleSearch}
           className="bg-findvenue-card-bg/80 backdrop-blur-xl p-4 md:p-6 rounded-lg border border-white/10 max-w-5xl mx-auto shadow-xl"
         >
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Event Type / Category */}
-            <div className="flex-1 min-w-0">
+            <div className="lg:col-span-1">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -152,8 +157,35 @@ const HeroSection = () => {
               </Popover>
             </div>
             
+            {/* Date Selection */}
+            <div className="lg:col-span-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`w-full justify-between border-white/10 bg-findvenue-surface/50 hover:bg-findvenue-surface h-12 ${date ? 'text-white' : 'text-findvenue-text-muted'}`}
+                  >
+                    <div className="flex items-center">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {date ? format(date, 'MMM dd, yyyy') : 'Select Date'}
+                    </div>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-findvenue-card-bg border-white/10">
+                  <CalendarComponent
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    className="p-3 pointer-events-auto border-none"
+                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            
             {/* Number of Guests */}
-            <div className="flex-1 min-w-0">
+            <div className="lg:col-span-1">
               <div className="relative">
                 <Input
                   type="number"
@@ -167,7 +199,7 @@ const HeroSection = () => {
             </div>
             
             {/* Location / City */}
-            <div className="flex-1 min-w-0">
+            <div className="lg:col-span-1">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -203,13 +235,15 @@ const HeroSection = () => {
             </div>
             
             {/* Search Button */}
-            <Button
-              type="submit"
-              className="bg-findvenue hover:bg-findvenue-dark h-12 transition-all duration-300 px-8"
-            >
-              <Search className="w-4 h-4 mr-2" />
-              Search
-            </Button>
+            <div className="lg:col-span-1">
+              <Button
+                type="submit"
+                className="bg-findvenue hover:bg-findvenue-dark h-12 transition-all duration-300 px-8 w-full"
+              >
+                <Search className="w-4 h-4 mr-2" />
+                Search
+              </Button>
+            </div>
           </div>
           
           {/* Advanced Filters Toggle */}
@@ -224,7 +258,7 @@ const HeroSection = () => {
               <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </Button>
             
-            {(eventType || guests || location) && (
+            {(eventType || guests || location || date) && (
               <Button
                 type="button"
                 variant="ghost"
