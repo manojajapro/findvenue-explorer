@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Loader2, User, Bot, RefreshCw, StopCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Loader2, User, Bot, RefreshCw, StopCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
