@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -753,6 +754,7 @@ const VenueDetails = () => {
             
             {renderAdditionalServices()}
             {renderOwnerInfo()}
+            {renderVenueType()}
           </div>
           
           <div>
@@ -812,4 +814,15 @@ const VenueDetails = () => {
                   venueId={venue?.id || ''} 
                   initialRating={venue?.rating || 0} 
                   reviewsCount={venue?.reviews || 0}
-                  onRatingUpdated={update
+                  onRatingUpdated={updateVenueRating}
+                />
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default VenueDetails;

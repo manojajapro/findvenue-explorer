@@ -90,6 +90,24 @@ export const useVenueData = () => {
             console.error("Error parsing rules_and_regulations for venue", data.id, e);
           }
           
+          // Process category data for proper display
+          let categoryData = data.category_name || '';
+          try {
+            if (typeof categoryData === 'string' && 
+               (categoryData.startsWith('[') || categoryData.includes(','))) {
+              // Try to parse as JSON or split by commas
+              try {
+                const parsed = JSON.parse(categoryData.replace(/'/g, '"'));
+                categoryData = Array.isArray(parsed) ? parsed : [categoryData];
+              } catch (e) {
+                // If parsing fails, split by commas
+                categoryData = categoryData.replace(/[\[\]']/g, '').split(',').map(item => item.trim());
+              }
+            }
+          } catch (e) {
+            console.error("Error processing category data", e);
+          }
+          
           // Use the first gallery image instead of image_url
           const defaultImage = data.gallery_images && data.gallery_images.length > 0 
             ? data.gallery_images[0] 
@@ -104,7 +122,7 @@ export const useVenueData = () => {
             address: data.address || '',
             city: data.city_name || '',
             cityId: data.city_id || '',
-            category: data.category_name || '',
+            category: categoryData,
             categoryId: data.category_id || '',
             capacity: {
               min: data.min_capacity || 0,
