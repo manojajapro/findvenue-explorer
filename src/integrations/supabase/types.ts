@@ -227,6 +227,7 @@ export type Database = {
           price_per_person: number | null
           rating: number | null
           reviews_count: number | null
+          rules_and_regulations: Json | null
           starting_price: number | null
           updated_at: string | null
           wifi: boolean | null
@@ -261,6 +262,7 @@ export type Database = {
           price_per_person?: number | null
           rating?: number | null
           reviews_count?: number | null
+          rules_and_regulations?: Json | null
           starting_price?: number | null
           updated_at?: string | null
           wifi?: boolean | null
@@ -295,6 +297,7 @@ export type Database = {
           price_per_person?: number | null
           rating?: number | null
           reviews_count?: number | null
+          rules_and_regulations?: Json | null
           starting_price?: number | null
           updated_at?: string | null
           wifi?: boolean | null
