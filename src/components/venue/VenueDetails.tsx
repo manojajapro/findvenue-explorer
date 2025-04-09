@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import { formatDistanceToNow } from 'date-fns';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 
 interface OwnerInfo {
   name: string;
@@ -35,6 +37,7 @@ const VenueDetails = () => {
   const navigate = useNavigate();
   const { venue, isLoading, error } = useVenueData();
   const { user } = useAuth();
+  const [showAllImages, setShowAllImages] = useState(false);
   
   useEffect(() => {
     if (!isLoading && !user) {
@@ -49,16 +52,16 @@ const VenueDetails = () => {
       if (category.startsWith('[') && category.endsWith(']')) {
         try {
           const parsed = JSON.parse(category.replace(/'/g, '"'));
-          return Array.isArray(parsed) ? parsed.join(', ') : category;
+          return Array.isArray(parsed) ? parsed.join(' • ') : category;
         } catch (e) {
-          return category.replace(/[\[\]']/g, '').split(',').join(', ');
+          return category.replace(/[\[\]']/g, '').split(',').join(' • ');
         }
       }
       return category;
     }
     
     if (Array.isArray(category)) {
-      return category.join(', ');
+      return category.join(' • ');
     }
     
     return String(category);
@@ -106,6 +109,38 @@ const VenueDetails = () => {
   
   return (
     <div className="container mx-auto p-4">
+      {/* Owner Profile Header (for non-owner users only) */}
+      {ownerInfo && !isOwner && user && (
+        <div className="bg-findvenue-surface/10 p-4 rounded-lg mb-6 flex items-center">
+          <div className="relative">
+            {ownerInfo.profile_image ? (
+              <img 
+                src={ownerInfo.profile_image} 
+                alt={ownerInfo.name} 
+                className="w-12 h-12 rounded-full object-cover mr-3"
+              />
+            ) : (
+              <div className="w-12 h-12 bg-findvenue rounded-full flex items-center justify-center text-white text-lg font-bold mr-3">
+                {ownerInfo.name.charAt(0)}
+              </div>
+            )}
+            <span className={`absolute bottom-0 right-0 w-3 h-3 ${
+              ownerInfo.online_status === 'online' ? 'bg-green-500' : 'bg-gray-400'
+            } rounded-full border-2 border-white`}></span>
+          </div>
+          <div className="ml-3">
+            <h4 className="font-medium">{ownerInfo.name}</h4>
+            <div className="text-sm text-findvenue-text-muted flex items-center">
+              {ownerInfo.online_status === 'online' ? (
+                <span className="text-green-500">Online</span>
+              ) : (
+                <span>Active {formatLastActive()}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="md:flex md:gap-8">
         <div className="md:w-2/3 space-y-4">
           <div className="grid grid-cols-12 gap-4 h-96">
@@ -118,9 +153,25 @@ const VenueDetails = () => {
                 <div key={index} className="relative rounded-lg overflow-hidden">
                   <img src={image} alt={`${venue.name} Gallery ${index + 1}`} className="w-full h-full object-cover" />
                   {index === 1 && venue.galleryImages && venue.galleryImages.length > 2 && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                      <span className="text-white text-lg font-medium">+{venue.galleryImages.length - 2} photos</span>
-                    </div>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                          <span className="text-white text-lg font-medium">+{venue.galleryImages.length - 2} photos</span>
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="w-full max-w-4xl p-0">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4">
+                          {venue.galleryImages.map((img, idx) => (
+                            <img 
+                              key={idx}
+                              src={img}
+                              alt={`Gallery ${idx + 1}`}
+                              className="w-full h-48 object-cover rounded-md"
+                            />
+                          ))}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   )}
                 </div>
               ))}
@@ -250,84 +301,6 @@ const VenueDetails = () => {
         ownerId={venue.ownerInfo?.user_id || ''}
         ownerName={venue.ownerInfo?.name || ''}
       />
-      
-      {ownerInfo && (
-        <>
-          <Separator className="my-4" />
-          <div className="mb-4 bg-findvenue-surface/10 p-4 rounded-lg">
-            <div className="flex items-center mb-3">
-              <div className="relative">
-                {ownerInfo.profile_image ? (
-                  <img 
-                    src={ownerInfo.profile_image} 
-                    alt={ownerInfo.name} 
-                    className="w-12 h-12 rounded-full object-cover mr-3"
-                  />
-                ) : (
-                  <div className="w-12 h-12 bg-findvenue rounded-full flex items-center justify-center text-white text-lg font-bold mr-3">
-                    {ownerInfo.name.charAt(0)}
-                  </div>
-                )}
-                <span className={`absolute bottom-0 right-0 w-3 h-3 ${
-                  ownerInfo.online_status === 'online' ? 'bg-green-500' : 'bg-gray-400'
-                } rounded-full border-2 border-white`}></span>
-              </div>
-              <div>
-                <h4 className="text-lg font-semibold">{ownerInfo.name}</h4>
-                {!isOwner && (
-                  <div className="flex items-center gap-2 text-sm text-findvenue-text-muted">
-                    <span className="inline-flex items-center">
-                      {ownerInfo.online_status === 'online' ? (
-                        <span className="text-green-500">Online</span>
-                      ) : (
-                        <span>Active {formatLastActive()}</span>
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-findvenue-text-muted mb-1">Contact</p>
-                <p className="text-gray-700">{ownerInfo.contact}</p>
-              </div>
-              <div>
-                <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
-                <p className="text-gray-700">{ownerInfo.responseTime}</p>
-              </div>
-              <div className="md:col-span-2">
-                <p className="text-sm text-findvenue-text-muted mb-1">Response Rate</p>
-                <p className="text-gray-700">100%</p>
-              </div>
-            </div>
-            {ownerInfo.socialLinks && (
-              <div className="mt-4 flex space-x-3">
-                {ownerInfo.socialLinks.facebook && (
-                  <a href={ownerInfo.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                    <FacebookIcon className="h-5 w-5" />
-                  </a>
-                )}
-                {ownerInfo.socialLinks.twitter && (
-                  <a href={ownerInfo.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                    <TwitterIcon className="h-5 w-5" />
-                  </a>
-                )}
-                {ownerInfo.socialLinks.instagram && (
-                  <a href={ownerInfo.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300">
-                    <InstagramIcon className="h-5 w-5" />
-                  </a>
-                )}
-                {ownerInfo.socialLinks.linkedin && (
-                  <a href={ownerInfo.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500">
-                    <LinkedinIcon className="h-5 w-5" />
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
-        </>
-      )}
 
       <VenueAIAssistants venue={venue} />
     </div>

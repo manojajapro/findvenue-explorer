@@ -26,6 +26,8 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
   const { user, checkIsFavorite, toggleFavoriteVenue } = useAuth();
   const [isFavorite, setIsFavorite] = useState(user ? checkIsFavorite(venue.id) : false);
   const imagesRef = useRef<string[]>([]);
+  const carouselRef = useRef<any>(null);
+  const [api, setApi] = useState<any>(null);
   
   // Prepare the images array, including the main image and gallery images
   useEffect(() => {
@@ -42,6 +44,17 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
     const uniqueImages = [...new Set(images)];
     imagesRef.current = uniqueImages.length > 0 ? uniqueImages : [venue.imageUrl];
   }, [venue.imageUrl, venue.galleryImages]);
+
+  // Set up auto-scrolling for the carousel
+  useEffect(() => {
+    if (!api) return;
+    
+    const autoplayInterval = setInterval(() => {
+      api.scrollNext();
+    }, 3000); // Auto scroll every 3 seconds
+    
+    return () => clearInterval(autoplayInterval);
+  }, [api]);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -107,8 +120,7 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
               align: "start",
               loop: true,
             }}
-            autoplay={true}
-            interval={1000}
+            setApi={setApi}
           >
             <CarouselContent className="h-full">
               {imagesRef.current.map((imgSrc, index) => (

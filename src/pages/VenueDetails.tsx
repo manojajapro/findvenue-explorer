@@ -34,6 +34,8 @@ import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import VenueRating from '@/components/venue/VenueRating';
 import { getVenueOwnerId } from '@/utils/venueHelpers';
+import { formatDistanceToNow } from 'date-fns';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
@@ -140,15 +142,52 @@ const VenueDetails = () => {
             wifi: venueData.wifi,
             accessibilityFeatures: venueData.accessibility_features || [],
             acceptedPaymentMethods: venueData.accepted_payment_methods || [],
+            openingHours: venueData.opening_hours,
+            ownerInfo: ownerInfoData,
+            additionalServices: venueData.additional_services || [],
+            type: venueData.type || '',
+            rulesAndRegulations: venueData.rules_and_regulations
+          };
+          setActiveImage(defaultImage);
+          setVenue({
+            id: venueData.id,
+            name: venueData.name,
+            description: venueData.description || '',
+            imageUrl: defaultImage,
+            galleryImages: venueData.gallery_images || [],
+            address: venueData.address || '',
+            city: venueData.city_name || '',
+            cityId: venueData.city_id || '',
+            category: venueData.category_name || '',
+            categoryId: venueData.category_id || '',
+            capacity: {
+              min: venueData.min_capacity || 0,
+              max: venueData.max_capacity || 0
+            },
+            pricing: {
+              currency: venueData.currency || 'SAR',
+              startingPrice: venueData.starting_price || 0,
+              pricePerPerson: venueData.price_per_person || 0
+            },
+            amenities: venueData.amenities || [],
+            rating: venueData.rating || 0,
+            reviews: venueData.reviews_count || 0,
+            featured: venueData.featured || false,
+            popular: venueData.popular || false,
+            availability: venueData.availability || [],
+            latitude: venueData.latitude,
+            longitude: venueData.longitude,
+            parking: venueData.parking,
+            wifi: venueData.wifi,
+            accessibilityFeatures: venueData.accessibility_features || [],
+            acceptedPaymentMethods: venueData.accepted_payment_methods || [],
             openingHours: openingHoursData,
             ownerInfo: ownerInfoData,
             additionalServices: venueData.additional_services || [],
             type: venueData.type || '',
             rulesAndRegulations: rulesAndRegulationsData
-          };
-          
-          setVenue(transformedVenue);
-          setActiveImage(transformedVenue.imageUrl);
+          });
+          setActiveImage(defaultImage);
           
           const { data: similarData, error: similarError } = await supabase
             .from('venues')
@@ -411,19 +450,31 @@ const VenueDetails = () => {
       if (category.startsWith('[') && category.endsWith(']')) {
         try {
           const parsed = JSON.parse(category.replace(/'/g, '"'));
-          return Array.isArray(parsed) ? parsed.join(', ') : category;
+          return Array.isArray(parsed) ? parsed.join(' • ') : category;
         } catch (e) {
-          return category.replace(/[\[\]']/g, '').split(',').join(', ');
+          return category.replace(/[\[\]']/g, '').split(',').join(' • ');
         }
       }
       return category;
     }
     
     if (Array.isArray(category)) {
-      return category.join(', ');
+      return category.join(' • ');
     }
     
     return String(category);
+  };
+  
+  const formatLastActive = () => {
+    if (venue?.ownerInfo?.last_active) {
+      try {
+        const lastActiveDate = new Date(venue.ownerInfo.last_active);
+        return formatDistanceToNow(lastActiveDate, { addSuffix: true });
+      } catch (error) {
+        return "Recently";
+      }
+    }
+    return "Recently";
   };
   
   if (loading) {
@@ -468,6 +519,8 @@ const VenueDetails = () => {
     );
   }
   
+  const isOwner = user?.id === venue.ownerInfo?.user_id;
+  
   return (
     <div className="pt-24 pb-16">
       <div className="container mx-auto px-4">
@@ -477,6 +530,38 @@ const VenueDetails = () => {
             Back to venues
           </Link>
         </div>
+
+        {/* Owner Profile Header (for non-owner users only) */}
+        {venue.ownerInfo && !isOwner && user && (
+          <div className="bg-findvenue-surface/10 p-4 rounded-lg mb-6 flex items-center">
+            <div className="relative">
+              {venue.ownerInfo.profile_image ? (
+                <img 
+                  src={venue.ownerInfo.profile_image} 
+                  alt={venue.ownerInfo.name} 
+                  className="w-12 h-12 rounded-full object-cover mr-3"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-findvenue rounded-full flex items-center justify-center text-white text-lg font-bold mr-3">
+                  {venue.ownerInfo.name.charAt(0)}
+                </div>
+              )}
+              <span className={`absolute bottom-0 right-0 w-3 h-3 ${
+                venue.ownerInfo.online_status === 'online' ? 'bg-green-500' : 'bg-gray-400'
+              } rounded-full border-2 border-white`}></span>
+            </div>
+            <div className="ml-3">
+              <h4 className="font-medium">{venue.ownerInfo.name}</h4>
+              <div className="text-sm text-findvenue-text-muted flex items-center">
+                {venue.ownerInfo.online_status === 'online' ? (
+                  <span className="text-green-500">Online</span>
+                ) : (
+                  <span>Active {formatLastActive()}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="mb-10">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -505,15 +590,36 @@ const VenueDetails = () => {
               </div>
             </div>
             <div className="grid grid-cols-4 md:grid-cols-1 gap-2">
-              {venue?.galleryImages?.slice(0, 4).map((img, index) => (
+              {venue?.galleryImages?.slice(0, 2).map((img, index) => (
                 <div 
                   key={index}
-                  className={`rounded-lg overflow-hidden aspect-square cursor-pointer transition-all duration-300 ${
+                  className={`relative rounded-lg overflow-hidden aspect-square cursor-pointer transition-all duration-300 ${
                     activeImage === img ? 'ring-2 ring-findvenue' : 'opacity-70 hover:opacity-100'
                   }`}
                   onClick={() => setActiveImage(img)}
                 >
                   <img src={img} alt={`Gallery ${index+1}`} className="w-full h-full object-cover" />
+                  {index === 1 && venue?.galleryImages && venue?.galleryImages.length > 2 && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                          <span className="text-white text-lg font-medium">+{venue.galleryImages.length - 2} photos</span>
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="w-full max-w-4xl p-0">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4">
+                          {venue.galleryImages.map((img, idx) => (
+                            <img 
+                              key={idx}
+                              src={img}
+                              alt={`Gallery ${idx + 1}`}
+                              className="w-full h-48 object-cover rounded-md"
+                            />
+                          ))}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </div>
               ))}
             </div>
@@ -645,8 +751,8 @@ const VenueDetails = () => {
             
             <VenueAIAssistants venue={venue} />
             
-            {venue?.additionalServices && venue.additionalServices.length > 0 && renderAdditionalServices()}
-            {venue?.ownerInfo && renderOwnerInfo()}
+            {renderAdditionalServices()}
+            {renderOwnerInfo()}
           </div>
           
           <div>
@@ -706,38 +812,4 @@ const VenueDetails = () => {
                   venueId={venue?.id || ''} 
                   initialRating={venue?.rating || 0} 
                   reviewsCount={venue?.reviews || 0}
-                  onRatingUpdated={updateVenueRating}
-                />
-              </div>
-              
-              {venue?.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && renderPaymentMethods()}
-              
-              {renderOpeningHours()}
-              
-              {renderVenueType()}
-            </Card>
-          </div>
-        </div>
-        
-        {similarVenues.length > 0 && (
-          <div className="mt-16">
-            <h2 className="text-2xl font-bold mb-6">Similar Venues You Might Like</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {similarVenues.map((venue) => (
-                <div 
-                  key={venue.id} 
-                  className="h-full cursor-pointer" 
-                  onClick={() => navigate(`/venue/${venue.id}`)}
-                >
-                  <VenueCard venue={venue} />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default VenueDetails;
+                  onRatingUpdated={update

@@ -49,6 +49,9 @@ export const useVenueData = () => {
                 contact: ownerInfo.contact || '',
                 responseTime: ownerInfo.response_time || '',
                 user_id: ownerInfo.user_id || '',
+                profile_image: ownerInfo.profile_image || '',
+                online_status: ownerInfo.online_status || 'offline',
+                last_active: ownerInfo.last_active || new Date().toISOString(),
                 socialLinks: {
                   facebook: ownerInfo.facebook_url || ownerInfo.facebook || '',
                   twitter: ownerInfo.twitter_url || ownerInfo.twitter || '',
