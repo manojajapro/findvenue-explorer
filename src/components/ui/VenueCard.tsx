@@ -7,54 +7,59 @@ import { Card } from '@/components/ui/card';
 import { Star, Users, CalendarDays, MapPin, Heart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { useLanguage } from '@/hooks/useLanguage';
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselPrevious,
-  CarouselNext,
 } from "@/components/ui/carousel";
 
 interface VenueCardProps {
   venue: Venue;
   featured?: boolean;
   onFavoriteRemoved?: (venueId: string) => void;
+  index?: number; // Add index for staggered animations
 }
 
-const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProps) => {
+const VenueCard = ({ venue, featured = false, onFavoriteRemoved, index = 0 }: VenueCardProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const { user, checkIsFavorite, toggleFavoriteVenue } = useAuth();
+  const { isRTL } = useLanguage();
   const [isFavorite, setIsFavorite] = useState(user ? checkIsFavorite(venue.id) : false);
   const imagesRef = useRef<string[]>([]);
-  const carouselRef = useRef<any>(null);
   const [api, setApi] = useState<any>(null);
   
   // Prepare the images array, including the main image and gallery images
   useEffect(() => {
     const images: string[] = [];
-    if (venue.imageUrl) {
-      images.push(venue.imageUrl);
-    }
     
+    // Use gallery images if available
     if (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0) {
       images.push(...venue.galleryImages);
+    } 
+    // Fallback to main image if no gallery images
+    else if (venue.imageUrl) {
+      images.push(venue.imageUrl);
     }
     
     // Remove duplicates
     const uniqueImages = [...new Set(images)];
-    imagesRef.current = uniqueImages.length > 0 ? uniqueImages : [venue.imageUrl];
+    imagesRef.current = uniqueImages.length > 0 ? uniqueImages : [venue.imageUrl || ''];
   }, [venue.imageUrl, venue.galleryImages]);
 
-  // Set up auto-scrolling for the carousel
+  // Set up auto-scrolling for the carousel with different timing based on index
   useEffect(() => {
     if (!api) return;
     
+    // Use different intervals for odd and even cards
+    const interval = index % 2 === 0 ? 3500 : 4500;
+    
     const autoplayInterval = setInterval(() => {
       api.scrollNext();
-    }, 3000); // Auto scroll every 3 seconds
+    }, interval);
     
     return () => clearInterval(autoplayInterval);
-  }, [api]);
+  }, [api, index]);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -108,7 +113,7 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
 
   return (
     <Link to={`/venue/${venue.id}`} className="block h-full">
-      <Card className={`overflow-hidden transition-all duration-500 h-full transform hover-scale glass-card ${featured ? 'border-findvenue-gold/30' : 'border-white/10'}`}>
+      <Card className={`overflow-hidden transition-all duration-500 h-full transform hover:scale-105 glass-card ${featured ? 'border-findvenue-gold/30' : 'border-white/10'}`}>
         <div className="relative overflow-hidden aspect-[4/3]">
           {!isLoaded && (
             <div className="absolute inset-0 bg-findvenue-surface animate-pulse" />
@@ -119,6 +124,7 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
             opts={{
               align: "start",
               loop: true,
+              direction: isRTL ? 'rtl' : 'ltr',
             }}
             setApi={setApi}
           >
@@ -128,7 +134,7 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
                   <img 
                     src={imgSrc} 
                     alt={`${venue.name} ${index}`}
-                    className="w-full h-full object-cover"
+                    className={`w-full h-full object-cover transition-transform duration-700 ${api ? 'hover:scale-110' : ''}`}
                     onLoad={() => {
                       if (index === 0) setIsLoaded(true);
                     }}
@@ -138,17 +144,18 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
             </CarouselContent>
           </Carousel>
           
+          {/* Badges and favorite button */}
           {featured && (
-            <div className="absolute top-2 right-2 z-10">
+            <div className={`absolute top-2 ${isRTL ? 'left-2' : 'right-2'} z-10`}>
               <Badge className="bg-findvenue-gold text-black font-medium px-2 py-1">
-                Featured
+                {isRTL ? 'مميز' : 'Featured'}
               </Badge>
             </div>
           )}
           {venue.popular && (
-            <div className="absolute top-2 left-2 z-10">
+            <div className={`absolute top-2 ${isRTL ? 'right-2' : 'left-2'} z-10`}>
               <Badge className="bg-findvenue text-white font-medium px-2 py-1">
-                Popular
+                {isRTL ? 'شائع' : 'Popular'}
               </Badge>
             </div>
           )}
@@ -163,7 +170,7 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm"
+              className={`absolute top-2 ${isRTL ? 'right-2' : 'left-2'} z-10 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm`}
               onClick={handleFavoriteClick}
             >
               <Heart 
@@ -193,11 +200,11 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
           <div className="flex flex-wrap gap-3 text-xs text-findvenue-text-muted mt-auto">
             <div className="flex items-center">
               <Users className="w-3 h-3 mr-1" />
-              <span>Up to {venue.capacity.max}</span>
+              <span>{isRTL ? 'حتى' : 'Up to'} {venue.capacity.max}</span>
             </div>
             <div className="flex items-center">
               <CalendarDays className="w-3 h-3 mr-1" />
-              <span>{venue.availability?.length} days/week</span>
+              <span>{venue.availability?.length} {isRTL ? 'أيام/أسبوع' : 'days/week'}</span>
             </div>
             <div className="ml-auto font-semibold text-white">
               {venue.pricing.currency} {venue.pricing.startingPrice.toLocaleString()}

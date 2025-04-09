@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
@@ -223,4 +222,42 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* RTL Support */
+html[dir="rtl"] .rtl-mirror {
+  transform: scaleX(-1);
+}
+
+html[dir="rtl"] .rtl-flip {
+  direction: rtl;
+}
+
+html[dir="rtl"] body {
+  font-family: 'Cairo', sans-serif;
+  text-align: right;
+}
+
+html[dir="rtl"] .rtl-reverse {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .rtl-ml {
+  margin-right: auto;
+  margin-left: 0 !important;
+}
+
+html[dir="rtl"] .rtl-mr {
+  margin-left: auto;
+  margin-right: 0 !important;
+}
+
+html[dir="rtl"] .rtl-pl {
+  padding-right: 1rem;
+  padding-left: 0 !important;
+}
+
+html[dir="rtl"] .rtl-pr {
+  padding-left: 1rem;
+  padding-right: 0 !important;
 }

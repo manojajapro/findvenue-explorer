@@ -1,9 +1,9 @@
-
 import { useNavigate } from 'react-router-dom';
 import { VenueCard } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/hooks/useLanguage';
 import { toast } from "@/components/ui/use-toast";
 
 interface VenuesListProps {
@@ -23,6 +23,7 @@ const VenuesList = ({
 }: VenuesListProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { language } = useLanguage();
   
   const handleVenueClick = (venueId: string) => {
     if (user) {
@@ -32,8 +33,8 @@ const VenuesList = ({
       // User is not logged in, save venue ID to localStorage and redirect to login
       localStorage.setItem('redirectVenueId', venueId);
       toast({
-        title: "Login Required",
-        description: "Please login to view venue details",
+        title: language === 'en' ? "Login Required" : "تسجيل الدخول مطلوب",
+        description: language === 'en' ? "Please login to view venue details" : "يرجى تسجيل الدخول لعرض تفاصيل المكان",
         variant: "default",
       });
       navigate('/login');
@@ -61,10 +62,13 @@ const VenuesList = ({
   if (venues.length === 0) {
     return (
       <div className="text-center py-8 border border-white/10 rounded-lg bg-findvenue-surface/20">
-        <h3 className="text-xl font-medium mb-2">No venues found</h3>
+        <h3 className="text-xl font-medium mb-2">
+          {language === 'en' ? 'No venues found' : 'لم يتم العثور على أماكن'}
+        </h3>
         <p className="text-findvenue-text-muted max-w-md mx-auto">
-          We couldn't find any venues matching your criteria. 
-          Try adjusting your search filters or browsing all venues.
+          {language === 'en' 
+            ? 'We couldn\'t find any venues matching your criteria. Try adjusting your search filters or browsing all venues.' 
+            : 'لم نتمكن من العثور على أي أماكن تطابق معاييرك. حاول ضبط مرشحات البحث أو تصفح جميع الأماكن.'}
         </p>
       </div>
     );
@@ -72,7 +76,7 @@ const VenuesList = ({
   
   return (
     <div className={`grid grid-cols-2 ${compact ? '' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-4`}>
-      {venues.map((venue) => (
+      {venues.map((venue, index) => (
         <div 
           key={venue.id} 
           className={`h-full ${compact ? 'mb-3 last:mb-0' : ''} cursor-pointer`}
@@ -80,7 +84,7 @@ const VenuesList = ({
           onMouseLeave={() => onVenueMouseLeave && onVenueMouseLeave()}
           onClick={() => handleVenueClick(venue.id)}
         >
-          <VenueCard venue={venue} featured={venue.featured} />
+          <VenueCard venue={venue} featured={venue.featured} index={index} />
         </div>
       ))}
     </div>

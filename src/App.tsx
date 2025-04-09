@@ -1,171 +1,52 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, useLocation, Navigate } from "react-router-dom";
-import { useEffect } from "react";
-import { useAuth } from "./hooks/useAuth";
-import Index from "./pages/Index";
-import VenueDetails from "./pages/VenueDetails";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import ListVenue from "./pages/ListVenue";
-import VenueOwnerPromo from "./pages/VenueOwnerPromo";
-import NotFound from "./pages/NotFound";
-import Venues from "./pages/Venues";
-import Categories from "./pages/Categories";
-import Cities from "./pages/Cities";
-import Profile from "./pages/Profile";
-import Bookings from "./pages/Bookings";
-import CustomerBookings from "./pages/CustomerBookings";
-import Favorites from "./pages/Favorites";
-import Messages from "./pages/Messages";
-import MyVenues from "./pages/MyVenues";
-import EditVenue from "./pages/EditVenue";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster } from "sonner";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
-import { AuthProvider } from "./hooks/useAuth";
-import AuthCallback from "./pages/AuthCallback";
-
-const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element, allowedRoles?: string[] }) => {
-  const { user, isLoading, profile } = useAuth();
-  
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  if (allowedRoles.length > 0 && profile) {
-    if (!allowedRoles.includes(profile.user_role)) {
-      return <Navigate to="/" replace />;
-    }
-  }
-  
-  return children;
-};
-
-const HomeRoute = () => {
-  const { user, isVenueOwner } = useAuth();
-  
-  if (user && isVenueOwner) {
-    return <Navigate to="/my-venues?tab=dashboard" replace />;
-  }
-  
-  return <Index />;
-};
-
-const LoginRoute = () => {
-  const { user, isVenueOwner } = useAuth();
-  
-  if (user) {
-    if (isVenueOwner) {
-      return <Navigate to="/my-venues?tab=dashboard" replace />;
-    } else {
-      return <Navigate to="/" replace />;
-    }
-  }
-  
-  return <Login />;
-};
-
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-  
-  return null;
-}
-
-function RevealOnScroll() {
-  useEffect(() => {
-    function reveal() {
-      const reveals = document.querySelectorAll('.reveal');
-      
-      for (let i = 0; i < reveals.length; i++) {
-        const windowHeight = window.innerHeight;
-        const elementTop = reveals[i].getBoundingClientRect().top;
-        const elementVisible = 150;
-        
-        if (elementTop < windowHeight - elementVisible) {
-          reveals[i].classList.add('active');
-        }
-      }
-    }
-    
-    window.addEventListener('scroll', reveal);
-    reveal(); // Initial check
-    
-    return () => window.removeEventListener('scroll', reveal);
-  }, []);
-  
-  return null;
-}
-
-const queryClient = new QueryClient();
+import { LanguageProvider } from "./hooks/useLanguage";
+import Home from "./pages/Home";
+import Venues from "./pages/Venues";
+import VenueDetails from "./pages/VenueDetails";
+import Categories from "./pages/Categories";
+import Cities from "./pages/Cities";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Profile from "./pages/Profile";
+import Bookings from "./pages/Bookings";
+import Favorites from "./pages/Favorites";
+import VenueOwner from "./pages/VenueOwner";
+import MyVenues from "./pages/MyVenues";
+import ListVenue from "./pages/ListVenue";
+import EditVenue from "./pages/EditVenue";
+import CustomerBookings from "./pages/CustomerBookings";
+import Messages from "./pages/Messages";
 
 function App() {
   return (
-    <div className="app">
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <Navbar />
-            <main className="min-h-screen">
-              <Routes>
-                <Route path="/" element={<HomeRoute />} />
-                {/* Protected VenueDetails route */}
-                <Route path="/venue/:id" element={<ProtectedRoute><VenueDetails /></ProtectedRoute>} />
-                <Route path="/login" element={<LoginRoute />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/venues" element={<Venues />} />
-                <Route path="/categories" element={<Categories />} />
-                <Route path="/cities" element={<Cities />} />
-                <Route path="/venue-owner" element={<VenueOwnerPromo />} />
-                
-                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/account" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
-                <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
-                
-                {/* Updated routes for messaging - using a single Messages component for both views */}
-                <Route path="/messages" element={
-                  <ProtectedRoute>
-                    <Messages />
-                  </ProtectedRoute>
-                } />
-                <Route path="/messages/:contactId" element={
-                  <ProtectedRoute>
-                    <Messages />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
-                <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />
-                <Route path="/edit-venue/:id" element={<ProtectedRoute allowedRoles={['venue-owner']}><EditVenue /></ProtectedRoute>} />
-                <Route path="/customer-bookings" element={<ProtectedRoute allowedRoles={['venue-owner']}><CustomerBookings /></ProtectedRoute>} />
-                
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </main>
-            <Footer />
-            <ScrollToTop />
-            <RevealOnScroll />
-          </TooltipProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </div>
+    <LanguageProvider>
+      <BrowserRouter>
+        <Toaster richColors />
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/venues" element={<Venues />} />
+          <Route path="/venue/:id" element={<VenueDetails />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/cities" element={<Cities />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/bookings" element={<Bookings />} />
+          <Route path="/favorites" element={<Favorites />} />
+          <Route path="/venue-owner" element={<VenueOwner />} />
+          <Route path="/my-venues" element={<MyVenues />} />
+          <Route path="/list-venue" element={<ListVenue />} />
+          <Route path="/edit-venue/:id" element={<EditVenue />} />
+          <Route path="/customer-bookings" element={<CustomerBookings />} />
+          <Route path="/messages" element={<Messages />} />
+        </Routes>
+        <Footer />
+      </BrowserRouter>
+    </LanguageProvider>
   );
 }
 

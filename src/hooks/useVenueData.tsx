@@ -1,8 +1,23 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
+
+interface ExtendedOwnerInfo {
+  name: string;
+  contact: string;
+  responseTime: string;
+  user_id: string;
+  profile_image?: string;
+  online_status?: string;
+  last_active?: string;
+  socialLinks?: {
+    facebook?: string;
+    twitter?: string;
+    instagram?: string;
+    linkedin?: string;
+  };
+}
 
 export const useVenueData = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,7 +52,7 @@ export const useVenueData = () => {
         if (data) {
           console.log("Raw venue data:", data);
           
-          let ownerInfoData = undefined;
+          let ownerInfoData: ExtendedOwnerInfo | undefined = undefined;
           try {
             if (data.owner_info) {
               const ownerInfo = typeof data.owner_info === 'string'
@@ -90,25 +105,21 @@ export const useVenueData = () => {
             console.error("Error parsing rules_and_regulations for venue", data.id, e);
           }
           
-          // Process category data for proper display
           let categoryData = data.category_name || '';
           try {
             if (typeof categoryData === 'string' && 
                (categoryData.startsWith('[') || categoryData.includes(','))) {
-              // Try to parse as JSON or split by commas
               try {
                 const parsed = JSON.parse(categoryData.replace(/'/g, '"'));
                 categoryData = Array.isArray(parsed) ? parsed : [categoryData];
               } catch (e) {
-                // If parsing fails, split by commas
-                categoryData = categoryData.replace(/[\[\]']/g, '').split(',').map(item => item.trim());
+                categoryData = categoryData.replace(/[\[\]']/g, '').split(',').map((item: string) => item.trim());
               }
             }
           } catch (e) {
             console.error("Error processing category data", e);
           }
           
-          // Use the first gallery image instead of image_url
           const defaultImage = data.gallery_images && data.gallery_images.length > 0 
             ? data.gallery_images[0] 
             : '';
@@ -117,7 +128,7 @@ export const useVenueData = () => {
             id: data.id,
             name: data.name,
             description: data.description || '',
-            imageUrl: defaultImage, // Use first gallery image instead
+            imageUrl: defaultImage, 
             galleryImages: data.gallery_images || [],
             address: data.address || '',
             city: data.city_name || '',

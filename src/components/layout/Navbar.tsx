@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -14,19 +13,21 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Search, LogIn, Menu, X, Heart, 
   Calendar, User, Building, PlusCircle, LogOut,
-  Home, MessageCircle
+  Home, MessageCircle, Languages
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useLanguage } from '@/hooks/useLanguage';
+import { Switch } from '@/components/ui/switch';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 
 const Navbar = () => {
   const { user, profile, isVenueOwner, signOut } = useAuth();
+  const { language, toggleLanguage, isRTL } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // Track scroll position for navbar styling
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -36,12 +37,10 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
-  // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
   
-  // Check if a route is active
   const isActive = (path: string) => {
     if (path === '/') {
       return location.pathname === path;
@@ -76,7 +75,6 @@ const Navbar = () => {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
-          {/* Logo */}
           <div 
             className="text-xl md:text-2xl font-bold text-white cursor-pointer flex items-center" 
             onClick={handleLogoClick}
@@ -84,7 +82,6 @@ const Navbar = () => {
             <span className="bg-findvenue px-2 py-1 rounded text-white mr-1">Find</span>Venue
           </div>
           
-          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
             {!isVenueOwner && (
               <>
@@ -167,17 +164,23 @@ const Navbar = () => {
             )}
           </nav>
           
-          {/* User Menu & Auth Buttons */}
           <div className="flex items-center">
-            {/* Search Button */}
+            <div className="flex items-center mr-2">
+              <Languages className="h-4 w-4 mr-1" />
+              <span className="mr-1 text-xs hidden sm:inline">{language === 'en' ? 'EN' : 'AR'}</span>
+              <Switch 
+                checked={language === 'ar'} 
+                onCheckedChange={toggleLanguage}
+                aria-label="Toggle language" 
+              />
+            </div>
+            
             <Button variant="ghost" size="icon" className="mr-1">
               <Search className="h-5 w-5" />
             </Button>
             
-            {/* Notifications center for logged in users */}
             {user && <NotificationCenter />}
             
-            {/* Messages link for logged in users */}
             {user && (
               <Link to="/messages">
                 <Button 
@@ -284,7 +287,6 @@ const Navbar = () => {
               </Button>
             )}
             
-            {/* Mobile Menu Button */}
             <Button 
               variant="ghost" 
               size="icon" 
@@ -300,10 +302,21 @@ const Navbar = () => {
           </div>
         </div>
         
-        {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="md:hidden mt-4 pb-2 border-t border-findvenue-surface pt-3">
             <nav className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between p-2">
+                <div className="flex items-center">
+                  <Languages className="h-4 w-4 mr-2" />
+                  <span>{language === 'en' ? 'English' : 'العربية'}</span>
+                </div>
+                <Switch 
+                  checked={language === 'ar'} 
+                  onCheckedChange={toggleLanguage}
+                  aria-label="Toggle language" 
+                />
+              </div>
+              
               {!isVenueOwner && (
                 <>
                   <Link to="/">

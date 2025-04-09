@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,6 +50,42 @@ const MyVenues = () => {
     }
   }, [location.search, navigate]);
 
+  const transformVenue = (venue: any): Venue => {
+    const primaryImage = venue.gallery_images && venue.gallery_images.length > 0 
+      ? venue.gallery_images[0] 
+      : (venue.image_url || '');
+      
+    return {
+      id: venue.id,
+      name: venue.name,
+      description: venue.description || '',
+      imageUrl: primaryImage,
+      galleryImages: venue.gallery_images || [],
+      address: venue.address || '',
+      city: venue.city_name || '',
+      cityId: venue.city_id || '',
+      category: venue.category_name || '',
+      categoryId: venue.category_id || '',
+      capacity: {
+        min: venue.min_capacity || 0,
+        max: venue.max_capacity || 0
+      },
+      pricing: {
+        currency: venue.currency || 'SAR',
+        startingPrice: venue.starting_price || 0,
+        pricePerPerson: venue.price_per_person,
+        hourlyRate: venue.hourly_rate || 0
+      },
+      amenities: venue.amenities || [],
+      rating: venue.rating || 0,
+      reviews: venue.reviews_count || 0,
+      featured: venue.featured || false,
+      popular: venue.popular || false,
+      availability: venue.availability || [],
+      ownerInfo: venue.owner_info
+    } as Venue;
+  };
+
   const fetchVenues = async () => {
     if (!user) return;
     
@@ -82,62 +119,7 @@ const MyVenues = () => {
         
         console.log("Filtered user venues:", userVenues);
         
-        const transformedVenues = userVenues.map(venue => {
-          let ownerInfoData = undefined;
-          
-          try {
-            if (venue.owner_info) {
-              const ownerInfo = typeof venue.owner_info === 'string'
-                ? JSON.parse(venue.owner_info)
-                : venue.owner_info;
-                
-              ownerInfoData = {
-                name: ownerInfo.name || '',
-                contact: ownerInfo.contact || '',
-                responseTime: ownerInfo.response_time || '',
-                user_id: ownerInfo.user_id || '',
-                socialLinks: ownerInfo.socialLinks || {
-                  facebook: '',
-                  twitter: '',
-                  instagram: '',
-                  linkedin: ''
-                }
-              };
-            }
-          } catch (e) {
-            console.error("Error parsing owner_info for venue", venue.id, e);
-          }
-          
-          return {
-            id: venue.id,
-            name: venue.name,
-            description: venue.description || '',
-            imageUrl: venue.image_url || '',
-            galleryImages: venue.gallery_images || [],
-            address: venue.address || '',
-            city: venue.city_name || '',
-            cityId: venue.city_id || '',
-            category: venue.category_name || '',
-            categoryId: venue.category_id || '',
-            capacity: {
-              min: venue.min_capacity || 0,
-              max: venue.max_capacity || 0
-            },
-            pricing: {
-              currency: venue.currency || 'SAR',
-              startingPrice: venue.starting_price || 0,
-              pricePerPerson: venue.price_per_person,
-              hourlyRate: venue.hourly_rate || 0
-            },
-            amenities: venue.amenities || [],
-            rating: venue.rating || 0,
-            reviews: venue.reviews_count || 0,
-            featured: venue.featured || false,
-            popular: venue.popular || false,
-            availability: venue.availability || [],
-            ownerInfo: ownerInfoData
-          } as Venue;
-        });
+        const transformedVenues = userVenues.map(transformVenue);
         
         console.log("Transformed venues:", transformedVenues);
         setVenues(transformedVenues);
@@ -650,7 +632,7 @@ const MyVenues = () => {
                               <p className="text-sm font-medium mt-1">{booking.venue_name}</p>
                               <div className="flex justify-between items-center mt-1">
                                 <span className="text-xs text-findvenue-text-muted">{booking.guests} guests</span>
-                                <span className="text-sm font-medium">SAR {booking.total_price}</span>
+                                <span className="font-medium">SAR {booking.total_price}</span>
                               </div>
                             </div>
                           ))}
