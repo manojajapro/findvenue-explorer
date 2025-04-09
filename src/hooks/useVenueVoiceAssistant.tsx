@@ -25,7 +25,7 @@ export const useVenueVoiceAssistant = ({
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(true); // Default to true for better UX
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const [isWelcomePlayed, setIsWelcomePlayed] = useState(false);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -69,18 +69,13 @@ export const useVenueVoiceAssistant = ({
       recognitionRef.current.lang = 'en-US';
       
       recognitionRef.current.onstart = () => {
-        if (isMountedRef.current) {
-          setIsListening(true);
-          console.log('Speech recognition started');
-        }
+        if (isMountedRef.current) setIsListening(true);
       };
       
       recognitionRef.current.onresult = (event) => {
         const transcript = Array.from(event.results)
           .map(result => result[0].transcript)
           .join('');
-        
-        console.log('Transcript:', transcript);
         
         if (isMountedRef.current) setTranscript(transcript);
         
@@ -98,15 +93,10 @@ export const useVenueVoiceAssistant = ({
         if (isMountedRef.current) {
           setError(`Speech recognition error: ${event.error}`);
           setIsListening(false);
-          
-          if (event.error !== 'no-speech') {
-            toast.error(`Microphone error: ${event.error}`);
-          }
         }
       };
       
       recognitionRef.current.onend = () => {
-        console.log('Speech recognition ended');
         if (isMountedRef.current) setIsListening(false);
         
         if (autoRestart && !processingRef.current && isMountedRef.current) {
@@ -114,7 +104,6 @@ export const useVenueVoiceAssistant = ({
             if (recognitionRef.current && !processingRef.current && isMountedRef.current) {
               try {
                 recognitionRef.current.start();
-                console.log('Auto-restarting speech recognition');
               } catch (e) {
                 console.error('Failed to restart recognition:', e);
               }
@@ -124,7 +113,6 @@ export const useVenueVoiceAssistant = ({
       };
     } else {
       setError('Speech recognition not supported in this browser.');
-      toast.error('Speech recognition not supported in this browser. Try using Chrome or Edge.');
     }
   }, [autoRestart, onTranscript]);
   
@@ -143,8 +131,6 @@ export const useVenueVoiceAssistant = ({
         }
       }
       
-      console.log('Processing voice query:', text);
-      
       const { data, error } = await supabase.functions.invoke('venue-assistant', {
         body: {
           query: text,
@@ -156,8 +142,6 @@ export const useVenueVoiceAssistant = ({
       if (error) throw new Error(error.message);
       
       if (data?.answer && isMountedRef.current) {
-        console.log('Voice assistant response:', data.answer);
-        
         if (onAnswer) {
           onAnswer(data.answer);
         }
@@ -170,7 +154,6 @@ export const useVenueVoiceAssistant = ({
       console.error('Error processing voice query:', err);
       if (isMountedRef.current) {
         setError(err.message || 'Failed to process your request');
-        toast.error('Failed to process your request. Please try again.');
       
         if (onAnswer) {
           onAnswer("I'm sorry, I encountered an error processing your request. Please try again.");
@@ -182,7 +165,7 @@ export const useVenueVoiceAssistant = ({
         processingRef.current = false;
         setTranscript('');
       
-        if (autoRestart && isMountedRef.current) {
+        if (autoRestart && !error && isMountedRef.current && audioEnabled) {
           setTimeout(() => {
             startListening();
           }, 1000);
@@ -197,8 +180,6 @@ export const useVenueVoiceAssistant = ({
     try {
       if (onSpeechStart) onSpeechStart();
       
-      console.log('Calling text-to-speech with text:', text.substring(0, 50) + '...');
-      
       const { data, error } = await supabase.functions.invoke('text-to-speech', {
         body: {
           text: text,
@@ -209,8 +190,6 @@ export const useVenueVoiceAssistant = ({
       if (error) throw new Error(error.message);
       
       if (!data?.audio) throw new Error('No audio received from TTS service');
-      
-      console.log('Audio data received, length:', data.audio.length);
       
       if (audioElementRef.current) {
         audioElementRef.current.pause();
@@ -241,7 +220,6 @@ export const useVenueVoiceAssistant = ({
         
         audio.play().catch(err => {
           console.error('Error playing audio:', err);
-          toast.error('Failed to play audio response. Check if your speakers are enabled.');
           if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
           reject(err);
         });
@@ -326,20 +304,16 @@ export const useVenueVoiceAssistant = ({
     
     if (recognitionRef.current) {
       try {
-        console.log('Starting speech recognition');
         await recognitionRef.current.start();
-        toast.success("Listening... Speak now");
       } catch (err) {
         console.error('Error starting speech recognition:', err);
         if (isMountedRef.current) {
           setError('Could not access microphone. Please ensure you have granted the necessary permissions.');
-          toast.error('Could not access microphone. Please check permissions and try again.');
         }
         throw err;
       }
     } else {
       setError('Speech recognition is not available in your browser.');
-      toast.error('Speech recognition is not available in your browser. Try using Chrome or Edge.');
     }
   }, [initSpeechRecognition]);
   
@@ -347,7 +321,6 @@ export const useVenueVoiceAssistant = ({
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-        console.log('Stopping speech recognition');
       } catch (err) {
         console.error('Error stopping speech recognition:', err);
       }
@@ -360,7 +333,6 @@ export const useVenueVoiceAssistant = ({
       audioElementRef.current.pause();
       audioElementRef.current.currentTime = 0;
       if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
-      console.log('Stopped speaking');
     }
   }, [onSpeechEnd]);
   
@@ -370,8 +342,6 @@ export const useVenueVoiceAssistant = ({
     if (audioEnabled && audioElementRef.current) {
       stopSpeaking();
     }
-    
-    toast.success(audioEnabled ? "Voice output disabled" : "Voice output enabled");
   }, [audioEnabled, stopSpeaking]);
   
   const forcePlayWelcome = useCallback(async () => {
@@ -408,7 +378,6 @@ export const useVenueVoiceAssistant = ({
         }
       } catch (err) {
         console.error('Failed to fetch welcome message:', err);
-        toast.error('Failed to play welcome message');
       }
     }
   }, [venue, audioEnabled, speakText, onAnswer]);

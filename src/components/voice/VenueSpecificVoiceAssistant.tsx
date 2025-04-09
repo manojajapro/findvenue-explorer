@@ -6,10 +6,10 @@ import { Venue } from '@/hooks/useSupabaseVenues';
 import { useVenueVoiceAssistant } from '@/hooks/useVenueVoiceAssistant';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
 
 interface VenueSpecificVoiceAssistantProps {
   venue: Venue | null;
@@ -17,10 +17,11 @@ interface VenueSpecificVoiceAssistantProps {
 
 const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps) => {
   const [transcriptHistory, setTranscriptHistory] = useState<Array<{ text: string; isUser: boolean }>>([]);
-  const [autoListenMode, setAutoListenMode] = useState(false);
+  const [autoListenMode, setAutoListenMode] = useState(false); // Changed to false by default
   const [lastTranscript, setLastTranscript] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
   
   const { 
     isListening,
@@ -75,34 +76,49 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   // Error handling
   useEffect(() => {
     if (error) {
-      toast.error(error || "There was an error with the voice assistant");
+      toast({
+        title: "Error",
+        description: error || "There was an error with the voice assistant",
+        variant: "destructive"
+      });
     }
-  }, [error]);
+  }, [error, toast]);
   
   const handleMicToggle = async () => {
     try {
       if (isListening) {
         stopListening();
-        toast.info("Voice Assistant Stopped", {
-          description: "Stopped listening"
+        toast({
+          title: "Voice Assistant Stopped",
+          description: "Stopped listening",
         });
       } else {
         await startListening();
-        toast.success("Voice Assistant Active", {
+        toast({
+          title: "Voice Assistant Active",
           description: autoListenMode 
             ? "Continuous mode enabled - I'll keep listening after each response" 
-            : "Press the mic button again when you finish speaking"
+            : "Press the mic button again when you finish speaking",
         });
       }
     } catch (err) {
-      toast.error("Microphone Error", {
-        description: "Could not access microphone. Please ensure microphone permissions are granted."
+      toast({
+        title: "Error",
+        description: "Could not access microphone. Please ensure microphone permissions are granted.",
+        variant: "destructive"
       });
     }
   };
   
   const handleVoiceOutputToggle = () => {
     toggleAudio();
+    
+    toast({
+      title: audioEnabled ? "Voice Output Disabled" : "Voice Output Enabled",
+      description: audioEnabled 
+        ? "The assistant will respond with text only" 
+        : "The assistant will respond with voice and text",
+    });
   };
   
   const handleStopSpeaking = () => {
@@ -110,23 +126,25 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
     stopSpeaking();
     setIsSpeaking(false);
     
-    toast.info("Playback Stopped", {
-      description: "Voice assistant playback stopped"
+    toast({
+      title: "Playback Stopped",
+      description: "Voice assistant playback stopped",
     });
   };
   
   const handleClearConversation = () => {
     setTranscriptHistory([]);
     setLastTranscript("");
-    toast.success("Conversation Cleared", {
-      description: "Your conversation history has been cleared"
+    toast({
+      title: "Conversation Cleared",
+      description: "Your conversation history has been cleared",
     });
   };
 
   // If venue is not available, show loading or error state
   if (!venue) {
     return (
-      <Card className="bg-findvenue-card-bg border border-white/10">
+      <Card className="bg-findvenue-card-bg border border-white/10 mt-6">
         <CardHeader>
           <CardTitle>Voice Assistant</CardTitle>
         </CardHeader>
@@ -138,7 +156,7 @@ const VenueSpecificVoiceAssistant = ({ venue }: VenueSpecificVoiceAssistantProps
   }
 
   return (
-    <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border border-white/10 shadow-lg">
+    <Card className="bg-findvenue-card-bg/80 backdrop-blur-sm border border-white/10 mt-6 shadow-lg">
       <CardHeader className="pb-2 border-b border-white/10">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
