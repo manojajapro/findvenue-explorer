@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Mic, MicOff, Send, User, Bot, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Send, User, Bot, Volume2, VolumeX, Loader2, Building } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useChatWithVenue } from '@/hooks/useChatWithVenue';
@@ -12,7 +12,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
 interface VenueUnifiedChatAssistantProps {
@@ -26,10 +25,11 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [unifiedMessages, setUnifiedMessages] = useState<Array<{ text: string; isUser: boolean; mode: 'text' | 'voice' }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   // Start with voice disabled by default
   const [audioEnabled, setAudioEnabled] = useState<boolean>(false);
+  const [isRecognizing, setIsRecognizing] = useState<boolean>(false);
 
   // Initialize audio element
   useEffect(() => {
@@ -63,16 +63,14 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     error: voiceError
   } = useVenueVoiceAssistant({
     venue,
-    // Disable auto restart of voice
     autoRestart: false,
     onTranscript: (text) => {
-      // We'll handle this in the component
+      // Update input field with recognized text in real-time
+      setTextInput(text);
     },
     onAnswer: (response) => {
       // Add the assistant's response to unified messages
       setUnifiedMessages(prev => [...prev, { text: response, isUser: false, mode: 'voice' }]);
-      
-      // Audio is handled by the audioEnabled state
     },
     onSpeechStart: () => {
       if (audioEnabled) {
@@ -95,6 +93,18 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [unifiedMessages]);
 
+  // Auto-submit when speech recognition is complete and has valid text
+  useEffect(() => {
+    if (isListening && transcript && transcript.trim().length > 0) {
+      // Set a flag to track if we're in recognition mode
+      setIsRecognizing(true);
+    } else if (!isListening && isRecognizing && textInput.trim().length > 0) {
+      // When recognition stops and we have text, auto-submit
+      handleTextSubmit(new Event('submit') as unknown as React.FormEvent);
+      setIsRecognizing(false);
+    }
+  }, [isListening, transcript, textInput, isRecognizing]);
+
   // Handle microphone permission request
   const requestMicrophonePermission = async () => {
     try {
@@ -115,21 +125,14 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     if (isListening) {
       stopListening();
       
-      // If we have a transcript, add it to messages and process it
-      if (transcript) {
-        const trimmedTranscript = transcript.trim();
-        if (trimmedTranscript) {
-          setUnifiedMessages(prev => [...prev, { text: trimmedTranscript, isUser: true, mode: 'voice' }]);
-          
-          // Process through AI
-          await processAIRequest(trimmedTranscript);
-        }
-      }
+      // Processing will be handled by the useEffect that monitors isListening changes
     } else {
       // Request permission if needed
       const hasPermission = micPermission || await requestMicrophonePermission();
       
       if (hasPermission) {
+        // Clear the input field before starting new recognition
+        setTextInput('');
         await startListening();
         toast.success('Listening...', {
           description: 'Speak clearly into your microphone.'
@@ -185,8 +188,9 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     const message = textInput.trim();
     if (!message) return;
     
-    setUnifiedMessages(prev => [...prev, { text: message, isUser: true, mode: 'text' }]);
+    setUnifiedMessages(prev => [...prev, { text: message, isUser: true, mode: isRecognizing ? 'voice' : 'text' }]);
     await processAIRequest(message);
+    setTextInput('');
   };
 
   // Convert text to speech
@@ -277,7 +281,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       <div className="p-6 pb-4 bg-gradient-to-r from-blue-800 to-indigo-800 rounded-t-lg flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="h-10 w-10 bg-blue-700 rounded-full flex items-center justify-center border border-blue-500/30 shadow-lg">
-            <Bot className="h-5 w-5 text-white" />
+            <Building className="h-5 w-5 text-white" />
           </div>
           <div>
             <h2 className="font-medium text-lg text-white">Venue Assistant</h2>
@@ -412,11 +416,12 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       <CardFooter className="p-4 border-t border-slate-800 bg-slate-900/90 rounded-b-lg">
         <form onSubmit={handleTextSubmit} className="flex gap-2 w-full">
           <Input
-            placeholder="Type your message..."
+            ref={inputRef}
+            placeholder={isListening ? "Listening to your voice..." : "Type your message..."}
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
-            className="flex-1 bg-slate-800 border-slate-700 focus:border-blue-700 text-white placeholder-gray-400"
-            disabled={isListening || voiceIsProcessing || chatIsLoading}
+            className={`flex-1 bg-slate-800 border-slate-700 focus:border-blue-700 text-white placeholder-gray-400 ${isListening ? 'border-green-500/50' : ''}`}
+            disabled={voiceIsProcessing || chatIsLoading}
           />
           
           <TooltipProvider>

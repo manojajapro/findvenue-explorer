@@ -32,7 +32,7 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
             </div>
           </TooltipTrigger>
           <TooltipContent side="left" className="bg-blue-950 text-white border-blue-800">
-            <p>Chat with AI Venue Assistant</p>
+            <p>Chat with Venue Assistant</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
