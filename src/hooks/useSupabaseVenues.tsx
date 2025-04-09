@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,6 +67,8 @@ export interface Venue {
   additionalServices?: string[];
   status?: string;
   rulesAndRegulations?: VenueRule[];
+  type?: string;       // New field
+  zipcode?: string;    // New field
 }
 
 export const useSupabaseVenues = () => {
@@ -235,7 +238,9 @@ export const useSupabaseVenues = () => {
             openingHours: openingHoursData,
             ownerInfo: ownerInfoData,
             additionalServices: venue.additional_services || [],
-            rulesAndRegulations: rulesAndRegulationsData
+            rulesAndRegulations: rulesAndRegulationsData,
+            type: venue.type || '',           // New field
+            zipcode: venue.zipcode || ''      // New field
           } as Venue;
         });
         

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,7 +36,6 @@ export const useVenueData = () => {
         if (data) {
           console.log("Raw venue data:", data);
           
-          // Transform data to match Venue interface
           let ownerInfoData = undefined;
           try {
             if (data.owner_info) {
@@ -124,7 +122,9 @@ export const useVenueData = () => {
             openingHours: openingHoursData,
             ownerInfo: ownerInfoData,
             additionalServices: data.additional_services || [],
-            rulesAndRegulations: rulesAndRegulationsData
+            rulesAndRegulations: rulesAndRegulationsData,
+            type: data.type || '',
+            zipcode: data.zipcode || ''
           };
           
           console.log("Transformed venue data:", transformedVenue);

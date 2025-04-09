@@ -97,6 +97,8 @@ const venueSchema = z.object({
     response_time: z.string().optional(),
     user_id: z.string().optional(),
   }).optional(),
+  type: z.string().optional(),
+  zipcode: z.string().optional(),
 });
 
 type VenueValues = z.infer<typeof venueSchema>
@@ -276,6 +278,8 @@ const EditVenue = () => {
           opening_hours: openingHours,
           owner_info: ownerInfo as any,
           availability: data.availability || [],
+          type: data.type || "",
+          zipcode: data.zipcode || "",
         });
       } else {
         setError('Venue not found.');
@@ -635,6 +639,23 @@ const EditVenue = () => {
 
                 <FormField
                   control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Venue Type</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Venue Type (e.g. Ballroom, Conference Hall)" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The type of venue you're offering.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="description"
                   render={({ field }) => (
                     <FormItem className="col-span-1 md:col-span-2">
@@ -665,6 +686,23 @@ const EditVenue = () => {
                       </FormControl>
                       <FormDescription>
                         The physical address of the venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="zipcode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zipcode</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Zipcode" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The postal/zip code of the venue.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
