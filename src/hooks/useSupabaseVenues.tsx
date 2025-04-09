@@ -157,7 +157,7 @@ export const useSupabaseVenues = () => {
         query = query.eq('type', filters.type);
       }
       
-      const { data, error: venuesError, count } = await query.limit(100);
+      const { data, error: venuesError, count } = await query;
       
       if (venuesError) throw venuesError;
       
@@ -210,7 +210,6 @@ export const useSupabaseVenues = () => {
             console.error("Error parsing rules_and_regulations for venue", venue.id, e);
           }
 
-          // Use first gallery image instead of image_url
           const defaultImage = venue.gallery_images && venue.gallery_images.length > 0 
             ? venue.gallery_images[0] 
             : '';
@@ -219,7 +218,7 @@ export const useSupabaseVenues = () => {
             id: venue.id,
             name: venue.name,
             description: venue.description || '',
-            imageUrl: defaultImage, // Use first gallery image instead
+            imageUrl: defaultImage,
             galleryImages: venue.gallery_images || [],
             address: venue.address || '',
             city: venue.city_name || '',

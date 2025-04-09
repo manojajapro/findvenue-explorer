@@ -26,14 +26,29 @@ const Categories = () => {
           
         if (error) throw error;
         
-        const categoriesData = data.map(category => ({
-          id: category.category_id,
-          name: category.category_name,
-          image_url: category.image_url,
-          venue_count: category.venue_count,
-          description: `Find perfect ${category.category_name.toLowerCase()} for your events`
-        })) || [];
+        // Process categories data to avoid duplicates and prefer gallery_images
+        const uniqueCategories = new Map();
         
+        data.forEach(category => {
+          // Skip if this category is already processed
+          if (!uniqueCategories.has(category.category_id)) {
+            // Use gallery_images if available
+            const imageSource = category.gallery_images && category.gallery_images.length > 0 
+              ? category.gallery_images[0] 
+              : category.image_url;
+            
+            uniqueCategories.set(category.category_id, {
+              id: category.category_id,
+              name: category.category_name,
+              image_url: imageSource,
+              gallery_images: category.gallery_images || [],
+              venue_count: category.venue_count,
+              description: `Find perfect ${category.category_name.toLowerCase()} for your events`
+            });
+          }
+        });
+        
+        const categoriesData = Array.from(uniqueCategories.values());
         setCategories(categoriesData);
         setFilteredCategories(categoriesData);
       } catch (error) {
@@ -106,7 +121,7 @@ const Categories = () => {
                 <Card className="overflow-hidden h-full transition-transform hover:scale-[1.02] bg-findvenue-card-bg border-white/10">
                   <div className="relative h-48">
                     <img 
-                      src={category.image_url || 'https://images.unsplash.com/photo-1469371670807-013ccf25f16a?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'} 
+                      src={category.image_url || (category.gallery_images && category.gallery_images.length > 0 ? category.gallery_images[0] : 'https://images.unsplash.com/photo-1469371670807-013ccf25f16a?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80')}
                       alt={category.name} 
                       className="w-full h-full object-cover"
                     />

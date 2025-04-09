@@ -20,7 +20,7 @@ const Venues = () => {
   const [viewMode, setViewMode] = useState<'list' | 'map'>(searchParams.get('view') as 'list' | 'map' || 'map');
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
-  const debouncedSearchTerm = useDebounce(searchTerm, 800); // Increased debounce time
+  const debouncedSearchTerm = useDebounce(searchTerm, 800);
   const isSearchUpdatingRef = useRef(false);
   const lastSearchTermRef = useRef<string>(searchTerm);
   const isInitialRenderRef = useRef(true);
@@ -34,11 +34,9 @@ const Venues = () => {
   const categoryName = useMemo(() => categoryId ? categories.find(c => c.id === categoryId)?.name : '', [categoryId, categories]);
   const cityName = useMemo(() => cityId ? cities.find(c => c.id === cityId)?.name : '', [cityId, cities]);
 
-  // Update filtered venues when venues or search params change
   useEffect(() => {
     setFilteredVenues(venues);
     
-    // Extract unique venue types for filter
     const types = Array.from(new Set(venues.map(venue => venue.type).filter(Boolean))) as string[];
     setVenueTypes(types);
   }, [venues]);
@@ -55,27 +53,22 @@ const Venues = () => {
     }
   }, [categoryName, cityName]);
 
-  // Handle search term URL updates with debouncing and reference checks
   useEffect(() => {
-    // Skip initial render to prevent double searches
     if (isInitialRenderRef.current) {
       isInitialRenderRef.current = false;
       return;
     }
     
-    // Prevent updating if we're currently in search update cycle
     if (isSearchUpdatingRef.current) {
       isSearchUpdatingRef.current = false;
       return;
     }
     
-    // Only update URL if search term has changed
     if (debouncedSearchTerm !== searchParams.get('search') && 
         debouncedSearchTerm !== lastSearchTermRef.current) {
       
       lastSearchTermRef.current = debouncedSearchTerm;
       
-      // Delayed URL update to prevent flickering
       const timer = setTimeout(() => {
         isSearchUpdatingRef.current = true;
         const newParams = new URLSearchParams(searchParams);
@@ -93,7 +86,6 @@ const Venues = () => {
     }
   }, [debouncedSearchTerm, searchParams, setSearchParams]);
 
-  // Sync view mode with URL
   useEffect(() => {
     const currentViewInUrl = searchParams.get('view');
     if (viewMode !== currentViewInUrl && (viewMode === 'list' || viewMode === 'map')) {
@@ -103,7 +95,6 @@ const Venues = () => {
     }
   }, [viewMode, searchParams, setSearchParams]);
 
-  // Initialize from URL on first load
   useEffect(() => {
     const viewFromUrl = searchParams.get('view') as 'list' | 'map' | null;
     const searchFromUrl = searchParams.get('search');
@@ -120,7 +111,7 @@ const Venues = () => {
     if (searchFromUrl && searchFromUrl !== searchTerm) {
       setSearchTerm(searchFromUrl);
     }
-  }, []); // Run only once on component mount
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,12 +139,10 @@ const Venues = () => {
     setHoveredVenueId(null);
   }, []);
 
-  // Handle receiving filtered venues from map component
   const handleMapFilteredVenues = useCallback((mapFilteredVenues: Venue[]) => {
     setFilteredVenues(mapFilteredVenues);
   }, []);
 
-  // Handle venue type filter change
   const handleTypeChange = (value: string) => {
     const newParams = new URLSearchParams(searchParams);
     if (value) {
@@ -213,7 +202,6 @@ const Venues = () => {
             </div>
           </form>
 
-          {/* Venue type filter */}
           <div className="flex flex-wrap gap-3 mt-3">
             <div className="w-full sm:w-auto flex items-center gap-2">
               <Building2 className="h-4 w-4 text-findvenue-text-muted" />
@@ -301,7 +289,7 @@ const Venues = () => {
         <div className="flex justify-between items-center mb-3">
           <div>
             <p className="text-sm text-findvenue-text-muted">
-              {isLoading ? 'Searching venues...' : `Found ${filteredVenues.length} venues (showing max 100)`}
+              {isLoading ? 'Searching venues...' : `Found ${filteredVenues.length} venues`}
             </p>
           </div>
           

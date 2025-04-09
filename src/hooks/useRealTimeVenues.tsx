@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -191,7 +192,8 @@ export const useRealTimeVenues = () => {
         query = query.ilike('name', `%${searchTerm}%`);
       }
       
-      const { data, error: venuesError, count } = await query.limit(100);
+      // Remove the limit to fetch all venues
+      const { data, error: venuesError, count } = await query;
       
       if (venuesError) throw venuesError;
       

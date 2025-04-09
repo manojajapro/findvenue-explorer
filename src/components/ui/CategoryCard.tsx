@@ -12,7 +12,7 @@ const CategoryCard = ({ category }: CategoryCardProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const navigate = useNavigate();
 
-  // Use the first gallery image if available, otherwise use a default value
+  // Use the first gallery image if available, otherwise fallback to imageUrl
   const imageUrl = category.gallery_images && category.gallery_images.length > 0 
     ? category.gallery_images[0] 
     : category.imageUrl || '';
