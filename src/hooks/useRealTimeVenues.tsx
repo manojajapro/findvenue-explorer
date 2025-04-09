@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +38,10 @@ export const useRealTimeVenues = () => {
       filters.amenities = amenitiesParam ? amenitiesParam.split(',') : undefined;
     }
     
+    if (searchParams.has('type')) {
+      filters.type = searchParams.get('type') || undefined;
+    }
+    
     return filters;
   }, [searchParams]);
   
@@ -74,6 +77,21 @@ export const useRealTimeVenues = () => {
         }
       } catch (e) {
         console.error("Error parsing opening_hours for venue", venue.id, e);
+      }
+
+      let rulesAndRegulationsData = undefined;
+      try {
+        if (venue.rules_and_regulations) {
+          rulesAndRegulationsData = typeof venue.rules_and_regulations === 'string'
+            ? JSON.parse(venue.rules_and_regulations)
+            : (venue.rules_and_regulations as Array<{
+                category: string;
+                title: string;
+                description: string;
+              }>);
+        }
+      } catch (e) {
+        console.error("Error parsing rules_and_regulations for venue", venue.id, e);
       }
 
       // Use first gallery image instead of image_url
@@ -115,7 +133,10 @@ export const useRealTimeVenues = () => {
         acceptedPaymentMethods: venue.accepted_payment_methods || [],
         openingHours: openingHoursData,
         ownerInfo: ownerInfoData,
-        additionalServices: venue.additional_services || []
+        additionalServices: venue.additional_services || [],
+        rulesAndRegulations: rulesAndRegulationsData,
+        type: venue.type || '',
+        zipcode: venue.zipcode || ''
       } as Venue;
     });
   }, []);
@@ -135,7 +156,7 @@ export const useRealTimeVenues = () => {
       }
       
       if (filters.categoryId) {
-        query = query.eq('category_id', filters.categoryId);
+        query = query.contains('category_id', [filters.categoryId]);
       }
       
       if (filters.guests) {
@@ -160,6 +181,10 @@ export const useRealTimeVenues = () => {
         filters.amenities.forEach(amenity => {
           query = query.contains('amenities', [amenity]);
         });
+      }
+      
+      if (filters.type) {
+        query = query.eq('type', filters.type);
       }
       
       if (searchTerm.trim()) {

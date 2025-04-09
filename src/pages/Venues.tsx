@@ -6,12 +6,13 @@ import MapView from '@/components/map/MapView';
 import { useRealTimeVenues } from '@/hooks/useRealTimeVenues';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, MapPin, List, MapIcon, Filter, X } from 'lucide-react';
+import { Search, MapPin, List, MapIcon, Filter, X, Building2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Venue } from '@/hooks/useSupabaseVenues';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Venues = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -24,9 +25,11 @@ const Venues = () => {
   const isSearchUpdatingRef = useRef(false);
   const lastSearchTermRef = useRef<string>(searchTerm);
   const isInitialRenderRef = useRef(true);
+  const [venueTypes, setVenueTypes] = useState<string[]>([]);
 
   const categoryId = searchParams.get('categoryId');
   const cityId = searchParams.get('cityId');
+  const venueType = searchParams.get('type');
   const hasFilters = searchParams.toString().length > 0;
 
   const categoryName = useMemo(() => categoryId ? categories.find(c => c.id === categoryId)?.name : '', [categoryId, categories]);
@@ -35,6 +38,10 @@ const Venues = () => {
   // Update filtered venues when venues or search params change
   useEffect(() => {
     setFilteredVenues(venues);
+    
+    // Extract unique venue types for filter
+    const types = Array.from(new Set(venues.map(venue => venue.type).filter(Boolean))) as string[];
+    setVenueTypes(types);
   }, [venues]);
 
   useEffect(() => {
@@ -147,6 +154,17 @@ const Venues = () => {
     setFilteredVenues(mapFilteredVenues);
   }, []);
 
+  // Handle venue type filter change
+  const handleTypeChange = (value: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (value) {
+      newParams.set('type', value);
+    } else {
+      newParams.delete('type');
+    }
+    setSearchParams(newParams, { replace: true });
+  };
+
   return (
     <div className="pt-20 pb-16">
       <div className="container mx-auto px-4">
@@ -164,7 +182,7 @@ const Venues = () => {
         </div>
         
         <Card className="mb-4 p-3 bg-findvenue-surface/30 border-white/10">
-          <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-2">
+          <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-2 mb-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
               <Input
@@ -195,6 +213,24 @@ const Venues = () => {
               )}
             </div>
           </form>
+
+          {/* Add venue type filter */}
+          <div className="flex flex-wrap gap-3 mt-3">
+            <div className="w-full sm:w-auto flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-findvenue-text-muted" />
+              <Select value={venueType || ''} onValueChange={handleTypeChange}>
+                <SelectTrigger className="w-full sm:w-[180px] bg-findvenue-surface/50 border-white/10">
+                  <SelectValue placeholder="Venue Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Types</SelectItem>
+                  {venueTypes.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           
           {hasFilters && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -244,6 +280,21 @@ const Venues = () => {
                   </button>
                 </Badge>
               )}
+              {venueType && (
+                <Badge variant="outline" className="bg-findvenue-surface/50 border-white/20">
+                  Type: {venueType}
+                  <button 
+                    className="ml-2"
+                    onClick={() => {
+                      const newParams = new URLSearchParams(searchParams);
+                      newParams.delete('type');
+                      setSearchParams(newParams, { replace: true });
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
             </div>
           )}
         </Card>
@@ -251,7 +302,7 @@ const Venues = () => {
         <div className="flex justify-between items-center mb-3">
           <div>
             <p className="text-sm text-findvenue-text-muted">
-              {isLoading ? 'Searching venues...' : `Found ${filteredVenues.length} venues`}
+              {isLoading ? 'Searching venues...' : `Found ${filteredVenues.length} venues (showing max 100)`}
             </p>
           </div>
           

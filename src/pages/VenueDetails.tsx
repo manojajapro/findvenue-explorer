@@ -21,7 +21,8 @@ import {
   X,
   Clock3,
   AccessibilityIcon,
-  MessageCircle
+  MessageCircle,
+  Building2
 } from 'lucide-react';
 import { VenueCard } from '@/components/ui';
 import { supabase } from '@/integrations/supabase/client';
@@ -75,7 +76,8 @@ const VenueDetails = () => {
             ownerInfoData = {
               name: ownerInfo.name as string,
               contact: ownerInfo.contact as string,
-              responseTime: ownerInfo.response_time as string
+              responseTime: ownerInfo.response_time as string,
+              user_id: ownerInfo.user_id as string
             };
           }
           
@@ -84,11 +86,30 @@ const VenueDetails = () => {
             openingHoursData = venueData.opening_hours as Record<string, {open: string, close: string}>;
           }
           
+          let rulesAndRegulationsData = undefined;
+          try {
+            if (venueData.rules_and_regulations) {
+              rulesAndRegulationsData = typeof venueData.rules_and_regulations === 'string'
+                ? JSON.parse(venueData.rules_and_regulations)
+                : (venueData.rules_and_regulations as Array<{
+                    category: string;
+                    title: string;
+                    description: string;
+                  }>);
+            }
+          } catch (e) {
+            console.error("Error parsing rules_and_regulations for venue", venueData.id, e);
+          }
+          
+          const defaultImage = venueData.gallery_images && venueData.gallery_images.length > 0 
+            ? venueData.gallery_images[0] 
+            : '';
+          
           const transformedVenue: Venue = {
             id: venueData.id,
             name: venueData.name,
             description: venueData.description || '',
-            imageUrl: venueData.image_url || '',
+            imageUrl: defaultImage,
             galleryImages: venueData.gallery_images || [],
             address: venueData.address || '',
             city: venueData.city_name || '',
@@ -118,7 +139,9 @@ const VenueDetails = () => {
             acceptedPaymentMethods: venueData.accepted_payment_methods || [],
             openingHours: openingHoursData,
             ownerInfo: ownerInfoData,
-            additionalServices: venueData.additional_services || []
+            additionalServices: venueData.additional_services || [],
+            type: venueData.type || '',
+            rulesAndRegulations: rulesAndRegulationsData
           };
           
           setVenue(transformedVenue);
@@ -135,13 +158,18 @@ const VenueDetails = () => {
           
           if (similarData) {
             const transformedSimilar = similarData.map(venue => {
+              const venueImage = venue.gallery_images && venue.gallery_images.length > 0 
+                ? venue.gallery_images[0] 
+                : '';
+
               let ownerInfoData = undefined;
               if (venue.owner_info) {
                 const ownerInfo = venue.owner_info as Record<string, any>;
                 ownerInfoData = {
                   name: ownerInfo.name as string,
                   contact: ownerInfo.contact as string,
-                  responseTime: ownerInfo.response_time as string
+                  responseTime: ownerInfo.response_time as string,
+                  user_id: ownerInfo.user_id as string
                 };
               }
               
@@ -150,11 +178,22 @@ const VenueDetails = () => {
                 openingHoursData = venue.opening_hours as Record<string, {open: string, close: string}>;
               }
               
+              let rulesAndRegulationsData = undefined;
+              try {
+                if (venue.rules_and_regulations) {
+                  rulesAndRegulationsData = typeof venue.rules_and_regulations === 'string'
+                    ? JSON.parse(venue.rules_and_regulations)
+                    : venue.rules_and_regulations;
+                }
+              } catch (e) {
+                console.error("Error parsing rules_and_regulations for venue", venue.id, e);
+              }
+              
               return {
                 id: venue.id,
                 name: venue.name,
                 description: venue.description || '',
-                imageUrl: venue.image_url || '',
+                imageUrl: venueImage,
                 galleryImages: venue.gallery_images || [],
                 address: venue.address || '',
                 city: venue.city_name || '',
@@ -184,7 +223,9 @@ const VenueDetails = () => {
                 acceptedPaymentMethods: venue.accepted_payment_methods || [],
                 openingHours: openingHoursData,
                 ownerInfo: ownerInfoData,
-                additionalServices: venue.additional_services || []
+                additionalServices: venue.additional_services || [],
+                type: venue.type || '',
+                rulesAndRegulations: rulesAndRegulationsData
               } as Venue;
             });
             
@@ -320,6 +361,43 @@ const VenueDetails = () => {
     );
   };
   
+  const renderVenueType = () => {
+    if (!venue?.type) return null;
+    
+    return (
+      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
+        <div className="p-4 border-b border-white/10">
+          <h3 className="font-semibold flex items-center">
+            <Building2 className="w-4 h-4 mr-2 text-findvenue" />
+            Venue Type
+          </h3>
+        </div>
+        <div className="p-4">
+          <p>{venue.type}</p>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderRulesAndRegulations = () => {
+    if (!venue?.rulesAndRegulations || venue.rulesAndRegulations.length === 0) return null;
+    
+    return (
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Rules & Regulations</h2>
+        <div className="grid grid-cols-1 gap-4">
+          {venue.rulesAndRegulations.map((rule, index) => (
+            <div key={index} className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4">
+              <h3 className="font-medium mb-2">{rule.title}</h3>
+              <div className="text-sm text-findvenue-text-muted mb-1">Category: {rule.category}</div>
+              <p className="text-sm">{rule.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  
   if (loading) {
     return (
       <div className="pt-24 pb-16">
@@ -431,6 +509,11 @@ const VenueDetails = () => {
                 <Star className="w-4 h-4 mr-1 text-findvenue-gold fill-findvenue-gold" />
                 <span>{venue?.rating} ({venue?.reviews} reviews)</span>
               </div>
+              {venue?.type && (
+                <Badge className="bg-findvenue/20 text-findvenue border-0">
+                  {venue.type}
+                </Badge>
+              )}
               <Badge className="bg-findvenue/20 text-findvenue border-0">
                 {venue?.category}
               </Badge>
@@ -518,6 +601,8 @@ const VenueDetails = () => {
               </p>
             </div>
             
+            {renderRulesAndRegulations()}
+            
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4">Location</h2>
               {venue && (
@@ -552,6 +637,15 @@ const VenueDetails = () => {
                   <div className="flex justify-between items-center">
                     <span>Price per person</span>
                     <span>{venue?.pricing.currency} {venue?.pricing.pricePerPerson}</span>
+                  </div>
+                </div>
+              )}
+              
+              {venue?.type && (
+                <div className="mb-4 pb-4 border-b border-white/10">
+                  <div className="flex justify-between items-center">
+                    <span>Venue Type</span>
+                    <span className="font-medium">{venue.type}</span>
                   </div>
                 </div>
               )}
@@ -591,6 +685,8 @@ const VenueDetails = () => {
               {venue?.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && renderPaymentMethods()}
               
               {renderOpeningHours()}
+              
+              {renderVenueType()}
             </Card>
           </div>
         </div>

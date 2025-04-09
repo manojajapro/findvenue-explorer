@@ -217,8 +217,8 @@ export type Database = {
           image_url: string | null
           latitude: number | null
           longitude: number | null
-          max_capacity: number | null
-          min_capacity: number | null
+          max_capacity: string | null
+          min_capacity: string | null
           name: string
           opening_hours: Json | null
           owner_info: Json | null
@@ -254,8 +254,8 @@ export type Database = {
           image_url?: string | null
           latitude?: number | null
           longitude?: number | null
-          max_capacity?: number | null
-          min_capacity?: number | null
+          max_capacity?: string | null
+          min_capacity?: string | null
           name: string
           opening_hours?: Json | null
           owner_info?: Json | null
@@ -291,8 +291,8 @@ export type Database = {
           image_url?: string | null
           latitude?: number | null
           longitude?: number | null
-          max_capacity?: number | null
-          min_capacity?: number | null
+          max_capacity?: string | null
+          min_capacity?: string | null
           name?: string
           opening_hours?: Json | null
           owner_info?: Json | null

@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Category } from '@/data/categories';
 import { Card } from '@/components/ui/card';
 
@@ -11,6 +11,11 @@ interface CategoryCardProps {
 const CategoryCard = ({ category }: CategoryCardProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const navigate = useNavigate();
+
+  // Use the first gallery image if available, otherwise use a default value
+  const imageUrl = category.galleryImages && category.galleryImages.length > 0 
+    ? category.galleryImages[0] 
+    : category.imageUrl;
 
   const handleClick = () => {
     navigate(`/venues?categoryId=${category.id}`);
@@ -24,7 +29,7 @@ const CategoryCard = ({ category }: CategoryCardProps) => {
           <div className="absolute inset-0 bg-findvenue-surface animate-pulse" />
         )}
         <img 
-          src={category.imageUrl} 
+          src={imageUrl} 
           alt={category.name}
           className={`w-full h-full object-cover aspect-square transition-all duration-700 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`}
           onLoad={() => setIsLoaded(true)}

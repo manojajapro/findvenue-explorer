@@ -12,6 +12,11 @@ const CityCard = ({ city }: CityCardProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const navigate = useNavigate();
 
+  // Use the first gallery image if available, otherwise use a default value
+  const imageUrl = city.galleryImages && city.galleryImages.length > 0 
+    ? city.galleryImages[0] 
+    : city.imageUrl;
+
   const handleClick = () => {
     navigate(`/venues?cityId=${city.id}`);
   };
@@ -24,7 +29,7 @@ const CityCard = ({ city }: CityCardProps) => {
           <div className="absolute inset-0 bg-findvenue-surface animate-pulse" />
         )}
         <img 
-          src={city.imageUrl} 
+          src={imageUrl} 
           alt={city.name}
           className={`w-full h-full object-cover aspect-[3/4] transition-all duration-700 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`}
           onLoad={() => setIsLoaded(true)}

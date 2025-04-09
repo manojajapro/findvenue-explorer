@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +9,7 @@ export interface VenueFilter {
   guests?: number;
   priceRange?: string;
   amenities?: string[];
+  type?: string;
 }
 
 export interface VenueRule {
@@ -67,8 +67,8 @@ export interface Venue {
   additionalServices?: string[];
   status?: string;
   rulesAndRegulations?: VenueRule[];
-  type?: string;       // New field
-  zipcode?: string;    // New field
+  type?: string;       
+  zipcode?: string;    
 }
 
 export const useSupabaseVenues = () => {
@@ -105,6 +105,10 @@ export const useSupabaseVenues = () => {
       filters.amenities = amenitiesParam ? amenitiesParam.split(',') : undefined;
     }
     
+    if (searchParams.has('type')) {
+      filters.type = searchParams.get('type') || undefined;
+    }
+    
     return filters;
   }, [searchParams]);
   
@@ -122,7 +126,7 @@ export const useSupabaseVenues = () => {
       }
       
       if (filters.categoryId) {
-        query = query.eq('category_id', filters.categoryId);
+        query = query.contains('category_id', [filters.categoryId]);
       }
       
       if (filters.guests) {
@@ -147,6 +151,10 @@ export const useSupabaseVenues = () => {
         filters.amenities.forEach(amenity => {
           query = query.contains('amenities', [amenity]);
         });
+      }
+      
+      if (filters.type) {
+        query = query.eq('type', filters.type);
       }
       
       const { data, error: venuesError, count } = await query.limit(100);
@@ -244,8 +252,8 @@ export const useSupabaseVenues = () => {
             ownerInfo: ownerInfoData,
             additionalServices: venue.additional_services || [],
             rulesAndRegulations: rulesAndRegulationsData,
-            type: venue.type || '',           // New field
-            zipcode: venue.zipcode || ''      // New field
+            type: venue.type || '',           
+            zipcode: venue.zipcode || ''      
           } as Venue;
         });
         
