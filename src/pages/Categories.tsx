@@ -21,42 +21,77 @@ const Categories = () => {
       try {
         setIsLoading(true);
         
-        // Get all venues to extract unique categories
-        const { data: venuesData, error: venuesError } = await supabase
-          .from('venues')
-          .select('category_id, category_name, gallery_images')
+        // Fetch all categories from database
+        const { data: categoryGroupsData, error: categoryGroupsError } = await supabase
+          .from('category_groups')
+          .select('*')
           .order('category_name', { ascending: true });
           
-        if (venuesError) throw venuesError;
-        
-        if (venuesData) {
-          // Process all categories from venues (each venue may have multiple categories)
-          const allCategoriesMap = new Map();
+        if (categoryGroupsError) {
+          console.error('Error fetching category groups:', categoryGroupsError);
           
-          venuesData.forEach(venue => {
-            // Check if category_id is an array
-            if (Array.isArray(venue.category_id)) {
-              // Process each category in the array
-              venue.category_id.forEach((catId: string, index: number) => {
-                if (!catId) return; // Skip empty category IDs
+          // Fallback: Get all venues to extract unique categories
+          const { data: venuesData, error: venuesError } = await supabase
+            .from('venues')
+            .select('category_id, category_name, gallery_images')
+            .order('category_name', { ascending: true });
+            
+          if (venuesError) throw venuesError;
+          
+          if (venuesData) {
+            // Process all categories from venues (each venue may have multiple categories)
+            const allCategoriesMap = new Map();
+            
+            venuesData.forEach(venue => {
+              // Handle array of category_id
+              if (Array.isArray(venue.category_id)) {
+                venue.category_id.forEach((catId: string, index: number) => {
+                  if (!catId) return; // Skip empty category IDs
+                  
+                  const categoryName = Array.isArray(venue.category_name) && venue.category_name[index] 
+                    ? venue.category_name[index] 
+                    : 'Unnamed Category';
+                  
+                  // Only add if we don't have this category yet, or update if we get better data
+                  if (!allCategoriesMap.has(catId)) {
+                    allCategoriesMap.set(catId, {
+                      id: catId,
+                      name: categoryName,
+                      gallery_images: venue.gallery_images || [],
+                      venueCount: 1,
+                      description: `Find perfect ${categoryName.toLowerCase()} for your events`
+                    });
+                  } else {
+                    // Increment venue count for this category
+                    const existingCat = allCategoriesMap.get(catId);
+                    existingCat.venueCount += 1;
+                    
+                    // Use gallery_images if the current category doesn't have any
+                    if ((!existingCat.gallery_images || existingCat.gallery_images.length === 0) && 
+                        venue.gallery_images && venue.gallery_images.length > 0) {
+                      existingCat.gallery_images = venue.gallery_images;
+                    }
+                    
+                    allCategoriesMap.set(catId, existingCat);
+                  }
+                });
+              } else if (venue.category_id) {
+                // Handle non-array category_id
+                const catId = venue.category_id;
+                const categoryName = venue.category_name || 'Unnamed Category';
                 
-                const categoryName = Array.isArray(venue.category_name) && venue.category_name[index] 
-                  ? venue.category_name[index] 
-                  : 'Unnamed Category';
-                
-                // Only add if we don't have this category yet, or update if we get better data
-                if (!allCategoriesMap.has(catId) || !allCategoriesMap.get(catId).gallery_images) {
+                if (!allCategoriesMap.has(catId)) {
                   allCategoriesMap.set(catId, {
                     id: catId,
                     name: categoryName,
                     gallery_images: venue.gallery_images || [],
-                    venue_count: 1,
+                    venueCount: 1,
                     description: `Find perfect ${categoryName.toLowerCase()} for your events`
                   });
                 } else {
                   // Increment venue count for this category
                   const existingCat = allCategoriesMap.get(catId);
-                  existingCat.venue_count += 1;
+                  existingCat.venueCount += 1;
                   
                   // Use gallery_images if the current category doesn't have any
                   if ((!existingCat.gallery_images || existingCat.gallery_images.length === 0) && 
@@ -66,41 +101,29 @@ const Categories = () => {
                   
                   allCategoriesMap.set(catId, existingCat);
                 }
-              });
-            } else if (venue.category_id) {
-              // Handle non-array category_id
-              const catId = venue.category_id;
-              const categoryName = venue.category_name || 'Unnamed Category';
-              
-              if (!allCategoriesMap.has(catId) || !allCategoriesMap.get(catId).gallery_images) {
-                allCategoriesMap.set(catId, {
-                  id: catId,
-                  name: categoryName,
-                  gallery_images: venue.gallery_images || [],
-                  venue_count: 1,
-                  description: `Find perfect ${categoryName.toLowerCase()} for your events`
-                });
-              } else {
-                // Increment venue count for this category
-                const existingCat = allCategoriesMap.get(catId);
-                existingCat.venue_count += 1;
-                
-                // Use gallery_images if the current category doesn't have any
-                if ((!existingCat.gallery_images || existingCat.gallery_images.length === 0) && 
-                    venue.gallery_images && venue.gallery_images.length > 0) {
-                  existingCat.gallery_images = venue.gallery_images;
-                }
-                
-                allCategoriesMap.set(catId, existingCat);
               }
-            }
-          });
+            });
+            
+            const uniqueCategories = Array.from(allCategoriesMap.values());
+            console.log("Extracted unique categories from venues:", uniqueCategories);
+            
+            setCategories(uniqueCategories);
+            setFilteredCategories(uniqueCategories);
+          }
+        } else if (categoryGroupsData && categoryGroupsData.length > 0) {
+          // Use pre-aggregated category data from the database
+          const formattedCategories = categoryGroupsData.map(cat => ({
+            id: cat.category_id,
+            name: cat.category_name,
+            description: `Find perfect ${cat.category_name.toLowerCase()} for your events`,
+            gallery_images: cat.image_url ? [cat.image_url] : [],
+            venueCount: cat.venue_count || 0
+          }));
           
-          const uniqueCategories = Array.from(allCategoriesMap.values());
-          console.log("Unique categories:", uniqueCategories);
+          console.log("Using category groups data:", formattedCategories);
           
-          setCategories(uniqueCategories);
-          setFilteredCategories(uniqueCategories);
+          setCategories(formattedCategories);
+          setFilteredCategories(formattedCategories);
         }
       } catch (error) {
         console.error('Error fetching categories:', error);
@@ -121,7 +144,7 @@ const Categories = () => {
     
     const filtered = categories.filter(category => 
       category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      category.description.toLowerCase().includes(searchTerm.toLowerCase())
+      (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()))
     );
     
     setFilteredCategories(filtered);
@@ -169,9 +192,9 @@ const Categories = () => {
                   category={{
                     id: category.id,
                     name: category.name,
-                    description: category.description,
+                    description: category.description || `Find perfect ${category.name.toLowerCase()} venues`,
                     imageUrl: '',
-                    venueCount: category.venue_count,
+                    venueCount: category.venueCount,
                     gallery_images: category.gallery_images
                   }}
                 />

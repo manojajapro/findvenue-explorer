@@ -12,7 +12,7 @@ const CityCard = ({ city }: CityCardProps) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const navigate = useNavigate();
 
-  // Use the first gallery image if available, otherwise fallback to imageUrl
+  // Prioritize gallery_images if available, otherwise fallback to imageUrl
   const imageUrl = city.gallery_images && city.gallery_images.length > 0 
     ? city.gallery_images[0] 
     : city.imageUrl || '';

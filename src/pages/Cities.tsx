@@ -21,65 +21,72 @@ const Cities = () => {
       try {
         setIsLoading(true);
         
-        // Get all venues to extract unique cities
-        const { data: venuesData, error: venuesError } = await supabase
-          .from('venues')
-          .select('city_id, city_name, gallery_images')
+        // First try to get the pre-aggregated city data
+        const { data: cityGroupsData, error: cityGroupsError } = await supabase
+          .from('city_groups')
+          .select('*')
           .order('city_name', { ascending: true });
           
-        if (venuesError) throw venuesError;
-        
-        if (venuesData) {
-          // Process cities data to avoid duplicates and prefer gallery_images
-          const uniqueCities = new Map();
+        if (cityGroupsError) {
+          console.error('Error fetching city groups:', cityGroupsError);
           
-          venuesData.forEach(venue => {
-            if (!venue.city_id) return; // Skip venues without city_id
+          // Fallback: Get all venues to extract unique cities
+          const { data: venuesData, error: venuesError } = await supabase
+            .from('venues')
+            .select('city_id, city_name, gallery_images')
+            .order('city_name', { ascending: true });
             
-            // Skip if this city is already processed and has gallery images
-            if (uniqueCities.has(venue.city_id) && 
-                uniqueCities.get(venue.city_id).gallery_images &&
-                uniqueCities.get(venue.city_id).gallery_images.length > 0) {
-              // Just increment the venue count
-              const existingCity = uniqueCities.get(venue.city_id);
-              existingCity.venue_count += 1;
-              uniqueCities.set(venue.city_id, existingCity);
-              return;
-            }
+          if (venuesError) throw venuesError;
+          
+          if (venuesData) {
+            // Process cities data to avoid duplicates and prefer gallery_images
+            const uniqueCities = new Map();
             
-            // Use gallery_images if available
-            const imageSource = venue.gallery_images && venue.gallery_images.length > 0 
-              ? venue.gallery_images[0] 
-              : '';
-            
-            // Create or update city entry
-            if (!uniqueCities.has(venue.city_id)) {
-              uniqueCities.set(venue.city_id, {
-                id: venue.city_id,
-                name: venue.city_name || 'Unknown City',
-                gallery_images: venue.gallery_images || [],
-                venue_count: 1
-              });
-            } else {
-              // Update existing city with better data if available
-              const existingCity = uniqueCities.get(venue.city_id);
-              existingCity.venue_count += 1;
+            venuesData.forEach(venue => {
+              if (!venue.city_id) return; // Skip venues without city_id
               
-              // Update gallery_images if the current city doesn't have any
-              if ((!existingCity.gallery_images || existingCity.gallery_images.length === 0) && 
-                  venue.gallery_images && venue.gallery_images.length > 0) {
-                existingCity.gallery_images = venue.gallery_images;
+              // Create or update city entry
+              if (!uniqueCities.has(venue.city_id)) {
+                uniqueCities.set(venue.city_id, {
+                  id: venue.city_id,
+                  name: venue.city_name || 'Unknown City',
+                  gallery_images: venue.gallery_images || [],
+                  venueCount: 1
+                });
+              } else {
+                // Update existing city with better data if available
+                const existingCity = uniqueCities.get(venue.city_id);
+                existingCity.venueCount += 1;
+                
+                // Update gallery_images if the current city doesn't have any
+                if ((!existingCity.gallery_images || existingCity.gallery_images.length === 0) && 
+                    venue.gallery_images && venue.gallery_images.length > 0) {
+                  existingCity.gallery_images = venue.gallery_images;
+                }
+                
+                uniqueCities.set(venue.city_id, existingCity);
               }
-              
-              uniqueCities.set(venue.city_id, existingCity);
-            }
-          });
+            });
+            
+            const citiesData = Array.from(uniqueCities.values());
+            console.log("Extracted unique cities from venues:", citiesData);
+            
+            setCities(citiesData);
+            setFilteredCities(citiesData);
+          }
+        } else if (cityGroupsData && cityGroupsData.length > 0) {
+          // Use pre-aggregated city data from the database
+          const formattedCities = cityGroupsData.map(city => ({
+            id: city.city_id,
+            name: city.city_name,
+            gallery_images: city.image_url ? [city.image_url] : [],
+            venueCount: city.venue_count || 0
+          }));
           
-          const citiesData = Array.from(uniqueCities.values());
-          console.log("Unique cities:", citiesData);
+          console.log("Using city groups data:", formattedCities);
           
-          setCities(citiesData);
-          setFilteredCities(citiesData);
+          setCities(formattedCities);
+          setFilteredCities(formattedCities);
         }
       } catch (error) {
         console.error('Error fetching cities:', error);
@@ -148,7 +155,7 @@ const Cities = () => {
                     id: city.id,
                     name: city.name,
                     imageUrl: '',
-                    venueCount: city.venue_count,
+                    venueCount: city.venueCount,
                     gallery_images: city.gallery_images
                   }}
                 />

@@ -51,3 +51,7 @@ export const cities: City[] = [
     gallery_images: []
   }
 ];
+
+// For compatibility with existing code
+export const saudiCities = cities;
+export const globalCities = cities;
