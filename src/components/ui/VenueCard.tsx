@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,35 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
   const [isLoaded, setIsLoaded] = useState(false);
   const { user, checkIsFavorite, toggleFavoriteVenue } = useAuth();
   const [isFavorite, setIsFavorite] = useState(user ? checkIsFavorite(venue.id) : false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const imagesRef = useRef<string[]>([]);
+
+  // Prepare the images array, including the main image and gallery images
+  useEffect(() => {
+    const images: string[] = [];
+    if (venue.imageUrl) {
+      images.push(venue.imageUrl);
+    }
+    
+    if (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0) {
+      images.push(...venue.galleryImages);
+    }
+    
+    // Remove duplicates
+    const uniqueImages = [...new Set(images)];
+    imagesRef.current = uniqueImages.length > 0 ? uniqueImages : [venue.imageUrl];
+  }, [venue.imageUrl, venue.galleryImages]);
+
+  // Auto-rotate images every 3 seconds
+  useEffect(() => {
+    if (imagesRef.current.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex(prev => (prev + 1) % imagesRef.current.length);
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -76,12 +105,21 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
           {!isLoaded && (
             <div className="absolute inset-0 bg-findvenue-surface animate-pulse" />
           )}
-          <img 
-            src={venue.imageUrl} 
-            alt={venue.name}
-            className={`w-full h-full object-cover transition-all duration-700 ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`}
-            onLoad={() => setIsLoaded(true)}
-          />
+          
+          {imagesRef.current.map((imgSrc, index) => (
+            <img 
+              key={index}
+              src={imgSrc} 
+              alt={`${venue.name} ${index}`}
+              className={`w-full h-full object-cover absolute inset-0 transition-opacity duration-1000 ${
+                currentImageIndex === index ? 'opacity-100' : 'opacity-0'
+              }`}
+              onLoad={() => {
+                if (index === 0) setIsLoaded(true);
+              }}
+            />
+          ))}
+          
           {featured && (
             <div className="absolute top-2 right-2">
               <Badge className="bg-findvenue-gold text-black font-medium px-2 py-1">
@@ -114,6 +152,20 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
                 className={`w-4 h-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-white'}`} 
               />
             </Button>
+          )}
+          
+          {/* Image indicator dots */}
+          {imagesRef.current.length > 1 && (
+            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
+              {imagesRef.current.map((_, index) => (
+                <div 
+                  key={index} 
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    currentImageIndex === index ? 'bg-white' : 'bg-white/40'
+                  }`}
+                />
+              ))}
+            </div>
           )}
         </div>
         <div className="p-4">

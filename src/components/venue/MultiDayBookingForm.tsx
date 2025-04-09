@@ -69,9 +69,42 @@ export default function MultiDayBookingForm({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalPrice, setTotalPrice] = useState(0);
+  const [pricePerPerson, setPricePerPerson] = useState(0);
+  const [basePrice, setBasePrice] = useState(0);
   
-  // Full day rate - 13 hours x hourly rate with a 15% discount
-  const fullDayRate = Math.round(pricePerHour * 13 * 0.85);
+  // Fetch the venue's price per person
+  useEffect(() => {
+    const fetchVenuePricing = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('venues')
+          .select('price_per_person, starting_price')
+          .eq('id', venueId)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data) {
+          // Set price per person if available
+          if (data.price_per_person) {
+            setPricePerPerson(data.price_per_person);
+          }
+          
+          // Set base price
+          if (data.starting_price) {
+            setBasePrice(data.starting_price);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching venue pricing:', error);
+        // Fallback to default calculation if API call fails
+        // Full day rate - 13 hours x hourly rate with a 15% discount
+        setBasePrice(Math.round(pricePerHour * 13 * 0.85));
+      }
+    };
+    
+    fetchVenuePricing();
+  }, [venueId, pricePerHour]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -84,10 +117,18 @@ export default function MultiDayBookingForm({
     },
   });
 
+  // Watch for changes to guests count to update price
+  const guestsCount = form.watch('guests');
+  
   useEffect(() => {
-    // Set total price
-    setTotalPrice(fullDayRate);
-  }, [fullDayRate]);
+    // Calculate total price based on guests
+    if (pricePerPerson > 0) {
+      setTotalPrice(pricePerPerson * guestsCount);
+    } else {
+      // If no price per person is available, use base price
+      setTotalPrice(basePrice);
+    }
+  }, [guestsCount, pricePerPerson, basePrice]);
 
   // Convert array of booked dates from strings to Date objects for use in the calendar
   const disabledDates = bookedDates.map(dateStr => new Date(dateStr));
@@ -305,17 +346,16 @@ export default function MultiDayBookingForm({
         <div className="bg-findvenue-surface/20 p-4 rounded-md">
           <div className="flex justify-between items-center">
             <div>
-              <span className="font-medium">Full-day Rate:</span>
+              <span className="font-medium">Total Price:</span>
               <p className="text-xs text-findvenue-text-muted mt-1">
-                Includes the entire venue from 00:00 to 23:59
+                {pricePerPerson > 0 
+                  ? `${pricePerPerson} SAR × ${guestsCount} guests`
+                  : 'Full day rate includes the entire venue from 00:00 to 23:59'
+                }
               </p>
             </div>
             <span className="font-bold text-lg">SAR {totalPrice.toFixed(2)}</span>
           </div>
-          <hr className="my-2 border-white/10" />
-          <p className="text-sm text-findvenue-text-muted">
-            Full day booking includes a 15% discount compared to hourly booking
-          </p>
         </div>
 
         <Button 

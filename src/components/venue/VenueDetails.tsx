@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -12,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
+import { formatDistanceToNow } from 'date-fns';
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -51,6 +53,19 @@ const VenueDetails = () => {
   }
 
   const isOwner = user?.id === venue.ownerInfo?.user_id;
+  
+  // Format last active time if available
+  const formatLastActive = () => {
+    if (venue.ownerInfo?.last_active) {
+      try {
+        const lastActiveDate = new Date(venue.ownerInfo.last_active);
+        return formatDistanceToNow(lastActiveDate, { addSuffix: true });
+      } catch (error) {
+        return "Recently";
+      }
+    }
+    return "Recently";
+  };
   
   return (
     <div className="container mx-auto p-4">
@@ -121,9 +136,16 @@ const VenueDetails = () => {
           <div className="mb-4">
             <h4 className="text-lg font-semibold">Pricing</h4>
             <p className="text-gray-700">
-              Starting from <span className="font-bold">{venue.pricing.currency} {venue.pricing.startingPrice}</span>
-              {venue.pricing.pricePerPerson && <span> + {venue.pricing.currency} {venue.pricing.pricePerPerson} per person</span>}
-              {venue.pricing.hourlyRate && <span> / {venue.pricing.currency} {venue.pricing.hourlyRate} per hour</span>}
+              {venue.pricing.pricePerPerson ? (
+                <>
+                  <span className="font-bold">{venue.pricing.currency} {venue.pricing.pricePerPerson}</span> per person
+                </>
+              ) : (
+                <>
+                  Starting from <span className="font-bold">{venue.pricing.currency} {venue.pricing.startingPrice}</span>
+                  {venue.pricing.hourlyRate && <span> / {venue.pricing.currency} {venue.pricing.hourlyRate} per hour</span>}
+                </>
+              )}
             </p>
           </div>
           
@@ -190,17 +212,35 @@ const VenueDetails = () => {
           <Separator className="my-4" />
           <div className="mb-4 bg-findvenue-surface/10 p-4 rounded-lg">
             <div className="flex items-center mb-3">
-              <div className="w-12 h-12 bg-findvenue rounded-full flex items-center justify-center text-white text-lg font-bold mr-3">
-                {venue.ownerInfo.name.charAt(0)}
+              <div className="relative">
+                {venue.ownerInfo.profile_image ? (
+                  <img 
+                    src={venue.ownerInfo.profile_image} 
+                    alt={venue.ownerInfo.name} 
+                    className="w-12 h-12 rounded-full object-cover mr-3"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-findvenue rounded-full flex items-center justify-center text-white text-lg font-bold mr-3">
+                    {venue.ownerInfo.name.charAt(0)}
+                  </div>
+                )}
+                <span className={`absolute bottom-0 right-0 w-3 h-3 ${
+                  venue.ownerInfo.online_status === 'online' ? 'bg-green-500' : 'bg-gray-400'
+                } rounded-full border-2 border-white`}></span>
               </div>
               <div>
                 <h4 className="text-lg font-semibold">{venue.ownerInfo.name}</h4>
-                <div className="flex items-center gap-2 text-sm text-findvenue-text-muted">
-                  <span className="inline-flex items-center">
-                    <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                    Active 3h 10 min ago
-                  </span>
-                </div>
+                {!isOwner && (
+                  <div className="flex items-center gap-2 text-sm text-findvenue-text-muted">
+                    <span className="inline-flex items-center">
+                      {venue.ownerInfo.online_status === 'online' ? (
+                        <span className="text-green-500">Online</span>
+                      ) : (
+                        <span>Active {formatLastActive()}</span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
