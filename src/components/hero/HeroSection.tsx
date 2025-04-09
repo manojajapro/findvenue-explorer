@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Users, Calendar, MapPin, ChevronDown, X } from 'lucide-react';
+import { Search, Users, Calendar, MapPin, ChevronDown, X, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,27 +13,115 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 const HeroSection = () => {
   const navigate = useNavigate();
   const [eventType, setEventType] = useState('');
+  const [venueType, setVenueType] = useState('');
   const [guests, setGuests] = useState('');
   const [location, setLocation] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [cities, setCities] = useState<{id: string, name: string}[]>([]);
+  const [venueTypes, setVenueTypes] = useState<{value: string, label: string}[]>([
+    { value: 'hall', label: 'Hall' },
+    { value: 'restaurant', label: 'Restaurant' },
+    { value: 'hotel', label: 'Hotel' },
+    { value: 'outdoor', label: 'Outdoor' },
+    { value: 'lounge', label: 'Lounge' },
+    { value: 'rooftop', label: 'Rooftop' }
+  ]);
   const [date, setDate] = useState<Date | undefined>(undefined);
   
-  // Fetch categories from Supabase
+  // Fetch categories from Supabase with deduplication
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const { data } = await supabase
+        // First check if we have category_groups table data
+        const { data: categoryGroupsData, error: categoryGroupsError } = await supabase
           .from('category_groups')
           .select('category_id, category_name')
           .order('category_name');
         
-        if (data) {
-          const formattedCategories = data.map(cat => ({
-            id: cat.category_id || '',
-            name: cat.category_name || ''
-          })).filter(cat => cat.id && cat.name);
+        if (categoryGroupsError || !categoryGroupsData || categoryGroupsData.length === 0) {
+          // Fallback: Get all venues to extract unique categories
+          const { data: venuesData, error: venuesError } = await supabase
+            .from('venues')
+            .select('category_id, category_name')
+            .order('category_name');
+            
+          if (venuesError) throw venuesError;
+          
+          if (venuesData) {
+            const uniqueCategories = new Map();
+            
+            venuesData.forEach(venue => {
+              if (Array.isArray(venue.category_id)) {
+                // Handle only first category to avoid duplicates in dropdown
+                const catId = venue.category_id[0];
+                if (!catId) return;
+                
+                let categoryName = '';
+                if (Array.isArray(venue.category_name) && venue.category_name[0]) {
+                  categoryName = venue.category_name[0];
+                } else if (typeof venue.category_name === 'string' && venue.category_name.startsWith('[')) {
+                  try {
+                    const parsedCategories = JSON.parse(venue.category_name.replace(/'/g, '"'));
+                    categoryName = parsedCategories[0] || 'Unnamed Category';
+                  } catch (e) {
+                    const match = venue.category_name.match(/'([^']+)'/);
+                    categoryName = match ? match[1] : 'Unnamed Category';
+                  }
+                }
+                
+                if (categoryName && catId && !uniqueCategories.has(catId)) {
+                  uniqueCategories.set(catId, {
+                    id: catId,
+                    name: categoryName
+                  });
+                }
+              } else if (venue.category_id) {
+                let categoryName = venue.category_name || 'Unnamed Category';
+                
+                if (typeof categoryName === 'string' && categoryName.startsWith('[')) {
+                  try {
+                    const parsedCategories = JSON.parse(categoryName.replace(/'/g, '"'));
+                    categoryName = parsedCategories[0] || 'Unnamed Category';
+                  } catch (e) {
+                    const match = categoryName.match(/'([^']+)'/);
+                    categoryName = match ? match[1] : 'Unnamed Category';
+                  }
+                }
+                
+                if (!uniqueCategories.has(venue.category_id)) {
+                  uniqueCategories.set(venue.category_id, {
+                    id: venue.category_id,
+                    name: categoryName
+                  });
+                }
+              }
+            });
+            
+            const formattedCategories = Array.from(uniqueCategories.values());
+            setCategories(formattedCategories);
+          }
+        } else {
+          // Use pre-aggregated category data from the database
+          const formattedCategories = categoryGroupsData.map(cat => {
+            let categoryName = cat.category_name || '';
+            
+            // Process string array format if present
+            if (typeof categoryName === 'string' && categoryName.startsWith('[')) {
+              try {
+                const parsedCategories = JSON.parse(categoryName.replace(/'/g, '"'));
+                categoryName = parsedCategories[0] || 'Unnamed Category';
+              } catch (e) {
+                const match = categoryName.match(/'([^']+)'/);
+                categoryName = match ? match[1] : 'Unnamed Category';
+              }
+            }
+            
+            return {
+              id: cat.category_id || '',
+              name: categoryName
+            };
+          }).filter(cat => cat.id && cat.name);
           
           setCategories(formattedCategories);
         }
@@ -75,6 +163,7 @@ const HeroSection = () => {
     const params = new URLSearchParams();
     
     if (eventType) params.append('categoryId', eventType);
+    if (venueType) params.append('type', venueType);
     if (guests) params.append('guests', guests);
     if (location) params.append('cityId', location);
     if (date) params.append('date', format(date, 'yyyy-MM-dd'));
@@ -85,6 +174,7 @@ const HeroSection = () => {
   
   const clearForm = () => {
     setEventType('');
+    setVenueType('');
     setGuests('');
     setLocation('');
     setDate(undefined);
@@ -157,29 +247,38 @@ const HeroSection = () => {
               </Popover>
             </div>
             
-            {/* Date Selection */}
+            {/* Venue Type */}
             <div className="lg:col-span-1">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={`w-full justify-between border-white/10 bg-findvenue-surface/50 hover:bg-findvenue-surface h-12 ${date ? 'text-white' : 'text-findvenue-text-muted'}`}
+                    role="combobox"
+                    className={`w-full justify-between border-white/10 bg-findvenue-surface/50 hover:bg-findvenue-surface h-12 ${venueType ? 'text-white' : 'text-findvenue-text-muted'}`}
                   >
                     <div className="flex items-center">
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {date ? format(date, 'MMM dd, yyyy') : 'Select Date'}
+                      <Building className="mr-2 h-4 w-4" />
+                      {venueTypes.find(type => type.value === venueType)?.label || 'Venue Type'}
                     </div>
                     <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-findvenue-card-bg border-white/10">
-                  <CalendarComponent
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    className="p-3 pointer-events-auto border-none"
-                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                  />
+                <PopoverContent className="w-full p-0 max-h-[300px] overflow-y-auto bg-findvenue-card-bg border-white/10">
+                  <div className="grid gap-1 p-2">
+                    {venueTypes.map((type) => (
+                      <Button
+                        key={type.value}
+                        variant="ghost"
+                        className="justify-start text-findvenue-text hover:text-white hover:bg-findvenue-surface"
+                        onClick={() => {
+                          setVenueType(type.value);
+                          document.body.click(); // Close popover
+                        }}
+                      >
+                        {type.label}
+                      </Button>
+                    ))}
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>
@@ -258,7 +357,7 @@ const HeroSection = () => {
               <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </Button>
             
-            {(eventType || guests || location || date) && (
+            {(eventType || venueType || guests || location || date) && (
               <Button
                 type="button"
                 variant="ghost"

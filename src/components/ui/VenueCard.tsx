@@ -59,6 +59,11 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
       }
     }
     
+    // If it's already an array, just take the first item
+    if (Array.isArray(venue.category)) {
+      return venue.category[0] || '';
+    }
+    
     return venue.category;
   };
 

@@ -11,8 +11,8 @@ const CategoriesSection = () => {
   const [featuredCategories, setFeaturedCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Define the image indices to use for categories
-  const imageIndices = [1, 3, 5, 7, 9, 11];
+  // Define the image indices to use for categories in the specific order requested
+  const imageIndices = [1, 4, 7, 10, 12, 14, 17, 18];
   
   useEffect(() => {
     const fetchTopCategories = async () => {
@@ -45,68 +45,67 @@ const CategoriesSection = () => {
             venuesData.forEach(venue => {
               // Check if category_id is an array
               if (Array.isArray(venue.category_id)) {
-                // Process each category in the array
-                venue.category_id.forEach((catId: string, index: number) => {
-                  if (!catId) return; // Skip empty category IDs
-                  
-                  let categoryName = '';
-                  // Handle array format of category_name
-                  if (Array.isArray(venue.category_name) && venue.category_name[index]) {
-                    categoryName = venue.category_name[index];
-                  } else if (typeof venue.category_name === 'string' && venue.category_name.startsWith('[')) {
-                    // Handle string array format like "['Category1', 'Category2']"
-                    try {
-                      const parsedCategories = JSON.parse(
-                        venue.category_name.replace(/'/g, '"')
-                      );
-                      categoryName = parsedCategories[index] || 'Unnamed Category';
-                    } catch (e) {
-                      // If parsing fails, use a substring approach
-                      const matches = venue.category_name.match(/'([^']+)'/g);
-                      categoryName = matches && matches[index] 
-                        ? matches[index].replace(/'/g, '') 
-                        : 'Unnamed Category';
-                    }
-                  } else {
-                    categoryName = 'Unnamed Category';
+                // Process each category in the array (just the first one to avoid duplicates)
+                const catId = venue.category_id[0];
+                if (!catId) return; // Skip empty category IDs
+                
+                let categoryName = '';
+                // Handle array format of category_name
+                if (Array.isArray(venue.category_name) && venue.category_name[0]) {
+                  categoryName = venue.category_name[0];
+                } else if (typeof venue.category_name === 'string' && venue.category_name.startsWith('[')) {
+                  // Handle string array format like "['Category1', 'Category2']"
+                  try {
+                    const parsedCategories = JSON.parse(
+                      venue.category_name.replace(/'/g, '"')
+                    );
+                    categoryName = parsedCategories[0] || 'Unnamed Category';
+                  } catch (e) {
+                    // If parsing fails, use a substring approach
+                    const matches = venue.category_name.match(/'([^']+)'/g);
+                    categoryName = matches && matches[0] 
+                      ? matches[0].replace(/'/g, '') 
+                      : 'Unnamed Category';
                   }
-                  
-                  // Use specific image indices for each category
-                  let categoryImage = [];
-                  if (venue.gallery_images && venue.gallery_images.length > 0) {
-                    // Get the current category count to determine which image index to use
-                    const categoryCount = allCategoriesMap.size;
-                    // Use the corresponding image index from our predefined list
-                    const imageIndex = categoryCount < imageIndices.length 
-                      ? imageIndices[categoryCount] 
-                      : categoryCount % venue.gallery_images.length;
-                      
-                    // Make sure the index is within bounds
-                    if (imageIndex < venue.gallery_images.length) {
-                      categoryImage = [venue.gallery_images[imageIndex]];
-                    } else {
-                      categoryImage = [venue.gallery_images[0]]; // Fallback to first image
-                    }
-                  }
-                  
-                  // Only add if we don't have this category yet, or update if needed
-                  if (!allCategoriesMap.has(catId)) {
-                    allCategoriesMap.set(catId, {
-                      id: catId,
-                      name: categoryName,
-                      singleCategory: categoryName,
-                      gallery_images: categoryImage,
-                      venueCount: 1,
-                      description: `Find perfect ${categoryName.toLowerCase()} for your events`
-                    });
-                  } else {
-                    // Increment venue count for this category
-                    const existingCat = allCategoriesMap.get(catId);
-                    existingCat.venueCount += 1;
+                } else {
+                  categoryName = 'Unnamed Category';
+                }
+                
+                // Use specific image indices for each category
+                let categoryImage = [];
+                if (venue.gallery_images && venue.gallery_images.length > 0) {
+                  // Get the current category count to determine which image index to use
+                  const categoryCount = allCategoriesMap.size;
+                  // Use the corresponding image index from our predefined list
+                  const imageIndex = categoryCount < imageIndices.length 
+                    ? imageIndices[categoryCount] 
+                    : categoryCount % venue.gallery_images.length;
                     
-                    allCategoriesMap.set(catId, existingCat);
+                  // Make sure the index is within bounds
+                  if (imageIndex < venue.gallery_images.length) {
+                    categoryImage = [venue.gallery_images[imageIndex]];
+                  } else {
+                    categoryImage = [venue.gallery_images[0]]; // Fallback to first image
                   }
-                });
+                }
+                
+                // Only add if we don't have this category yet, or update if needed
+                if (!allCategoriesMap.has(catId)) {
+                  allCategoriesMap.set(catId, {
+                    id: catId,
+                    name: categoryName,
+                    singleCategory: categoryName,
+                    gallery_images: categoryImage,
+                    venueCount: 1,
+                    description: `Find perfect ${categoryName.toLowerCase()} for your events`
+                  });
+                } else {
+                  // Increment venue count for this category
+                  const existingCat = allCategoriesMap.get(catId);
+                  existingCat.venueCount += 1;
+                  
+                  allCategoriesMap.set(catId, existingCat);
+                }
               } else if (venue.category_id) {
                 // Handle non-array category_id
                 const catId = venue.category_id;
