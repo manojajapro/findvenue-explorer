@@ -125,8 +125,6 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
             <span>{venue.city}</span>
           </div>
           
-          {/* Remove duplicate category display here, since it's already shown in the image */}
-          
           <p className="text-sm text-findvenue-text-muted mb-4 line-clamp-2">
             {venue.description}
           </p>

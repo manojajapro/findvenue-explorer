@@ -41,7 +41,6 @@ const CategoriesSection = () => {
           if (venuesData) {
             // Process all categories from venues (each venue may have multiple categories)
             const allCategoriesMap = new Map();
-            const categoryImageMap = new Map(); // Track images used for each category
             
             venuesData.forEach(venue => {
               // Check if category_id is an array
@@ -105,12 +104,6 @@ const CategoriesSection = () => {
                     const existingCat = allCategoriesMap.get(catId);
                     existingCat.venueCount += 1;
                     
-                    // Use the new image if the current category doesn't have any
-                    if ((!existingCat.gallery_images || existingCat.gallery_images.length === 0) && 
-                        categoryImage.length > 0) {
-                      existingCat.gallery_images = categoryImage;
-                    }
-                    
                     allCategoriesMap.set(catId, existingCat);
                   }
                 });
@@ -165,12 +158,6 @@ const CategoriesSection = () => {
                   const existingCat = allCategoriesMap.get(catId);
                   existingCat.venueCount += 1;
                   
-                  // Use the new image if the current category doesn't have any
-                  if ((!existingCat.gallery_images || existingCat.gallery_images.length === 0) && 
-                      categoryImage.length > 0) {
-                    existingCat.gallery_images = categoryImage;
-                  }
-                  
                   allCategoriesMap.set(catId, existingCat);
                 }
               }
@@ -199,6 +186,11 @@ const CategoriesSection = () => {
               }
             }
             
+            // Choose a specific image index from our predefined list
+            const imageIndex = index < imageIndices.length 
+              ? imageIndices[index] 
+              : index % imageIndices.length;
+            
             return {
               id: category.category_id,
               name: category.category_name || 'Unnamed Category',
@@ -206,7 +198,8 @@ const CategoriesSection = () => {
               gallery_images: category.image_url ? [category.image_url] : [],
               venueCount: category.venue_count || 0,
               description: `Find perfect ${singleCategory.toLowerCase() || 'event'} venues`,
-              imageUrl: ''
+              imageUrl: '',
+              imageIndex: imageIndex // Store the image index for reference
             };
           });
           
