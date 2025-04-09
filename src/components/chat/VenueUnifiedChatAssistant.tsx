@@ -30,7 +30,9 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
   // Start with voice disabled by default
   const [audioEnabled, setAudioEnabled] = useState<boolean>(false);
   const [isRecognizing, setIsRecognizing] = useState<boolean>(false);
-
+  const [speechPaused, setSpeechPaused] = useState<boolean>(false);
+  const pauseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Initialize audio element
   useEffect(() => {
     audioElementRef.current = new Audio();
@@ -47,6 +49,10 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       if (audioElementRef.current) {
         audioElementRef.current.pause();
         audioElementRef.current = null;
+      }
+      
+      if (pauseTimeoutRef.current) {
+        clearTimeout(pauseTimeoutRef.current);
       }
     };
   }, []);
@@ -67,6 +73,22 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     onTranscript: (text) => {
       // Update input field with recognized text in real-time
       setTextInput(text);
+      
+      // Reset the pause timeout
+      if (pauseTimeoutRef.current) {
+        clearTimeout(pauseTimeoutRef.current);
+      }
+      
+      // Set a new timeout for speech pause detection
+      pauseTimeoutRef.current = setTimeout(() => {
+        setSpeechPaused(true);
+        if (text.trim().length > 0) {
+          console.log("Speech paused, auto-submitting:", text);
+          // Auto-submit when speech pauses
+          setIsRecognizing(false);
+          handleTextSubmit(new Event('submit') as unknown as React.FormEvent);
+        }
+      }, 1500); // 1.5 seconds of silence is considered a pause
     },
     onAnswer: (response) => {
       // Add the assistant's response to unified messages
@@ -95,15 +117,13 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
 
   // Auto-submit when speech recognition is complete and has valid text
   useEffect(() => {
-    if (isListening && transcript && transcript.trim().length > 0) {
-      // Set a flag to track if we're in recognition mode
-      setIsRecognizing(true);
-    } else if (!isListening && isRecognizing && textInput.trim().length > 0) {
+    if (!isListening && isRecognizing && textInput.trim().length > 0) {
+      console.log("Speech recognition stopped, auto-submitting:", textInput);
       // When recognition stops and we have text, auto-submit
       handleTextSubmit(new Event('submit') as unknown as React.FormEvent);
       setIsRecognizing(false);
     }
-  }, [isListening, transcript, textInput, isRecognizing]);
+  }, [isListening, textInput, isRecognizing]);
 
   // Handle microphone permission request
   const requestMicrophonePermission = async () => {
@@ -124,7 +144,6 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
   const handleVoiceToggle = async () => {
     if (isListening) {
       stopListening();
-      
       // Processing will be handled by the useEffect that monitors isListening changes
     } else {
       // Request permission if needed
@@ -133,6 +152,8 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
       if (hasPermission) {
         // Clear the input field before starting new recognition
         setTextInput('');
+        setSpeechPaused(false);
+        setIsRecognizing(true);
         await startListening();
         toast.success('Listening...', {
           description: 'Speak clearly into your microphone.'
@@ -189,8 +210,15 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     if (!message) return;
     
     setUnifiedMessages(prev => [...prev, { text: message, isUser: true, mode: isRecognizing ? 'voice' : 'text' }]);
+    
+    // Stop listening if we're currently recognizing speech
+    if (isListening) {
+      stopListening();
+    }
+    
     await processAIRequest(message);
     setTextInput('');
+    setSpeechPaused(false);
   };
 
   // Convert text to speech
