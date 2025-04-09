@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
-  const { refreshSession } = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -16,7 +16,7 @@ const AuthCallback = () => {
       if (hash || searchParams.has('code')) {
         try {
           await supabase.auth.getSession();
-          await refreshSession();
+          // No need for refreshSession as the session will be updated via the auth state change listener
           navigate('/');
         } catch (error) {
           console.error('Error during authentication callback:', error);
@@ -28,7 +28,7 @@ const AuthCallback = () => {
     };
 
     handleAuthCallback();
-  }, [navigate, refreshSession]);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
