@@ -29,24 +29,26 @@ function App() {
         <BrowserRouter>
           <Toaster richColors />
           <Navbar />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/venues" element={<Venues />} />
-            <Route path="/venue/:id" element={<VenueDetails />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/cities" element={<Cities />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/bookings" element={<Bookings />} />
-            <Route path="/favorites" element={<Favorites />} />
-            <Route path="/venue-owner" element={<VenueOwnerPromo />} />
-            <Route path="/my-venues" element={<MyVenues />} />
-            <Route path="/list-venue" element={<ListVenue />} />
-            <Route path="/edit-venue/:id" element={<EditVenue />} />
-            <Route path="/customer-bookings" element={<CustomerBookings />} />
-            <Route path="/messages" element={<Messages />} />
-          </Routes>
+          <div className="pt-20 min-h-screen">
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/venues" element={<Venues />} />
+              <Route path="/venue/:id" element={<VenueDetails />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/cities" element={<Cities />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/bookings" element={<Bookings />} />
+              <Route path="/favorites" element={<Favorites />} />
+              <Route path="/venue-owner" element={<VenueOwnerPromo />} />
+              <Route path="/my-venues" element={<MyVenues />} />
+              <Route path="/list-venue" element={<ListVenue />} />
+              <Route path="/edit-venue/:id" element={<EditVenue />} />
+              <Route path="/customer-bookings" element={<CustomerBookings />} />
+              <Route path="/messages" element={<Messages />} />
+            </Routes>
+          </div>
           <Footer />
         </BrowserRouter>
       </LanguageProvider>

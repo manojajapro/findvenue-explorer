@@ -16,19 +16,13 @@ import { formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 
 interface OwnerInfo {
-  name: string;
-  contact: string;
-  responseTime: string;
-  user_id: string;
-  profile_image?: string;
-  online_status?: 'online' | 'offline' | 'away';
-  last_active?: string;
-  socialLinks?: {
-    facebook?: string;
-    twitter?: string;
-    instagram?: string;
-    linkedin?: string;
-  };
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  profile_image?: string | null;
+  online_status?: boolean;
+  last_active?: string | Date | null;
 }
 
 const VenueDetails = () => {
