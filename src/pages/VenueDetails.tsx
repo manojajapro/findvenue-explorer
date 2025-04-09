@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -37,6 +36,22 @@ import VenueRating from '@/components/venue/VenueRating';
 import { getVenueOwnerId } from '@/utils/venueHelpers';
 import { formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+
+interface OwnerInfo {
+  name: string;
+  contact: string;
+  responseTime: string;
+  user_id: string;
+  profile_image?: string;
+  online_status?: string;
+  last_active?: string;
+  socialLinks?: {
+    facebook?: string;
+    twitter?: string;
+    instagram?: string;
+    linkedin?: string;
+  };
+}
 
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
@@ -83,7 +98,8 @@ const VenueDetails = () => {
               user_id: ownerInfo.user_id as string,
               profile_image: ownerInfo.profile_image as string,
               online_status: ownerInfo.online_status as string,
-              last_active: ownerInfo.last_active as string
+              last_active: ownerInfo.last_active as string,
+              socialLinks: ownerInfo.social_links as OwnerInfo['socialLinks']
             };
           }
           
@@ -215,7 +231,8 @@ const VenueDetails = () => {
                   user_id: ownerInfo.user_id as string,
                   profile_image: ownerInfo.profile_image as string,
                   online_status: ownerInfo.online_status as string,
-                  last_active: ownerInfo.last_active as string
+                  last_active: ownerInfo.last_active as string,
+                  socialLinks: ownerInfo.social_links as OwnerInfo['socialLinks']
                 };
               }
               
@@ -400,6 +417,19 @@ const VenueDetails = () => {
             <div>
               <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
               <p className="font-medium">{venue.ownerInfo.responseTime}</p>
+            </div>
+            <div>
+              <p className="text-sm text-findvenue-text-muted mb-1">Social Links</p>
+              <div className="flex flex-wrap gap-2">
+                {venue.ownerInfo.socialLinks && Object.entries(venue.ownerInfo.socialLinks).map(([key, value]) => (
+                  <div key={key} className="flex items-center">
+                    <span className="text-findvenue-text-muted mr-2">{key.charAt(0).toUpperCase() + key.slice(1)}</span>
+                    <a href={value} target="_blank" rel="noopener noreferrer" className="text-findvenue hover:text-findvenue-light transition-colors">
+                      {value}
+                    </a>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

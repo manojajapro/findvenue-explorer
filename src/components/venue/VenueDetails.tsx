@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -16,6 +15,7 @@ import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import { formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 
+// Updated OwnerInfo interface to include missing properties
 interface OwnerInfo {
   name: string;
   contact: string;

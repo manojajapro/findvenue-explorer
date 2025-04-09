@@ -1,9 +1,9 @@
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import { LanguageProvider } from "./hooks/useLanguage";
-import Home from "./pages/Home";
 import Venues from "./pages/Venues";
 import VenueDetails from "./pages/VenueDetails";
 import Categories from "./pages/Categories";
@@ -13,12 +13,16 @@ import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Bookings from "./pages/Bookings";
 import Favorites from "./pages/Favorites";
-import VenueOwner from "./pages/VenueOwner";
 import MyVenues from "./pages/MyVenues";
 import ListVenue from "./pages/ListVenue";
 import EditVenue from "./pages/EditVenue";
 import CustomerBookings from "./pages/CustomerBookings";
 import Messages from "./pages/Messages";
+
+// Import Index page instead of Home as that's what exists
+import Index from "./pages/Index";
+// Import VenueOwnerPromo instead of VenueOwner
+import VenueOwnerPromo from "./pages/VenueOwnerPromo";
 
 function App() {
   return (
@@ -27,7 +31,7 @@ function App() {
         <Toaster richColors />
         <Navbar />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Index />} />
           <Route path="/venues" element={<Venues />} />
           <Route path="/venue/:id" element={<VenueDetails />} />
           <Route path="/categories" element={<Categories />} />
@@ -37,7 +41,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/bookings" element={<Bookings />} />
           <Route path="/favorites" element={<Favorites />} />
-          <Route path="/venue-owner" element={<VenueOwner />} />
+          <Route path="/venue-owner" element={<VenueOwnerPromo />} />
           <Route path="/my-venues" element={<MyVenues />} />
           <Route path="/list-venue" element={<ListVenue />} />
           <Route path="/edit-venue/:id" element={<EditVenue />} />
