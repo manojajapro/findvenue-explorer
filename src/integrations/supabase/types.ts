@@ -301,6 +301,111 @@ export type Database = {
         }
         Relationships: []
       }
+      venues_duplicate: {
+        Row: {
+          accepted_payment_methods: string[] | null
+          accessibility_features: string[] | null
+          additional_services: string[] | null
+          address: string | null
+          amenities: string[] | null
+          availability: string[] | null
+          category_id: string | null
+          category_name: string | null
+          city_id: string | null
+          city_name: string | null
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          featured: boolean | null
+          gallery_images: string[] | null
+          id: string
+          image_url: string | null
+          latitude: number | null
+          longitude: number | null
+          max_capacity: number | null
+          min_capacity: number | null
+          name: string
+          opening_hours: Json | null
+          owner_info: Json | null
+          parking: boolean | null
+          popular: boolean | null
+          price_per_person: number | null
+          rating: number | null
+          reviews_count: number | null
+          starting_price: number | null
+          updated_at: string | null
+          wifi: boolean | null
+        }
+        Insert: {
+          accepted_payment_methods?: string[] | null
+          accessibility_features?: string[] | null
+          additional_services?: string[] | null
+          address?: string | null
+          amenities?: string[] | null
+          availability?: string[] | null
+          category_id?: string | null
+          category_name?: string | null
+          city_id?: string | null
+          city_name?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          featured?: boolean | null
+          gallery_images?: string[] | null
+          id?: string
+          image_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          max_capacity?: number | null
+          min_capacity?: number | null
+          name: string
+          opening_hours?: Json | null
+          owner_info?: Json | null
+          parking?: boolean | null
+          popular?: boolean | null
+          price_per_person?: number | null
+          rating?: number | null
+          reviews_count?: number | null
+          starting_price?: number | null
+          updated_at?: string | null
+          wifi?: boolean | null
+        }
+        Update: {
+          accepted_payment_methods?: string[] | null
+          accessibility_features?: string[] | null
+          additional_services?: string[] | null
+          address?: string | null
+          amenities?: string[] | null
+          availability?: string[] | null
+          category_id?: string | null
+          category_name?: string | null
+          city_id?: string | null
+          city_name?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          featured?: boolean | null
+          gallery_images?: string[] | null
+          id?: string
+          image_url?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          max_capacity?: number | null
+          min_capacity?: number | null
+          name?: string
+          opening_hours?: Json | null
+          owner_info?: Json | null
+          parking?: boolean | null
+          popular?: boolean | null
+          price_per_person?: number | null
+          rating?: number | null
+          reviews_count?: number | null
+          starting_price?: number | null
+          updated_at?: string | null
+          wifi?: boolean | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       category_groups: {
