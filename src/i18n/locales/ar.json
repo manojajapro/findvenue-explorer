@@ -1,0 +1,61 @@
+
+{
+  "app": {
+    "name": "فايند فينيو",
+    "tagline": "ابحث عن المكان المثالي لفعاليتك"
+  },
+  "navigation": {
+    "home": "الرئيسية",
+    "venues": "الأماكن",
+    "categories": "الفئات",
+    "cities": "المدن",
+    "profile": "الملف الشخصي",
+    "logout": "تسجيل الخروج",
+    "login": "تسجيل الدخول",
+    "register": "حساب جديد",
+    "list_venue": "إضافة مكان جديد",
+    "my_venues": "أماكني",
+    "bookings": "الحجوزات",
+    "favorites": "المفضلة",
+    "messages": "الرسائل"
+  },
+  "venues": {
+    "search": "البحث عن أماكن...",
+    "no_venues_found": "لم يتم العثور على أماكن",
+    "not_found_description": "لم نتمكن من العثور على أماكن تطابق معاييرك. حاول تعديل عوامل التصفية أو تصفح جميع الأماكن.",
+    "featured": "مميزة",
+    "popular": "شائعة",
+    "login_required": "تسجيل الدخول مطلوب",
+    "login_to_view": "الرجاء تسجيل الدخول لعرض تفاصيل المكان",
+    "rate_venue": "قيّم هذا المكان",
+    "select_stars": "انقر على نجمة لتقييم هذا المكان",
+    "selected_stars": "لقد اخترت {count} نجمة",
+    "selected_stars_plural": "لقد اخترت {count} نجوم",
+    "thank_you_rating": "شكرًا لتقييمك!",
+    "current_rating": "التقييم الحالي: {rating} ({count} تقييم)",
+    "current_rating_plural": "التقييم الحالي: {rating} ({count} تقييمات)",
+    "submit_rating": "إرسال التقييم",
+    "submitting": "جاري الإرسال..."
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "register": "حساب جديد",
+    "logout": "تسجيل الخروج",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "forgot_password": "نسيت كلمة المرور؟",
+    "no_account": "ليس لديك حساب؟",
+    "have_account": "لديك حساب بالفعل؟"
+  },
+  "buttons": {
+    "submit": "إرسال",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "search": "بحث"
+  },
+  "language": {
+    "select": "اختر اللغة",
+    "english": "الإنجليزية",
+    "arabic": "العربية"
+  }
+}

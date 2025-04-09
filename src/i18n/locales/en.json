@@ -1,0 +1,61 @@
+
+{
+  "app": {
+    "name": "FindVenue",
+    "tagline": "Find the perfect venue for your event"
+  },
+  "navigation": {
+    "home": "Home",
+    "venues": "Venues",
+    "categories": "Categories",
+    "cities": "Cities",
+    "profile": "Profile",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register",
+    "list_venue": "List Your Venue",
+    "my_venues": "My Venues",
+    "bookings": "Bookings",
+    "favorites": "Favorites",
+    "messages": "Messages"
+  },
+  "venues": {
+    "search": "Search venues...",
+    "no_venues_found": "No venues found",
+    "not_found_description": "We couldn't find any venues matching your criteria. Try adjusting your search filters or browsing all venues.",
+    "featured": "Featured",
+    "popular": "Popular",
+    "login_required": "Login Required",
+    "login_to_view": "Please login to view venue details",
+    "rate_venue": "Rate this venue",
+    "select_stars": "Click on a star to rate this venue",
+    "selected_stars": "You've selected {count} star",
+    "selected_stars_plural": "You've selected {count} stars",
+    "thank_you_rating": "Thank you for your rating!",
+    "current_rating": "Current rating: {rating} ({count} review)",
+    "current_rating_plural": "Current rating: {rating} ({count} reviews)",
+    "submit_rating": "Submit Rating",
+    "submitting": "Submitting..."
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "forgot_password": "Forgot Password?",
+    "no_account": "Don't have an account?",
+    "have_account": "Already have an account?"
+  },
+  "buttons": {
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "search": "Search"
+  },
+  "language": {
+    "select": "Select language",
+    "english": "English",
+    "arabic": "Arabic"
+  }
+}
