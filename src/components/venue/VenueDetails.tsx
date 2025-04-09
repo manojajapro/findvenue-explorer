@@ -15,14 +15,13 @@ import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import { formatDistanceToNow } from 'date-fns';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 
-// Updated OwnerInfo interface to include missing properties
 interface OwnerInfo {
   name: string;
   contact: string;
   responseTime: string;
   user_id: string;
   profile_image?: string;
-  online_status?: string;
+  online_status?: 'online' | 'offline' | 'away';
   last_active?: string;
   socialLinks?: {
     facebook?: string;
@@ -109,7 +108,6 @@ const VenueDetails = () => {
   
   return (
     <div className="container mx-auto p-4">
-      {/* Owner Profile Header (for non-owner users only) */}
       {ownerInfo && !isOwner && user && (
         <div className="bg-findvenue-surface/10 p-4 rounded-lg mb-6 flex items-center">
           <div className="relative">

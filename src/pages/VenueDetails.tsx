@@ -43,7 +43,7 @@ interface OwnerInfo {
   responseTime: string;
   user_id: string;
   profile_image?: string;
-  online_status?: string;
+  online_status?: 'online' | 'offline' | 'away';
   last_active?: string;
   socialLinks?: {
     facebook?: string;
@@ -97,7 +97,7 @@ const VenueDetails = () => {
               responseTime: ownerInfo.response_time as string,
               user_id: ownerInfo.user_id as string,
               profile_image: ownerInfo.profile_image as string,
-              online_status: ownerInfo.online_status as string,
+              online_status: ownerInfo.online_status as 'online' | 'offline' | 'away',
               last_active: ownerInfo.last_active as string,
               socialLinks: ownerInfo.social_links as OwnerInfo['socialLinks']
             };
@@ -230,7 +230,7 @@ const VenueDetails = () => {
                   responseTime: ownerInfo.response_time as string,
                   user_id: ownerInfo.user_id as string,
                   profile_image: ownerInfo.profile_image as string,
-                  online_status: ownerInfo.online_status as string,
+                  online_status: ownerInfo.online_status as 'online' | 'offline' | 'away',
                   last_active: ownerInfo.last_active as string,
                   socialLinks: ownerInfo.social_links as OwnerInfo['socialLinks']
                 };
