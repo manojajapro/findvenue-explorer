@@ -5,6 +5,7 @@ export interface City {
   imageUrl: string;
   venueCount: number;
   featured?: boolean;
+  gallery_images?: string[];
 }
 
 export const saudiCities: City[] = [

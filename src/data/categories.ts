@@ -5,6 +5,7 @@ export interface Category {
   description: string;
   imageUrl: string;
   venueCount: number;
+  gallery_images?: string[];
 }
 
 export const categories: Category[] = [
