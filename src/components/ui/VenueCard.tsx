@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Star, Users, CalendarDays, MapPin, Tag, Heart } from 'lucide-react';
+import { Star, Users, CalendarDays, MapPin, Heart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 
@@ -125,12 +125,7 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
             <span>{venue.city}</span>
           </div>
           
-          {primaryCategory && (
-            <div className="text-findvenue-text-muted text-sm mb-3 flex items-center">
-              <Tag className="w-3 h-3 mr-1" />
-              <span>{primaryCategory}</span>
-            </div>
-          )}
+          {/* Remove duplicate category display here, since it's already shown in the image */}
           
           <p className="text-sm text-findvenue-text-muted mb-4 line-clamp-2">
             {venue.description}

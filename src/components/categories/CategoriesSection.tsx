@@ -1,3 +1,4 @@
+
 import { useRef, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
@@ -9,6 +10,9 @@ const CategoriesSection = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const [featuredCategories, setFeaturedCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Define the image indices to use for categories
+  const imageIndices = [1, 3, 5, 7, 9, 11];
   
   useEffect(() => {
     const fetchTopCategories = async () => {
@@ -68,15 +72,22 @@ const CategoriesSection = () => {
                     categoryName = 'Unnamed Category';
                   }
                   
-                  // Select an image for this category if we don't have one yet
+                  // Use specific image indices for each category
                   let categoryImage = [];
                   if (venue.gallery_images && venue.gallery_images.length > 0) {
-                    // Get the current image index for this category
-                    const imageIndex = categoryImageMap.get(catId) || 0;
-                    // Select the image at that index, or the first one if index is out of bounds
-                    categoryImage = [venue.gallery_images[imageIndex % venue.gallery_images.length]];
-                    // Update the index for next time
-                    categoryImageMap.set(catId, (imageIndex + 1) % venue.gallery_images.length);
+                    // Get the current category count to determine which image index to use
+                    const categoryCount = allCategoriesMap.size;
+                    // Use the corresponding image index from our predefined list
+                    const imageIndex = categoryCount < imageIndices.length 
+                      ? imageIndices[categoryCount] 
+                      : categoryCount % venue.gallery_images.length;
+                      
+                    // Make sure the index is within bounds
+                    if (imageIndex < venue.gallery_images.length) {
+                      categoryImage = [venue.gallery_images[imageIndex]];
+                    } else {
+                      categoryImage = [venue.gallery_images[0]]; // Fallback to first image
+                    }
                   }
                   
                   // Only add if we don't have this category yet, or update if needed
@@ -121,15 +132,22 @@ const CategoriesSection = () => {
                   }
                 }
                 
-                // Select an image for this category if we don't have one yet
+                // Use specific image indices for each category
                 let categoryImage = [];
                 if (venue.gallery_images && venue.gallery_images.length > 0) {
-                  // Get the current image index for this category
-                  const imageIndex = categoryImageMap.get(catId) || 0;
-                  // Select the image at that index, or the first one if index is out of bounds
-                  categoryImage = [venue.gallery_images[imageIndex % venue.gallery_images.length]];
-                  // Update the index for next time
-                  categoryImageMap.set(catId, (imageIndex + 1) % venue.gallery_images.length);
+                  // Get the current category count to determine which image index to use
+                  const categoryCount = allCategoriesMap.size;
+                  // Use the corresponding image index from our predefined list
+                  const imageIndex = categoryCount < imageIndices.length 
+                    ? imageIndices[categoryCount] 
+                    : categoryCount % venue.gallery_images.length;
+                    
+                  // Make sure the index is within bounds
+                  if (imageIndex < venue.gallery_images.length) {
+                    categoryImage = [venue.gallery_images[imageIndex]];
+                  } else {
+                    categoryImage = [venue.gallery_images[0]]; // Fallback to first image
+                  }
                 }
                 
                 if (!allCategoriesMap.has(catId)) {

@@ -1,9 +1,19 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Category } from '@/data/categories';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+
+// Extend the Category interface to include singleCategory
+interface Category {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  description?: string;
+  venueCount: number;
+  gallery_images?: string[];
+  singleCategory?: string; // Add this property
+}
 
 interface CategoryCardProps {
   category: Category;
