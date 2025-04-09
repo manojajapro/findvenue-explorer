@@ -18,7 +18,7 @@ const translationCache: Record<string, Record<string, string>> = {
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentLanguage, setCurrentLanguage] = useState(() => {
-    return localStorage.getItem('language') || 'en';
+    return localStorage.getItem('language') || 'en'; // Default to English
   });
   
   const isRTL = currentLanguage === 'ar';
@@ -31,7 +31,9 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [currentLanguage, isRTL]);
   
   const setLanguage = useCallback((lang: string) => {
-    setCurrentLanguage(lang);
+    if (lang === 'en' || lang === 'ar') {
+      setCurrentLanguage(lang);
+    }
   }, []);
   
   const translate = useCallback(async (text: string): Promise<string> => {
