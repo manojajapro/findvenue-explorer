@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import CityCard from '@/components/ui/CityCard';
 
 const Cities = () => {
   const [cities, setCities] = useState<any[]>([]);
@@ -19,37 +20,67 @@ const Cities = () => {
     const fetchCities = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('city_groups')
-          .select('*')
-          .order('venue_count', { ascending: false });
+        
+        // Get all venues to extract unique cities
+        const { data: venuesData, error: venuesError } = await supabase
+          .from('venues')
+          .select('city_id, city_name, gallery_images')
+          .order('city_name', { ascending: true });
           
-        if (error) throw error;
+        if (venuesError) throw venuesError;
         
-        // Process cities data to avoid duplicates and prefer gallery_images
-        const uniqueCities = new Map();
-        
-        data.forEach(city => {
-          // Skip if this city is already processed
-          if (!uniqueCities.has(city.city_id)) {
-            // Use gallery_images if available
-            const imageSource = city.gallery_images && city.gallery_images.length > 0 
-              ? city.gallery_images[0] 
-              : city.image_url;
+        if (venuesData) {
+          // Process cities data to avoid duplicates and prefer gallery_images
+          const uniqueCities = new Map();
+          
+          venuesData.forEach(venue => {
+            if (!venue.city_id) return; // Skip venues without city_id
             
-            uniqueCities.set(city.city_id, {
-              id: city.city_id,
-              name: city.city_name,
-              image_url: imageSource,
-              gallery_images: city.gallery_images || [],
-              venue_count: city.venue_count
-            });
-          }
-        });
-        
-        const citiesData = Array.from(uniqueCities.values());
-        setCities(citiesData);
-        setFilteredCities(citiesData);
+            // Skip if this city is already processed and has gallery images
+            if (uniqueCities.has(venue.city_id) && 
+                uniqueCities.get(venue.city_id).gallery_images &&
+                uniqueCities.get(venue.city_id).gallery_images.length > 0) {
+              // Just increment the venue count
+              const existingCity = uniqueCities.get(venue.city_id);
+              existingCity.venue_count += 1;
+              uniqueCities.set(venue.city_id, existingCity);
+              return;
+            }
+            
+            // Use gallery_images if available
+            const imageSource = venue.gallery_images && venue.gallery_images.length > 0 
+              ? venue.gallery_images[0] 
+              : '';
+            
+            // Create or update city entry
+            if (!uniqueCities.has(venue.city_id)) {
+              uniqueCities.set(venue.city_id, {
+                id: venue.city_id,
+                name: venue.city_name || 'Unknown City',
+                gallery_images: venue.gallery_images || [],
+                venue_count: 1
+              });
+            } else {
+              // Update existing city with better data if available
+              const existingCity = uniqueCities.get(venue.city_id);
+              existingCity.venue_count += 1;
+              
+              // Update gallery_images if the current city doesn't have any
+              if ((!existingCity.gallery_images || existingCity.gallery_images.length === 0) && 
+                  venue.gallery_images && venue.gallery_images.length > 0) {
+                existingCity.gallery_images = venue.gallery_images;
+              }
+              
+              uniqueCities.set(venue.city_id, existingCity);
+            }
+          });
+          
+          const citiesData = Array.from(uniqueCities.values());
+          console.log("Unique cities:", citiesData);
+          
+          setCities(citiesData);
+          setFilteredCities(citiesData);
+        }
       } catch (error) {
         console.error('Error fetching cities:', error);
       } finally {
@@ -111,37 +142,17 @@ const Cities = () => {
         ) : filteredCities.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredCities.map((city) => (
-              <Link 
-                key={city.id}
-                to={`/venues?cityId=${city.id}`}
-                className="block h-full"
-              >
-                <Card className="overflow-hidden h-full transition-transform hover:scale-[1.02] bg-findvenue-card-bg border-white/10">
-                  <div className="relative h-48">
-                    <img 
-                      src={city.image_url || (city.gallery_images && city.gallery_images.length > 0 ? city.gallery_images[0] : 'https://images.unsplash.com/photo-1531054871758-3b3d4a5b0fbd?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80')}
-                      alt={city.name} 
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <div className="flex items-center mb-1">
-                        <MapPin className="h-4 w-4 text-findvenue mr-1" />
-                        <h3 className="text-xl font-semibold text-white">{city.name}</h3>
-                      </div>
-                      <p className="text-sm text-white/80">
-                        {city.venue_count} venues available
-                      </p>
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <Button variant="outline" className="w-full border-findvenue text-findvenue hover:bg-findvenue/10">
-                      View Venues
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Link>
+              <div key={city.id} className="h-full">
+                <CityCard
+                  city={{
+                    id: city.id,
+                    name: city.name,
+                    imageUrl: '',
+                    venueCount: city.venue_count,
+                    gallery_images: city.gallery_images
+                  }}
+                />
+              </div>
             ))}
           </div>
         ) : (
