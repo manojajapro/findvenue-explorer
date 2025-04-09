@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -49,6 +50,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log("Auth state change event:", event);
         const sessionUser = session?.user as any;
         setSession(session as any);
         
@@ -108,13 +110,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProfile(data);
       
+      // For Google logins, we need to ensure the first_name and last_name are set
+      if (!data.first_name && user?.user_metadata?.full_name) {
+        // If profile doesn't have a name but user metadata does, update the profile
+        const nameParts = user.user_metadata.full_name.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        await updateProfile({
+          first_name: firstName,
+          last_name: lastName,
+          avatar_url: user.user_metadata.avatar_url || data.avatar_url
+        });
+      }
+      
       setUser(prev => {
         if (!prev) return null;
         return {
           ...prev,
-          firstName: data?.first_name || '',
-          lastName: data?.last_name || '',
-          profileImage: data?.avatar_url || '',
+          firstName: data?.first_name || prev.user_metadata?.full_name?.split(' ')[0] || '',
+          lastName: data?.last_name || prev.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '',
+          profileImage: data?.avatar_url || prev.user_metadata?.avatar_url || '',
         };
       });
       
