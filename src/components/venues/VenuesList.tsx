@@ -5,6 +5,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from "@/components/ui/use-toast";
+import TranslatedText from '@/components/ui/TranslatedText';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface VenuesListProps {
   venues?: Venue[];
@@ -23,8 +25,9 @@ const VenuesList = ({
 }: VenuesListProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { translate } = useTranslation();
   
-  const handleVenueClick = (venueId: string) => {
+  const handleVenueClick = async (venueId: string) => {
     if (user) {
       // User is logged in, navigate to venue details
       navigate(`/venue/${venueId}`);
@@ -32,8 +35,8 @@ const VenuesList = ({
       // User is not logged in, save venue ID to localStorage and redirect to login
       localStorage.setItem('redirectVenueId', venueId);
       toast({
-        title: "Login Required",
-        description: "Please login to view venue details",
+        title: await translate("Login Required"),
+        description: await translate("Please login to view venue details"),
         variant: "default",
       });
       navigate('/login');
@@ -61,10 +64,13 @@ const VenuesList = ({
   if (venues.length === 0) {
     return (
       <div className="text-center py-8 border border-white/10 rounded-lg bg-findvenue-surface/20">
-        <h3 className="text-xl font-medium mb-2">No venues found</h3>
+        <h3 className="text-xl font-medium mb-2">
+          <TranslatedText text="No venues found" />
+        </h3>
         <p className="text-findvenue-text-muted max-w-md mx-auto">
-          We couldn't find any venues matching your criteria. 
-          Try adjusting your search filters or browsing all venues.
+          <TranslatedText 
+            text="We couldn't find any venues matching your criteria. Try adjusting your search filters or browsing all venues." 
+          />
         </p>
       </div>
     );

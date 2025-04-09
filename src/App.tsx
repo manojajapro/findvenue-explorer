@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect } from "react";
-import { useAuth } from "./hooks/useAuth";
+import { useAuth, AuthProvider } from "./hooks/useAuth";
 import Index from "./pages/Index";
 import VenueDetails from "./pages/VenueDetails";
 import Login from "./pages/Login";
@@ -26,8 +26,6 @@ import MyVenues from "./pages/MyVenues";
 import EditVenue from "./pages/EditVenue";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
-import { AuthProvider } from "./hooks/useAuth";
-import AuthCallback from "./pages/AuthCallback";
 
 const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element, allowedRoles?: string[] }) => {
   const { user, isLoading, profile } = useAuth();
@@ -122,7 +120,6 @@ function App() {
             <main className="min-h-screen">
               <Routes>
                 <Route path="/" element={<HomeRoute />} />
-                {/* Protected VenueDetails route */}
                 <Route path="/venue/:id" element={<ProtectedRoute><VenueDetails /></ProtectedRoute>} />
                 <Route path="/login" element={<LoginRoute />} />
                 <Route path="/register" element={<Register />} />
@@ -139,7 +136,6 @@ function App() {
                 <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
                 <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
                 
-                {/* Updated routes for messaging - using a single Messages component for both views */}
                 <Route path="/messages" element={
                   <ProtectedRoute>
                     <Messages />

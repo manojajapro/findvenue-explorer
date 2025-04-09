@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 import UserMenu from './UserMenu';
 import NavbarSearchButton from './NavbarSearchButton';
+import LanguageSwitcher from '@/components/language/LanguageSwitcher';
 
 const NavbarActions = () => {
   const { user, isVenueOwner } = useAuth();
@@ -14,6 +15,7 @@ const NavbarActions = () => {
     return (
       <div className="flex items-center gap-2">
         <NavbarSearchButton />
+        <LanguageSwitcher />
         
         <Button 
           variant="ghost" 
@@ -35,6 +37,7 @@ const NavbarActions = () => {
   return (
     <div className="flex items-center gap-3">
       <NavbarSearchButton />
+      <LanguageSwitcher />
       
       {isVenueOwner && (
         <Button 

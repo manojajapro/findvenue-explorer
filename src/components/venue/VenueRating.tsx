@@ -1,10 +1,11 @@
-
 import { useState } from 'react';
 import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import TranslatedText from '@/components/ui/TranslatedText';
+import { useTranslation } from '@/hooks/useTranslation';
 
 type VenueRatingProps = {
   venueId: string;
@@ -23,6 +24,7 @@ const VenueRating = ({
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasRated, setHasRated] = useState(false);
+  const { translate } = useTranslation();
   
   const handleRatingClick = (selectedRating: number) => {
     if (hasRated) return;
@@ -55,13 +57,20 @@ const VenueRating = ({
         onRatingUpdated(data.rating, data.reviewsCount);
       }
       
-      toast.success('Rating submitted successfully!', {
-        description: 'Thank you for your feedback'
+      const successMessage = await translate("Rating submitted successfully!");
+      const description = await translate("Thank you for your feedback");
+      
+      toast.success(successMessage, {
+        description: description
       });
     } catch (error: any) {
       console.error('Error submitting rating:', error);
-      toast.error('Failed to submit rating', {
-        description: error.message || 'Please try again'
+      
+      const errorMessage = await translate("Failed to submit rating");
+      const description = await translate(error.message || "Please try again");
+      
+      toast.error(errorMessage, {
+        description: description
       });
     } finally {
       setIsSubmitting(false);
@@ -71,7 +80,9 @@ const VenueRating = ({
   return (
     <Card className="glass-card border-white/10">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Rate this venue</CardTitle>
+        <CardTitle className="text-lg">
+          <TranslatedText text="Rate this venue" />
+        </CardTitle>
       </CardHeader>
       
       <CardContent>
@@ -103,14 +114,16 @@ const VenueRating = ({
           <div className="text-center mt-2 mb-4">
             <div className="text-sm text-findvenue-text-muted">
               {hasRated 
-                ? 'Thank you for your rating!' 
+                ? <TranslatedText text="Thank you for your rating!" />
                 : rating > 0 
-                  ? `You've selected ${rating} star${rating > 1 ? 's' : ''}` 
-                  : 'Click on a star to rate this venue'}
+                  ? <TranslatedText text={`You've selected ${rating} star${rating > 1 ? 's' : ''}`} />
+                  : <TranslatedText text="Click on a star to rate this venue" />}
             </div>
             
             <div className="text-sm mt-1">
-              Current rating: {initialRating} ({reviewsCount} review{reviewsCount !== 1 ? 's' : ''})
+              <TranslatedText 
+                text={`Current rating: ${initialRating} (${reviewsCount} review${reviewsCount !== 1 ? 's' : ''})`} 
+              />
             </div>
           </div>
         </div>
@@ -123,7 +136,9 @@ const VenueRating = ({
             disabled={rating === 0 || isSubmitting || hasRated}
             className="bg-findvenue hover:bg-findvenue-dark"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Rating'}
+            {isSubmitting 
+              ? <TranslatedText text="Submitting..." /> 
+              : <TranslatedText text="Submit Rating" />}
           </Button>
         )}
       </CardFooter>

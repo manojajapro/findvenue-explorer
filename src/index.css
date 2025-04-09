@@ -53,6 +53,19 @@
     font-family: 'Poppins', sans-serif;
   }
   
+  /* RTL support */
+  [dir="rtl"] .reverse-rtl {
+    flex-direction: row-reverse;
+  }
+  
+  [dir="rtl"] .mirror-rtl {
+    transform: scaleX(-1);
+  }
+  
+  [dir="rtl"] body {
+    text-align: right;
+  }
+  
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold text-white tracking-tight;
   }
