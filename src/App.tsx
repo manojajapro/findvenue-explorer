@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import { LanguageProvider } from "./hooks/useLanguage";
+import Index from "./pages/Index";
 import Venues from "./pages/Venues";
 import VenueDetails from "./pages/VenueDetails";
 import Categories from "./pages/Categories";
@@ -18,10 +19,6 @@ import ListVenue from "./pages/ListVenue";
 import EditVenue from "./pages/EditVenue";
 import CustomerBookings from "./pages/CustomerBookings";
 import Messages from "./pages/Messages";
-
-// Import Index page instead of Home as that's what exists
-import Index from "./pages/Index";
-// Import VenueOwnerPromo instead of VenueOwner
 import VenueOwnerPromo from "./pages/VenueOwnerPromo";
 
 function App() {
