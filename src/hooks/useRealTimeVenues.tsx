@@ -75,12 +75,17 @@ export const useRealTimeVenues = () => {
       } catch (e) {
         console.error("Error parsing opening_hours for venue", venue.id, e);
       }
+
+      // Use first gallery image instead of image_url
+      const defaultImage = venue.gallery_images && venue.gallery_images.length > 0 
+        ? venue.gallery_images[0] 
+        : '';
       
       return {
         id: venue.id,
         name: venue.name,
         description: venue.description || '',
-        imageUrl: venue.image_url || '',
+        imageUrl: defaultImage, // Use first gallery image
         galleryImages: venue.gallery_images || [],
         address: venue.address || '',
         city: venue.city_name || '',

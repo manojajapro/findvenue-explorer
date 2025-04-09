@@ -1,4 +1,3 @@
-
 interface Message {
   id: string;
   sender_id: string;
@@ -149,7 +148,6 @@ declare module '@supabase/supabase-js' {
             featured: boolean | null
             gallery_images: string[] | null
             id: string
-            image_url: string | null
             latitude: number | null
             longitude: number | null
             max_capacity: number | null
@@ -186,7 +184,6 @@ declare module '@supabase/supabase-js' {
             featured?: boolean | null
             gallery_images?: string[] | null
             id?: string
-            image_url?: string | null
             latitude?: number | null
             longitude?: number | null
             max_capacity?: number | null
@@ -223,7 +220,6 @@ declare module '@supabase/supabase-js' {
             featured?: boolean | null
             gallery_images?: string[] | null
             id?: string
-            image_url?: string | null
             latitude?: number | null
             longitude?: number | null
             max_capacity?: number | null

@@ -310,7 +310,7 @@ export type Database = {
         }
         Relationships: []
       }
-      venues_duplicate: {
+      venues_v1: {
         Row: {
           accepted_payment_methods: string[] | null
           accessibility_features: string[] | null
@@ -341,9 +341,12 @@ export type Database = {
           price_per_person: number | null
           rating: number | null
           reviews_count: number | null
+          rules_and_regulations: Json | null
           starting_price: number | null
+          type: string | null
           updated_at: string | null
           wifi: boolean | null
+          zipcode: string | null
         }
         Insert: {
           accepted_payment_methods?: string[] | null
@@ -375,9 +378,12 @@ export type Database = {
           price_per_person?: number | null
           rating?: number | null
           reviews_count?: number | null
+          rules_and_regulations?: Json | null
           starting_price?: number | null
+          type?: string | null
           updated_at?: string | null
           wifi?: boolean | null
+          zipcode?: string | null
         }
         Update: {
           accepted_payment_methods?: string[] | null
@@ -409,9 +415,12 @@ export type Database = {
           price_per_person?: number | null
           rating?: number | null
           reviews_count?: number | null
+          rules_and_regulations?: Json | null
           starting_price?: number | null
+          type?: string | null
           updated_at?: string | null
           wifi?: boolean | null
+          zipcode?: string | null
         }
         Relationships: []
       }

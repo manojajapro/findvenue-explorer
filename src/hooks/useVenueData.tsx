@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -86,11 +87,16 @@ export const useVenueData = () => {
             console.error("Error parsing rules_and_regulations for venue", data.id, e);
           }
           
+          // Use the first gallery image instead of image_url
+          const defaultImage = data.gallery_images && data.gallery_images.length > 0 
+            ? data.gallery_images[0] 
+            : '';
+          
           const transformedVenue: Venue = {
             id: data.id,
             name: data.name,
             description: data.description || '',
-            imageUrl: data.image_url || '',
+            imageUrl: defaultImage, // Use first gallery image instead
             galleryImages: data.gallery_images || [],
             address: data.address || '',
             city: data.city_name || '',

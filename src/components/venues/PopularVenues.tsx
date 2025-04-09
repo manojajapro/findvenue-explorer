@@ -54,33 +54,40 @@ const PopularVenues = () => {
         if (error) throw error;
         
         // Transform the data to match the expected format
-        const transformedData = data.map(venue => ({
-          id: venue.id,
-          name: venue.name,
-          description: venue.description,
-          imageUrl: venue.image_url,
-          galleryImages: venue.gallery_images || [],
-          address: venue.address,
-          city: venue.city_name || '',
-          cityId: venue.city_id,
-          category: venue.category_name || '',
-          categoryId: venue.category_id,
-          capacity: {
-            min: venue.min_capacity,
-            max: venue.max_capacity
-          },
-          pricing: {
-            currency: venue.currency,
-            startingPrice: venue.starting_price,
-            pricePerPerson: venue.price_per_person
-          },
-          amenities: venue.amenities || [],
-          rating: venue.rating,
-          reviews: venue.reviews_count,
-          featured: venue.featured,
-          popular: venue.popular,
-          availability: venue.availability || []
-        }));
+        const transformedData = data.map(venue => {
+          // Use first gallery image instead of image_url
+          const defaultImage = venue.gallery_images && venue.gallery_images.length > 0 
+            ? venue.gallery_images[0] 
+            : '';
+            
+          return {
+            id: venue.id,
+            name: venue.name,
+            description: venue.description,
+            imageUrl: defaultImage, // Use first gallery image
+            galleryImages: venue.gallery_images || [],
+            address: venue.address,
+            city: venue.city_name || '',
+            cityId: venue.city_id,
+            category: venue.category_name || '',
+            categoryId: venue.category_id,
+            capacity: {
+              min: venue.min_capacity,
+              max: venue.max_capacity
+            },
+            pricing: {
+              currency: venue.currency,
+              startingPrice: venue.starting_price,
+              pricePerPerson: venue.price_per_person
+            },
+            amenities: venue.amenities || [],
+            rating: venue.rating,
+            reviews: venue.reviews_count,
+            featured: venue.featured,
+            popular: venue.popular,
+            availability: venue.availability || []
+          }
+        });
         
         setVenues(transformedData);
       } catch (error) {
