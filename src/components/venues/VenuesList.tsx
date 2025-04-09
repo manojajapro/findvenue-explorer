@@ -1,8 +1,11 @@
 
+import { useNavigate } from 'react-router-dom';
 import { VenueCard } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from "@/components/ui/use-toast";
 
 interface VenuesListProps {
   venues?: Venue[];
@@ -19,6 +22,23 @@ const VenuesList = ({
   onVenueMouseEnter, 
   onVenueMouseLeave 
 }: VenuesListProps) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  const handleVenueClick = (venueId: string) => {
+    if (user) {
+      // User is logged in, navigate to venue details
+      navigate(`/venue/${venueId}`);
+    } else {
+      // User is not logged in, show toast and redirect to login
+      toast({
+        title: "Login Required",
+        description: "Please login to view venue details",
+        variant: "default",
+      });
+      navigate('/login');
+    }
+  };
   
   if (isLoading) {
     return (
@@ -55,9 +75,10 @@ const VenuesList = ({
       {venues.map((venue) => (
         <div 
           key={venue.id} 
-          className={`h-full ${compact ? 'mb-3 last:mb-0' : ''}`}
+          className={`h-full ${compact ? 'mb-3 last:mb-0' : ''} cursor-pointer`}
           onMouseEnter={() => onVenueMouseEnter && onVenueMouseEnter(venue.id)}
           onMouseLeave={() => onVenueMouseLeave && onVenueMouseLeave()}
+          onClick={() => handleVenueClick(venue.id)}
         >
           <VenueCard venue={venue} featured={venue.featured} />
         </div>

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -19,6 +18,12 @@ const VenueDetails = () => {
   const navigate = useNavigate();
   const { venue, isLoading, error } = useVenueData();
   const { user } = useAuth();
+  
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [user, isLoading, navigate]);
   
   if (isLoading) {
     return (
@@ -45,21 +50,17 @@ const VenueDetails = () => {
     return <div className="container mx-auto p-4">Venue not found.</div>;
   }
 
-  // Check if user is the venue owner
   const isOwner = user?.id === venue.ownerInfo?.user_id;
   
   return (
     <div className="container mx-auto p-4">
       <div className="md:flex md:gap-8">
-        {/* New Image Gallery Layout */}
         <div className="md:w-2/3 space-y-4">
           <div className="grid grid-cols-12 gap-4 h-96">
-            {/* Main large image */}
             <div className="col-span-8 h-full">
               <img src={venue.imageUrl} alt={venue.name} className="w-full h-full rounded-lg object-cover" />
             </div>
             
-            {/* Side gallery - 2 columns x 2 rows */}
             <div className="col-span-4 grid grid-rows-2 gap-4 h-full">
               {venue.galleryImages && venue.galleryImages.slice(0, 2).map((image, index) => (
                 <div key={index} className="relative rounded-lg overflow-hidden">
@@ -86,7 +87,6 @@ const VenueDetails = () => {
           </div>
         </div>
         
-        {/* Venue Details */}
         <div className="md:w-1/3">
           <h1 className="text-2xl font-semibold mb-2">{venue.name}</h1>
           <div className="flex items-center gap-2 mb-2">
@@ -108,7 +108,6 @@ const VenueDetails = () => {
             <span className="text-gray-600">Capacity: {venue.capacity.min} - {venue.capacity.max}</span>
           </div>
           
-          {/* Amenities Badges */}
           <div className="flex flex-wrap gap-2 mb-4">
             {venue.amenities && venue.amenities.map((amenity, index) => (
               <Badge key={index}>{amenity}</Badge>
@@ -119,7 +118,6 @@ const VenueDetails = () => {
             {venue.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && <Badge>Payment Options</Badge>}
           </div>
           
-          {/* Pricing */}
           <div className="mb-4">
             <h4 className="text-lg font-semibold">Pricing</h4>
             <p className="text-gray-700">
@@ -129,7 +127,6 @@ const VenueDetails = () => {
             </p>
           </div>
           
-          {/* Contact Venue Owner - Only show if user is not the owner */}
           {venue.ownerInfo && !isOwner && user && (
             <ContactVenueOwner 
               venueId={venue.id}
@@ -143,7 +140,6 @@ const VenueDetails = () => {
       
       <Separator className="my-4" />
       
-      {/* Venue Description */}
       <div className="mb-4">
         <h4 className="text-lg font-semibold">About This Venue</h4>
         <p className="text-gray-700">{venue.description}</p>
@@ -151,7 +147,6 @@ const VenueDetails = () => {
       
       <Separator className="my-4" />
       
-      {/* Rules and Regulations */}
       <div className="mb-4">
         <h4 className="text-lg font-semibold">Rules and Regulations</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
@@ -180,7 +175,6 @@ const VenueDetails = () => {
       
       <Separator className="my-4" />
       
-      {/* Venue Booking Tabs - Only show if user is not the owner */}
       <VenueBookingTabs 
         venueId={venue.id}
         venueName={venue.name}
@@ -191,7 +185,6 @@ const VenueDetails = () => {
         ownerName={venue.ownerInfo?.name || ''}
       />
       
-      {/* Owner Information */}
       {venue.ownerInfo && (
         <>
           <Separator className="my-4" />
@@ -252,7 +245,6 @@ const VenueDetails = () => {
         </>
       )}
 
-      {/* AI Assistants moved to floating buttons */}
       <VenueAIAssistants venue={venue} />
     </div>
   );
