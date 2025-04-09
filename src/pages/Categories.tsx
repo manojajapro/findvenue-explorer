@@ -48,9 +48,27 @@ const Categories = () => {
                 venue.category_id.forEach((catId: string, index: number) => {
                   if (!catId) return; // Skip empty category IDs
                   
-                  const categoryName = Array.isArray(venue.category_name) && venue.category_name[index] 
-                    ? venue.category_name[index] 
-                    : 'Unnamed Category';
+                  let categoryName = '';
+                  // Handle array format of category_name
+                  if (Array.isArray(venue.category_name) && venue.category_name[index]) {
+                    categoryName = venue.category_name[index];
+                  } else if (typeof venue.category_name === 'string' && venue.category_name.startsWith('[')) {
+                    // Handle string array format like "['Category1', 'Category2']"
+                    try {
+                      const parsedCategories = JSON.parse(
+                        venue.category_name.replace(/'/g, '"')
+                      );
+                      categoryName = parsedCategories[index] || 'Unnamed Category';
+                    } catch (e) {
+                      // If parsing fails, use a substring approach
+                      const matches = venue.category_name.match(/'([^']+)'/g);
+                      categoryName = matches && matches[index] 
+                        ? matches[index].replace(/'/g, '') 
+                        : 'Unnamed Category';
+                    }
+                  } else {
+                    categoryName = 'Unnamed Category';
+                  }
                   
                   // Only add if we don't have this category yet, or update if we get better data
                   if (!allCategoriesMap.has(catId)) {
@@ -78,7 +96,20 @@ const Categories = () => {
               } else if (venue.category_id) {
                 // Handle non-array category_id
                 const catId = venue.category_id;
-                const categoryName = venue.category_name || 'Unnamed Category';
+                let categoryName = venue.category_name || 'Unnamed Category';
+                
+                // Handle string representation of array
+                if (typeof categoryName === 'string' && categoryName.startsWith('[')) {
+                  try {
+                    // Try to parse the string as JSON after replacing single quotes with double quotes
+                    const parsedCategories = JSON.parse(categoryName.replace(/'/g, '"'));
+                    categoryName = parsedCategories[0] || 'Unnamed Category';
+                  } catch (e) {
+                    // If parsing fails, use a substring approach
+                    const match = categoryName.match(/'([^']+)'/);
+                    categoryName = match ? match[1] : 'Unnamed Category';
+                  }
+                }
                 
                 if (!allCategoriesMap.has(catId)) {
                   allCategoriesMap.set(catId, {
@@ -112,13 +143,30 @@ const Categories = () => {
           }
         } else if (categoryGroupsData && categoryGroupsData.length > 0) {
           // Use pre-aggregated category data from the database
-          const formattedCategories = categoryGroupsData.map(cat => ({
-            id: cat.category_id,
-            name: cat.category_name,
-            description: `Find perfect ${cat.category_name.toLowerCase()} for your events`,
-            gallery_images: cat.image_url ? [cat.image_url] : [],
-            venueCount: cat.venue_count || 0
-          }));
+          const formattedCategories = categoryGroupsData.map(cat => {
+            let categoryName = cat.category_name;
+            
+            // Handle string representation of array
+            if (typeof categoryName === 'string' && categoryName.startsWith('[')) {
+              try {
+                // Try to parse the string as JSON after replacing single quotes with double quotes
+                const parsedCategories = JSON.parse(categoryName.replace(/'/g, '"'));
+                categoryName = parsedCategories[0] || 'Unnamed Category';
+              } catch (e) {
+                // If parsing fails, use a substring approach
+                const match = categoryName.match(/'([^']+)'/);
+                categoryName = match ? match[1] : 'Unnamed Category';
+              }
+            }
+            
+            return {
+              id: cat.category_id,
+              name: categoryName,
+              description: `Find perfect ${categoryName.toLowerCase()} for your events`,
+              gallery_images: cat.image_url ? [cat.image_url] : [],
+              venueCount: cat.venue_count || 0
+            };
+          });
           
           console.log("Using category groups data:", formattedCategories);
           
@@ -142,10 +190,22 @@ const Categories = () => {
       return;
     }
     
-    const filtered = categories.filter(category => 
-      category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    const filtered = categories.filter(category => {
+      // Handle string representation of array
+      let categoryName = category.name;
+      if (typeof categoryName === 'string' && categoryName.startsWith('[')) {
+        try {
+          const parsedCategories = JSON.parse(categoryName.replace(/'/g, '"'));
+          categoryName = parsedCategories[0] || '';
+        } catch (e) {
+          const match = categoryName.match(/'([^']+)'/);
+          categoryName = match ? match[1] : '';
+        }
+      }
+      
+      return categoryName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    });
     
     setFilteredCategories(filtered);
   }, [searchTerm, categories]);

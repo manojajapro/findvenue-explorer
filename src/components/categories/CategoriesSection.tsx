@@ -46,9 +46,27 @@ const CategoriesSection = () => {
                 venue.category_id.forEach((catId: string, index: number) => {
                   if (!catId) return; // Skip empty category IDs
                   
-                  const categoryName = Array.isArray(venue.category_name) && venue.category_name[index] 
-                    ? venue.category_name[index] 
-                    : 'Unnamed Category';
+                  let categoryName = '';
+                  // Handle array format of category_name
+                  if (Array.isArray(venue.category_name) && venue.category_name[index]) {
+                    categoryName = venue.category_name[index];
+                  } else if (typeof venue.category_name === 'string' && venue.category_name.startsWith('[')) {
+                    // Handle string array format like "['Category1', 'Category2']"
+                    try {
+                      const parsedCategories = JSON.parse(
+                        venue.category_name.replace(/'/g, '"')
+                      );
+                      categoryName = parsedCategories[index] || 'Unnamed Category';
+                    } catch (e) {
+                      // If parsing fails, use a substring approach
+                      const matches = venue.category_name.match(/'([^']+)'/g);
+                      categoryName = matches && matches[index] 
+                        ? matches[index].replace(/'/g, '') 
+                        : 'Unnamed Category';
+                    }
+                  } else {
+                    categoryName = 'Unnamed Category';
+                  }
                   
                   // Only add if we don't have this category yet, or update if we get better data
                   if (!allCategoriesMap.has(catId) || !allCategoriesMap.get(catId).gallery_images) {
@@ -76,7 +94,20 @@ const CategoriesSection = () => {
               } else if (venue.category_id) {
                 // Handle non-array category_id
                 const catId = venue.category_id;
-                const categoryName = venue.category_name || 'Unnamed Category';
+                let categoryName = venue.category_name || 'Unnamed Category';
+                
+                // Handle string representation of array
+                if (typeof categoryName === 'string' && categoryName.startsWith('[')) {
+                  try {
+                    // Try to parse the string as JSON after replacing single quotes with double quotes
+                    const parsedCategories = JSON.parse(categoryName.replace(/'/g, '"'));
+                    categoryName = parsedCategories[0] || 'Unnamed Category';
+                  } catch (e) {
+                    // If parsing fails, use a substring approach
+                    const match = categoryName.match(/'([^']+)'/);
+                    categoryName = match ? match[1] : 'Unnamed Category';
+                  }
+                }
                 
                 if (!allCategoriesMap.has(catId)) {
                   allCategoriesMap.set(catId, {
