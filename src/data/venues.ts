@@ -1,6 +1,11 @@
-
 import { categories } from './categories';
 import { saudiCities } from './cities';
+
+export interface VenueRule {
+  category: string;
+  title: string;
+  description: string;
+}
 
 export interface Venue {
   id: string;
@@ -28,6 +33,7 @@ export interface Venue {
   featured?: boolean;
   popular?: boolean;
   availability?: string[];
+  rules_and_regulations?: VenueRule[];
 }
 
 export const venues: Venue[] = [
@@ -61,7 +67,34 @@ export const venues: Venue[] = [
     reviews: 124,
     featured: true,
     popular: true,
-    availability: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    availability: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    rules_and_regulations: [
+      {
+        category: 'General Policies',
+        title: 'Hours of Operation',
+        description: 'Operating hours: Monday to Sunday from 8:00 AM to 11:00 PM. Last entry at 10:00 PM.'
+      },
+      {
+        category: 'General Policies',
+        title: 'Reservations and Bookings',
+        description: 'Advance booking required. Minimum 7 days notice. Cancellations must be made 48 hours in advance for refund.'
+      },
+      {
+        category: 'Conduct and Behavior',
+        title: 'Guest Conduct',
+        description: 'Respectful behavior expected. Appropriate attire required. Management reserves the right to refuse entry.'
+      },
+      {
+        category: 'Facility Usage',
+        title: 'Space Usage',
+        description: 'Maximum capacity: 500 persons. No unauthorized access to restricted areas.'
+      },
+      {
+        category: 'Food and Beverages',
+        title: 'Catering and Refreshments',
+        description: 'Outside food and beverages not permitted. Licensed caterers only.'
+      }
+    ]
   },
   {
     id: 'ritz-conference-center',

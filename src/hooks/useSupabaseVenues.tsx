@@ -11,6 +11,12 @@ export interface VenueFilter {
   amenities?: string[];
 }
 
+export interface VenueRule {
+  category: string;
+  title: string;
+  description: string;
+}
+
 export interface Venue {
   id: string;
   name: string;
@@ -59,6 +65,7 @@ export interface Venue {
   };
   additionalServices?: string[];
   status?: string;
+  rulesAndRegulations?: VenueRule[];
 }
 
 export const useSupabaseVenues = () => {
@@ -177,6 +184,21 @@ export const useSupabaseVenues = () => {
             console.error("Error parsing opening_hours for venue", venue.id, e);
           }
           
+          let rulesAndRegulationsData = undefined;
+          try {
+            if (venue.rules_and_regulations) {
+              rulesAndRegulationsData = typeof venue.rules_and_regulations === 'string'
+                ? JSON.parse(venue.rules_and_regulations)
+                : (venue.rules_and_regulations as Array<{
+                    category: string;
+                    title: string;
+                    description: string;
+                  }>);
+            }
+          } catch (e) {
+            console.error("Error parsing rules_and_regulations for venue", venue.id, e);
+          }
+          
           return {
             id: venue.id,
             name: venue.name,
@@ -212,7 +234,8 @@ export const useSupabaseVenues = () => {
             acceptedPaymentMethods: venue.accepted_payment_methods || [],
             openingHours: openingHoursData,
             ownerInfo: ownerInfoData,
-            additionalServices: venue.additional_services || []
+            additionalServices: venue.additional_services || [],
+            rulesAndRegulations: rulesAndRegulationsData
           } as Venue;
         });
         

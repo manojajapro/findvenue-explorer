@@ -73,6 +73,21 @@ export const useVenueData = () => {
             console.error("Error parsing opening_hours for venue", data.id, e);
           }
           
+          let rulesAndRegulationsData = undefined;
+          try {
+            if (data.rules_and_regulations) {
+              rulesAndRegulationsData = typeof data.rules_and_regulations === 'string'
+                ? JSON.parse(data.rules_and_regulations)
+                : (data.rules_and_regulations as Array<{
+                    category: string;
+                    title: string;
+                    description: string;
+                  }>);
+            }
+          } catch (e) {
+            console.error("Error parsing rules_and_regulations for venue", data.id, e);
+          }
+          
           const transformedVenue: Venue = {
             id: data.id,
             name: data.name,
@@ -108,7 +123,8 @@ export const useVenueData = () => {
             acceptedPaymentMethods: data.accepted_payment_methods || [],
             openingHours: openingHoursData,
             ownerInfo: ownerInfoData,
-            additionalServices: data.additional_services || []
+            additionalServices: data.additional_services || [],
+            rulesAndRegulations: rulesAndRegulationsData
           };
           
           console.log("Transformed venue data:", transformedVenue);
