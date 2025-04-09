@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -15,6 +14,22 @@ import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import { formatDistanceToNow } from 'date-fns';
 
+interface OwnerInfo {
+  name: string;
+  contact: string;
+  responseTime: string;
+  user_id: string;
+  profile_image?: string;
+  online_status?: string;
+  last_active?: string;
+  socialLinks?: {
+    facebook?: string;
+    twitter?: string;
+    instagram?: string;
+    linkedin?: string;
+  };
+}
+
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
   const navigate = useNavigate();
@@ -26,6 +41,28 @@ const VenueDetails = () => {
       navigate('/login', { replace: true });
     }
   }, [user, isLoading, navigate]);
+
+  const formatCategories = (category: string | string[] | undefined) => {
+    if (!category) return '';
+    
+    if (typeof category === 'string') {
+      if (category.startsWith('[') && category.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(category.replace(/'/g, '"'));
+          return Array.isArray(parsed) ? parsed.join(', ') : category;
+        } catch (e) {
+          return category.replace(/[\[\]']/g, '').split(',').join(', ');
+        }
+      }
+      return category;
+    }
+    
+    if (Array.isArray(category)) {
+      return category.join(', ');
+    }
+    
+    return String(category);
+  };
   
   if (isLoading) {
     return (
@@ -53,12 +90,12 @@ const VenueDetails = () => {
   }
 
   const isOwner = user?.id === venue.ownerInfo?.user_id;
+  const ownerInfo = venue.ownerInfo as OwnerInfo | undefined;
   
-  // Format last active time if available
   const formatLastActive = () => {
-    if (venue.ownerInfo?.last_active) {
+    if (ownerInfo?.last_active) {
       try {
-        const lastActiveDate = new Date(venue.ownerInfo.last_active);
+        const lastActiveDate = new Date(ownerInfo.last_active);
         return formatDistanceToNow(lastActiveDate, { addSuffix: true });
       } catch (error) {
         return "Recently";
@@ -122,6 +159,13 @@ const VenueDetails = () => {
             <Users className="h-4 w-4 text-gray-500" />
             <span className="text-gray-600">Capacity: {venue.capacity.min} - {venue.capacity.max}</span>
           </div>
+          
+          {venue.category && (
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-gray-600 font-medium">Categories:</span>
+              <span>{formatCategories(venue.category)}</span>
+            </div>
+          )}
           
           <div className="flex flex-wrap gap-2 mb-4">
             {venue.amenities && venue.amenities.map((amenity, index) => (
@@ -207,33 +251,33 @@ const VenueDetails = () => {
         ownerName={venue.ownerInfo?.name || ''}
       />
       
-      {venue.ownerInfo && (
+      {ownerInfo && (
         <>
           <Separator className="my-4" />
           <div className="mb-4 bg-findvenue-surface/10 p-4 rounded-lg">
             <div className="flex items-center mb-3">
               <div className="relative">
-                {venue.ownerInfo.profile_image ? (
+                {ownerInfo.profile_image ? (
                   <img 
-                    src={venue.ownerInfo.profile_image} 
-                    alt={venue.ownerInfo.name} 
+                    src={ownerInfo.profile_image} 
+                    alt={ownerInfo.name} 
                     className="w-12 h-12 rounded-full object-cover mr-3"
                   />
                 ) : (
                   <div className="w-12 h-12 bg-findvenue rounded-full flex items-center justify-center text-white text-lg font-bold mr-3">
-                    {venue.ownerInfo.name.charAt(0)}
+                    {ownerInfo.name.charAt(0)}
                   </div>
                 )}
                 <span className={`absolute bottom-0 right-0 w-3 h-3 ${
-                  venue.ownerInfo.online_status === 'online' ? 'bg-green-500' : 'bg-gray-400'
+                  ownerInfo.online_status === 'online' ? 'bg-green-500' : 'bg-gray-400'
                 } rounded-full border-2 border-white`}></span>
               </div>
               <div>
-                <h4 className="text-lg font-semibold">{venue.ownerInfo.name}</h4>
+                <h4 className="text-lg font-semibold">{ownerInfo.name}</h4>
                 {!isOwner && (
                   <div className="flex items-center gap-2 text-sm text-findvenue-text-muted">
                     <span className="inline-flex items-center">
-                      {venue.ownerInfo.online_status === 'online' ? (
+                      {ownerInfo.online_status === 'online' ? (
                         <span className="text-green-500">Online</span>
                       ) : (
                         <span>Active {formatLastActive()}</span>
@@ -246,36 +290,36 @@ const VenueDetails = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-findvenue-text-muted mb-1">Contact</p>
-                <p className="text-gray-700">{venue.ownerInfo.contact}</p>
+                <p className="text-gray-700">{ownerInfo.contact}</p>
               </div>
               <div>
                 <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
-                <p className="text-gray-700">{venue.ownerInfo.responseTime}</p>
+                <p className="text-gray-700">{ownerInfo.responseTime}</p>
               </div>
               <div className="md:col-span-2">
                 <p className="text-sm text-findvenue-text-muted mb-1">Response Rate</p>
                 <p className="text-gray-700">100%</p>
               </div>
             </div>
-            {venue.ownerInfo.socialLinks && (
+            {ownerInfo.socialLinks && (
               <div className="mt-4 flex space-x-3">
-                {venue.ownerInfo.socialLinks.facebook && (
-                  <a href={venue.ownerInfo.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                {ownerInfo.socialLinks.facebook && (
+                  <a href={ownerInfo.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
                     <FacebookIcon className="h-5 w-5" />
                   </a>
                 )}
-                {venue.ownerInfo.socialLinks.twitter && (
-                  <a href={venue.ownerInfo.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                {ownerInfo.socialLinks.twitter && (
+                  <a href={ownerInfo.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
                     <TwitterIcon className="h-5 w-5" />
                   </a>
                 )}
-                {venue.ownerInfo.socialLinks.instagram && (
-                  <a href={venue.ownerInfo.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300">
+                {ownerInfo.socialLinks.instagram && (
+                  <a href={ownerInfo.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300">
                     <InstagramIcon className="h-5 w-5" />
                   </a>
                 )}
-                {venue.ownerInfo.socialLinks.linkedin && (
-                  <a href={venue.ownerInfo.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500">
+                {ownerInfo.socialLinks.linkedin && (
+                  <a href={ownerInfo.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500">
                     <LinkedinIcon className="h-5 w-5" />
                   </a>
                 )}

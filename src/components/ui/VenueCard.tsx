@@ -7,6 +7,13 @@ import { Card } from '@/components/ui/card';
 import { Star, Users, CalendarDays, MapPin, Heart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from "@/components/ui/carousel";
 
 interface VenueCardProps {
   venue: Venue;
@@ -18,9 +25,8 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
   const [isLoaded, setIsLoaded] = useState(false);
   const { user, checkIsFavorite, toggleFavoriteVenue } = useAuth();
   const [isFavorite, setIsFavorite] = useState(user ? checkIsFavorite(venue.id) : false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const imagesRef = useRef<string[]>([]);
-
+  
   // Prepare the images array, including the main image and gallery images
   useEffect(() => {
     const images: string[] = [];
@@ -36,17 +42,6 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
     const uniqueImages = [...new Set(images)];
     imagesRef.current = uniqueImages.length > 0 ? uniqueImages : [venue.imageUrl];
   }, [venue.imageUrl, venue.galleryImages]);
-
-  // Auto-rotate images every 3 seconds
-  useEffect(() => {
-    if (imagesRef.current.length <= 1) return;
-    
-    const interval = setInterval(() => {
-      setCurrentImageIndex(prev => (prev + 1) % imagesRef.current.length);
-    }, 3000);
-    
-    return () => clearInterval(interval);
-  }, []);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -106,36 +101,47 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
             <div className="absolute inset-0 bg-findvenue-surface animate-pulse" />
           )}
           
-          {imagesRef.current.map((imgSrc, index) => (
-            <img 
-              key={index}
-              src={imgSrc} 
-              alt={`${venue.name} ${index}`}
-              className={`w-full h-full object-cover absolute inset-0 transition-opacity duration-1000 ${
-                currentImageIndex === index ? 'opacity-100' : 'opacity-0'
-              }`}
-              onLoad={() => {
-                if (index === 0) setIsLoaded(true);
-              }}
-            />
-          ))}
+          <Carousel
+            className="w-full h-full"
+            opts={{
+              align: "start",
+              loop: true,
+            }}
+            autoplay={true}
+            interval={1000}
+          >
+            <CarouselContent className="h-full">
+              {imagesRef.current.map((imgSrc, index) => (
+                <CarouselItem key={index} className="h-full">
+                  <img 
+                    src={imgSrc} 
+                    alt={`${venue.name} ${index}`}
+                    className="w-full h-full object-cover"
+                    onLoad={() => {
+                      if (index === 0) setIsLoaded(true);
+                    }}
+                  />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
           
           {featured && (
-            <div className="absolute top-2 right-2">
+            <div className="absolute top-2 right-2 z-10">
               <Badge className="bg-findvenue-gold text-black font-medium px-2 py-1">
                 Featured
               </Badge>
             </div>
           )}
           {venue.popular && (
-            <div className="absolute top-2 left-2">
+            <div className="absolute top-2 left-2 z-10">
               <Badge className="bg-findvenue text-white font-medium px-2 py-1">
                 Popular
               </Badge>
             </div>
           )}
           {primaryCategory && (
-            <div className="absolute bottom-2 left-2">
+            <div className="absolute bottom-2 left-2 z-10">
               <Badge variant="outline" className="bg-black/40 backdrop-blur-sm border-white/10 text-white text-xs px-2 py-1">
                 {primaryCategory}
               </Badge>
@@ -145,27 +151,13 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm"
+              className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm"
               onClick={handleFavoriteClick}
             >
               <Heart 
                 className={`w-4 h-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-white'}`} 
               />
             </Button>
-          )}
-          
-          {/* Image indicator dots */}
-          {imagesRef.current.length > 1 && (
-            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
-              {imagesRef.current.map((_, index) => (
-                <div 
-                  key={index} 
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    currentImageIndex === index ? 'bg-white' : 'bg-white/40'
-                  }`}
-                />
-              ))}
-            </div>
           )}
         </div>
         <div className="p-4">

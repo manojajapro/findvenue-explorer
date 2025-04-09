@@ -77,7 +77,10 @@ const VenueDetails = () => {
               name: ownerInfo.name as string,
               contact: ownerInfo.contact as string,
               responseTime: ownerInfo.response_time as string,
-              user_id: ownerInfo.user_id as string
+              user_id: ownerInfo.user_id as string,
+              profile_image: ownerInfo.profile_image as string,
+              online_status: ownerInfo.online_status as string,
+              last_active: ownerInfo.last_active as string
             };
           }
           
@@ -169,7 +172,10 @@ const VenueDetails = () => {
                   name: ownerInfo.name as string,
                   contact: ownerInfo.contact as string,
                   responseTime: ownerInfo.response_time as string,
-                  user_id: ownerInfo.user_id as string
+                  user_id: ownerInfo.user_id as string,
+                  profile_image: ownerInfo.profile_image as string,
+                  online_status: ownerInfo.online_status as string,
+                  last_active: ownerInfo.last_active as string
                 };
               }
               
@@ -398,6 +404,28 @@ const VenueDetails = () => {
     );
   };
   
+  const formatCategories = (category: string | string[]) => {
+    if (!category) return '';
+    
+    if (typeof category === 'string') {
+      if (category.startsWith('[') && category.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(category.replace(/'/g, '"'));
+          return Array.isArray(parsed) ? parsed.join(', ') : category;
+        } catch (e) {
+          return category.replace(/[\[\]']/g, '').split(',').join(', ');
+        }
+      }
+      return category;
+    }
+    
+    if (Array.isArray(category)) {
+      return category.join(', ');
+    }
+    
+    return String(category);
+  };
+  
   if (loading) {
     return (
       <div className="pt-24 pb-16">
@@ -515,7 +543,7 @@ const VenueDetails = () => {
                 </Badge>
               )}
               <Badge className="bg-findvenue/20 text-findvenue border-0">
-                {venue?.category}
+                {formatCategories(venue?.category || '')}
               </Badge>
             </div>
             
