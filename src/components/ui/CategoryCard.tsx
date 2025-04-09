@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Category } from '@/data/categories';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface CategoryCardProps {
   category: Category;
@@ -21,8 +22,27 @@ const CategoryCard = ({ category }: CategoryCardProps) => {
     navigate(`/venues?categoryId=${category.id}`);
   };
 
-  // Format category name if it's from an array string representation
-  const displayName = category.name.replace(/^\['|'\]$|'/g, '').split("', ")[0];
+  // Parse category name if it's in array format
+  const getCategoryName = () => {
+    if (!category.name) return 'Unnamed Category';
+    
+    // Handle string representation of array
+    if (typeof category.name === 'string' && category.name.startsWith('[')) {
+      try {
+        // Try to parse the string as JSON after replacing single quotes with double quotes
+        const parsedCategories = JSON.parse(category.name.replace(/'/g, '"'));
+        return parsedCategories[0] || 'Unnamed Category';
+      } catch (e) {
+        // If parsing fails, use a substring approach
+        const match = category.name.match(/'([^']+)'/);
+        return match ? match[1] : 'Unnamed Category';
+      }
+    }
+    
+    return category.name;
+  };
+
+  const displayName = getCategoryName();
 
   return (
     <div className="block h-full cursor-pointer" onClick={handleClick}>
@@ -39,7 +59,12 @@ const CategoryCard = ({ category }: CategoryCardProps) => {
         />
         <div className="absolute bottom-0 left-0 right-0 p-4 z-10 text-white">
           <h3 className="font-bold text-xl drop-shadow-md">{displayName}</h3>
-          <p className="text-sm text-white/80">{category.venueCount} spaces</p>
+          <p className="text-sm text-white/80 mb-2">{category.venueCount} spaces</p>
+          {category.singleCategory && (
+            <Badge className="bg-findvenue/80 hover:bg-findvenue text-white border-none">
+              {category.singleCategory}
+            </Badge>
+          )}
         </div>
       </Card>
     </div>

@@ -42,6 +42,28 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
     }
   };
 
+  // Extract primary category from category string or array
+  const getPrimaryCategory = () => {
+    if (!venue.category) return '';
+    
+    // Handle string representation of array
+    if (typeof venue.category === 'string' && venue.category.startsWith('[')) {
+      try {
+        // Try to parse the string as JSON after replacing single quotes with double quotes
+        const parsedCategories = JSON.parse(venue.category.replace(/'/g, '"'));
+        return parsedCategories[0] || '';
+      } catch (e) {
+        // If parsing fails, use a substring approach
+        const match = venue.category.match(/'([^']+)'/);
+        return match ? match[1] : '';
+      }
+    }
+    
+    return venue.category;
+  };
+
+  const primaryCategory = getPrimaryCategory();
+
   return (
     <Link to={`/venue/${venue.id}`} className="block h-full">
       <Card className={`overflow-hidden transition-all duration-500 h-full transform hover-scale glass-card ${featured ? 'border-findvenue-gold/30' : 'border-white/10'}`}>
@@ -69,10 +91,10 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
               </Badge>
             </div>
           )}
-          {venue.category && (
+          {primaryCategory && (
             <div className="absolute bottom-2 left-2">
               <Badge variant="outline" className="bg-black/40 backdrop-blur-sm border-white/10 text-white text-xs px-2 py-1">
-                {venue.category}
+                {primaryCategory}
               </Badge>
             </div>
           )}
@@ -103,10 +125,12 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
             <span>{venue.city}</span>
           </div>
           
-          <div className="text-findvenue-text-muted text-sm mb-3 flex items-center">
-            <Tag className="w-3 h-3 mr-1" />
-            <span>{venue.category}</span>
-          </div>
+          {primaryCategory && (
+            <div className="text-findvenue-text-muted text-sm mb-3 flex items-center">
+              <Tag className="w-3 h-3 mr-1" />
+              <span>{primaryCategory}</span>
+            </div>
+          )}
           
           <p className="text-sm text-findvenue-text-muted mb-4 line-clamp-2">
             {venue.description}
