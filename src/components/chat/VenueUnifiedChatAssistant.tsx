@@ -71,6 +71,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     venue,
     autoRestart: false,
     onTranscript: (text) => {
+      console.log("Transcript received:", text);
       // Update input field with recognized text in real-time
       setTextInput(text);
       
@@ -154,10 +155,20 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
         setTextInput('');
         setSpeechPaused(false);
         setIsRecognizing(true);
-        await startListening();
-        toast.success('Listening...', {
-          description: 'Speak clearly into your microphone.'
-        });
+        
+        try {
+          await startListening();
+          console.log("Listening started successfully");
+          toast.success('Listening...', {
+            description: 'Speak clearly into your microphone.'
+          });
+        } catch (error) {
+          console.error("Error starting listening:", error);
+          setIsRecognizing(false);
+          toast.error('Failed to start listening', {
+            description: 'Please check your microphone and permissions.'
+          });
+        }
       }
     }
   };
@@ -228,7 +239,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
     setIsSpeaking(true);
     
     try {
-      // Call our Edge Function for ElevenLabs TTS
+      // Call our Edge Function for TTS
       const { data, error } = await supabase.functions.invoke('text-to-speech', {
         body: {
           text: text,
@@ -313,7 +324,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
           </div>
           <div>
             <h2 className="font-medium text-lg text-white">Venue Assistant</h2>
-            <p className="text-xs text-blue-200">Ask anything about {venue.name}</p>
+            <p className="text-xs text-blue-200">Ask anything about {venue?.name}</p>
           </div>
         </div>
         
@@ -351,7 +362,7 @@ const VenueUnifiedChatAssistant = ({ venue, onClose }: VenueUnifiedChatAssistant
                 <Bot className="h-8 w-8 text-white" />
               </div>
               <div className="text-center space-y-2">
-                <p className="text-gray-300 font-medium">How can I help you with {venue.name}?</p>
+                <p className="text-gray-300 font-medium">How can I help you with {venue?.name}?</p>
                 <p className="text-xs text-gray-500">Ask about amenities, pricing, or booking details</p>
               </div>
             </div>

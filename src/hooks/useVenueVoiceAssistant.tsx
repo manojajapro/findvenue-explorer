@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,16 +58,19 @@ export const useVenueVoiceAssistant = ({
   const initSpeechRecognition = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
+      recognitionRef.current = null;
     }
     
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      console.log("Speech recognition is available");
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
+      recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
       
       recognitionRef.current.onstart = () => {
+        console.log("Speech recognition started");
         if (isMountedRef.current) setIsListening(true);
       };
       
@@ -77,14 +79,12 @@ export const useVenueVoiceAssistant = ({
           .map(result => result[0].transcript)
           .join('');
         
+        console.log("Speech recognition result:", transcript);
+        
         if (isMountedRef.current) setTranscript(transcript);
         
         if (onTranscript && isMountedRef.current) {
           onTranscript(transcript);
-        }
-        
-        if (event.results[0].isFinal && isMountedRef.current) {
-          handleFinalTranscript(transcript);
         }
       };
       
@@ -97,24 +97,14 @@ export const useVenueVoiceAssistant = ({
       };
       
       recognitionRef.current.onend = () => {
+        console.log("Speech recognition ended");
         if (isMountedRef.current) setIsListening(false);
-        
-        if (autoRestart && !processingRef.current && isMountedRef.current) {
-          setTimeout(() => {
-            if (recognitionRef.current && !processingRef.current && isMountedRef.current) {
-              try {
-                recognitionRef.current.start();
-              } catch (e) {
-                console.error('Failed to restart recognition:', e);
-              }
-            }
-          }, 1000);
-        }
       };
     } else {
+      console.error("Speech recognition is NOT available");
       setError('Speech recognition not supported in this browser.');
     }
-  }, [autoRestart, onTranscript]);
+  }, [onTranscript]);
   
   const handleFinalTranscript = useCallback(async (text: string) => {
     if (!text.trim() || !venue || processingRef.current || !isMountedRef.current) return;
@@ -302,9 +292,12 @@ export const useVenueVoiceAssistant = ({
       initSpeechRecognition();
     }
     
+    console.log("Starting speech recognition...");
+    
     if (recognitionRef.current) {
       try {
         await recognitionRef.current.start();
+        console.log("Speech recognition started successfully");
       } catch (err) {
         console.error('Error starting speech recognition:', err);
         if (isMountedRef.current) {
@@ -313,11 +306,15 @@ export const useVenueVoiceAssistant = ({
         throw err;
       }
     } else {
+      console.error('Speech recognition is not available in your browser.');
       setError('Speech recognition is not available in your browser.');
+      throw new Error('Speech recognition is not available in your browser.');
     }
   }, [initSpeechRecognition]);
   
   const stopListening = useCallback(() => {
+    console.log("Stopping speech recognition...");
+    
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
