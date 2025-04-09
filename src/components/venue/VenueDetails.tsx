@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -14,6 +13,22 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import { formatDistanceToNow } from 'date-fns';
+
+interface VenueOwnerInfo {
+  name: string;
+  contact: string;
+  responseTime: string;
+  user_id: string;
+  profile_image?: string;
+  online_status?: string;
+  last_active?: string;
+  socialLinks?: {
+    facebook?: string;
+    twitter?: string;
+    instagram?: string;
+    linkedin?: string;
+  };
+}
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -54,9 +69,8 @@ const VenueDetails = () => {
 
   const isOwner = user?.id === venue.ownerInfo?.user_id;
   
-  // Format last active time if available
   const formatLastActive = () => {
-    if (venue.ownerInfo?.last_active) {
+    if (venue?.ownerInfo?.last_active) {
       try {
         const lastActiveDate = new Date(venue.ownerInfo.last_active);
         return formatDistanceToNow(lastActiveDate, { addSuffix: true });

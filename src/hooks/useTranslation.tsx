@@ -1,121 +1,76 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
-type LanguageContextType = {
+interface TranslationContextType {
   currentLanguage: string;
+  setLanguage: (lang: string) => void;
   translate: (text: string) => Promise<string>;
-  setLanguage: (language: string) => void;
   isRTL: boolean;
+}
+
+const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
+
+// Cache for translations to avoid repeated API calls
+const translationCache: Record<string, Record<string, string>> = {
+  en: {},
+  ar: {}
 };
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentLanguage, setCurrentLanguage] = useState(() => {
+    return localStorage.getItem('language') || 'en';
+  });
+  
+  const isRTL = currentLanguage === 'ar';
+  
+  // Update document direction based on language
+  useEffect(() => {
+    document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+    document.documentElement.lang = currentLanguage;
+    localStorage.setItem('language', currentLanguage);
+  }, [currentLanguage, isRTL]);
+  
+  const setLanguage = useCallback((lang: string) => {
+    setCurrentLanguage(lang);
+  }, []);
+  
+  const translate = useCallback(async (text: string): Promise<string> => {
+    // If text is empty or just whitespace, return it as is
+    if (!text || !text.trim()) return text;
+    
+    // If already in cache, return cached translation
+    if (currentLanguage === 'en' || (currentLanguage === 'ar' && translationCache.ar[text])) {
+      return currentLanguage === 'en' ? text : (translationCache.ar[text] || text);
+    }
+    
+    // For now, until we implement the actual translation, just return the original text
+    // When ready to implement real translation, replace this with API call
+    // This is a placeholder for the actual translation implementation
+    if (currentLanguage === 'ar') {
+      // Simulate API call delay
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          // Store in cache for future use
+          translationCache.ar[text] = text; // Replace with actual translation
+          resolve(text); // Replace with actual translation
+        }, 50);
+      });
+    }
+    
+    return text;
+  }, [currentLanguage]);
+  
+  return (
+    <TranslationContext.Provider value={{ currentLanguage, setLanguage, translate, isRTL }}>
+      {children}
+    </TranslationContext.Provider>
+  );
+};
 
-export const useTranslation = () => {
-  const context = useContext(LanguageContext);
+export const useTranslation = (): TranslationContextType => {
+  const context = useContext(TranslationContext);
   if (context === undefined) {
     throw new Error('useTranslation must be used within a LanguageProvider');
   }
   return context;
-};
-
-interface LanguageProviderProps {
-  children: ReactNode;
-}
-
-export const LanguageProvider = ({ children }: LanguageProviderProps) => {
-  const [currentLanguage, setCurrentLanguage] = useState(() => {
-    // Get browser language or stored preference
-    const storedLanguage = localStorage.getItem('preferredLanguage');
-    if (storedLanguage) return storedLanguage;
-    
-    const browserLang = navigator.language.split('-')[0];
-    return browserLang === 'ar' ? 'ar' : 'en';
-  });
-  
-  const [isRTL, setIsRTL] = useState(currentLanguage === 'ar');
-  const [translationCache, setTranslationCache] = useState<Record<string, Record<string, string>>>({});
-  
-  // Update document direction for RTL languages
-  useEffect(() => {
-    document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
-    document.documentElement.lang = currentLanguage;
-  }, [isRTL, currentLanguage]);
-  
-  const setLanguage = (language: string) => {
-    setCurrentLanguage(language);
-    setIsRTL(language === 'ar');
-    localStorage.setItem('preferredLanguage', language);
-  };
-  
-  const translate = async (text: string): Promise<string> => {
-    // If text is empty, return empty
-    if (!text) return '';
-    
-    // If we're in English and the text isn't Arabic, or vice versa, no need to translate
-    const isArabicText = /[\u0600-\u06FF]/.test(text);
-    if ((currentLanguage === 'en' && !isArabicText) || (currentLanguage === 'ar' && isArabicText)) {
-      return text;
-    }
-    
-    // Check cache first
-    if (translationCache[text] && translationCache[text][currentLanguage]) {
-      return translationCache[text][currentLanguage];
-    }
-
-    // Translate text using LibreTranslate API
-    // Note: In a production app, you might want to use a more robust service
-    try {
-      const sourceLang = isArabicText ? 'ar' : 'en';
-      const targetLang = currentLanguage;
-      
-      if (sourceLang === targetLang) return text;
-      
-      const response = await fetch('https://libretranslate.com/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          q: text,
-          source: sourceLang,
-          target: targetLang,
-        }),
-      });
-      
-      if (!response.ok) {
-        console.error('Translation API error:', response.statusText);
-        return text; // Fallback to original text
-      }
-      
-      const data = await response.json();
-      const translatedText = data.translatedText || text;
-      
-      // Cache the result
-      setTranslationCache(prev => ({
-        ...prev,
-        [text]: {
-          ...prev[text],
-          [currentLanguage]: translatedText,
-        },
-      }));
-      
-      return translatedText;
-    } catch (error) {
-      console.error('Translation error:', error);
-      return text; // Fallback to original text
-    }
-  };
-  
-  const value = {
-    currentLanguage,
-    translate,
-    setLanguage,
-    isRTL,
-  };
-  
-  return (
-    <LanguageContext.Provider value={value}>
-      {children}
-    </LanguageContext.Provider>
-  );
 };

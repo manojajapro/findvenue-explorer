@@ -26,6 +26,7 @@ import MyVenues from "./pages/MyVenues";
 import EditVenue from "./pages/EditVenue";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
+import AuthCallback from "./pages/AuthCallback";
 
 const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element, allowedRoles?: string[] }) => {
   const { user, isLoading, profile } = useAuth();
