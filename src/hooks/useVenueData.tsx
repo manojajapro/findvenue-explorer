@@ -1,23 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
-
-interface ExtendedOwnerInfo {
-  name: string;
-  contact: string;
-  responseTime: string;
-  user_id: string;
-  profile_image?: string;
-  online_status?: string;
-  last_active?: string;
-  socialLinks?: {
-    facebook?: string;
-    twitter?: string;
-    instagram?: string;
-    linkedin?: string;
-  };
-}
 
 export const useVenueData = () => {
   const { id } = useParams<{ id: string }>();
@@ -52,7 +37,7 @@ export const useVenueData = () => {
         if (data) {
           console.log("Raw venue data:", data);
           
-          let ownerInfoData: ExtendedOwnerInfo | undefined = undefined;
+          let ownerInfoData = undefined;
           try {
             if (data.owner_info) {
               const ownerInfo = typeof data.owner_info === 'string'
@@ -64,9 +49,6 @@ export const useVenueData = () => {
                 contact: ownerInfo.contact || '',
                 responseTime: ownerInfo.response_time || '',
                 user_id: ownerInfo.user_id || '',
-                profile_image: ownerInfo.profile_image || '',
-                online_status: ownerInfo.online_status || 'offline',
-                last_active: ownerInfo.last_active || new Date().toISOString(),
                 socialLinks: {
                   facebook: ownerInfo.facebook_url || ownerInfo.facebook || '',
                   twitter: ownerInfo.twitter_url || ownerInfo.twitter || '',
@@ -105,21 +87,7 @@ export const useVenueData = () => {
             console.error("Error parsing rules_and_regulations for venue", data.id, e);
           }
           
-          let categoryData = data.category_name || '';
-          try {
-            if (typeof categoryData === 'string' && 
-               (categoryData.startsWith('[') || categoryData.includes(','))) {
-              try {
-                const parsed = JSON.parse(categoryData.replace(/'/g, '"'));
-                categoryData = Array.isArray(parsed) ? parsed : [categoryData];
-              } catch (e) {
-                categoryData = categoryData.replace(/[\[\]']/g, '').split(',').map((item: string) => item.trim());
-              }
-            }
-          } catch (e) {
-            console.error("Error processing category data", e);
-          }
-          
+          // Use the first gallery image instead of image_url
           const defaultImage = data.gallery_images && data.gallery_images.length > 0 
             ? data.gallery_images[0] 
             : '';
@@ -128,12 +96,12 @@ export const useVenueData = () => {
             id: data.id,
             name: data.name,
             description: data.description || '',
-            imageUrl: defaultImage, 
+            imageUrl: defaultImage, // Use first gallery image instead
             galleryImages: data.gallery_images || [],
             address: data.address || '',
             city: data.city_name || '',
             cityId: data.city_id || '',
-            category: categoryData,
+            category: data.category_name || '',
             categoryId: data.category_id || '',
             capacity: {
               min: data.min_capacity || 0,
