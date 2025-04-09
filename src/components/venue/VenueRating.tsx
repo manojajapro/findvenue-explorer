@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useTranslation } from 'react-i18next';
 
 type VenueRatingProps = {
   venueId: string;
@@ -24,7 +23,6 @@ const VenueRating = ({
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasRated, setHasRated] = useState(false);
-  const { t } = useTranslation();
   
   const handleRatingClick = (selectedRating: number) => {
     if (hasRated) return;
@@ -57,7 +55,7 @@ const VenueRating = ({
         onRatingUpdated(data.rating, data.reviewsCount);
       }
       
-      toast.success(t('venues.thank_you_rating'), {
+      toast.success('Rating submitted successfully!', {
         description: 'Thank you for your feedback'
       });
     } catch (error: any) {
@@ -73,7 +71,7 @@ const VenueRating = ({
   return (
     <Card className="glass-card border-white/10">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg">{t('venues.rate_venue')}</CardTitle>
+        <CardTitle className="text-lg">Rate this venue</CardTitle>
       </CardHeader>
       
       <CardContent>
@@ -105,14 +103,14 @@ const VenueRating = ({
           <div className="text-center mt-2 mb-4">
             <div className="text-sm text-findvenue-text-muted">
               {hasRated 
-                ? t('venues.thank_you_rating')
+                ? 'Thank you for your rating!' 
                 : rating > 0 
-                  ? t('venues.selected_stars', { count: rating }) 
-                  : t('venues.select_stars')}
+                  ? `You've selected ${rating} star${rating > 1 ? 's' : ''}` 
+                  : 'Click on a star to rate this venue'}
             </div>
             
             <div className="text-sm mt-1">
-              {t('venues.current_rating', { rating: initialRating, count: reviewsCount })}
+              Current rating: {initialRating} ({reviewsCount} review{reviewsCount !== 1 ? 's' : ''})
             </div>
           </div>
         </div>
@@ -125,7 +123,7 @@ const VenueRating = ({
             disabled={rating === 0 || isSubmitting || hasRated}
             className="bg-findvenue hover:bg-findvenue-dark"
           >
-            {isSubmitting ? t('venues.submitting') : t('venues.submit_rating')}
+            {isSubmitting ? 'Submitting...' : 'Submit Rating'}
           </Button>
         )}
       </CardFooter>

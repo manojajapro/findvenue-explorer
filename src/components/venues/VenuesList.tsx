@@ -5,7 +5,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from "@/components/ui/use-toast";
-import { useTranslation } from 'react-i18next';
 
 interface VenuesListProps {
   venues?: Venue[];
@@ -24,7 +23,6 @@ const VenuesList = ({
 }: VenuesListProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { t } = useTranslation();
   
   const handleVenueClick = (venueId: string) => {
     if (user) {
@@ -34,8 +32,8 @@ const VenuesList = ({
       // User is not logged in, save venue ID to localStorage and redirect to login
       localStorage.setItem('redirectVenueId', venueId);
       toast({
-        title: t('venues.login_required'),
-        description: t('venues.login_to_view'),
+        title: "Login Required",
+        description: "Please login to view venue details",
         variant: "default",
       });
       navigate('/login');
@@ -63,9 +61,10 @@ const VenuesList = ({
   if (venues.length === 0) {
     return (
       <div className="text-center py-8 border border-white/10 rounded-lg bg-findvenue-surface/20">
-        <h3 className="text-xl font-medium mb-2">{t('venues.no_venues_found')}</h3>
+        <h3 className="text-xl font-medium mb-2">No venues found</h3>
         <p className="text-findvenue-text-muted max-w-md mx-auto">
-          {t('venues.not_found_description')}
+          We couldn't find any venues matching your criteria. 
+          Try adjusting your search filters or browsing all venues.
         </p>
       </div>
     );
