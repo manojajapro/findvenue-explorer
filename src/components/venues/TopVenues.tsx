@@ -59,7 +59,7 @@ const TopVenues = ({ cityId, cityName }: TopVenuesProps) => {
         
         // Transform the data to match the expected format
         const transformedData = data.map(venue => {
-          // Use first gallery image instead of image_url
+          // Use first gallery image as the image URL
           const defaultImage = venue.gallery_images && venue.gallery_images.length > 0 
             ? venue.gallery_images[0] 
             : '';
