@@ -13,9 +13,9 @@ const CityCard = ({ city }: CityCardProps) => {
   const navigate = useNavigate();
 
   // Use the first gallery image if available, otherwise use a default value
-  const imageUrl = city.galleryImages && city.galleryImages.length > 0 
-    ? city.galleryImages[0] 
-    : city.imageUrl;
+  const imageUrl = city.gallery_images && city.gallery_images.length > 0 
+    ? city.gallery_images[0] 
+    : city.imageUrl || '';
 
   const handleClick = () => {
     navigate(`/venues?cityId=${city.id}`);

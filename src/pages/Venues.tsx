@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import VenuesList from '@/components/venues/VenuesList';
@@ -214,7 +213,7 @@ const Venues = () => {
             </div>
           </form>
 
-          {/* Add venue type filter */}
+          {/* Venue type filter */}
           <div className="flex flex-wrap gap-3 mt-3">
             <div className="w-full sm:w-auto flex items-center gap-2">
               <Building2 className="h-4 w-4 text-findvenue-text-muted" />
@@ -223,8 +222,8 @@ const Venues = () => {
                   <SelectValue placeholder="Venue Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Types</SelectItem>
-                  {venueTypes.map((type) => (
+                  <SelectItem value="all-types">All Types</SelectItem>
+                  {venueTypes.filter(type => type).map((type) => (
                     <SelectItem key={type} value={type}>{type}</SelectItem>
                   ))}
                 </SelectContent>

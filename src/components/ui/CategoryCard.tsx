@@ -13,9 +13,9 @@ const CategoryCard = ({ category }: CategoryCardProps) => {
   const navigate = useNavigate();
 
   // Use the first gallery image if available, otherwise use a default value
-  const imageUrl = category.galleryImages && category.galleryImages.length > 0 
-    ? category.galleryImages[0] 
-    : category.imageUrl;
+  const imageUrl = category.gallery_images && category.gallery_images.length > 0 
+    ? category.gallery_images[0] 
+    : category.imageUrl || '';
 
   const handleClick = () => {
     navigate(`/venues?categoryId=${category.id}`);
