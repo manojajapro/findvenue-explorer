@@ -47,7 +47,7 @@ const Register = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await supabase.auth.signUp({ 
+      const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
@@ -60,13 +60,22 @@ const Register = () => {
       });
       
       if (error) throw error;
+
+      if (data?.user) {
+        toast({
+          title: 'Success',
+          description: 'Registration successful! Please check your email to verify your account.',
+        });
       
-      toast({
-        title: 'Success',
-        description: 'Registration successful! Please check your email to verify your account.',
-      });
-      
-      navigate('/login');
+        // If we have a pending venue ID to redirect to
+        const redirectVenueId = localStorage.getItem('redirectVenueId');
+        if (redirectVenueId) {
+          localStorage.removeItem('redirectVenueId');
+          navigate(`/venue/${redirectVenueId}`);
+        } else {
+          navigate('/login');
+        }
+      }
     } catch (error: any) {
       console.error('Registration error:', error);
       toast({
@@ -89,7 +98,7 @@ const Register = () => {
             access_type: 'offline',
             prompt: 'consent',
           },
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}/auth/callback`,
           // Set user_role metadata to 'customer'
           data: {
             user_role: 'customer'
@@ -97,7 +106,15 @@ const Register = () => {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Google sign-in error:", error);
+        toast({
+          title: 'Error',
+          description: `Google login failed: ${error.message}. Please ensure Google auth is enabled in Supabase dashboard.`,
+          variant: 'destructive'
+        });
+        setIsGoogleLoading(false);
+      }
       
     } catch (error: any) {
       console.error('Google login error:', error);

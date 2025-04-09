@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { VenueCard } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from "@/components/ui/use-toast";
 
@@ -30,7 +29,8 @@ const VenuesList = ({
       // User is logged in, navigate to venue details
       navigate(`/venue/${venueId}`);
     } else {
-      // User is not logged in, show toast and redirect to login
+      // User is not logged in, save venue ID to localStorage and redirect to login
+      localStorage.setItem('redirectVenueId', venueId);
       toast({
         title: "Login Required",
         description: "Please login to view venue details",

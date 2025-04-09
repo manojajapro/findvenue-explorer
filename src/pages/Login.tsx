@@ -51,7 +51,15 @@ const Login = () => {
         title: 'Success',
         description: 'Logged in successfully',
       });
-      // We'll let the App.tsx routing handle the redirect based on user role
+      
+      // Check if there's a venue to redirect to
+      const redirectVenueId = localStorage.getItem('redirectVenueId');
+      if (redirectVenueId) {
+        localStorage.removeItem('redirectVenueId');
+        navigate(`/venue/${redirectVenueId}`);
+      } else {
+        // We'll let the App.tsx routing handle the redirect based on user role
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
@@ -74,7 +82,7 @@ const Login = () => {
             access_type: 'offline',
             prompt: 'consent',
           },
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}/auth/callback`,
           // Set user_role metadata to 'customer'
           data: {
             user_role: 'customer'
@@ -82,8 +90,18 @@ const Login = () => {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Google sign-in error:", error);
+        toast({
+          title: 'Error',
+          description: `Google login failed: ${error.message}. Please ensure Google auth is enabled in Supabase dashboard.`,
+          variant: 'destructive'
+        });
+        setIsGoogleLoading(false);
+        return;
+      }
       
+      // If successful, the page will be redirected by Supabase
     } catch (error: any) {
       console.error('Google login error:', error);
       toast({
