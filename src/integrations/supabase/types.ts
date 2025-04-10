@@ -12,7 +12,6 @@ export type Database = {
       bookings: {
         Row: {
           booking_date: string
-          booking_type: string | null
           created_at: string
           customer_email: string | null
           customer_phone: string | null
@@ -25,15 +24,12 @@ export type Database = {
           status: string
           total_price: number
           updated_at: string | null
-          user_email: string | null
           user_id: string
-          user_name: string | null
           venue_id: string
           venue_name: string
         }
         Insert: {
           booking_date: string
-          booking_type?: string | null
           created_at?: string
           customer_email?: string | null
           customer_phone?: string | null
@@ -46,15 +42,12 @@ export type Database = {
           status?: string
           total_price?: number
           updated_at?: string | null
-          user_email?: string | null
           user_id: string
-          user_name?: string | null
           venue_id: string
           venue_name: string
         }
         Update: {
           booking_date?: string
-          booking_type?: string | null
           created_at?: string
           customer_email?: string | null
           customer_phone?: string | null
@@ -67,9 +60,7 @@ export type Database = {
           status?: string
           total_price?: number
           updated_at?: string | null
-          user_email?: string | null
           user_id?: string
-          user_name?: string | null
           venue_id?: string
           venue_name?: string
         }
