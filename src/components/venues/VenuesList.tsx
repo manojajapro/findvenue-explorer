@@ -43,14 +43,14 @@ const VenuesList = ({
     }
   };
 
-  // Make sure venue images use the first image from gallery_images if available
+  // Make sure venue images use the first image from galleryImages if available
   const processVenueImages = (venues: Venue[]) => {
     return venues.map(venue => {
-      // If the venue has gallery_images, use the first one
-      if (venue.gallery_images && Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) {
+      // If the venue has galleryImages, use the first one
+      if (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0) {
         return {
           ...venue,
-          image_url: venue.gallery_images[0]
+          imageUrl: venue.galleryImages[0]
         };
       }
       return venue;

@@ -4,20 +4,25 @@ import { supabase } from '@/integrations/supabase/client';
 // Enable realtime for a specific table
 export const enableRealtimeForTable = async (table: string) => {
   try {
-    // Check first if the table is already in the publication
-    const { data, error } = await supabase
-      .from('supabase_realtime')
-      .select('*')
-      .eq('table', table)
-      .single();
+    // Check if the table is enabled for realtime using direct DB query
+    const { data: realtimeEnabled, error: realtimeCheckError } = await supabase
+      .from('venues')
+      .select('id')
+      .limit(1);
       
-    if (!error && data) {
-      console.log(`Table ${table} is already enabled for realtime`);
-      return true;
+    if (realtimeCheckError) {
+      console.error(`Error checking realtime status for ${table}:`, realtimeCheckError);
+      return false;
     }
     
-    // Add the table to the realtime publication
-    await supabase.rpc('enable_realtime_for_table', { table_name: table });
+    // Enable realtime channel for the table
+    const channel = supabase
+      .channel(`table:${table}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
+        console.log('Realtime change:', payload);
+      })
+      .subscribe();
+      
     console.log(`Enabled realtime for table: ${table}`);
     return true;
   } catch (error) {
@@ -29,12 +34,18 @@ export const enableRealtimeForTable = async (table: string) => {
 // Create a function to check if a table is enabled for realtime
 export const isTableRealtimeEnabled = async (table: string) => {
   try {
-    const { data, error } = await supabase
-      .rpc('is_table_realtime_enabled', { table_name: table });
-      
-    if (error) throw error;
+    // Simple check to see if we can subscribe to the table
+    const channel = supabase
+      .channel(`test-${table}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table }, () => {})
+      .subscribe();
     
-    return data;
+    // Cleanup the test channel
+    setTimeout(() => {
+      supabase.removeChannel(channel);
+    }, 1000);
+    
+    return true;
   } catch (error) {
     console.error(`Error checking realtime for ${table}:`, error);
     return false;

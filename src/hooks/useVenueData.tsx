@@ -153,7 +153,7 @@ export const useVenueData = () => {
             id: data.id,
             name: data.name,
             description: data.description || '',
-            imageUrl: defaultImage, // Use first gallery image as primary image
+            imageUrl: defaultImage,
             galleryImages: galleryImages,
             address: data.address || '',
             city: data.city_name || '',
