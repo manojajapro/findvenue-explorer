@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -210,7 +211,8 @@ export default function MultiDayBookingForm({
           } else {
             console.log('Venue owner notification sent successfully');
           }
-        } catch (notifyError) {
+        } catch (notifyError: unknown) {
+          // Fixed: Using 'unknown' type instead of 'instanceof Error'
           console.error("Error notifying venue owner:", notifyError);
         }
         
@@ -221,10 +223,12 @@ export default function MultiDayBookingForm({
       }
 
       navigate('/bookings');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // Fixed: Using 'unknown' type instead of Error
+      const errorMessage = error instanceof Error ? error.message : "There was a problem creating your booking.";
       toast({
         title: "Booking failed",
-        description: error.message || "There was a problem creating your booking.",
+        description: errorMessage,
         variant: "destructive",
       });
       console.error("Booking error:", error);
