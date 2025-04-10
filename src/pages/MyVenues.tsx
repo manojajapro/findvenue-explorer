@@ -33,7 +33,7 @@ import {
 const MyVenues = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const defaultTab = searchParams.get('tab') || 'my-venues';
+  const defaultTab = searchParams.get('tab') || 'dashboard'; // Default to dashboard
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -63,6 +63,14 @@ const MyVenues = () => {
     // Update the URL when tab changes
     setSearchParams({ tab: activeTab });
   }, [activeTab, setSearchParams]);
+
+  // Check URL params when component mounts or route changes
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && ['dashboard', 'my-venues', 'bookings'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
 
   const fetchVenues = async () => {
     setIsLoading(true);
@@ -184,7 +192,7 @@ const MyVenues = () => {
         </Button>
       </div>
       
-      <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="mb-8">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:w-[600px]">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="my-venues">My Venues</TabsTrigger>

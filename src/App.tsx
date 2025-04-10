@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -92,9 +93,9 @@ const VenueDetailsRoute = () => {
   const { isVenueOwner } = useAuth();
   const { id } = useParams<{ id: string }>();
   
-  // Venue owners should be redirected to the edit page or dashboard
+  // Venue owners should be redirected to the dashboard
   if (isVenueOwner) {
-    return <Navigate to={`/edit-venue/${id}`} replace />;
+    return <Navigate to="/my-venues?tab=dashboard" replace />;
   }
   
   // Customers see the normal venue details
@@ -162,7 +163,7 @@ function AppContent() {
             <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             
             {/* Routes accessible to both users, but with different views */}
-            <Route path="/venue/:id" element={<ProtectedRoute><VenueDetailsRoute /></ProtectedRoute>} />
+            <Route path="/venue/:id" element={<VenueDetailsRoute />} />
             
             {/* Customer-only routes */}
             {!isVenueOwner && (

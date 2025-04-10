@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Settings, LogOut, User, Building } from 'lucide-react';
+import { Settings, LogOut, User, Building, Calendar } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -20,7 +20,10 @@ const UserMenu = () => {
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (isSigningOut) return; // Prevent multiple clicks
     
     setIsSigningOut(true);
@@ -30,7 +33,7 @@ const UserMenu = () => {
         title: "Signed out successfully",
         description: "You have been signed out of your account.",
       });
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (error: any) {
       console.error('Sign out error:', error);
       toast({
@@ -74,21 +77,39 @@ const UserMenu = () => {
           <span>Profile</span>
         </DropdownMenuItem>
         {isVenueOwner && (
+          <>
+            <DropdownMenuItem 
+              className="cursor-pointer hover:bg-white/5" 
+              onClick={() => navigate('/my-venues?tab=my-venues')}
+            >
+              <Building className="mr-2 h-4 w-4" />
+              <span>My Venues</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              className="cursor-pointer hover:bg-white/5" 
+              onClick={() => navigate('/my-venues?tab=dashboard')}
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Dashboard</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              className="cursor-pointer hover:bg-white/5" 
+              onClick={() => navigate('/my-venues?tab=bookings')}
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              <span>Bookings</span>
+            </DropdownMenuItem>
+          </>
+        )}
+        {!isVenueOwner && (
           <DropdownMenuItem 
             className="cursor-pointer hover:bg-white/5" 
-            onClick={() => navigate('/my-venues')}
+            onClick={() => navigate('/bookings')}
           >
-            <Building className="mr-2 h-4 w-4" />
-            <span>My Venues</span>
+            <Calendar className="mr-2 h-4 w-4" />
+            <span>My Bookings</span>
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem 
-          className="cursor-pointer hover:bg-white/5" 
-          onClick={() => navigate('/bookings')}
-        >
-          <Settings className="mr-2 h-4 w-4" />
-          <span>My Bookings</span>
-        </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-white/10" />
         <DropdownMenuItem 
           className="cursor-pointer hover:bg-white/5 focus:bg-destructive/10" 

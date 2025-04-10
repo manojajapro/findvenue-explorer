@@ -67,6 +67,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }, 0);
         } else {
           setUser(null);
+          setProfile(null);
         }
       }
     );
@@ -109,9 +110,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       setProfile(data);
       
-      // For Google logins, we need to ensure the first_name and last_name are set
       if (!data.first_name && user?.user_metadata?.full_name) {
-        // If profile doesn't have a name but user metadata does, update the profile
         const nameParts = user.user_metadata.full_name.split(' ');
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || '';
@@ -154,24 +153,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
-      // First clear local state
       setUser(null);
       setSession(null);
       setProfile(null);
+      setIsVenueOwner(false);
       
-      // Then attempt to sign out from Supabase
+      try {
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('sb-esdmelfzeszjtbnoajig-auth-token');
+      } catch (e) {
+        console.warn("Could not clear local storage items:", e);
+      }
+      
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error("Error during signOut:", error);
-        throw error;
       }
     } catch (error) {
       console.error("SignOut error:", error);
-      // Even if there's an error, we want to make sure the user is signed out locally
-      setUser(null);
-      setSession(null);
-      setProfile(null);
     }
   };
 
