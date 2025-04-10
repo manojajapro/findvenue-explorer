@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { getVenueOwnerId } from './venueHelpers';
 
 // Send a notification to a user
 export const sendNotification = async (
@@ -47,9 +48,14 @@ export const sendNotification = async (
 
 // Notify venue owner about a new booking
 export const notifyVenueOwnerAboutBooking = async (booking: any) => {
-  if (!booking || !booking.venue_id) return null;
+  if (!booking || !booking.venue_id) {
+    console.error('Cannot send notification: Missing booking or venue ID');
+    return null;
+  }
   
   try {
+    console.log('Attempting to notify venue owner about booking:', booking.id);
+    
     // Get venue owner ID
     const { data: venueData, error: venueError } = await supabase
       .from('venues')
@@ -70,6 +76,8 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
         : venueData.owner_info;
         
       ownerId = ownerInfo?.user_id || null;
+      
+      console.log('Found venue owner ID:', ownerId);
     } catch (e) {
       console.error('Error parsing owner_info:', e);
       return null;
@@ -86,7 +94,7 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       : 'scheduled date';
     
     // Send notification
-    return await sendNotification(
+    const notification = await sendNotification(
       ownerId,
       'New Booking Request',
       `A new booking request for "${booking.venue_name}" on ${bookingDate} has been received.`,
@@ -97,6 +105,9 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
         venue_id: booking.venue_id
       }
     );
+    
+    console.log('Notification to venue owner sent:', notification);
+    return notification;
   } catch (error) {
     console.error('Failed to notify venue owner about booking:', error);
     return null;

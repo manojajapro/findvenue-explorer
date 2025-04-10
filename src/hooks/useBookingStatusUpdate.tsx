@@ -1,9 +1,9 @@
-
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { checkSupabaseConnection, updateBookingStatusInDatabase } from '@/utils/supabaseHealthCheck';
+import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
 
 export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
   const { toast } = useToast();
@@ -126,57 +126,13 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     try {
       console.log('Sending notification to venue owner for booking:', booking);
       
-      // First, get the venue owner's user_id from the venue data
-      const { data: venueData, error: venueError } = await supabase
-        .from('venues')
-        .select('owner_info')
-        .eq('id', booking.venue_id)
-        .single();
+      // Use our notifyVenueOwnerAboutBooking function from notificationService
+      const result = await notifyVenueOwnerAboutBooking(booking);
       
-      if (venueError || !venueData) {
-        console.error('Error fetching venue data:', venueError);
-        return;
-      }
-      
-      let ownerId;
-      try {
-        const ownerInfo = typeof venueData.owner_info === 'string' 
-          ? JSON.parse(venueData.owner_info) 
-          : venueData.owner_info;
-        
-        ownerId = ownerInfo?.user_id;
-        console.log('Owner ID found:', ownerId);
-      } catch (e) {
-        console.error('Error parsing owner_info:', e);
-        return;
-      }
-      
-      if (!ownerId) {
-        console.error('Could not find owner ID for this venue');
-        return;
-      }
-      
-      // Send notification to venue owner
-      const { data: notificationData, error: notificationError } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: ownerId,
-          title: 'New Booking Request',
-          message: `A new booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been received.`,
-          type: 'booking',
-          read: false,
-          link: '/customer-bookings',
-          data: {
-            booking_id: booking.id,
-            venue_id: booking.venue_id
-          }
-        })
-        .select();
-      
-      if (notificationError) {
-        console.error('Error sending notification to venue owner:', notificationError);
+      if (result) {
+        console.log('Successfully sent notification to venue owner:', result);
       } else {
-        console.log('Notification sent to venue owner:', notificationData);
+        console.error('Failed to send notification to venue owner');
       }
       
       // Also send a confirmation notification to the customer
