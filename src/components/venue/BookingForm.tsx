@@ -86,10 +86,12 @@ export default function BookingForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [totalPrice, setTotalPrice] = useState(0);
+  const [pricePerPerson, setPricePerPerson] = useState(0);
   const [availableStartTimes, setAvailableStartTimes] = useState<string[]>([]);
   const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([]);
   const [showTimeAlert, setShowTimeAlert] = useState(false);
   const [timeAlertMessage, setTimeAlertMessage] = useState('');
+  const [bookingType, setBookingType] = useState<'hourly' | 'half-day' | 'full-day'>('hourly');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -102,11 +104,31 @@ export default function BookingForm({
     },
   });
 
+  // Get venue details to get the price per person
+  useEffect(() => {
+    const fetchVenueDetails = async () => {
+      if (venueId) {
+        const { data, error } = await supabase
+          .from('venues')
+          .select('price_per_person')
+          .eq('id', venueId)
+          .single();
+          
+        if (data && !error && data.price_per_person) {
+          setPricePerPerson(data.price_per_person);
+        }
+      }
+    };
+    
+    fetchVenueDetails();
+  }, [venueId]);
+
   const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   const startTime = form.watch('startTime');
   const endTime = form.watch('endTime');
+  const guests = form.watch('guests') || 1;
 
-  // Update total price when start time or end time changes
+  // Update booking type and pricing when start/end times change
   useEffect(() => {
     if (startTime && endTime) {
       const startHour = parseInt(startTime.split(':')[0]);
@@ -114,14 +136,42 @@ export default function BookingForm({
       
       if (endHour > startHour) {
         const hours = endHour - startHour;
-        setTotalPrice(hours * pricePerHour);
+        
+        // Determine booking type based on duration
+        if (hours >= 12) {
+          setBookingType('full-day');
+        } else if (hours >= 6) {
+          setBookingType('half-day');
+        } else {
+          setBookingType('hourly');
+        }
+        
+        // Calculate price based on booking type and guests
+        let basePrice = 0;
+        
+        switch(bookingType) {
+          case 'full-day':
+            // Full day rate: price_per_person × guests
+            basePrice = pricePerPerson * guests;
+            break;
+          case 'half-day':
+            // Half day rate: price_per_person × guests × 0.5
+            basePrice = pricePerPerson * guests * 0.5;
+            break;
+          case 'hourly':
+            // Hourly rate: pricePerHour × hours
+            basePrice = pricePerHour * hours;
+            break;
+        }
+        
+        setTotalPrice(basePrice);
       } else {
         setTotalPrice(0);
       }
     } else {
       setTotalPrice(0);
     }
-  }, [startTime, endTime, pricePerHour]);
+  }, [startTime, endTime, pricePerHour, bookingType, guests, pricePerPerson]);
 
   // Check if a date has any hourly bookings
   const hasHourlyBookings = (date: Date): boolean => {
@@ -278,7 +328,38 @@ export default function BookingForm({
         throw error;
       }
 
-      // If booking successful, redirect to bookings page
+      // Send notification to venue owner about new booking
+      if (bookingData && bookingData.length > 0) {
+        // Notify venue owner about the booking
+        try {
+          const ownerId = await getVenueOwnerId();
+          
+          if (ownerId) {
+            const { error: notificationError } = await supabase
+              .from('notifications')
+              .insert({
+                user_id: ownerId,
+                title: 'New Booking',
+                message: `New ${bookingType} booking for ${venueName} on ${format(data.date, 'MMM d, yyyy')}`,
+                type: 'booking',
+                read: false,
+                link: '/customer-bookings',
+                data: {
+                  booking_id: bookingData[0].id,
+                  venue_id: venueId
+                }
+              });
+              
+            if (notificationError) {
+              console.error('Failed to notify venue owner:', notificationError);
+            }
+          }
+        } catch (notifyError) {
+          console.error('Error sending notification:', notifyError);
+        }
+      }
+
+      // Show success toast and redirect
       toast({
         title: "Booking confirmed!",
         description: `You've successfully booked ${venueName} for ${format(data.date, 'PPP')}. Total: SAR ${totalPrice}`,
@@ -295,6 +376,49 @@ export default function BookingForm({
     } finally {
       setIsSubmitting(false);
     }
+  };
+  
+  // Helper function to get venue owner ID
+  const getVenueOwnerId = async (): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('venues')
+        .select('owner_info')
+        .eq('id', venueId)
+        .single();
+        
+      if (error || !data?.owner_info) {
+        console.error('Error getting venue owner info:', error);
+        return null;
+      }
+      
+      const ownerInfo = typeof data.owner_info === 'string' 
+        ? JSON.parse(data.owner_info) 
+        : data.owner_info;
+        
+      return ownerInfo?.user_id || null;
+    } catch (e) {
+      console.error('Error parsing owner info:', e);
+      return null;
+    }
+  };
+
+  // Calculate the price description based on booking type
+  const getPriceDescription = () => {
+    if (startTime && endTime) {
+      const hours = parseInt(endTime.split(':')[0]) - parseInt(startTime.split(':')[0]);
+      
+      switch(bookingType) {
+        case 'full-day':
+          return `${pricePerPerson} SAR × ${guests} person(s) = ${pricePerPerson * guests} SAR (Full day)`;
+        case 'half-day':
+          return `${pricePerPerson} SAR × ${guests} person(s) × 50% = ${pricePerPerson * guests * 0.5} SAR (Half day)`;
+        case 'hourly':
+          return `${pricePerHour} SAR × ${hours} hours = ${pricePerHour * hours} SAR`;
+      }
+    }
+    
+    return `${pricePerHour} SAR per hour`;
   };
 
   return (
@@ -434,6 +558,23 @@ export default function BookingForm({
           />
         </div>
         
+        {/* Booking Type Info */}
+        {startTime && endTime && (
+          <div className="bg-findvenue-surface/20 p-3 rounded-md">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium">Booking Type:</span>
+              <span className={`px-2 py-1 rounded-full text-xs ${
+                bookingType === 'full-day' ? 'bg-findvenue text-white' : 
+                bookingType === 'half-day' ? 'bg-findvenue/70 text-white' : 
+                'bg-findvenue/40 text-white'
+              }`}>
+                {bookingType === 'full-day' ? 'Full Day' : 
+                 bookingType === 'half-day' ? 'Half Day' : 'Hourly'}
+              </span>
+            </div>
+          </div>
+        )}
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -511,7 +652,7 @@ export default function BookingForm({
             <span className="font-bold text-lg">SAR {totalPrice.toFixed(2)}</span>
           </div>
           <p className="text-sm text-findvenue-text-muted mt-1">
-            {pricePerHour} SAR × {totalPrice / pricePerHour || 0} hours
+            {getPriceDescription()}
           </p>
         </div>
 

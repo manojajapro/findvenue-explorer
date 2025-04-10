@@ -113,7 +113,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         if (!ownerNotificationSuccess) {
           console.error('Failed to send notification to venue owner after multiple attempts');
           toast({
-            variant: "warning",
+            variant: "destructive",
             title: "Notification Warning",
             description: "We've updated the booking, but notification to venue owner might be delayed.",
           });
@@ -165,7 +165,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         if (!customerNotificationSuccess) {
           console.error('Failed to send notification to customer after multiple attempts');
           toast({
-            variant: "warning",
+            variant: "destructive",
             title: "Notification Warning",
             description: "We've updated the booking, but notification to customer might be delayed.",
           });
@@ -266,7 +266,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       if (!result) {
         console.error('Failed to send notification to venue owner after multiple attempts');
         toast({
-          variant: "warning",
+          variant: "destructive",
           title: "Notification Warning",
           description: "Your booking was created, but the venue owner might not be notified immediately.",
         });

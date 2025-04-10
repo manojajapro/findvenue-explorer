@@ -2,14 +2,15 @@
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
-// Send a notification to a user
+// Send a notification to a user with retry capability
 export const sendNotification = async (
   userId: string, 
   title: string, 
   message: string, 
   type: 'booking' | 'message' | 'system',
   link?: string,
-  data?: any
+  data?: any,
+  maxRetries = 3
 ) => {
   try {
     if (!userId) {
@@ -19,26 +20,41 @@ export const sendNotification = async (
 
     console.log(`Sending ${type} notification to user ${userId}`);
     
-    const { data: notification, error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: userId,
-        title,
-        message,
-        type,
-        read: false,
-        link,
-        data
-      })
-      .select();
+    let attempts = 0;
+    let result = null;
     
-    if (error) {
-      console.error('Error sending notification:', error);
-      return null;
+    while (!result && attempts < maxRetries) {
+      try {
+        const { data: notification, error } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: userId,
+            title,
+            message,
+            type,
+            read: false,
+            link,
+            data
+          })
+          .select();
+        
+        if (error) {
+          console.error(`Error sending notification (attempt ${attempts + 1}):`, error);
+          attempts++;
+          if (attempts < maxRetries) await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+        } else {
+          console.log('Notification sent successfully:', notification);
+          result = notification;
+          break;
+        }
+      } catch (e) {
+        attempts++;
+        console.error(`Exception in sendNotification (attempt ${attempts}):`, e);
+        if (attempts < maxRetries) await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+      }
     }
     
-    console.log('Notification sent successfully:', notification);
-    return notification;
+    return result;
   } catch (error) {
     console.error('Exception in sendNotification:', error);
     return null;
@@ -104,7 +120,7 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       ? format(new Date(booking.booking_date), 'MMM d, yyyy') 
       : 'scheduled date';
     
-    // Send notification
+    // Send notification with retry attempts
     const notification = await sendNotification(
       ownerId,
       'New Booking Request',
@@ -114,10 +130,16 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       {
         booking_id: booking.id,
         venue_id: booking.venue_id
-      }
+      },
+      5
     );
     
-    console.log('Notification to venue owner sent:', notification);
+    if (notification) {
+      console.log('Notification to venue owner sent successfully');
+    } else {
+      console.error('Failed to send notification to venue owner after multiple attempts');
+    }
+    
     return notification;
   } catch (error) {
     console.error('Failed to notify venue owner about booking:', error);
@@ -158,4 +180,28 @@ export const markNotificationAsRead = async (notificationId: string) => {
     console.error('Error marking notification as read:', error);
     return false;
   }
+};
+
+// Function to ensure rules_and_regulations is properly formatted
+export const formatRulesAndRegulations = (rules: any) => {
+  // If rules is already an object with the right structure, return as-is
+  if (rules && typeof rules === 'object' && !Array.isArray(rules)) {
+    return rules;
+  }
+  
+  // If rules is an array, convert to expected object format
+  if (Array.isArray(rules)) {
+    return {
+      general: rules,
+      cancellation: [],
+      restrictions: []
+    };
+  }
+  
+  // Default empty structure
+  return {
+    general: [],
+    cancellation: [],
+    restrictions: []
+  };
 };
