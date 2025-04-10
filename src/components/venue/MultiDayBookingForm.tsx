@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
+import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification } from '@/utils/notificationService';
 import {
   Select,
   SelectContent,
@@ -73,7 +74,6 @@ export default function MultiDayBookingForm({
   const [totalPrice, setTotalPrice] = useState(0);
   const [pricePerPerson, setPricePerPerson] = useState(0);
   const [basePrice, setBasePrice] = useState(0);
-  const { notifyVenueOwner } = useBookingStatusUpdate(() => Promise.resolve());
   
   useEffect(() => {
     const fetchVenuePricing = async () => {
@@ -142,6 +142,8 @@ export default function MultiDayBookingForm({
     try {
       const initialStatus = autoConfirm ? 'confirmed' : 'pending';
       
+      console.log("Creating full day booking with status:", initialStatus);
+      
       const { data: bookingData, error } = await supabase
         .from('bookings')
         .insert([
@@ -180,10 +182,17 @@ export default function MultiDayBookingForm({
       };
 
       if (autoConfirm) {
-        const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
-        
-        if (!notified) {
-          console.warn('Booking confirmation notification may not have been sent');
+        console.log("Sending auto-confirm notification for full day booking");
+        try {
+          const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
+          
+          if (!notified) {
+            console.warn('Booking confirmation notification may not have been sent');
+          } else {
+            console.log('Booking confirmation notification sent successfully');
+          }
+        } catch (notifyError) {
+          console.error("Error sending booking notifications:", notifyError);
         }
         
         toast({
@@ -191,10 +200,17 @@ export default function MultiDayBookingForm({
           description: `Your booking for ${venueName} on ${format(data.date, 'PPP')} has been automatically confirmed. Total: SAR ${totalPrice}`,
         });
       } else {
-        const notified = await notifyVenueOwner(bookingWithDetails);
-        
-        if (!notified) {
-          console.warn('Venue owner notification may not have been sent');
+        console.log("Sending booking request notification for full day booking");
+        try {
+          const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
+          
+          if (!notified) {
+            console.warn('Venue owner notification may not have been sent');
+          } else {
+            console.log('Venue owner notification sent successfully');
+          }
+        } catch (notifyError) {
+          console.error("Error notifying venue owner:", notifyError);
         }
         
         toast({
@@ -396,14 +412,4 @@ export default function MultiDayBookingForm({
       </form>
     </Form>
   );
-}
-
-async function sendBookingStatusNotification(booking: any, status: string) {
-  try {
-    const { sendBookingStatusNotification } = await import('@/utils/notificationService');
-    return await sendBookingStatusNotification(booking, status);
-  } catch (error) {
-    console.error('Error sending booking notification:', error);
-    return false;
-  }
 }
