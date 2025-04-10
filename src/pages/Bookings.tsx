@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -51,6 +50,7 @@ const Bookings = () => {
   const [isCancelling, setIsCancelling] = useState(false);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   useEffect(() => {
     if (user) {
@@ -64,13 +64,13 @@ const Bookings = () => {
   }, [user]);
   
   useEffect(() => {
-    if (user) {
+    if (user && retryCount < 3) {
       fetchBookings();
-    } else {
+    } else if (!user) {
       setIsLoading(false);
       setBookings([]);
     }
-  }, [user]);
+  }, [user, retryCount]);
   
   const fetchBookings = async () => {
     if (!user) return;
@@ -79,6 +79,8 @@ const Bookings = () => {
     setFetchError(null);
     
     try {
+      console.log("Fetching bookings for user:", user.id, "isVenueOwner:", isVenueOwner);
+      
       let query;
       
       if (isVenueOwner) {
@@ -101,6 +103,8 @@ const Bookings = () => {
         console.error('Error fetching bookings:', error);
         throw error;
       }
+      
+      console.log("Bookings data:", data);
       
       if (!data || data.length === 0) {
         setBookings([]);
@@ -160,6 +164,7 @@ const Bookings = () => {
         };
       });
       
+      console.log("Formatted bookings:", formattedBookings);
       setBookings(formattedBookings);
     } catch (error: any) {
       console.error('Error fetching bookings:', error);
@@ -169,6 +174,8 @@ const Bookings = () => {
         description: error.message || 'Failed to load bookings.',
         variant: 'destructive',
       });
+      
+      setRetryCount(prev => prev + 1);
     } finally {
       setIsLoading(false);
     }
@@ -306,13 +313,12 @@ const Bookings = () => {
     }
   };
   
-  // Add retry mechanism for loading
   const handleRetryFetch = () => {
     setIsLoading(true);
+    setRetryCount(0);
     fetchBookings();
   };
 
-  // If user is null, prompt login
   if (!user) {
     return (
       <div className="min-h-screen pt-28 pb-16">

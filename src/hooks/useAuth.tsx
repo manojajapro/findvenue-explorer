@@ -49,6 +49,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    // First set up the auth state change subscription
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log("Auth state change event:", event);
@@ -161,8 +162,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     setAuthError(null);
+    setIsLoading(true);
     
     try {
+      console.log("Attempting login with email:", email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -174,11 +177,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
       
+      console.log("Login success:", data);
       return data;
     } catch (error: any) {
       console.error("Login error:", error);
       setAuthError(error.message);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 

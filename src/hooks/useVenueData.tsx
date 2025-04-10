@@ -3,12 +3,14 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
+import { useToast } from '@/components/ui/use-toast';
 
 export const useVenueData = () => {
   const { id } = useParams<{ id: string }>();
   const [venue, setVenue] = useState<Venue | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchVenueData = async () => {
@@ -199,17 +201,29 @@ export const useVenueData = () => {
           
           console.log("Transformed venue data:", transformedVenue);
           setVenue(transformedVenue);
+        } else {
+          setError("Venue not found");
+          toast({
+            title: "Error",
+            description: "Venue not found",
+            variant: "destructive"
+          });
         }
       } catch (error: any) {
         console.error('Error fetching venue data:', error);
         setError(error.message || 'Failed to fetch venue data');
+        toast({
+          title: "Error",
+          description: error.message || 'Failed to fetch venue data',
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchVenueData();
-  }, [id]);
+  }, [id, toast]);
 
   return { venue, isLoading, error };
 };
