@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -43,6 +42,7 @@ interface MultiDayBookingFormProps {
   maxCapacity?: number;
   bookedDates: string[];
   isLoading: boolean;
+  autoConfirm?: boolean;
 }
 
 const formSchema = z.object({
@@ -64,6 +64,7 @@ export default function MultiDayBookingForm({
   maxCapacity = 100,
   bookedDates,
   isLoading,
+  autoConfirm = false
 }: MultiDayBookingFormProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -139,7 +140,8 @@ export default function MultiDayBookingForm({
     setIsSubmitting(true);
 
     try {
-      // Create a booking record with additional data for proper notifications
+      const initialStatus = autoConfirm ? 'confirmed' : 'pending';
+      
       const { data: bookingData, error } = await supabase
         .from('bookings')
         .insert([
@@ -148,9 +150,9 @@ export default function MultiDayBookingForm({
             venue_id: venueId,
             venue_name: venueName,
             booking_date: format(data.date, 'yyyy-MM-dd'),
-            start_time: '00:00', // Full day booking indicator
-            end_time: '23:59',   // Full day booking indicator
-            status: 'pending',
+            start_time: '00:00',
+            end_time: '23:59',
+            status: initialStatus,
             total_price: totalPrice,
             guests: data.guests,
             special_requests: data.specialRequests,
@@ -171,25 +173,36 @@ export default function MultiDayBookingForm({
       
       console.log("Full day booking created:", bookingData[0]);
 
-      // Enhanced booking object to ensure proper notification
       const bookingWithDetails = {
         ...bookingData[0],
         venue_name: venueName,
         booking_date: format(data.date, 'yyyy-MM-dd'),
       };
 
-      // Send notification to venue owner about the new full-day booking
-      const notified = await notifyVenueOwner(bookingWithDetails);
-      
-      if (!notified) {
-        console.warn('Venue owner notification may not have been sent');
+      if (autoConfirm) {
+        const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
+        
+        if (!notified) {
+          console.warn('Booking confirmation notification may not have been sent');
+        }
+        
+        toast({
+          title: "Full-day booking confirmed!",
+          description: `Your booking for ${venueName} on ${format(data.date, 'PPP')} has been automatically confirmed. Total: SAR ${totalPrice}`,
+        });
+      } else {
+        const notified = await notifyVenueOwner(bookingWithDetails);
+        
+        if (!notified) {
+          console.warn('Venue owner notification may not have been sent');
+        }
+        
+        toast({
+          title: "Full-day booking requested!",
+          description: `You've successfully requested ${venueName} for ${format(data.date, 'PPP')}. Total: SAR ${totalPrice}`,
+        });
       }
 
-      toast({
-        title: "Full-day booking requested!",
-        description: `You've successfully requested ${venueName} for ${format(data.date, 'PPP')}. Total: SAR ${totalPrice}`,
-      });
-      
       navigate('/bookings');
     } catch (error: any) {
       toast({
@@ -383,4 +396,14 @@ export default function MultiDayBookingForm({
       </form>
     </Form>
   );
+}
+
+async function sendBookingStatusNotification(booking: any, status: string) {
+  try {
+    const { sendBookingStatusNotification } = await import('@/utils/notificationService');
+    return await sendBookingStatusNotification(booking, status);
+  } catch (error) {
+    console.error('Error sending booking notification:', error);
+    return false;
+  }
 }

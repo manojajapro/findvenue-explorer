@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -24,7 +25,6 @@ export const sendNotification = async (
     
     while (!result && attempts < maxRetries) {
       try {
-        // Use service role key for notifications to bypass RLS
         const { data: notification, error } = await supabase
           .from('notifications')
           .insert({
@@ -123,11 +123,22 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
     // Determine booking type
     const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
     
+    let title, message;
+    
+    // Customize message based on auto-confirmation
+    if (booking.status === 'confirmed') {
+      title = 'New Booking Confirmed';
+      message = `A new booking for "${booking.venue_name}" on ${bookingDate} has been automatically confirmed.`;
+    } else {
+      title = 'New Booking Request';
+      message = `A new booking request for "${booking.venue_name}" on ${bookingDate} has been received.`;
+    }
+    
     // Send notification with retry attempts
     const notification = await sendNotification(
       ownerId,
-      'New Booking Request',
-      `A new booking request for "${booking.venue_name}" on ${bookingDate} has been received.`,
+      title,
+      message,
       'booking',
       '/customer-bookings',
       {
@@ -173,7 +184,7 @@ export const sendBookingStatusNotification = async (booking: any, status: string
     if (ownerId) {
       const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
       const ownerMessage = status === 'confirmed' 
-        ? `You have confirmed a booking for "${booking.venue_name}" on ${formattedDate}.`
+        ? `A booking for "${booking.venue_name}" on ${formattedDate} has been confirmed${booking.status === 'confirmed' ? ' automatically' : ''}.`
         : `You have cancelled a booking for "${booking.venue_name}" on ${formattedDate}.`;
       
       console.log(`Sending notification to owner ${ownerId} for status ${status}`);
@@ -207,7 +218,7 @@ export const sendBookingStatusNotification = async (booking: any, status: string
     if (booking.user_id) {
       const customerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
       const customerMessage = status === 'confirmed' 
-        ? `Your booking for ${booking.venue_name} on ${formattedDate} has been confirmed.`
+        ? `Your booking for ${booking.venue_name} on ${formattedDate} has been ${booking.status === 'confirmed' ? 'automatically ' : ''}confirmed.`
         : `Your booking for ${booking.venue_name} on ${formattedDate} has been cancelled by the venue owner.`;
       
       console.log(`Sending notification to customer ${booking.user_id} for status ${status}`);

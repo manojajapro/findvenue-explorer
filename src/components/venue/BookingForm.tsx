@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -8,7 +7,6 @@ import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Clock, Users } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
@@ -34,15 +32,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 interface BookingFormProps {
   venueId: string;
@@ -50,18 +39,23 @@ interface BookingFormProps {
   pricePerHour?: number;
   ownerId: string;
   ownerName: string;
-  bookedTimeSlots: Record<string, string[]>;
   isLoading: boolean;
+  bookedTimeSlots: Record<string, string[]>;
   fullyBookedDates: string[];
   availableTimeSlots: string[];
+  autoConfirm?: boolean;  // Added auto-confirm flag
 }
 
 const formSchema = z.object({
   date: z.date({
     required_error: "Please select a date",
   }),
-  startTime: z.string().min(1, "Please select a start time"),
-  endTime: z.string().min(1, "Please select an end time"),
+  startTime: z.string({
+    required_error: "Please select a start time",
+  }),
+  endTime: z.string({
+    required_error: "Please select an end time",
+  }),
   guests: z.number().min(1, "At least one guest is required"),
   specialRequests: z.string().optional(),
   customerEmail: z.string().email("Please enter a valid email"),
@@ -75,27 +69,24 @@ export default function BookingForm({
   pricePerHour = 0,
   ownerId,
   ownerName,
-  bookedTimeSlots,
   isLoading,
+  bookedTimeSlots,
   fullyBookedDates,
-  availableTimeSlots
+  availableTimeSlots,
+  autoConfirm = false // Default to false
 }: BookingFormProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [pricePerPerson, setPricePerPerson] = useState(0);
-  const [availableStartTimes, setAvailableStartTimes] = useState<string[]>([]);
   const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([]);
-  const [showTimeAlert, setShowTimeAlert] = useState(false);
-  const [timeAlertMessage, setTimeAlertMessage] = useState('');
-  const [bookingType, setBookingType] = useState<'hourly' | 'half-day' | 'full-day'>('hourly');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      date: new Date(),
+      startTime: availableTimeSlots[0] || '',
+      endTime: availableTimeSlots[1] || '',
       guests: 1,
       specialRequests: "",
       customerEmail: user?.email ?? "",
@@ -104,166 +95,27 @@ export default function BookingForm({
     },
   });
 
-  // Get venue details to get the price per person
-  useEffect(() => {
-    const fetchVenueDetails = async () => {
-      if (venueId) {
-        const { data, error } = await supabase
-          .from('venues')
-          .select('price_per_person')
-          .eq('id', venueId)
-          .single();
-          
-        if (data && !error && data.price_per_person) {
-          setPricePerPerson(data.price_per_person);
-        }
-      }
-    };
-    
-    fetchVenueDetails();
-  }, [venueId]);
+  const selectedDate = form.watch('date');
+  const selectedStartTime = form.watch('startTime');
 
-  const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
-  const startTime = form.watch('startTime');
-  const endTime = form.watch('endTime');
-  const guests = form.watch('guests') || 1;
-
-  // Update booking type and pricing when start/end times change
-  useEffect(() => {
-    if (startTime && endTime) {
-      const startHour = parseInt(startTime.split(':')[0]);
-      const endHour = parseInt(endTime.split(':')[0]);
-      
-      if (endHour > startHour) {
-        const hours = endHour - startHour;
-        
-        // Determine booking type based on duration
-        if (hours >= 12) {
-          setBookingType('full-day');
-        } else if (hours >= 6) {
-          setBookingType('half-day');
-        } else {
-          setBookingType('hourly');
-        }
-        
-        // Calculate price based on booking type and guests
-        let basePrice = 0;
-        
-        switch(bookingType) {
-          case 'full-day':
-            // Full day rate: price_per_person × guests
-            basePrice = pricePerPerson * guests;
-            break;
-          case 'half-day':
-            // Half day rate: price_per_person × guests × 0.5
-            basePrice = pricePerPerson * guests * 0.5;
-            break;
-          case 'hourly':
-            // Hourly rate: pricePerHour × hours
-            basePrice = pricePerHour * hours;
-            break;
-        }
-        
-        setTotalPrice(basePrice);
-      } else {
-        setTotalPrice(0);
-      }
+  // Function to filter available end times based on the selected start time
+  const updateAvailableEndTimes = (startTime: string) => {
+    const startIndex = availableTimeSlots.indexOf(startTime);
+    if (startIndex !== -1) {
+      // End times should start from the next time slot after the start time
+      setAvailableEndTimes(availableTimeSlots.slice(startIndex + 1));
     } else {
-      setTotalPrice(0);
+      setAvailableEndTimes([]);
     }
-  }, [startTime, endTime, pricePerHour, bookingType, guests, pricePerPerson]);
-
-  // Check if a date has any hourly bookings
-  const hasHourlyBookings = (date: Date): boolean => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return bookedTimeSlots[dateStr] && bookedTimeSlots[dateStr].length > 0;
-  };
-  
-  // Check if a specific date is fully booked (either as a full day or too many hourly slots)
-  const isDateFullyBooked = (date: Date): boolean => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return fullyBookedDates.includes(dateStr);
   };
 
-  // Update available time slots when date changes
   useEffect(() => {
-    if (selectedDate) {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const bookedSlots = bookedTimeSlots[dateStr] || [];
-      
-      // Extract all booked hours for this date
-      const bookedHours = new Set<number>();
-      
-      bookedSlots.forEach(slot => {
-        const [start, end] = slot.split(' - ');
-        const startHour = parseInt(start.split(':')[0]);
-        const endHour = parseInt(end.split(':')[0]);
-        
-        for (let hour = startHour; hour < endHour; hour++) {
-          bookedHours.add(hour);
-        }
-      });
-      
-      // Filter available start times (can't start at or after a booked hour)
-      const filtered = availableTimeSlots.filter(timeSlot => {
-        const hour = parseInt(timeSlot.split(':')[0]);
-        return !bookedHours.has(hour);
-      });
-      
-      setAvailableStartTimes(filtered);
-      
-      // Update end times based on selected start time
-      if (startTime) {
-        updateAvailableEndTimes(startTime, bookedHours);
-      }
+    if (selectedStartTime) {
+      updateAvailableEndTimes(selectedStartTime);
     }
-  }, [selectedDate, bookedTimeSlots, availableTimeSlots, startTime]);
+  }, [selectedStartTime, availableTimeSlots]);
 
-  // Update available end times based on selected start time
-  const updateAvailableEndTimes = (start: string, bookedHours: Set<number>) => {
-    const startHour = parseInt(start.split(':')[0]);
-    let foundBookedHour = false;
-    
-    // End time must be after start time and before the next booked hour
-    const filtered = availableTimeSlots.filter(timeSlot => {
-      const hour = parseInt(timeSlot.split(':')[0]);
-      
-      // Once we find a booked hour after our start time, we can't go further
-      if (hour > startHour && bookedHours.has(hour) && !foundBookedHour) {
-        foundBookedHour = true;
-      }
-      
-      return hour > startHour && (!foundBookedHour || bookedHours.has(hour));
-    });
-    
-    setAvailableEndTimes(filtered);
-  };
-
-  // When start time is selected, update end time options
-  const handleStartTimeChange = (value: string) => {
-    form.setValue('startTime', value);
-    form.setValue('endTime', ''); // Reset end time
-    
-    if (selectedDate) {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const bookedSlots = bookedTimeSlots[dateStr] || [];
-      
-      // Extract all booked hours for this date
-      const bookedHours = new Set<number>();
-      
-      bookedSlots.forEach(slot => {
-        const [start, end] = slot.split(' - ');
-        const startHour = parseInt(start.split(':')[0]);
-        const endHour = parseInt(end.split(':')[0]);
-        
-        for (let hour = startHour; hour < endHour; hour++) {
-          bookedHours.add(hour);
-        }
-      });
-      
-      updateAvailableEndTimes(value, bookedHours);
-    }
-  };
+  const disabledDates = fullyBookedDates.map(dateStr => new Date(dateStr));
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (!user) {
@@ -275,34 +127,18 @@ export default function BookingForm({
       return;
     }
 
-    // Final validation to ensure time slot is available
-    const dateStr = format(data.date, 'yyyy-MM-dd');
-    const bookedSlots = bookedTimeSlots[dateStr] || [];
-    const startHour = parseInt(data.startTime.split(':')[0]);
-    const endHour = parseInt(data.endTime.split(':')[0]);
-    
-    let timeConflict = false;
-    
-    bookedSlots.forEach(slot => {
-      const [slotStart, slotEnd] = slot.split(' - ');
-      const slotStartHour = parseInt(slotStart.split(':')[0]);
-      const slotEndHour = parseInt(slotEnd.split(':')[0]);
-      
-      // Check if our booking overlaps with an existing booking
-      if ((startHour < slotEndHour && endHour > slotStartHour) || 
-          (startHour === slotStartHour && endHour === slotEndHour)) {
-        timeConflict = true;
-        setTimeAlertMessage(`The time slot from ${data.startTime} to ${data.endTime} conflicts with an existing booking.`);
-        setShowTimeAlert(true);
-        return;
-      }
-    });
-    
-    if (timeConflict) return;
-    
     setIsSubmitting(true);
 
     try {
+      // Calculate total price (hours * price per hour)
+      const startHour = parseInt(data.startTime.split(':')[0]);
+      const endHour = parseInt(data.endTime.split(':')[0]);
+      const hours = endHour - startHour;
+      const totalPrice = hours * pricePerHour;
+      
+      // Create a booking record with status set based on autoConfirm
+      const initialStatus = autoConfirm ? 'confirmed' : 'pending';
+      
       const { data: bookingData, error } = await supabase
         .from('bookings')
         .insert([
@@ -313,7 +149,7 @@ export default function BookingForm({
             booking_date: format(data.date, 'yyyy-MM-dd'),
             start_time: data.startTime,
             end_time: data.endTime,
-            status: 'confirmed', // Auto-confirm all bookings
+            status: initialStatus,
             total_price: totalPrice,
             guests: data.guests,
             special_requests: data.specialRequests,
@@ -324,46 +160,39 @@ export default function BookingForm({
         ])
         .select();
 
-      if (error) {
-        throw error;
+      if (error) throw error;
+      
+      if (!bookingData || bookingData.length === 0) {
+        throw new Error("Failed to create booking record");
       }
+      
+      console.log("Booking created:", bookingData[0]);
+      
+      // Enhanced booking object to ensure proper notification
+      const bookingWithDetails = {
+        ...bookingData[0],
+        venue_name: venueName,
+        booking_date: format(data.date, 'yyyy-MM-dd'),
+      };
 
-      // Send notification to venue owner about new booking
-      if (bookingData && bookingData.length > 0) {
-        // Notify venue owner about the booking
-        try {
-          const ownerId = await getVenueOwnerId();
-          
-          if (ownerId) {
-            const { error: notificationError } = await supabase
-              .from('notifications')
-              .insert({
-                user_id: ownerId,
-                title: 'New Booking',
-                message: `New ${bookingType} booking for ${venueName} on ${format(data.date, 'MMM d, yyyy')}`,
-                type: 'booking',
-                read: false,
-                link: '/customer-bookings',
-                data: {
-                  booking_id: bookingData[0].id,
-                  venue_id: venueId
-                }
-              });
-              
-            if (notificationError) {
-              console.error('Failed to notify venue owner:', notificationError);
-            }
-          }
-        } catch (notifyError) {
-          console.error('Error sending notification:', notifyError);
-        }
+      // Send notifications about the booking
+      if (autoConfirm) {
+        // Send confirmation notification to both customer and owner
+        await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
+        
+        toast({
+          title: "Booking confirmed!",
+          description: `Your booking for ${venueName} on ${format(data.date, 'PPP')} from ${data.startTime} to ${data.endTime} has been automatically confirmed. Total: SAR ${totalPrice}`,
+        });
+      } else {
+        // Send pending notification to venue owner
+        await notifyVenueOwner(bookingWithDetails);
+        
+        toast({
+          title: "Booking requested!",
+          description: `You've successfully requested ${venueName} on ${format(data.date, 'PPP')} from ${data.startTime} to ${data.endTime}. Total: SAR ${totalPrice}`,
+        });
       }
-
-      // Show success toast and redirect
-      toast({
-        title: "Booking confirmed!",
-        description: `You've successfully booked ${venueName} for ${format(data.date, 'PPP')}. Total: SAR ${totalPrice}`,
-      });
       
       navigate('/bookings');
     } catch (error: any) {
@@ -377,48 +206,11 @@ export default function BookingForm({
       setIsSubmitting(false);
     }
   };
-  
-  // Helper function to get venue owner ID
-  const getVenueOwnerId = async (): Promise<string | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('venues')
-        .select('owner_info')
-        .eq('id', venueId)
-        .single();
-        
-      if (error || !data?.owner_info) {
-        console.error('Error getting venue owner info:', error);
-        return null;
-      }
-      
-      const ownerInfo = typeof data.owner_info === 'string' 
-        ? JSON.parse(data.owner_info) 
-        : data.owner_info;
-        
-      return ownerInfo?.user_id || null;
-    } catch (e) {
-      console.error('Error parsing owner info:', e);
-      return null;
-    }
-  };
 
-  // Calculate the price description based on booking type
-  const getPriceDescription = () => {
-    if (startTime && endTime) {
-      const hours = parseInt(endTime.split(':')[0]) - parseInt(startTime.split(':')[0]);
-      
-      switch(bookingType) {
-        case 'full-day':
-          return `${pricePerPerson} SAR × ${guests} person(s) = ${pricePerPerson * guests} SAR (Full day)`;
-        case 'half-day':
-          return `${pricePerPerson} SAR × ${guests} person(s) × 50% = ${pricePerPerson * guests * 0.5} SAR (Half day)`;
-        case 'hourly':
-          return `${pricePerHour} SAR × ${hours} hours = ${pricePerHour * hours} SAR`;
-      }
-    }
-    
-    return `${pricePerHour} SAR per hour`;
+  // Function to check if a time slot is booked
+  const isTimeSlotBooked = (date: Date, timeSlot: string): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return bookedTimeSlots[dateStr]?.includes(timeSlot) || false;
   };
 
   return (
@@ -451,24 +243,15 @@ export default function BookingForm({
                     <Calendar
                       mode="single"
                       selected={field.value}
-                      onSelect={(date) => {
-                        field.onChange(date);
-                        setSelectedDate(date);
-                        // Reset time selections when date changes
-                        form.setValue('startTime', '');
-                        form.setValue('endTime', '');
-                      }}
+                      onSelect={field.onChange}
                       disabled={(date) => {
-                        // Disable dates in the past
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
                         if (date < today) return true;
-                        
-                        // Disable fully booked dates
-                        return isDateFullyBooked(date);
-                      }}
-                      modifiers={{
-                        booked: (date) => hasHourlyBookings(date),
+                        return disabledDates.some(
+                          disabledDate =>
+                            format(disabledDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                        );
                       }}
                       className="p-3 pointer-events-auto"
                     />
@@ -491,6 +274,7 @@ export default function BookingForm({
                     <Input
                       type="number"
                       min="1"
+                      max="100"
                       {...field}
                       onChange={(e) => field.onChange(parseInt(e.target.value))}
                     />
@@ -501,7 +285,7 @@ export default function BookingForm({
             )}
           />
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -509,19 +293,17 @@ export default function BookingForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Start Time</FormLabel>
-                <Select 
-                  onValueChange={handleStartTimeChange}
-                  value={field.value}
-                  disabled={!selectedDate || isLoading || availableStartTimes.length === 0}
-                >
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select start time" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {availableStartTimes.map((time) => (
-                      <SelectItem key={`start-${time}`} value={time}>{time}</SelectItem>
+                    {availableTimeSlots.map((time, index) => (
+                      <SelectItem key={index} value={time} disabled={isTimeSlotBooked(selectedDate, time)}>
+                        {time}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -536,20 +318,23 @@ export default function BookingForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>End Time</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value}
-                  disabled={!startTime || availableEndTimes.length === 0}
-                >
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select end time" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {availableEndTimes.map((time) => (
-                      <SelectItem key={`end-${time}`} value={time}>{time}</SelectItem>
-                    ))}
+                    {availableEndTimes.map((time, index) => {
+                      const startTime = form.getValues('startTime');
+                      const endTime = time;
+                      const timeSlot = `${startTime} - ${endTime}`;
+                      return (
+                        <SelectItem key={index} value={time} disabled={isTimeSlotBooked(selectedDate, timeSlot)}>
+                          {time}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -557,24 +342,7 @@ export default function BookingForm({
             )}
           />
         </div>
-        
-        {/* Booking Type Info */}
-        {startTime && endTime && (
-          <div className="bg-findvenue-surface/20 p-3 rounded-md">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-medium">Booking Type:</span>
-              <span className={`px-2 py-1 rounded-full text-xs ${
-                bookingType === 'full-day' ? 'bg-findvenue text-white' : 
-                bookingType === 'half-day' ? 'bg-findvenue/70 text-white' : 
-                'bg-findvenue/40 text-white'
-              }`}>
-                {bookingType === 'full-day' ? 'Full Day' : 
-                 bookingType === 'half-day' ? 'Half Day' : 'Hourly'}
-              </span>
-            </div>
-          </div>
-        )}
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -589,7 +357,7 @@ export default function BookingForm({
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="customerPhone"
@@ -604,14 +372,14 @@ export default function BookingForm({
             )}
           />
         </div>
-        
+
         <FormField
           control={form.control}
           name="paymentMethod"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Payment Method</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select payment method" />
@@ -627,7 +395,7 @@ export default function BookingForm({
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="specialRequests"
@@ -635,8 +403,8 @@ export default function BookingForm({
             <FormItem>
               <FormLabel>Special Requests (Optional)</FormLabel>
               <FormControl>
-                <Textarea 
-                  placeholder="Any special requirements for your booking?" 
+                <Textarea
+                  placeholder="Any special requirements for your booking?"
                   className="min-h-24"
                   {...field}
                 />
@@ -646,42 +414,42 @@ export default function BookingForm({
           )}
         />
 
-        <div className="bg-findvenue-surface/20 p-4 rounded-md">
-          <div className="flex justify-between items-center">
-            <span className="font-medium">Total Price:</span>
-            <span className="font-bold text-lg">SAR {totalPrice.toFixed(2)}</span>
-          </div>
-          <p className="text-sm text-findvenue-text-muted mt-1">
-            {getPriceDescription()}
-          </p>
-        </div>
-
-        <Button 
-          type="submit" 
-          className="w-full bg-findvenue hover:bg-findvenue-dark" 
+        <Button
+          type="submit"
+          className="w-full bg-findvenue hover:bg-findvenue-dark"
           disabled={isSubmitting || isLoading || !user}
         >
           {isSubmitting ? (
             <><span className="animate-spin mr-2">◌</span> Processing...</>
           ) : (
-            "Confirm Booking"
+            "Book Venue"
           )}
         </Button>
-        
-        <AlertDialog open={showTimeAlert} onOpenChange={setShowTimeAlert}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Time Slot Unavailable</AlertDialogTitle>
-              <AlertDialogDescription>
-                {timeAlertMessage}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogAction>OK</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </form>
     </Form>
   );
+}
+
+// Helper function directly in this component to send notifications
+async function sendBookingStatusNotification(booking: any, status: string) {
+  try {
+    // Import this function dynamically to avoid circular dependencies
+    const { sendBookingStatusNotification } = await import('@/utils/notificationService');
+    return await sendBookingStatusNotification(booking, status);
+  } catch (error) {
+    console.error('Error sending booking notification:', error);
+    return false;
+  }
+}
+
+// Helper function to notify venue owner
+async function notifyVenueOwner(booking: any) {
+  try {
+    // Import this function dynamically to avoid circular dependencies
+    const { notifyVenueOwnerAboutBooking } = await import('@/utils/notificationService');
+    return await notifyVenueOwnerAboutBooking(booking);
+  } catch (error) {
+    console.error('Error notifying venue owner:', error);
+    return false;
+  }
 }

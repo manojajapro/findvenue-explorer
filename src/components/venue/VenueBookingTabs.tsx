@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/components/ui/use-toast';
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -31,6 +32,7 @@ export default function VenueBookingTabs({
   const [activeTab, setActiveTab] = useState('booking');
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const isOwner = user?.id === ownerId;
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [bookedTimeSlots, setBookedTimeSlots] = useState<Record<string, string[]>>({});
@@ -265,8 +267,9 @@ export default function VenueBookingTabs({
               ownerName={ownerName}
               bookedTimeSlots={bookedTimeSlots}
               isLoading={isLoadingBookings}
-              fullyBookedDates={[...fullyBookedDates, ...dayBookedDates]} // Disable dates with full-day bookings for hourly booking
+              fullyBookedDates={[...fullyBookedDates, ...dayBookedDates]} 
               availableTimeSlots={generateTimeSlots()}
+              autoConfirm={true} // Added auto-confirm flag
             />
           ) : (
             <MultiDayBookingForm 
@@ -275,8 +278,9 @@ export default function VenueBookingTabs({
               pricePerHour={parsedPricePerHour}
               minCapacity={parsedMinCapacity}
               maxCapacity={parsedMaxCapacity}
-              bookedDates={[...fullyBookedDates, ...hourlyBookedDates]} // Disable dates with hourly bookings for day booking
+              bookedDates={[...fullyBookedDates, ...hourlyBookedDates]} 
               isLoading={isLoadingBookings}
+              autoConfirm={true} // Added auto-confirm flag
             />
           )}
         </div>
