@@ -1,84 +1,57 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { format, isSameDay, isToday, startOfMonth, endOfMonth, eachDayOfInterval, isAfter, isBefore, addDays } from "date-fns";
-import { 
-  BookOpen, 
-  Users, 
-  DollarSign, 
-  Clock, 
-  CalendarCheck, 
-  CalendarX, 
-  ChevronLeft,
-  ChevronRight,
-  Calendar as CalendarIcon,
-  Info,
-  MessageCircle
-} from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
 
-interface BookingDay {
-  date: Date;
-  bookings: BookingType[];
-  status: 'low' | 'medium' | 'high' | 'none';
-}
+import { useState, useEffect } from 'react';
+import { Calendar } from '@/components/ui/calendar';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { CalendarClock, ChevronLeft, ChevronRight, User, Users, Clock, DollarSign, MapPin, Calendar as CalendarIcon } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { format, parseISO, addMonths, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
-interface BookingType {
+interface Booking {
   id: string;
+  user_id: string;
+  user_name: string;
   venue_id: string;
   venue_name: string;
   booking_date: string;
   start_time: string;
   end_time: string;
-  guests: number;
   status: string;
   total_price: number;
-  user_id: string;
-  user_name?: string;
-  special_requests?: string | null;
+  guests: number;
+  created_at: string;
+  special_requests?: string;
+  customer_email?: string;
+  customer_phone?: string;
 }
 
-export function OwnerBookingsCalendar() {
+export const OwnerBookingsCalendar = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const navigate = useNavigate();
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [bookings, setBookings] = useState<BookingType[]>([]);
-  const [dates, setDates] = useState<BookingDay[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedDateBookings, setSelectedDateBookings] = useState<BookingType[]>([]);
-  const [month, setMonth] = useState<Date>(new Date());
-  const [showStats, setShowStats] = useState(false);
-  const [bookedTimeSlots, setBookedTimeSlots] = useState<Record<string, string[]>>({});
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [bookedDates, setBookedDates] = useState<Date[]>([]);
 
-  const fetchBookings = async () => {
+  const fetchOwnerBookings = async () => {
     if (!user) return;
     
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
+      // First get venues owned by the current user
       const { data: venuesData, error: venuesError } = await supabase
         .from('venues')
         .select('id, name, owner_info');
         
-      if (venuesError) throw venuesError;
+      if (venuesError) {
+        console.error('Error fetching venues:', venuesError);
+        throw venuesError;
+      }
       
-      const ownerVenues = venuesData.filter(venue => {
+      // Filter to only include venues owned by this user
+      const ownerVenues = venuesData?.filter(venue => {
         if (!venue.owner_info) return false;
         
         try {
@@ -88,610 +61,339 @@ export function OwnerBookingsCalendar() {
             
           return ownerInfo.user_id === user.id;
         } catch (e) {
-          console.error("Error parsing owner_info", e);
+          console.error("Error parsing owner_info for venue", venue.id, e);
           return false;
         }
       });
       
-      if (ownerVenues.length === 0) {
-        setIsLoading(false);
+      if (!ownerVenues || ownerVenues.length === 0) {
         setBookings([]);
+        setIsLoading(false);
         return;
       }
       
       const venueIds = ownerVenues.map(venue => venue.id);
       
+      // Then fetch all bookings for these venues
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
-        .select('*, user_id')
+        .select(`
+          id,
+          venue_id,
+          venue_name,
+          booking_date,
+          start_time,
+          end_time,
+          status,
+          total_price,
+          created_at,
+          guests,
+          special_requests,
+          user_id,
+          customer_email,
+          customer_phone
+        `)
         .in('venue_id', venueIds);
+        
+      if (bookingsError) {
+        console.error('Error fetching bookings:', bookingsError);
+        throw bookingsError;
+      }
       
-      if (bookingsError) throw bookingsError;
-      
-      const userIds = [...new Set((bookingsData || []).map(booking => booking.user_id))];
-      
+      // Fetch user profiles to get names
+      const userIds = (bookingsData || []).map(booking => booking.user_id);
       const { data: userProfiles, error: profilesError } = await supabase
         .from('user_profiles')
         .select('id, first_name, last_name')
         .in('id', userIds);
-      
+        
       if (profilesError) {
         console.error('Error fetching user profiles:', profilesError);
       }
       
-      const enhancedBookings = (bookingsData || []).map(booking => {
+      // Format the bookings data
+      const formattedBookings = (bookingsData || []).map(booking => {
         const userProfile = userProfiles?.find(profile => profile.id === booking.user_id);
+        
         return {
-          ...booking,
-          user_name: userProfile 
-            ? `${userProfile.first_name} ${userProfile.last_name}` 
-            : 'Unknown Customer'
+          id: booking.id,
+          user_id: booking.user_id,
+          user_name: userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Unknown Customer',
+          venue_id: booking.venue_id,
+          venue_name: booking.venue_name || 'Unnamed Venue',
+          booking_date: booking.booking_date,
+          start_time: booking.start_time,
+          end_time: booking.end_time,
+          status: booking.status,
+          total_price: booking.total_price,
+          guests: booking.guests,
+          created_at: booking.created_at,
+          special_requests: booking.special_requests,
+          customer_email: booking.customer_email,
+          customer_phone: booking.customer_phone,
         };
       });
       
-      setBookings(enhancedBookings);
+      setBookings(formattedBookings);
       
-      const timeSlots: Record<string, string[]> = {};
-      enhancedBookings.forEach(booking => {
-        if (booking.status === 'confirmed') {
-          const dateKey = booking.booking_date;
-          const timeSlot = `${booking.start_time} - ${booking.end_time}`;
-          
-          if (!timeSlots[dateKey]) {
-            timeSlots[dateKey] = [];
-          }
-          
-          timeSlots[dateKey].push(timeSlot);
+      // Process dates for calendar
+      const dates = formattedBookings
+        .filter(booking => booking.status !== 'cancelled')
+        .map(booking => parseISO(booking.booking_date));
+      
+      setBookedDates(dates);
+      
+      // Set the selected booking if the current selected date matches a booking
+      if (selectedDate) {
+        const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
+        const bookingsOnSelectedDate = formattedBookings.filter(
+          booking => booking.booking_date === formattedSelectedDate
+        );
+        
+        if (bookingsOnSelectedDate.length > 0) {
+          setSelectedBooking(bookingsOnSelectedDate[0]);
+        } else {
+          setSelectedBooking(null);
         }
-      });
+      }
       
-      setBookedTimeSlots(timeSlots);
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load bookings',
-        variant: 'destructive',
-      });
+    } catch (error: any) {
+      console.error('Error fetching bookings for calendar:', error);
     } finally {
       setIsLoading(false);
     }
   };
-
+  
   useEffect(() => {
-    fetchBookings();
+    fetchOwnerBookings();
   }, [user]);
-
+  
   useEffect(() => {
-    if (bookings.length === 0) {
-      setDates([]);
-      return;
-    }
-    
-    const dateMap = new Map<string, BookingType[]>();
-    
-    bookings.forEach(booking => {
-      const dateStr = booking.booking_date;
-      const existingBookings = dateMap.get(dateStr) || [];
-      dateMap.set(dateStr, [...existingBookings, booking]);
-    });
-    
-    const datesArray: BookingDay[] = Array.from(dateMap.entries()).map(([dateStr, dayBookings]) => {
-      const bookingsCount = dayBookings.length;
-      let status: 'low' | 'medium' | 'high' | 'none' = 'none';
-      
-      if (bookingsCount > 0 && bookingsCount <= 2) status = 'low';
-      else if (bookingsCount > 2 && bookingsCount <= 5) status = 'medium';
-      else if (bookingsCount > 5) status = 'high';
-      
-      return {
-        date: new Date(dateStr),
-        bookings: dayBookings,
-        status
-      };
-    });
-    
-    setDates(datesArray);
-    
     if (selectedDate) {
-      updateSelectedDateBookings(selectedDate);
-    }
-  }, [bookings]);
-  
-  const updateSelectedDateBookings = (date: Date) => {
-    const matchingBookings = bookings.filter(booking => 
-      isSameDay(new Date(booking.booking_date), date)
-    );
-    
-    setSelectedDateBookings(matchingBookings);
-  };
-  
-  const handleDateSelect = (date: Date | undefined) => {
-    if (!date) return;
-    
-    setSelectedDate(date);
-    updateSelectedDateBookings(date);
-  };
-  
-  const modifiers = useMemo(() => {
-    const modifiersObj: Record<string, Date[]> = {
-      hasLowBookings: [],
-      hasMediumBookings: [],
-      hasHighBookings: [],
-    };
-    
-    dates.forEach(day => {
-      if (day.status === 'low') {
-        modifiersObj.hasLowBookings.push(day.date);
-      } else if (day.status === 'medium') {
-        modifiersObj.hasMediumBookings.push(day.date);
-      } else if (day.status === 'high') {
-        modifiersObj.hasHighBookings.push(day.date);
-      }
-    });
-    
-    return modifiersObj;
-  }, [dates]);
-  
-  const modifiersStyles = {
-    hasLowBookings: { 
-      backgroundColor: 'rgba(34, 197, 94, 0.1)', 
-      color: '#22c55e', 
-      fontWeight: 500,
-      borderRadius: '9999px' 
-    },
-    hasMediumBookings: { 
-      backgroundColor: 'rgba(234, 179, 8, 0.2)', 
-      color: '#eab308', 
-      fontWeight: 500,
-      borderRadius: '9999px'
-    },
-    hasHighBookings: { 
-      backgroundColor: 'rgba(16, 185, 129, 0.2)', 
-      color: '#10b981', 
-      fontWeight: 700,
-      borderRadius: '9999px'
-    }
-  };
-  
-  const getBookingStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'pending':
-        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'cancelled':
-        return 'bg-destructive/20 text-destructive border-destructive/30';
-      default:
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
-  };
-
-  const handleConfirmBooking = async (bookingId: string) => {
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'confirmed' })
-        .eq('id', bookingId);
-        
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: 'Booking confirmed successfully',
-      });
-      
-      fetchBookings();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to confirm booking',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleCancelBooking = async (bookingId: string) => {
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'cancelled' })
-        .eq('id', bookingId);
-        
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: 'Booking cancelled successfully',
-      });
-      
-      fetchBookings();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to cancel booking',
-        variant: 'destructive',
-      });
-    }
-  };
-  
-  const getUpcomingBookings = () => {
-    const now = new Date();
-    return bookings
-      .filter(booking => new Date(booking.booking_date) >= now)
-      .sort((a, b) => new Date(a.booking_date).getTime() - new Date(b.booking_date).getTime())
-      .slice(0, 5);
-  };
-  
-  const getTodayBookings = () => {
-    return bookings.filter(booking => isToday(new Date(booking.booking_date)));
-  };
-  
-  const getMonthlyBookingStats = () => {
-    const start = startOfMonth(month);
-    const end = endOfMonth(month);
-    const daysInMonth = eachDayOfInterval({ start, end });
-    
-    let confirmed = 0;
-    let pending = 0;
-    let cancelled = 0;
-    let totalRevenue = 0;
-    
-    daysInMonth.forEach(day => {
-      const dayBookings = bookings.filter(booking => 
-        isSameDay(new Date(booking.booking_date), day)
+      const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
+      const bookingsOnSelectedDate = bookings.filter(
+        booking => booking.booking_date === formattedSelectedDate
       );
       
-      dayBookings.forEach(booking => {
-        if (booking.status === 'confirmed') {
-          confirmed++;
-          totalRevenue += booking.total_price;
-        }
-        else if (booking.status === 'pending') pending++;
-        else if (booking.status === 'cancelled') cancelled++;
-      });
-    });
-    
-    return { confirmed, pending, cancelled, totalRevenue };
-  };
-
-  const handleChatWithUser = (userId: string) => {
-    navigate(`/messages/${userId}`);
+      if (bookingsOnSelectedDate.length > 0) {
+        setSelectedBooking(bookingsOnSelectedDate[0]);
+      } else {
+        setSelectedBooking(null);
+      }
+    }
+  }, [selectedDate, bookings]);
+  
+  const nextMonth = () => {
+    setCurrentMonth(prev => addMonths(prev, 1));
   };
   
-  if (isLoading) {
-    return (
-      <Card className="glass-card border-white/10">
-        <CardContent className="pt-6 text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-findvenue mx-auto"></div>
-          <p className="mt-4 text-findvenue-text-muted">Loading calendar...</p>
-        </CardContent>
-      </Card>
+  const prevMonth = () => {
+    setCurrentMonth(prev => addMonths(prev, -1));
+  };
+  
+  // Custom day content for the calendar
+  const isDayBooked = (date: Date) => {
+    return bookedDates.some(bookedDate => 
+      format(bookedDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
     );
-  }
+  };
+  
+  // Count bookings on a specific date
+  const getBookingsCountForDate = (date: Date) => {
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    return bookings.filter(booking => 
+      booking.booking_date === formattedDate && booking.status !== 'cancelled'
+    ).length;
+  };
+  
+  // Get bookings for a specific date
+  const getBookingsForDate = (date: Date) => {
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    return bookings.filter(booking => booking.booking_date === formattedDate);
+  };
+  
+  const handleDateClick = (date: Date) => {
+    setSelectedDate(date);
+  };
 
+  const modifiersStyles = {
+    booked: {
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+      color: 'rgba(239, 68, 68, 0.9)',
+      fontWeight: 'bold',
+      position: 'relative' as const,
+    }
+  };
+  
   return (
-    <Card className="glass-card border-white/10 overflow-hidden">
-      <CardHeader className="pb-3">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
-          <h3 className="text-xl font-bold flex items-center">
-            <CalendarIcon className="mr-2 h-5 w-5 text-findvenue" />
-            Bookings Calendar
-          </h3>
-          
-          <div className="mt-2 sm:mt-0 flex items-center space-x-2">
-            <Badge variant="outline" className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-green-400 mr-1"></div> 1-2
-            </Badge>
-            <Badge variant="outline" className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-yellow-500 mr-1"></div> 3-5
-            </Badge>
-            <Badge variant="outline" className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-findvenue mr-1"></div> 5+
-            </Badge>
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => setShowStats(!showStats)}
-              className="ml-2"
-            >
-              <Info className="h-4 w-4" />
-            </Button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">Bookings Calendar</h3>
+        <div className="flex space-x-2">
+          <Button variant="outline" size="sm" onClick={prevMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="font-medium">
+            {format(currentMonth, 'MMMM yyyy')}
           </div>
+          <Button variant="outline" size="sm" onClick={nextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
-      </CardHeader>
+      </div>
       
-      <CardContent className="p-0">
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-0">
-          <div className="md:col-span-3 p-6 border-r border-white/10 min-h-[650px]">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleDateSelect}
-              month={month}
-              onMonthChange={setMonth}
-              className="p-3 rounded-md pointer-events-auto"
-              modifiers={modifiers}
-              modifiersStyles={modifiersStyles}
-            />
-            
-            <div className="mt-4">
-              <h4 className="text-sm font-medium mb-2">Today's Bookings</h4>
-              {getTodayBookings().length > 0 ? (
-                <div className="space-y-2">
-                  {getTodayBookings().map(booking => (
-                    <div 
-                      key={booking.id} 
-                      className="flex justify-between items-center p-2 border border-white/10 rounded-md cursor-pointer hover:bg-findvenue-surface/20"
-                      onClick={() => {
-                        setSelectedDate(new Date(booking.booking_date));
-                        updateSelectedDateBookings(new Date(booking.booking_date));
-                      }}
-                    >
-                      <div className="flex items-center">
-                        <Badge className={getBookingStatusColor(booking.status)} variant="outline">
-                          {booking.status}
-                        </Badge>
-                        <span className="ml-2 text-sm">{booking.venue_name}</span>
-                      </div>
-                      <div className="text-xs text-findvenue-text-muted">
-                        {booking.start_time} - {booking.end_time}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-findvenue-text-muted">No bookings for today</p>
-              )}
-            </div>
-          </div>
-          
-          <div className="md:col-span-4 p-6">
-            {showStats ? (
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium">
-                    {format(month, 'MMMM yyyy')} Stats
-                  </h3>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setShowStats(false)}
-                  >
-                    Back to Details
-                  </Button>
-                </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-findvenue-card-bg border border-white/10 rounded-lg p-4">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={handleDateClick}
+            className="w-full"
+            month={currentMonth}
+            onMonthChange={setCurrentMonth}
+            modifiersStyles={modifiersStyles}
+            modifiers={{
+              booked: (date) => isDayBooked(date)
+            }}
+            components={{
+              DayContent: ({ date, activeModifiers }) => {
+                const bookingsCount = getBookingsCountForDate(date);
+                const isDateBooked = isDayBooked(date);
                 
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 mb-6">
-                  {(() => {
-                    const stats = getMonthlyBookingStats();
-                    return (
-                      <>
-                        <Card className="bg-findvenue-surface/30 backdrop-blur-sm border-white/10">
-                          <CardContent className="pt-6">
-                            <p className="text-sm text-findvenue-text-muted">Confirmed</p>
-                            <h3 className="text-2xl font-bold flex items-center mt-1">
-                              <CalendarCheck className="mr-2 h-5 w-5 text-green-400" />
-                              {stats.confirmed}
-                            </h3>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card className="bg-findvenue-surface/30 backdrop-blur-sm border-white/10">
-                          <CardContent className="pt-6">
-                            <p className="text-sm text-findvenue-text-muted">Pending</p>
-                            <h3 className="text-2xl font-bold flex items-center mt-1">
-                              <Clock className="mr-2 h-5 w-5 text-yellow-400" />
-                              {stats.pending}
-                            </h3>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card className="bg-findvenue-surface/30 backdrop-blur-sm border-white/10">
-                          <CardContent className="pt-6">
-                            <p className="text-sm text-findvenue-text-muted">Cancelled</p>
-                            <h3 className="text-2xl font-bold flex items-center mt-1">
-                              <CalendarX className="mr-2 h-5 w-5 text-destructive" />
-                              {stats.cancelled}
-                            </h3>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card className="bg-findvenue-surface/30 backdrop-blur-sm border-white/10">
-                          <CardContent className="pt-6">
-                            <p className="text-sm text-findvenue-text-muted">Revenue</p>
-                            <h3 className="text-2xl font-bold flex items-center mt-1">
-                              <DollarSign className="mr-2 h-5 w-5 text-green-400" />
-                              SAR {stats.totalRevenue.toFixed(0)}
-                            </h3>
-                          </CardContent>
-                        </Card>
-                      </>
-                    );
-                  })()}
-                </div>
+                const currentMonthStart = startOfMonth(currentMonth);
+                const currentMonthEnd = endOfMonth(currentMonth);
+                const isCurrentMonth = isWithinInterval(date, {
+                  start: currentMonthStart, 
+                  end: currentMonthEnd
+                });
                 
-                <h4 className="text-sm font-medium mb-2">Upcoming Bookings</h4>
-                {getUpcomingBookings().length > 0 ? (
-                  <div className="space-y-2">
-                    {getUpcomingBookings().map(booking => (
-                      <div 
-                        key={booking.id} 
-                        className="bg-findvenue-surface/20 backdrop-blur-sm border border-white/10 p-3 rounded-md flex justify-between items-center cursor-pointer hover:bg-findvenue-surface/30 transition-colors"
-                        onClick={() => {
-                          setSelectedDate(new Date(booking.booking_date));
-                          updateSelectedDateBookings(new Date(booking.booking_date));
-                          setShowStats(false);
-                        }}
-                      >
-                        <div>
-                          <div className="font-medium">{booking.venue_name}</div>
-                          <div className="text-sm text-findvenue-text-muted">
-                            {format(new Date(booking.booking_date), 'MMMM d, yyyy')} • {booking.start_time}
-                          </div>
-                        </div>
-                        <div className="flex items-center">
-                          <Badge className={getBookingStatusColor(booking.status)}>
-                            {booking.status}
-                          </Badge>
-                          <ChevronRight className="ml-2 h-4 w-4 text-findvenue-text-muted" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-findvenue-text-muted">No upcoming bookings</p>
-                )}
-              </div>
-            ) : (
-              <div>
-                {selectedDate ? (
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-medium flex items-center">
-                        <CalendarIcon className="h-5 w-5 mr-2 text-findvenue" />
-                        {format(selectedDate, 'MMMM d, yyyy')}
-                      </h3>
-                      <div className="flex gap-2">
-                        <Badge variant="outline" className="font-mono">
-                          {selectedDateBookings.length} booking{selectedDateBookings.length !== 1 ? 's' : ''}
-                        </Badge>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setShowStats(true)}
-                        >
-                          View Stats
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <Separator className="mb-4" />
-                    
-                    {selectedDateBookings.length > 0 ? (
-                      <div>
-                        <div className="mb-4">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="border-white/10">
-                                <TableHead>Customer</TableHead>
-                                <TableHead>Venue</TableHead>
-                                <TableHead>Time</TableHead>
-                                <TableHead>Guests</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {selectedDateBookings.map((booking) => (
-                                <TableRow key={booking.id} className="border-white/10">
-                                  <TableCell className="font-medium">{booking.user_name}</TableCell>
-                                  <TableCell>{booking.venue_name}</TableCell>
-                                  <TableCell>{booking.start_time} - {booking.end_time}</TableCell>
-                                  <TableCell>{booking.guests}</TableCell>
-                                  <TableCell>SAR {booking.total_price.toFixed(2)}</TableCell>
-                                  <TableCell>
-                                    <Badge className={getBookingStatusColor(booking.status)}>
-                                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex space-x-2 justify-end">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="border-findvenue text-findvenue hover:bg-findvenue/10"
-                                        onClick={() => handleChatWithUser(booking.user_id)}
-                                      >
-                                        <MessageCircle className="h-4 w-4 mr-1" />
-                                        Chat
-                                      </Button>
-                                      
-                                      {booking.status === 'pending' && (
-                                        <>
-                                          <Button 
-                                            size="sm" 
-                                            variant="outline"
-                                            className="border-green-500 text-green-500 hover:bg-green-500/10"
-                                            onClick={() => handleConfirmBooking(booking.id)}
-                                          >
-                                            <CalendarCheck className="h-4 w-4 mr-1" />
-                                            Confirm
-                                          </Button>
-                                          
-                                          <Button 
-                                            size="sm" 
-                                            variant="outline"
-                                            className="border-destructive text-destructive hover:bg-destructive/10"
-                                            onClick={() => handleCancelBooking(booking.id)}
-                                          >
-                                            <CalendarX className="h-4 w-4 mr-1" />
-                                            Cancel
-                                          </Button>
-                                        </>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-
-                        <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
-                          {selectedDateBookings.filter(booking => booking.special_requests).map(booking => (
-                            <div key={`req-${booking.id}`} className="bg-findvenue-card-bg/30 backdrop-blur-sm border border-white/10 rounded-lg p-4">
-                              <div className="flex flex-col md:flex-row md:justify-between">
-                                <div className="mb-3 md:mb-0">
-                                  <h4 className="text-lg font-medium mb-1 flex items-center">
-                                    Special Request: {booking.user_name}
-                                    <Badge className={`ml-2 ${getBookingStatusColor(booking.status)}`}>
-                                      {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                                    </Badge>
-                                  </h4>
-                                  <div className="text-sm mt-1">
-                                    {booking.venue_name} • {booking.start_time} - {booking.end_time} • {booking.guests} guests
-                                  </div>
-                                </div>
-                                
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="border-findvenue text-findvenue hover:bg-findvenue/10 h-8"
-                                  onClick={() => handleChatWithUser(booking.user_id)}
-                                >
-                                  <MessageCircle className="h-4 w-4 mr-1" />
-                                  Chat with Customer
-                                </Button>
-                              </div>
-                              
-                              {booking.special_requests && (
-                                <div className="mt-4 pt-2 border-t border-white/10">
-                                  <p className="text-sm text-findvenue-text-muted">{booking.special_requests}</p>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <BookOpen className="w-12 h-12 mx-auto text-findvenue-text-muted opacity-50 mb-4" />
-                        <p className="text-findvenue-text-muted">No bookings for this date</p>
+                return (
+                  <div className="relative flex items-center justify-center w-full h-full">
+                    <span className={activeModifiers.selected ? 'text-white' : ''}>
+                      {date.getDate()}
+                    </span>
+                    {isDateBooked && isCurrentMonth && (
+                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex space-x-0.5">
+                        <span className={`inline-block h-1 w-1 rounded-full ${
+                          activeModifiers.selected ? 'bg-white' : 'bg-red-500'
+                        }`}></span>
+                        {bookingsCount > 1 && <span className={`inline-block h-1 w-1 rounded-full ${
+                          activeModifiers.selected ? 'bg-white' : 'bg-red-500'
+                        }`}></span>}
+                        {bookingsCount > 2 && <span className={`inline-block h-1 w-1 rounded-full ${
+                          activeModifiers.selected ? 'bg-white' : 'bg-red-500'
+                        }`}></span>}
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-findvenue-text-muted">Select a date to view bookings</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                );
+              }
+            }}
+          />
         </div>
-      </CardContent>
-    </Card>
+        
+        <div>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-findvenue"></div>
+            </div>
+          ) : selectedDate ? (
+            <div>
+              <div className="mb-4 flex items-center">
+                <CalendarIcon className="mr-2 h-5 w-5 text-findvenue" />
+                <h3 className="text-lg font-medium">
+                  {format(selectedDate, 'EEEE, MMMM d, yyyy')}
+                </h3>
+              </div>
+              
+              {getBookingsForDate(selectedDate).length > 0 ? (
+                <div className="space-y-4">
+                  {getBookingsForDate(selectedDate).map((booking) => (
+                    <Card key={booking.id} className="glass-card border-white/10 p-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-semibold">{booking.venue_name}</h4>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            booking.status === 'confirmed' 
+                              ? 'bg-green-500/10 text-green-500' 
+                              : booking.status === 'cancelled'
+                                ? 'bg-red-500/10 text-red-500'
+                                : 'bg-yellow-500/10 text-yellow-500'
+                          }`}>
+                            {booking.status.toUpperCase()}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="flex items-center">
+                            <User className="mr-2 h-4 w-4 text-findvenue-text-muted" />
+                            <span>{booking.user_name}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Users className="mr-2 h-4 w-4 text-findvenue-text-muted" />
+                            <span>{booking.guests} guests</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Clock className="mr-2 h-4 w-4 text-findvenue-text-muted" />
+                            <span>{booking.start_time} - {booking.end_time}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <DollarSign className="mr-2 h-4 w-4 text-findvenue-text-muted" />
+                            <span>SAR {booking.total_price.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        
+                        {booking.customer_email && (
+                          <div className="text-sm flex items-center">
+                            <span className="mr-2">Email:</span>
+                            <a href={`mailto:${booking.customer_email}`} className="text-findvenue hover:underline">
+                              {booking.customer_email}
+                            </a>
+                          </div>
+                        )}
+                        
+                        {booking.customer_phone && (
+                          <div className="text-sm flex items-center">
+                            <span className="mr-2">Phone:</span>
+                            <a href={`tel:${booking.customer_phone}`} className="text-findvenue hover:underline">
+                              {booking.customer_phone}
+                            </a>
+                          </div>
+                        )}
+                        
+                        {booking.special_requests && (
+                          <div className="mt-2">
+                            <p className="text-sm font-medium mb-1">Special Requests:</p>
+                            <p className="text-sm text-findvenue-text-muted bg-findvenue-card-bg/50 p-2 rounded">
+                              {booking.special_requests}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 border border-white/10 rounded-lg bg-findvenue-card-bg">
+                  <CalendarClock className="h-10 w-10 text-findvenue-text-muted mx-auto mb-2" />
+                  <h4 className="text-lg font-medium">No Bookings</h4>
+                  <p className="text-findvenue-text-muted">
+                    There are no bookings scheduled for this date.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 border border-white/10 rounded-lg bg-findvenue-card-bg">
+              <CalendarIcon className="h-10 w-10 text-findvenue-text-muted mx-auto mb-2" />
+              <h4 className="text-lg font-medium">Select a Date</h4>
+              <p className="text-findvenue-text-muted">
+                Select a date on the calendar to view booking details.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
-}
+};

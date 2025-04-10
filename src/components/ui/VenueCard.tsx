@@ -19,22 +19,28 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
   const { user, checkIsFavorite, toggleFavoriteVenue } = useAuth();
   const [isFavorite, setIsFavorite] = useState(user ? checkIsFavorite(venue.id) : false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageError, setImageError] = useState(false);
   const imagesRef = useRef<string[]>([]);
 
   // Prepare the images array, including the main image and gallery images
   useEffect(() => {
     const images: string[] = [];
-    if (venue.imageUrl) {
-      images.push(venue.imageUrl);
-    }
     
+    // Add gallery images if available
     if (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0) {
       images.push(...venue.galleryImages);
     }
     
-    // Remove duplicates
-    const uniqueImages = [...new Set(images)];
-    imagesRef.current = uniqueImages.length > 0 ? uniqueImages : [venue.imageUrl];
+    // Add imageUrl if it's not already in images and it exists
+    if (venue.imageUrl && !images.includes(venue.imageUrl)) {
+      images.push(venue.imageUrl);
+    }
+    
+    // Fallback to a placeholder if no images
+    const uniqueImages = [...new Set(images)].filter(img => !!img);
+    imagesRef.current = uniqueImages.length > 0 
+      ? uniqueImages 
+      : ['/placeholder.svg'];
   }, [venue.imageUrl, venue.galleryImages]);
 
   // Auto-rotate images every 3 seconds
@@ -69,6 +75,14 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
     } catch (error) {
       console.error("Error toggling favorite:", error);
     }
+  };
+
+  const handleImageError = () => {
+    setImageError(true);
+    // Set a fallback image
+    setCurrentImageIndex(0);
+    imagesRef.current = ['/placeholder.svg'];
+    setIsLoaded(true);
   };
 
   // Extract primary category from category string or array
@@ -117,6 +131,7 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
               onLoad={() => {
                 if (index === 0) setIsLoaded(true);
               }}
+              onError={handleImageError}
             />
           ))}
           

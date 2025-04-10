@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +19,7 @@ const CustomerBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
-  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('calendar');
   const [error, setError] = useState<string | null>(null);
   const [processingBookingIds, setProcessingBookingIds] = useState<Set<string>>(new Set());
   
@@ -284,20 +285,20 @@ const CustomerBookings = () => {
             
             <div className="ms-auto flex space-x-2">
               <Button
-                variant={viewMode === 'table' ? 'default' : 'outline'}
-                onClick={() => setViewMode('table')}
-                className={viewMode === 'table' ? 'bg-findvenue hover:bg-findvenue-dark' : ''}
-                size="sm"
-              >
-                Table View
-              </Button>
-              <Button
                 variant={viewMode === 'calendar' ? 'default' : 'outline'}
                 onClick={() => setViewMode('calendar')}
                 className={viewMode === 'calendar' ? 'bg-findvenue hover:bg-findvenue-dark' : ''}
                 size="sm"
               >
                 Calendar View
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'outline'}
+                onClick={() => setViewMode('table')}
+                className={viewMode === 'table' ? 'bg-findvenue hover:bg-findvenue-dark' : ''}
+                size="sm"
+              >
+                Table View
               </Button>
             </div>
           </div>
@@ -339,7 +340,15 @@ const CustomerBookings = () => {
               </CardContent>
             </Card>
           ) : (
-            <Tabs defaultValue="table" value={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'calendar')}>
+            <Tabs defaultValue="calendar" value={viewMode} onValueChange={(value) => setViewMode(value as 'table' | 'calendar')}>
+              <TabsContent value="calendar">
+                <Card className="glass-card border-white/10">
+                  <CardContent className="p-4">
+                    <OwnerBookingsCalendar />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
               <TabsContent value="table">
                 <Card className="glass-card border-white/10 overflow-hidden">
                   <CardContent className="p-0">
@@ -351,17 +360,6 @@ const CustomerBookings = () => {
                       handleStatusUpdate={handleStatusUpdate}
                       initiateChat={initiateChat}
                     />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="calendar">
-                <Card className="glass-card border-white/10">
-                  <CardHeader>
-                    <CardTitle>Bookings Calendar</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <OwnerBookingsCalendar />
                   </CardContent>
                 </Card>
               </TabsContent>

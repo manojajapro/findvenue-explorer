@@ -133,22 +133,28 @@ export const useVenueData = () => {
             }
             
             if (typeof category === 'string') {
+              // Check if this is a comma-separated string
+              if (category.includes(',')) {
+                const categories = category.split(',').map(c => c.trim());
+                return categories[0] || '';
+              }
               return category;
             }
             
             return '';
           };
           
-          // Use the first gallery image instead of image_url
+          // Process gallery images - ensure we have an array of strings
           const galleryImages = processArrayField(data.gallery_images);
+          // Use the first gallery image as default image
           const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
           
           const transformedVenue: Venue = {
             id: data.id,
             name: data.name,
             description: data.description || '',
-            imageUrl: defaultImage, // Use first gallery image instead
-            galleryImages: processArrayField(data.gallery_images),
+            imageUrl: defaultImage, // Use first gallery image as primary image
+            galleryImages: galleryImages,
             address: data.address || '',
             city: data.city_name || '',
             cityId: data.city_id || '',

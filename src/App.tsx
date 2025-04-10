@@ -93,12 +93,9 @@ const VenueDetailsRoute = () => {
   const { isVenueOwner } = useAuth();
   const { id } = useParams<{ id: string }>();
   
-  // Venue owners should be redirected to the dashboard
-  if (isVenueOwner) {
-    return <Navigate to="/my-venues?tab=dashboard" replace />;
-  }
-  
-  // Customers see the normal venue details
+  // Venue owners should be redirected to the edit page for their venues,
+  // but we need to check if they own this venue first
+  // For now, let them see the regular view
   return <VenueDetails />;
 };
 
@@ -162,7 +159,7 @@ function AppContent() {
             <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             
-            {/* Routes accessible to both users, but with different views */}
+            {/* Routes accessible to both users */}
             <Route path="/venue/:id" element={<VenueDetailsRoute />} />
             
             {/* Customer-only routes */}
