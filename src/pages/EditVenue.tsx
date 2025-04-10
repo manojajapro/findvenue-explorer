@@ -447,15 +447,10 @@ const EditVenue = () => {
       
       values.category_name = categoryNames;
       
-      if (values.rules_and_regulations) {
-        values.rules_and_regulations.general = customRulesGeneral;
-        values.rules_and_regulations.booking = customRulesBooking;
-      } else {
-        values.rules_and_regulations = {
-          general: customRulesGeneral,
-          booking: customRulesBooking
-        };
-      }
+      values.rules_and_regulations = {
+        general: customRulesGeneral,
+        booking: customRulesBooking
+      };
       
       if (venue && venue.owner_info && !values.owner_info) {
         if (typeof venue.owner_info === 'string') {
