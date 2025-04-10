@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -49,11 +50,25 @@ const Bookings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [fetchError, setFetchError] = useState<string | null>(null);
   
   useEffect(() => {
     if (user) {
-      enableRealtimeForTable('bookings');
-      enableRealtimeForTable('notifications');
+      try {
+        enableRealtimeForTable('bookings');
+        enableRealtimeForTable('notifications');
+      } catch (e) {
+        console.log('Error enabling realtime:', e);
+      }
+    }
+  }, [user]);
+  
+  useEffect(() => {
+    if (user) {
+      fetchBookings();
+    } else {
+      setIsLoading(false);
+      setBookings([]);
     }
   }, [user]);
   
@@ -61,16 +76,19 @@ const Bookings = () => {
     if (!user) return;
     
     setIsLoading(true);
+    setFetchError(null);
     
     try {
       let query;
       
       if (isVenueOwner) {
+        // Fetch venue owner bookings
         query = supabase
           .from('bookings')
           .select('*, venues:venue_id(name, gallery_images, owner_info)')
           .filter('venues.owner_info->user_id', 'eq', user.id);
       } else {
+        // Fetch customer bookings
         query = supabase
           .from('bookings')
           .select('*, venues:venue_id(name, gallery_images, owner_info)')
@@ -79,7 +97,16 @@ const Bookings = () => {
       
       const { data, error } = await query;
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching bookings:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        setBookings([]);
+        setIsLoading(false);
+        return;
+      }
       
       const formattedBookings: Booking[] = data.map((item: any) => {
         let ownerId = undefined;
@@ -99,8 +126,17 @@ const Bookings = () => {
         }
         
         let venueImage = '';
-        if (item.venues && item.venues.gallery_images && Array.isArray(item.venues.gallery_images) && item.venues.gallery_images.length > 0) {
-          venueImage = item.venues.gallery_images[0];
+        if (item.venues && item.venues.gallery_images) {
+          if (Array.isArray(item.venues.gallery_images) && item.venues.gallery_images.length > 0) {
+            venueImage = item.venues.gallery_images[0];
+          } else if (typeof item.venues.gallery_images === 'string') {
+            try {
+              const images = JSON.parse(item.venues.gallery_images);
+              venueImage = Array.isArray(images) && images.length > 0 ? images[0] : '';
+            } catch (e) {
+              console.error("Error parsing gallery_images", e);
+            }
+          }
         }
         
         let formattedDate = item.booking_date;
@@ -127,6 +163,7 @@ const Bookings = () => {
       setBookings(formattedBookings);
     } catch (error: any) {
       console.error('Error fetching bookings:', error);
+      setFetchError(error.message || 'Failed to load bookings.');
       toast({
         title: 'Error',
         description: error.message || 'Failed to load bookings.',
@@ -269,6 +306,39 @@ const Bookings = () => {
     }
   };
   
+  // Add retry mechanism for loading
+  const handleRetryFetch = () => {
+    setIsLoading(true);
+    fetchBookings();
+  };
+
+  // If user is null, prompt login
+  if (!user) {
+    return (
+      <div className="min-h-screen pt-28 pb-16">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold mb-2">My Bookings</h1>
+            <p className="text-findvenue-text-muted mb-8">
+              View and manage your venue bookings
+            </p>
+            
+            <Card className="glass-card border-white/10">
+              <CardContent className="pt-6 text-center py-12">
+                <p className="text-findvenue-text-muted mb-4">
+                  Please log in to view your bookings
+                </p>
+                <Button className="bg-findvenue hover:bg-findvenue-dark" asChild>
+                  <a href="/login">Login</a>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-screen pt-28 pb-16">
       <div className="container mx-auto px-4">
@@ -304,6 +374,17 @@ const Bookings = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-findvenue mx-auto"></div>
               <p className="mt-4 text-findvenue-text-muted">Loading bookings...</p>
             </div>
+          ) : fetchError ? (
+            <Card className="glass-card border-white/10">
+              <CardContent className="pt-6 text-center py-12">
+                <p className="text-destructive mb-4">
+                  {fetchError}
+                </p>
+                <Button onClick={handleRetryFetch} className="bg-findvenue hover:bg-findvenue-dark">
+                  Retry Loading
+                </Button>
+              </CardContent>
+            </Card>
           ) : displayBookings.length === 0 ? (
             <Card className="glass-card border-white/10">
               <CardContent className="pt-6 text-center py-12">

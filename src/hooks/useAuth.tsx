@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isVenueOwner, setIsVenueOwner] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -63,6 +64,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           };
           setUser(enhancedUser);
           
+          // Use setTimeout to avoid deadlock with Supabase client
           setTimeout(() => {
             fetchUserProfile(sessionUser.id);
           }, 0);
@@ -70,11 +72,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(null);
           setProfile(null);
           setIsVenueOwner(false);
+          setAuthError(null);
         }
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
       const sessionUser = session?.user as any;
       setSession(session as any);
       
@@ -92,6 +96,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(null);
         setProfile(null);
         setIsVenueOwner(false);
+        
+        if (error) {
+          console.error("Session error:", error);
+          setAuthError(error.message);
+        }
       }
     });
 
@@ -106,37 +115,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
+        console.error("Error fetching profile:", error);
         throw error;
       }
 
-      setProfile(data);
-      
-      if (!data.first_name && user?.user_metadata?.full_name) {
-        const nameParts = user.user_metadata.full_name.split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
+      if (data) {
+        setProfile(data);
         
-        await updateProfile({
-          first_name: firstName,
-          last_name: lastName,
-          avatar_url: user.user_metadata.avatar_url || data.avatar_url
+        if (!data.first_name && user?.user_metadata?.full_name) {
+          const nameParts = user.user_metadata.full_name.split(' ');
+          const firstName = nameParts[0] || '';
+          const lastName = nameParts.slice(1).join(' ') || '';
+          
+          await updateProfile({
+            first_name: firstName,
+            last_name: lastName,
+            avatar_url: user.user_metadata.avatar_url || data.avatar_url
+          });
+        }
+        
+        setUser(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            firstName: data?.first_name || prev.user_metadata?.full_name?.split(' ')[0] || '',
+            lastName: data?.last_name || prev.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '',
+            profileImage: data?.avatar_url || prev.user_metadata?.avatar_url || '',
+          };
         });
+        
+        setIsVenueOwner(data?.user_role === 'venue-owner');
+      } else {
+        // No profile found, clear venue owner status
+        setIsVenueOwner(false);
       }
-      
-      setUser(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          firstName: data?.first_name || prev.user_metadata?.full_name?.split(' ')[0] || '',
-          lastName: data?.last_name || prev.user_metadata?.full_name?.split(' ').slice(1).join(' ') || '',
-          profileImage: data?.avatar_url || prev.user_metadata?.avatar_url || '',
-        };
-      });
-      
-      setIsVenueOwner(data?.user_role === 'venue-owner');
     } catch (error) {
       console.error('Error fetching user profile:', error);
     } finally {
@@ -145,12 +160,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    setAuthError(null);
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-    if (error) {
+      if (error) {
+        console.error("Login error:", error);
+        setAuthError(error.message);
+        throw error;
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error("Login error:", error);
+      setAuthError(error.message);
       throw error;
     }
   };
@@ -162,6 +189,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(null);
       setProfile(null);
       setIsVenueOwner(false);
+      setAuthError(null);
       
       // Clear local storage items used by Supabase Auth
       try {
@@ -234,11 +262,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from('user_profiles')
         .select('favorites')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
       
-      return data.favorites || [];
+      return data?.favorites || [];
     } catch (error) {
       console.error('Error getting favorites:', error);
       return [];

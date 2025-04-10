@@ -100,28 +100,26 @@ export const useVenueData = () => {
             }
             
             if (typeof field === 'string') {
-              // Check if it's already in array format
-              if (field.startsWith('[') && field.endsWith(']')) {
-                try {
-                  return JSON.parse(field);
-                } catch (e) {
-                  // Not valid JSON array
-                }
+              // Check if it looks like a CSV format
+              if (field.includes(',') && !field.includes('[') && !field.includes('{')) {
+                return field.split(',').map(item => item.trim());
               }
-                
-              // Try to parse as JSON array first
+              
+              // If it's a JSON string, try to parse it
               try {
                 const parsed = JSON.parse(field);
                 if (Array.isArray(parsed)) {
                   return parsed;
                 }
+                return [field]; // Not an array, use as a single item
               } catch (e) {
-                // Not valid JSON, try as comma-separated string
-                return field.split(',').map(item => item.trim());
+                // Not valid JSON, return as single item
+                return [field];
               }
             }
             
-            return [];
+            // If it's anything else, convert to string and return as single item
+            return [String(field)];
           };
           
           // Special handling for category_name which could be a single string or an array
