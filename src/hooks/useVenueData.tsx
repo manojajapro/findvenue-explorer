@@ -49,6 +49,7 @@ export const useVenueData = () => {
                 contact: ownerInfo.contact || '',
                 responseTime: ownerInfo.response_time || '',
                 user_id: ownerInfo.user_id || '',
+                // Remove the references to profile_image, online_status, and last_active
                 socialLinks: {
                   facebook: ownerInfo.facebook_url || ownerInfo.facebook || '',
                   twitter: ownerInfo.twitter_url || ownerInfo.twitter || '',
