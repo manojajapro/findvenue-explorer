@@ -41,7 +41,7 @@ const CustomerBookings = () => {
       if (isVenueOwner) {
         const { data: venuesData, error: venuesError } = await supabase
           .from('venues')
-          .select('id, name, owner_info');
+          .select('id, name, gallery_images, owner_info');
           
         if (venuesError) {
           console.error('Error fetching venues:', venuesError);
@@ -115,6 +115,14 @@ const CustomerBookings = () => {
           console.error('Error fetching user profiles:', profilesError);
         }
         
+        // Add venue image data to bookings
+        const venueImagesMap = ownerVenues.reduce((acc, venue) => {
+          if (venue.gallery_images && Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) {
+            acc[venue.id] = venue.gallery_images[0];
+          }
+          return acc;
+        }, {});
+        
         const formattedBookings = (bookingsData || []).map(booking => {
           const userProfile = userProfiles?.find(profile => profile.id === booking.user_id) || null;
           return {
@@ -125,6 +133,7 @@ const CustomerBookings = () => {
             customer_phone: booking.customer_phone,
             venue_id: booking.venue_id,
             venue_name: booking.venue_name || 'Unnamed Venue',
+            venue_image: venueImagesMap[booking.venue_id] || '',
             booking_date: booking.booking_date,
             start_time: booking.start_time,
             end_time: booking.end_time,

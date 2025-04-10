@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Users, Trash2, Loader2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -68,12 +68,12 @@ const Bookings = () => {
       if (isVenueOwner) {
         query = supabase
           .from('bookings')
-          .select('*, venues:venue_id(name, image_url, owner_info)')
+          .select('*, venues:venue_id(name, gallery_images, owner_info)')
           .filter('venues.owner_info->user_id', 'eq', user.id);
       } else {
         query = supabase
           .from('bookings')
-          .select('*, venues:venue_id(name, image_url, owner_info)')
+          .select('*, venues:venue_id(name, gallery_images, owner_info)')
           .eq('user_id', user.id);
       }
       
@@ -98,6 +98,12 @@ const Bookings = () => {
           }
         }
         
+        // Get the venue image from gallery_images
+        let venueImage = '';
+        if (item.venues && item.venues.gallery_images && Array.isArray(item.venues.gallery_images) && item.venues.gallery_images.length > 0) {
+          venueImage = item.venues.gallery_images[0];
+        }
+        
         // Ensure we're handling the booking date correctly without timezone shifts
         let formattedDate = item.booking_date;
         
@@ -106,7 +112,7 @@ const Bookings = () => {
           user_id: item.user_id,
           venue_id: item.venue_id,
           venue_name: item.venues?.name || item.venue_name || 'Unnamed Venue',
-          venue_image: item.venues?.image_url,
+          venue_image: venueImage,
           booking_date: formattedDate,
           start_time: item.start_time,
           end_time: item.end_time,
