@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -72,7 +71,6 @@ export default function MultiDayBookingForm({
   const [pricePerPerson, setPricePerPerson] = useState(0);
   const [basePrice, setBasePrice] = useState(0);
   
-  // Fetch the venue's price per person
   useEffect(() => {
     const fetchVenuePricing = async () => {
       try {
@@ -85,20 +83,16 @@ export default function MultiDayBookingForm({
         if (error) throw error;
         
         if (data) {
-          // Set price per person if available
           if (data.price_per_person) {
             setPricePerPerson(Number(data.price_per_person) || 0);
           }
           
-          // Set base price
           if (data.starting_price) {
             setBasePrice(Number(data.starting_price) || 0);
           }
         }
       } catch (error) {
         console.error('Error fetching venue pricing:', error);
-        // Fallback to default calculation if API call fails
-        // Full day rate - 13 hours x hourly rate with a 15% discount
         setBasePrice(Math.round(pricePerHour * 13 * 0.85));
       }
     };
@@ -117,20 +111,16 @@ export default function MultiDayBookingForm({
     },
   });
 
-  // Watch for changes to guests count to update price
   const guestsCount = form.watch('guests');
   
   useEffect(() => {
-    // Calculate total price based on guests
     if (pricePerPerson > 0) {
       setTotalPrice(pricePerPerson * guestsCount);
     } else {
-      // If no price per person is available, use base price
       setTotalPrice(basePrice);
     }
   }, [guestsCount, pricePerPerson, basePrice]);
 
-  // Convert array of booked dates from strings to Date objects for use in the calendar
   const disabledDates = bookedDates.map(dateStr => new Date(dateStr));
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
@@ -156,7 +146,7 @@ export default function MultiDayBookingForm({
             booking_date: format(data.date, 'yyyy-MM-dd'),
             start_time: '00:00',
             end_time: '23:59',
-            status: 'confirmed', // Auto-confirm bookings
+            status: 'pending',
             total_price: totalPrice,
             guests: data.guests,
             special_requests: data.specialRequests,
@@ -170,44 +160,72 @@ export default function MultiDayBookingForm({
       if (error) {
         throw error;
       }
+      
+      if (!bookingData || bookingData.length === 0) {
+        throw new Error("Failed to create booking record");
+      }
+      
+      console.log("Booking created:", bookingData[0]);
 
-      // Send notification to venue owner
-      const { data: venueData } = await supabase
-        .from('venues')
-        .select('owner_info')
-        .eq('id', venueId)
-        .single();
-        
-      if (venueData?.owner_info) {
-        const ownerInfo = typeof venueData.owner_info === 'string'
-          ? JSON.parse(venueData.owner_info)
-          : venueData.owner_info;
+      try {
+        const { data: venueData } = await supabase
+          .from('venues')
+          .select('owner_info')
+          .eq('id', venueId)
+          .single();
+          
+        if (venueData?.owner_info) {
+          let ownerInfo;
+          
+          try {
+            ownerInfo = typeof venueData.owner_info === 'string'
+              ? JSON.parse(venueData.owner_info)
+              : venueData.owner_info;
+                
+            const ownerId = ownerInfo?.user_id;
             
-        const ownerId = ownerInfo.user_id;
-        
-        if (ownerId) {
-          // Create a notification for the venue owner
-          await supabase.from('notifications').insert([{
-            user_id: ownerId,
-            type: 'booking',
-            message: `New booking for ${venueName} on ${format(data.date, 'PPP')}`,
-            data: { 
-              booking_date: format(data.date, 'yyyy-MM-dd'),
-              venue_id: venueId,
-              venue_name: venueName,
-              guests: data.guests,
-              total_price: totalPrice,
-              customer_email: data.customerEmail
-            },
-            read: false
-          }]);
+            if (ownerId) {
+              console.log("Sending notification to venue owner:", ownerId);
+              const notificationData = {
+                user_id: ownerId,
+                title: 'New Booking Request',
+                message: `New booking for ${venueName} on ${format(data.date, 'PPP')}`,
+                type: 'booking' as const,
+                read: false,
+                link: '/customer-bookings',
+                data: { 
+                  booking_id: bookingData[0].id,
+                  venue_id: venueId,
+                  venue_name: venueName,
+                  guests: data.guests,
+                  total_price: totalPrice,
+                  customer_email: data.customerEmail,
+                  booking_date: format(data.date, 'yyyy-MM-dd')
+                }
+              };
+              
+              const { data: notification, error: notificationError } = await supabase
+                .from('notifications')
+                .insert([notificationData])
+                .select();
+                
+              if (notificationError) {
+                console.error("Error sending notification:", notificationError);
+              } else {
+                console.log("Notification sent successfully:", notification);
+              }
+            }
+          } catch (parseError) {
+            console.error("Error parsing owner_info:", parseError);
+          }
         }
+      } catch (notifError) {
+        console.error("Error in notification process:", notifError);
       }
 
-      // If booking successful, redirect to bookings page
       toast({
-        title: "Full-day booking confirmed!",
-        description: `You've successfully booked ${venueName} for ${format(data.date, 'PPP')}. Total: SAR ${totalPrice}`,
+        title: "Full-day booking requested!",
+        description: `You've successfully requested ${venueName} for ${format(data.date, 'PPP')}. Total: SAR ${totalPrice}`,
       });
       
       navigate('/bookings');
@@ -255,12 +273,10 @@ export default function MultiDayBookingForm({
                       selected={field.value}
                       onSelect={field.onChange}
                       disabled={(date) => {
-                        // Disable dates in the past
                         const today = new Date();
                         today.setHours(0, 0, 0, 0);
                         if (date < today) return true;
                         
-                        // Check if date is in the list of booked dates
                         return disabledDates.some(
                           disabledDate => 
                             format(disabledDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
