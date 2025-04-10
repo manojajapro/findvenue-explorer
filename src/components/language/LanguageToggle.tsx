@@ -3,34 +3,30 @@ import React from 'react';
 import { Globe } from 'lucide-react';
 import { Toggle } from '@/components/ui/toggle';
 import { useTranslation } from '@/hooks/useTranslation';
-import TranslatedText from '@/components/ui/TranslatedText';
 
 const LanguageToggle = () => {
-  const { currentLanguage, setLanguage, isRTL } = useTranslation();
+  const { currentLanguage } = useTranslation();
   
+  // Function is now empty/disabled
   const toggleLanguage = () => {
-    setLanguage(currentLanguage === 'en' ? 'ar' : 'en');
+    // No-op since we're removing Arabic conversion
+    console.log("Language toggle disabled in current version");
   };
 
   return (
     <div className="flex items-center gap-2">
       <Globe className="h-4 w-4 text-muted-foreground" />
       <Toggle 
-        pressed={currentLanguage === 'ar'} 
+        pressed={false} 
         onPressedChange={toggleLanguage}
         size="sm"
         aria-label="Toggle language"
+        disabled={true}
       >
-        <span className={`text-xs ${currentLanguage === 'en' ? 'font-medium' : 'text-muted-foreground'}`}>
-          {currentLanguage === 'en' ? 'EN' : 'عربي'}
-        </span>
+        <span className="text-xs font-medium">EN</span>
       </Toggle>
       <div className="hidden sm:block">
-        <TranslatedText 
-          text="Language" 
-          as="span" 
-          className="text-xs text-muted-foreground" 
-        />
+        <span className="text-xs text-muted-foreground">Language</span>
       </div>
     </div>
   );
