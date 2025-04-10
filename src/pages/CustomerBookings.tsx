@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
 import { CustomerBookingsTable } from '@/components/booking/CustomerBookingsTable';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
+import { enableRealtimeForTable, sendNotification, getVenueOwnerId } from '@/utils/supabaseRealtime';
 import BookingOwnerChat from '@/components/bookings/BookingOwnerChat';
 
 const CustomerBookings = () => {
@@ -27,6 +28,7 @@ const CustomerBookings = () => {
   // Enable realtime for the bookings table
   useEffect(() => {
     enableRealtimeForTable('bookings');
+    enableRealtimeForTable('notifications');
   }, []);
   
   const fetchBookings = useCallback(async () => {
@@ -199,7 +201,7 @@ const CustomerBookings = () => {
             ? undefined 
             : `user_id=eq.${user.id}`
         }, 
-        (payload) => {
+        async (payload) => {
           console.log('Booking change detected:', payload);
           
           if (payload.eventType === 'INSERT') {
@@ -211,6 +213,27 @@ const CustomerBookings = () => {
               if (!venueIds.includes(newBooking.venue_id)) {
                 // Not for owner's venue, ignore
                 return;
+              }
+              
+              // Send notification to venue owner
+              await sendNotification(
+                user.id,
+                'New Booking Received',
+                `A new booking has been created for ${newBooking.venue_name}.`,
+                'booking',
+                '/customer-bookings'
+              );
+            } else {
+              // Customer made a booking, send notification to venue owner
+              const ownerId = await getVenueOwnerId(newBooking.venue_id);
+              if (ownerId) {
+                await sendNotification(
+                  ownerId,
+                  'New Booking Received',
+                  `${user.email || 'A customer'} has booked your venue "${newBooking.venue_name}".`,
+                  'booking',
+                  '/customer-bookings'
+                );
               }
             }
             
@@ -227,6 +250,17 @@ const CustomerBookings = () => {
             );
             
             if (payload.old.status !== payload.new.status) {
+              // Status changed, send notification to customer
+              if (!isVenueOwner && payload.new.user_id === user.id) {
+                await sendNotification(
+                  user.id,
+                  'Booking Status Updated',
+                  `Your booking for ${payload.new.venue_name} is now ${payload.new.status}.`,
+                  'booking',
+                  '/bookings'
+                );
+              }
+              
               toast({
                 title: 'Booking Status Changed',
                 description: `Booking for ${payload.new.venue_name} is now ${payload.new.status}.`,
@@ -263,6 +297,17 @@ const CustomerBookings = () => {
       }
       
       await updateBookingStatus(bookingId, status, booking, setBookings);
+      
+      // Send notification to customer
+      if (booking.user_id) {
+        await sendNotification(
+          booking.user_id,
+          `Booking ${status === 'confirmed' ? 'Confirmed' : 'Cancelled'}`,
+          `Your booking for ${booking.venue_name} on ${new Date(booking.booking_date).toLocaleDateString()} has been ${status}.`,
+          'booking',
+          '/bookings'
+        );
+      }
       
       await fetchBookings();
       

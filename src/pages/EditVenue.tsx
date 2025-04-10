@@ -760,24 +760,9 @@ const EditVenue = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>City</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a city" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {cities.map((city) => (
-                            <SelectItem 
-                              key={`city-${city.id}`} 
-                              value={city.id}
-                              data-city-id={city.id}
-                            >
-                              {city.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input placeholder="Enter city name" {...field} />
+                      </FormControl>
                       <FormDescription>
                         The city where the venue is located.
                       </FormDescription>
@@ -792,24 +777,9 @@ const EditVenue = () => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem 
-                              key={`category-${category.id}`} 
-                              value={category.id}
-                              data-category-id={category.id}
-                            >
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input placeholder="Enter venue category" {...field} />
+                      </FormControl>
                       <FormDescription>
                         The category of the venue.
                       </FormDescription>
