@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,7 +12,7 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
-import { PlusCircle, Edit, Trash, Calendar, Star, MapPin, Users, Clock, Building, ChevronRight } from 'lucide-react';
+import { PlusCircle, Edit, Trash, Calendar, Star, MapPin, Users, Clock, Building, ChevronRight, MessageCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
@@ -30,6 +29,7 @@ import {
   AlertDialogCancel 
 } from '@/components/ui/alert-dialog';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
+import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
 
 const MyVenues = () => {
   const navigate = useNavigate();
@@ -43,6 +43,7 @@ const MyVenues = () => {
   const [error, setError] = useState<string | null>(null);
   const [deletingVenueId, setDeletingVenueId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const [recentBookings, setRecentBookings] = useState<any[]>([]);
   
   // Booking stats
   const [bookingStats, setBookingStats] = useState({
@@ -57,6 +58,10 @@ const MyVenues = () => {
     if (user) {
       fetchVenues();
       fetchBookingStats();
+      fetchRecentBookings();
+      
+      // Enable realtime for bookings
+      enableRealtimeForTable('bookings');
     }
   }, [user]);
 
@@ -181,6 +186,93 @@ const MyVenues = () => {
     }
   };
 
+  const fetchRecentBookings = async () => {
+    try {
+      if (!user) return;
+      
+      // Get all venues owned by the current user
+      const { data: venuesData, error: venuesError } = await supabase
+        .from('venues')
+        .select('id, name, gallery_images, owner_info');
+      
+      if (venuesError) {
+        console.error('Error fetching venues for recent bookings:', venuesError);
+        return;
+      }
+      
+      // Filter venues to only include those owned by this user
+      const ownerVenues = venuesData?.filter(venue => {
+        if (!venue.owner_info) return false;
+        
+        try {
+          const ownerInfo = typeof venue.owner_info === 'string' 
+            ? JSON.parse(venue.owner_info) 
+            : venue.owner_info;
+            
+          return ownerInfo.user_id === user.id;
+        } catch (e) {
+          console.error("Error parsing owner_info for venue", venue.id, e);
+          return false;
+        }
+      });
+      
+      if (!ownerVenues || ownerVenues.length === 0) {
+        console.log('No venues found for recent bookings');
+        return;
+      }
+      
+      const venueIds = ownerVenues.map(venue => venue.id);
+      
+      // Fetch recent bookings for these venues
+      const { data: bookingsData, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('*')
+        .in('venue_id', venueIds)
+        .order('created_at', { ascending: false })
+        .limit(5);
+        
+      if (bookingsError) {
+        console.error('Error fetching recent bookings:', bookingsError);
+        return;
+      }
+      
+      // Fetch customer info for these bookings
+      const userIds = bookingsData?.map(booking => booking.user_id) || [];
+      const { data: userProfiles, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('id, first_name, last_name')
+        .in('id', userIds);
+        
+      if (profilesError) {
+        console.error('Error fetching user profiles:', profilesError);
+      }
+      
+      // Create venue image mapping
+      const venueImageMap = ownerVenues.reduce((acc, venue) => {
+        if (venue.gallery_images && Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) {
+          acc[venue.id] = venue.gallery_images[0];
+        }
+        return acc;
+      }, {});
+      
+      // Map bookings with user and venue info
+      const recentBookingsWithInfo = bookingsData?.map(booking => {
+        const userProfile = userProfiles?.find(profile => profile.id === booking.user_id);
+        return {
+          ...booking,
+          user_name: userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Unknown',
+          venue_image: venueImageMap[booking.venue_id] || ''
+        };
+      }) || [];
+      
+      console.log('Recent bookings with info:', recentBookingsWithInfo);
+      setRecentBookings(recentBookingsWithInfo);
+      
+    } catch (err) {
+      console.error('Error fetching recent bookings:', err);
+    }
+  };
+
   const handleDeleteVenue = async (venueId: string) => {
     try {
       const { error } = await supabase
@@ -213,6 +305,10 @@ const MyVenues = () => {
       return venue.gallery_images[0];
     }
     return 'https://placehold.co/600x400?text=No+Image';
+  };
+
+  const handleStartChat = (userId: string, userName: string, venueId: string, venueName: string) => {
+    navigate(`/messages/${userId}?venueId=${venueId}&venueName=${encodeURIComponent(venueName)}`);
   };
 
   return (
@@ -395,18 +491,73 @@ const MyVenues = () => {
                 <CardTitle>Recent Bookings</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <Calendar className="mx-auto h-12 w-12 text-findvenue-text-muted opacity-30" />
-                  <p className="mt-2 text-findvenue-text-muted">No recent bookings</p>
-                  <Button 
-                    variant="outline" 
-                    className="mt-4" 
-                    onClick={() => setActiveTab('bookings')}
-                  >
-                    Check Bookings
-                  </Button>
-                </div>
+                {isLoading ? (
+                  <p>Loading bookings...</p>
+                ) : recentBookings.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentBookings.map((booking) => (
+                      <div key={booking.id} className="flex items-center gap-4 p-3 rounded-lg border">
+                        <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
+                          <img 
+                            src={booking.venue_image || 'https://placehold.co/600x400?text=No+Image'} 
+                            alt={booking.venue_name} 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium">{booking.venue_name}</h4>
+                          <div className="flex items-center text-findvenue-text-muted text-sm mb-1">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            <span>{new Date(booking.booking_date).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center text-findvenue-text-muted text-sm">
+                            <Users className="h-3 w-3 mr-1" />
+                            <span>{booking.user_name} • {booking.guests} guests</span>
+                          </div>
+                        </div>
+                        <Badge className={
+                          booking.status === 'confirmed' ? 'bg-green-500' : 
+                          booking.status === 'pending' ? 'bg-amber-500' : 
+                          booking.status === 'cancelled' ? 'bg-red-500' : 'bg-gray-500'
+                        }>
+                          {booking.status}
+                        </Badge>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleStartChat(booking.user_id, booking.user_name, booking.venue_id, booking.venue_name)}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Calendar className="mx-auto h-12 w-12 text-findvenue-text-muted opacity-30" />
+                    <p className="mt-2 text-findvenue-text-muted">No recent bookings</p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-4" 
+                      onClick={() => setActiveTab('bookings')}
+                    >
+                      Check Bookings
+                    </Button>
+                  </div>
+                )}
               </CardContent>
+              {recentBookings.length > 0 && (
+                <CardFooter>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full flex items-center justify-center gap-1"
+                    onClick={() => navigate('/customer-bookings')}
+                  >
+                    View All Bookings
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </CardFooter>
+              )}
             </Card>
           </div>
         </TabsContent>
