@@ -73,7 +73,12 @@ const venueSchema = z.object({
   amenities: z.array(z.string()).default([]),
   wifi: z.boolean().default(false),
   parking: z.boolean().default(false),
-  opening_hours: z.any().optional(),
+  opening_hours: z.record(
+    z.object({
+      open: z.string(),
+      close: z.string(),
+    })
+  ).optional(),
   availability: z.array(z.string()).default([]),
   accepted_payment_methods: z.array(z.string()).default([]),
   accessibility_features: z.array(z.string()).default([]),
@@ -86,10 +91,19 @@ const venueSchema = z.object({
   currency: z.string().optional(),
   rating: z.number().optional(),
   reviews_count: z.number().optional(),
-  owner_info: z.any().optional(),
+  owner_info: z.object({
+    name: z.string().optional(),
+    contact: z.string().optional(),
+    response_time: z.string().optional(),
+    user_id: z.string().optional(),
+  }).optional(),
   type: z.string().optional(),
   zipcode: z.string().optional(),
-  rules_and_regulations: z.any().default([]),
+  rules_and_regulations: z.array(z.object({
+    title: z.string(),
+    category: z.string(),
+    description: z.string()
+  })).default([]),
   category_name: z.array(z.string()).optional(),
 });
 
@@ -310,7 +324,7 @@ const EditVenue = () => {
           description: data.description || "",
           address: data.address || "",
           city_id: data.city_id || "",
-          category_id: data.category_id ? (Array.isArray(data.category_id) ? data.category_id[0] : data.category_id) : "",
+          category_id: Array.isArray(data.category_id) ? data.category_id : [data.category_id],
           min_capacity: data.min_capacity || 1,
           max_capacity: data.max_capacity || 1,
           starting_price: data.starting_price || 0,
@@ -330,11 +344,14 @@ const EditVenue = () => {
           latitude: data.latitude,
           longitude: data.longitude,
           opening_hours: openingHours,
-          owner_info: ownerInfo,
+          owner_info: ownerInfo as any,
           availability: data.availability || [],
           type: data.type || "",
           zipcode: data.zipcode || "",
-          rules_and_regulations: rulesAndRegulations,
+          rules_and_regulations: rulesAndRegulations || {
+            general: customRulesGeneral,
+            booking: customRulesBooking
+          },
           category_name: Array.isArray(data.category_name) ? data.category_name : [],
         });
       } else {
@@ -424,6 +441,7 @@ const EditVenue = () => {
       console.log("Starting venue update with ID:", id);
       console.log("Form values before updating custom fields:", values);
       
+      // Ensure arrays are properly formatted
       values.amenities = customAmenities;
       values.accessibility_features = customAccessibility;
       values.accepted_payment_methods = customPaymentMethods;
@@ -431,10 +449,12 @@ const EditVenue = () => {
       values.gallery_images = galleryImages;
       values.category_name = categoryNames;
       
+      // Make sure category_id is an array
       if (typeof values.category_id === 'string') {
         values.category_id = [values.category_id];
       }
       
+      // Format rules_and_regulations correctly
       const formattedRules = [
         ...customRulesGeneral.map((rule, index) => ({
           title: `General Rule ${index + 1}`,
@@ -946,362 +966,85 @@ const EditVenue = () => {
               <CardDescription>Manage amenities and features your venue offers</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="wifi"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          WiFi
-                        </FormLabel>
-                        <FormDescription>
-                          Does your venue offer WiFi?
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="parking"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Parking
-                        </FormLabel>
-                        <FormDescription>
-                          Does your venue offer parking?
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="opening_hours"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1 md:col-span-2">
-                      <FormLabel>Opening Hours</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Opening hours JSON"
-                          value={JSON.stringify(field.value, null, 2)}
-                          onChange={(e) => {
-                            try {
-                              field.onChange(JSON.parse(e.target.value));
-                            } catch (err) {
-                              console.error('Invalid JSON for opening hours', err);
-                            }
-                          }}
-                          className="font-mono"
-                          rows={10}
-                        />
-                      </FormControl>
+              <FormField
+                control={form.control}
+                name="wifi"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 mb-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">WiFi</FormLabel>
                       <FormDescription>
-                        Opening hours in JSON format. Edit carefully.
+                        Does your venue offer WiFi?
                       </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="amenities"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Amenities</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter amenities and press Enter"
-                          value={field.value.join(',')}
-                          onChange={(e) => {
-                            const values = e.target.value.split(',').map(val => val.trim());
-                            field.onChange(values);
-                          }}
-                        />
-                      </FormControl>
+              <FormField
+                control={form.control}
+                name="parking"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 mb-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Parking</FormLabel>
                       <FormDescription>
-                        List of amenities offered by the venue.
+                        Does your venue offer parking?
                       </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
-                <FormField
-                  control={form.control}
-                  name="accessibility_features"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Accessibility Features</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter accessibility features and press Enter"
-                          value={field.value.join(',')}
-                          onChange={(e) => {
-                            const values = e.target.value.split(',').map(val => val.trim());
-                            field.onChange(values);
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        List of accessibility features offered by the venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="accepted_payment_methods"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Accepted Payment Methods</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter accepted payment methods and press Enter"
-                          value={field.value.join(',')}
-                          onChange={(e) => {
-                            const values = e.target.value.split(',').map(val => val.trim());
-                            field.onChange(values);
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        List of accepted payment methods for the venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="additional_services"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Additional Services</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter additional services and press Enter"
-                          value={field.value.join(',')}
-                          onChange={(e) => {
-                            const values = e.target.value.split(',').map(val => val.trim());
-                            field.onChange(values);
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        List of additional services offered by the venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Gallery Images</CardTitle>
-              <CardDescription>Manage images of your venue</CardDescription>
-            </CardHeader>
-            <CardContent>
               <div className="space-y-4">
-                <div className="flex justify-between">
-                  <div className="flex items-center">
-                    <Button onClick={handleAddImageUrl} variant="outline">
-                      Add Image
-                    </Button>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </div>
-                  <div className="flex items-center">
-                    {galleryImages.map((imageUrl, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <img src={imageUrl} alt={`Gallery Image ${index + 1}`} className="w-16 h-16 rounded" />
-                        <button onClick={() => handleRemoveImage(index)} className="text-red-500 hover:text-red-700">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Featured Status</CardTitle>
-              <CardDescription>Set the featured and popular status of your venue</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="featured"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Featured
-                        </FormLabel>
-                        <FormDescription>
-                          Mark this venue as featured.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value || false}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="popular"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Popular
-                        </FormLabel>
-                        <FormDescription>
-                          Mark this venue as popular.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value || false}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
-                
-          <Card>
-            <CardHeader>
-              <CardTitle>Owner Information</CardTitle>
-              <CardDescription>Set information about the venue owner</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-4">
-                <FormField
-                  control={form.control}
-                  name="owner_info"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1">
-                      <FormLabel>Owner Information</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Owner information JSON"
-                          value={JSON.stringify(field.value, null, 2)}
-                          onChange={(e) => {
-                            try {
-                              field.onChange(JSON.parse(e.target.value));
-                            } catch (err) {
-                              console.error('Invalid JSON for owner info', err);
-                            }
-                          }}
-                          className="font-mono"
-                          rows={5}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Owner information in JSON format. Edit carefully.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Rules and Regulations</CardTitle>
-              <CardDescription>Set rules and regulations for the venue</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-4">
-                <FormField
-                  control={form.control}
-                  name="rules_and_regulations"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1">
-                      <FormLabel>Rules and Regulations</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Rules and regulations JSON"
-                          value={JSON.stringify(field.value, null, 2)}
-                          onChange={(e) => {
-                            try {
-                              field.onChange(JSON.parse(e.target.value));
-                            } catch (err) {
-                              console.error('Invalid JSON for rules', err);
-                            }
-                          }}
-                          className="font-mono"
-                          rows={10}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Rules and regulations in JSON format. Edit carefully.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="col-span-1">
-                  <Label className="mb-2 block">General Rules</Label>
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Amenities</h3>
                   <TagInput
-                    tags={customRulesGeneral}
-                    setTags={setCustomRulesGeneral}
-                    placeholder="Add general rule and press Enter"
-                    className="w-full mb-4"
+                    tags={customAmenities}
+                    setTags={setCustomAmenities}
+                    placeholder="Add amenity and press Enter"
+                    className="w-full"
                   />
                 </div>
 
-                <div className="col-span-1">
-                  <Label className="mb-2 block">Booking Rules</Label>
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Accessibility Features</h3>
                   <TagInput
-                    tags={customRulesBooking}
-                    setTags={setCustomRulesBooking}
-                    placeholder="Add booking rule and press Enter"
+                    tags={customAccessibility}
+                    setTags={setCustomAccessibility}
+                    placeholder="Add accessibility feature and press Enter"
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Accepted Payment Methods</h3>
+                  <TagInput
+                    tags={customPaymentMethods}
+                    setTags={setCustomPaymentMethods}
+                    placeholder="Add payment method and press Enter"
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Additional Services</h3>
+                  <TagInput
+                    tags={customServices}
+                    setTags={setCustomServices}
+                    placeholder="Add additional service and press Enter"
                     className="w-full"
                   />
                 </div>
@@ -1309,37 +1052,130 @@ const EditVenue = () => {
             </CardContent>
           </Card>
 
-          <div className="flex justify-between pt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Rules and Regulations</CardTitle>
+              <CardDescription>Set venue rules and booking terms</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-2">General Rules</h3>
+                  <TagInput
+                    tags={customRulesGeneral}
+                    setTags={setCustomRulesGeneral}
+                    placeholder="Add rule and press Enter"
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Booking Terms</h3>
+                  <TagInput
+                    tags={customRulesBooking}
+                    setTags={setCustomRulesBooking}
+                    placeholder="Add booking term and press Enter"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Gallery Images</CardTitle>
+              <CardDescription>Add images of your venue</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Input 
+                    placeholder="Image URL" 
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={handleAddImageUrl}
+                    disabled={!newImageUrl.trim()}
+                  >
+                    Add URL
+                  </Button>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="file-upload" className="cursor-pointer bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-colors flex items-center">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Images
+                  </Label>
+                  <Input 
+                    id="file-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    multiple
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
+                  {uploadingImage && <span className="text-sm text-muted-foreground">Uploading...</span>}
+                </div>
+                
+                {galleryImages.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Gallery Preview</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {galleryImages.map((url, index) => (
+                        <div key={index} className="group relative rounded-md overflow-hidden aspect-square">
+                          <img 
+                            src={url} 
+                            alt={`Gallery image ${index + 1}`} 
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-between">
             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" type="button">Delete Venue</Button>
+                <Button variant="destructive" type="button">
+                  Delete Venue
+                </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your venue and all associated data.
+                    This action cannot be undone. This will permanently delete your venue
+                    and remove it from our servers.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
+                  <AlertDialogAction onClick={onDelete}>Continue</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-
+            
             <div className="space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate(`/venue/${id}`)}
-                disabled={loading}
-              >
+              <Button type="button" variant="outline" onClick={() => navigate('/my-venues?tab=my-venues')}>
                 Cancel
               </Button>
-
               <Button type="submit" disabled={loading}>
-                {loading ? "Updating..." : "Update Venue"}
+                {loading ? 'Updating...' : 'Save Changes'}
               </Button>
             </div>
           </div>
