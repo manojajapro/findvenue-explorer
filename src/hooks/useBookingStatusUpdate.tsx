@@ -119,7 +119,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     }
   };
   
-  // Add function to send notification to venue owner when a booking is created
+  // Function to send notification to venue owner when a booking is created
   const notifyVenueOwner = async (booking: any) => {
     if (!booking) return;
     
@@ -133,6 +133,16 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         console.log('Successfully sent notification to venue owner:', result);
       } else {
         console.error('Failed to send notification to venue owner');
+        // Retry once more with a delay
+        setTimeout(async () => {
+          console.log('Retrying notification to venue owner...');
+          const retryResult = await notifyVenueOwnerAboutBooking(booking);
+          if (retryResult) {
+            console.log('Retry successful for venue owner notification:', retryResult);
+          } else {
+            console.error('Retry failed for venue owner notification');
+          }
+        }, 2000);
       }
       
       // Also send a confirmation notification to the customer

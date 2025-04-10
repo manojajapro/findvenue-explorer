@@ -1,7 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { getVenueOwnerId } from './venueHelpers';
 
 // Send a notification to a user
 export const sendNotification = async (
@@ -46,6 +45,42 @@ export const sendNotification = async (
   }
 };
 
+// Extract venue owner ID from venue data
+export const getVenueOwnerId = async (venueId: string): Promise<string | null> => {
+  try {
+    console.log('Getting venue owner ID for venue:', venueId);
+    
+    const { data: venueData, error: venueError } = await supabase
+      .from('venues')
+      .select('owner_info')
+      .eq('id', venueId)
+      .single();
+    
+    if (venueError || !venueData?.owner_info) {
+      console.error('Error fetching venue owner info:', venueError);
+      return null;
+    }
+    
+    // Parse owner info
+    try {
+      const ownerInfo = typeof venueData.owner_info === 'string'
+        ? JSON.parse(venueData.owner_info)
+        : venueData.owner_info;
+        
+      const ownerId = ownerInfo?.user_id || null;
+      console.log('Found venue owner ID:', ownerId);
+      return ownerId;
+      
+    } catch (e) {
+      console.error('Error parsing owner_info:', e);
+      return null;
+    }
+  } catch (error) {
+    console.error('Exception in getVenueOwnerId:', error);
+    return null;
+  }
+};
+
 // Notify venue owner about a new booking
 export const notifyVenueOwnerAboutBooking = async (booking: any) => {
   if (!booking || !booking.venue_id) {
@@ -57,31 +92,7 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
     console.log('Attempting to notify venue owner about booking:', booking.id);
     
     // Get venue owner ID
-    const { data: venueData, error: venueError } = await supabase
-      .from('venues')
-      .select('owner_info')
-      .eq('id', booking.venue_id)
-      .single();
-    
-    if (venueError || !venueData?.owner_info) {
-      console.error('Error fetching venue owner info:', venueError);
-      return null;
-    }
-    
-    // Parse owner info
-    let ownerId: string | null = null;
-    try {
-      const ownerInfo = typeof venueData.owner_info === 'string'
-        ? JSON.parse(venueData.owner_info)
-        : venueData.owner_info;
-        
-      ownerId = ownerInfo?.user_id || null;
-      
-      console.log('Found venue owner ID:', ownerId);
-    } catch (e) {
-      console.error('Error parsing owner_info:', e);
-      return null;
-    }
+    const ownerId = await getVenueOwnerId(booking.venue_id);
     
     if (!ownerId) {
       console.error('No owner ID found for venue', booking.venue_id);
