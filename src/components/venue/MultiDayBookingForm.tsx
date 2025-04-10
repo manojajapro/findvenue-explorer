@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
@@ -42,7 +41,6 @@ export default function MultiDayBookingForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalPrice, setTotalPrice] = useState(0);
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -64,10 +62,8 @@ export default function MultiDayBookingForm({
       return;
     }
 
-    // Format the date for storage
     const bookingDateString = format(selectedDate, 'yyyy-MM-dd');
     
-    // Check if date is in the past
     if (isBefore(selectedDate, new Date()) && !isAfter(selectedDate, addDays(new Date(), -1))) {
       toast({
         title: "Error",
@@ -80,24 +76,22 @@ export default function MultiDayBookingForm({
     try {
       setIsSubmitting(true);
       
-      // Calculate total price
-      const calculatedPrice = pricePerHour * 24; // Full day price
+      const calculatedPrice = pricePerHour * 24;
       
-      // Create a booking
       const bookingData = {
         user_id: user.id,
         venue_id: venueId,
         booking_date: bookingDateString,
         guests: guests,
-        start_time: '00:00', // Start of day
-        end_time: '23:59',   // End of day
+        start_time: '00:00',
+        end_time: '23:59',
         special_requests: specialRequests,
         status: autoConfirm ? 'confirmed' : 'pending',
         total_price: calculatedPrice,
         venue_name: venueName,
         user_name: user.user_metadata?.full_name || user.email,
         user_email: user.email,
-        booking_type: 'full-day' // Explicitly set booking type
+        booking_type: 'full-day'
       };
       
       console.log('Creating full day booking with data:', bookingData);
@@ -112,17 +106,14 @@ export default function MultiDayBookingForm({
         throw error;
       }
       
-      // Log success
       console.log('Successfully created booking:', data);
       
-      // Notify the venue owner about the new booking
       if (data && data[0]) {
         console.log('Notifying venue owner about new booking');
         const notificationResult = await notifyVenueOwner(data[0]);
         console.log('Notification result:', notificationResult);
       }
 
-      // Show success message
       toast({
         title: "Booking Successful",
         description: autoConfirm 
@@ -131,7 +122,6 @@ export default function MultiDayBookingForm({
         variant: "default",
       });
 
-      // Reset form
       setSelectedDate(undefined);
       setGuests(minCapacity);
       setSpecialRequests('');
@@ -148,41 +138,35 @@ export default function MultiDayBookingForm({
     }
   };
 
-  // Handle date change
   const handleDateChange = (date: Date | undefined) => {
     setSelectedDate(date);
     if (date) {
-      const newTotalPrice = pricePerHour * 24; // Full day booking
+      const newTotalPrice = pricePerHour * 24;
       setTotalPrice(newTotalPrice);
     } else {
       setTotalPrice(0);
     }
   };
 
-  // Format date strings for the calendar
   const formattedBookedDates = bookedDates.map(date => {
     try {
-      // Check if the date is already a Date object
-      if (date && typeof date === 'object' && date instanceof Date) return date;
+      if (date && date instanceof Date) return date;
       
-      // Try to parse as ISO date
       const parsedDate = new Date(date);
       if (!isNaN(parsedDate.getTime())) return parsedDate;
       
-      // Try to parse as YYYY-MM-DD
-      if (date.includes('-')) {
+      if (typeof date === 'string' && date.includes('-')) {
         return parseISO(date);
       }
       
-      return new Date(2000, 0, 1); // Fallback to an old date to handle invalid dates
+      return new Date(2000, 0, 1);
     } catch (e) {
       console.error("Error parsing date:", e, date);
-      return new Date(2000, 0, 1); // Fallback date
+      return new Date(2000, 0, 1);
     }
   });
 
   const isDateDisabled = (date: Date) => {
-    // Check if date is in bookedDates
     return formattedBookedDates.some(bookedDate => 
       format(bookedDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
     ) || isBefore(date, new Date()) && !isAfter(date, addDays(new Date(), -1));
