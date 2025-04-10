@@ -17,6 +17,7 @@ import { Bell } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNavigate } from 'react-router-dom';
 import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
+import { markAllNotificationsAsRead, markNotificationAsRead } from '@/utils/notificationService';
 
 type Notification = {
   id: string;
@@ -36,12 +37,21 @@ const NotificationCenter = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
 
     const fetchNotifications = async () => {
       try {
+        console.log('Fetching notifications for user:', user.id);
         const { data, error } = await supabase
           .from('notifications')
           .select('*')
@@ -49,13 +59,18 @@ const NotificationCenter = () => {
           .order('created_at', { ascending: false })
           .limit(20);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching notifications:', error);
+          return;
+        }
         
         console.log('Fetched notifications:', data);
         setNotifications(data as Notification[]);
-        setUnreadCount(data.filter(n => !n.read).length);
+        setUnreadCount(data.filter((n: any) => !n.read).length);
       } catch (error) {
-        console.error('Error fetching notifications:', error);
+        console.error('Exception fetching notifications:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -112,9 +127,9 @@ const NotificationCenter = () => {
               prev.map(n => n.id === payload.new.id ? payload.new as Notification : n)
             );
             // Recalculate unread count
-            setUnreadCount(prev => {
-              const newCount = notifications.filter(n => !n.read).length;
-              return newCount;
+            setNotifications(currentNotifications => {
+              setUnreadCount(currentNotifications.filter(n => !n.read).length);
+              return currentNotifications;
             });
           }
         }
@@ -131,37 +146,30 @@ const NotificationCenter = () => {
     };
   }, [user, navigate]);
 
-  const markAsRead = async (id?: string) => {
+  const handleMarkAsRead = async (id?: string) => {
     if (!user) return;
 
     try {
       if (id) {
         // Mark single notification as read
-        const { error } = await supabase
-          .from('notifications')
-          .update({ read: true })
-          .eq('id', id);
-          
-        if (error) throw error;
-          
-        setNotifications(prev => 
-          prev.map(n => n.id === id ? { ...n, read: true } : n)
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        const success = await markNotificationAsRead(id);
+        
+        if (success) {
+          setNotifications(prev => 
+            prev.map(n => n.id === id ? { ...n, read: true } : n)
+          );
+          setUnreadCount(prev => Math.max(0, prev - 1));
+        }
       } else {
         // Mark all as read
-        const { error } = await supabase
-          .from('notifications')
-          .update({ read: true })
-          .eq('user_id', user.id)
-          .eq('read', false);
-          
-        if (error) throw error;
-          
-        setNotifications(prev => 
-          prev.map(n => ({ ...n, read: true }))
-        );
-        setUnreadCount(0);
+        const success = await markAllNotificationsAsRead(user.id);
+        
+        if (success) {
+          setNotifications(prev => 
+            prev.map(n => ({ ...n, read: true }))
+          );
+          setUnreadCount(0);
+        }
       }
     } catch (error) {
       console.error('Error marking notifications as read:', error);
@@ -169,7 +177,7 @@ const NotificationCenter = () => {
   };
 
   const handleNotificationClick = async (notification: Notification) => {
-    await markAsRead(notification.id);
+    await handleMarkAsRead(notification.id);
     
     if (notification.link) {
       navigate(notification.link);
@@ -201,14 +209,18 @@ const NotificationCenter = () => {
                 variant="ghost" 
                 size="sm" 
                 className="text-xs h-8" 
-                onClick={() => markAsRead()}
+                onClick={() => handleMarkAsRead()}
               >
                 Mark all as read
               </Button>
             )}
           </div>
           <ScrollArea className="h-[350px]">
-            {notifications.length === 0 ? (
+            {isLoading ? (
+              <div className="p-4 text-center text-findvenue-text-muted">
+                Loading notifications...
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="p-4 text-center text-findvenue-text-muted">
                 No notifications
               </div>

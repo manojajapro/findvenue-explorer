@@ -130,11 +130,34 @@ export const useVenueData = () => {
             
             // Handle array directly
             if (Array.isArray(categories)) {
-              return categories.map(cat => typeof cat === 'string' ? cat.trim() : String(cat).trim());
+              return categories.map(cat => {
+                if (typeof cat === 'string') {
+                  // Remove any square brackets, quotes, etc. that might be in the string
+                  return cat.replace(/[[\]']/g, '').trim();
+                }
+                return String(cat).trim();
+              });
             }
             
             // Handle string formats
             if (typeof categories === 'string') {
+              // Check if the string looks like an array representation
+              if (categories.startsWith('[') && categories.endsWith(']')) {
+                try {
+                  // Try to parse as JSON
+                  const parsed = JSON.parse(categories.replace(/'/g, '"'));
+                  if (Array.isArray(parsed)) {
+                    return parsed.map(item => String(item).trim());
+                  }
+                } catch (e) {
+                  // If parsing fails, try to extract from the string format ['item1', 'item2']
+                  const matches = categories.match(/'([^']+)'/g) || [];
+                  if (matches.length > 0) {
+                    return matches.map(m => m.replace(/'/g, '').trim());
+                  }
+                }
+              }
+              
               // Check if comma-separated list
               if (categories.includes(',')) {
                 return categories.split(',').map(cat => cat.trim());

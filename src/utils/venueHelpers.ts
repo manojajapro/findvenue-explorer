@@ -50,3 +50,89 @@ export const formatRating = (rating: number | undefined): string => {
   if (!rating && rating !== 0) return 'No ratings';
   return rating.toFixed(1);
 };
+
+/**
+ * Process category names from various formats to a clean array
+ * @param categories The categories in any format
+ * @returns Array of category names
+ */
+export const processCategoryNames = (categories: any): string[] => {
+  if (!categories) return [];
+  
+  // Handle array directly
+  if (Array.isArray(categories)) {
+    return categories.map(cat => {
+      if (typeof cat === 'string') {
+        return cat.replace(/[[\]']/g, '').trim();
+      }
+      return String(cat).trim();
+    });
+  }
+  
+  // Handle string formats
+  if (typeof categories === 'string') {
+    // Check if the string looks like an array representation
+    if (categories.startsWith('[') && categories.endsWith(']')) {
+      try {
+        // Try to parse as JSON
+        const parsed = JSON.parse(categories.replace(/'/g, '"'));
+        if (Array.isArray(parsed)) {
+          return parsed.map(item => String(item).trim());
+        }
+      } catch (e) {
+        // If parsing fails, try to extract from the string format ['item1', 'item2']
+        const matches = categories.match(/'([^']+)'/g) || [];
+        if (matches.length > 0) {
+          return matches.map(m => m.replace(/'/g, '').trim());
+        }
+      }
+    }
+    
+    // Check if comma-separated list
+    if (categories.includes(',')) {
+      return categories.split(',').map(cat => cat.trim());
+    }
+    
+    // Try to parse as JSON
+    try {
+      const parsed = JSON.parse(categories);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => String(item).trim());
+      }
+    } catch (e) {
+      // Not JSON, continue processing
+    }
+    
+    // Handle CamelCase concatenated categories (e.g., "ExhibitionsConferencesGraduation")
+    if (/[a-z][A-Z]/.test(categories)) {
+      return categories.replace(/([a-z])([A-Z])/g, '$1,$2').split(',')
+        .map(cat => cat.trim());
+    }
+    
+    // Return as single item if nothing else worked
+    return [categories.trim()];
+  }
+  
+  return [];
+};
+
+// Parse numeric values safely from various formats (string or number)
+export const safeParseInt = (value: any, defaultValue: number = 0): number => {
+  if (value === null || value === undefined) return defaultValue;
+  
+  if (typeof value === 'number') return value;
+  
+  if (typeof value === 'string') {
+    // Extract digits if the string contains text
+    const matches = value.match(/\d+/);
+    if (matches && matches.length > 0) {
+      return parseInt(matches[0], 10);
+    }
+    
+    // Try direct parsing
+    const parsed = parseInt(value, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  
+  return defaultValue;
+};
