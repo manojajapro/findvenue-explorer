@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
@@ -126,23 +127,28 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     try {
       console.log('Sending notification to venue owner for booking:', booking);
       
-      // Use our notifyVenueOwnerAboutBooking function from notificationService
-      const result = await notifyVenueOwnerAboutBooking(booking);
+      // Make multiple attempts to ensure notification is sent
+      let attempts = 0;
+      let result = null;
       
-      if (result) {
-        console.log('Successfully sent notification to venue owner:', result);
-      } else {
-        console.error('Failed to send notification to venue owner');
-        // Retry once more with a delay
-        setTimeout(async () => {
-          console.log('Retrying notification to venue owner...');
-          const retryResult = await notifyVenueOwnerAboutBooking(booking);
-          if (retryResult) {
-            console.log('Retry successful for venue owner notification:', retryResult);
-          } else {
-            console.error('Retry failed for venue owner notification');
+      while (!result && attempts < 3) {
+        // Use our notifyVenueOwnerAboutBooking function from notificationService
+        result = await notifyVenueOwnerAboutBooking(booking);
+        
+        if (result) {
+          console.log('Successfully sent notification to venue owner:', result);
+        } else {
+          attempts++;
+          console.log(`Attempt ${attempts} failed, ${attempts < 3 ? 'retrying' : 'giving up'}...`);
+          if (attempts < 3) {
+            // Wait a bit before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
           }
-        }, 2000);
+        }
+      }
+      
+      if (!result) {
+        console.error('Failed to send notification to venue owner after multiple attempts');
       }
       
       // Also send a confirmation notification to the customer

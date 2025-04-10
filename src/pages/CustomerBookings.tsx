@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +24,6 @@ const CustomerBookings = () => {
   const [error, setError] = useState<string | null>(null);
   const [processingBookingIds, setProcessingBookingIds] = useState<Set<string>>(new Set());
   
-  // Enable realtime for the bookings table
   useEffect(() => {
     enableRealtimeForTable('bookings');
     enableRealtimeForTable('notifications');
@@ -117,7 +115,6 @@ const CustomerBookings = () => {
           console.error('Error fetching user profiles:', profilesError);
         }
         
-        // Add venue image data to bookings
         const venueImagesMap = ownerVenues.reduce((acc, venue) => {
           if (venue.gallery_images && Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) {
             acc[venue.id] = venue.gallery_images[0];
@@ -185,11 +182,9 @@ const CustomerBookings = () => {
     }
   }, [user, fetchBookings]);
   
-  // Set up realtime subscription for bookings
   useEffect(() => {
     if (!user) return;
 
-    // Subscribe to bookings changes for this user
     const channel = supabase
       .channel('bookings_changes')
       .on('postgres_changes', 
@@ -207,24 +202,53 @@ const CustomerBookings = () => {
           if (payload.eventType === 'INSERT') {
             const newBooking = payload.new;
             
-            // For venue owners, check if this booking is for one of their venues
             if (isVenueOwner) {
               const venueIds = bookings.map(b => b.venue_id);
               if (!venueIds.includes(newBooking.venue_id)) {
-                // Not for owner's venue, ignore
-                return;
+                const { data: venuesData } = await supabase
+                  .from('venues')
+                  .select('id, owner_info')
+                  .eq('id', newBooking.venue_id);
+                
+                if (!venuesData || venuesData.length === 0) {
+                  return;
+                }
+                
+                const venueData = venuesData[0];
+                let ownerInfo;
+                
+                try {
+                  ownerInfo = typeof venueData.owner_info === 'string' 
+                    ? JSON.parse(venueData.owner_info) 
+                    : venueData.owner_info;
+                } catch (e) {
+                  console.error('Error parsing owner_info:', e);
+                  return;
+                }
+                
+                if (!ownerInfo || ownerInfo.user_id !== user.id) {
+                  return;
+                }
               }
               
-              // Send notification to venue owner
               await sendNotification(
                 user.id,
                 'New Booking Received',
                 `A new booking has been created for ${newBooking.venue_name}.`,
                 'booking',
-                '/customer-bookings'
+                '/customer-bookings',
+                {
+                  booking_id: newBooking.id,
+                  venue_id: newBooking.venue_id
+                }
               );
+              
+              setBookings(prev => [newBooking, ...prev]);
+              toast({
+                title: 'New Booking',
+                description: `A new booking has been created for ${newBooking.venue_name}.`
+              });
             } else {
-              // Customer made a booking, send notification to venue owner
               const ownerId = await getVenueOwnerId(newBooking.venue_id);
               if (ownerId) {
                 await sendNotification(
@@ -232,25 +256,22 @@ const CustomerBookings = () => {
                   'New Booking Received',
                   `${user.email || 'A customer'} has booked your venue "${newBooking.venue_name}".`,
                   'booking',
-                  '/customer-bookings'
+                  '/customer-bookings',
+                  {
+                    booking_id: newBooking.id,
+                    venue_id: newBooking.venue_id
+                  }
                 );
               }
+              
+              setBookings(prev => [newBooking, ...prev]);
             }
-            
-            // Add the new booking to the list
-            setBookings(prev => [newBooking, ...prev]);
-            toast({
-              title: 'New Booking',
-              description: `A new booking has been created for ${newBooking.venue_name}.`
-            });
           } else if (payload.eventType === 'UPDATE') {
-            // Update existing booking
             setBookings(prev => 
               prev.map(b => b.id === payload.new.id ? { ...b, ...payload.new } : b)
             );
             
             if (payload.old.status !== payload.new.status) {
-              // Status changed, send notification to customer
               if (!isVenueOwner && payload.new.user_id === user.id) {
                 await sendNotification(
                   user.id,
@@ -268,7 +289,6 @@ const CustomerBookings = () => {
               });
             }
           } else if (payload.eventType === 'DELETE') {
-            // Remove deleted booking
             setBookings(prev => prev.filter(b => b.id !== payload.old.id));
           }
         }
@@ -298,7 +318,6 @@ const CustomerBookings = () => {
       
       await updateBookingStatus(bookingId, status, booking, setBookings);
       
-      // Send notification to customer
       if (booking.user_id) {
         await sendNotification(
           booking.user_id,
