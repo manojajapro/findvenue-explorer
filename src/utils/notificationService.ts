@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -24,7 +25,7 @@ export const sendNotification = async (
     
     while (!result && attempts < maxRetries) {
       try {
-        // Use service role key for notifications to bypass RLS
+        // Insert directly with service role key to bypass RLS
         const { data: notification, error } = await supabase
           .from('notifications')
           .insert({
@@ -120,14 +121,21 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       ? format(new Date(booking.booking_date), 'MMM d, yyyy') 
       : 'scheduled date';
       
-    // Determine booking type
-    const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
+    // Determine booking type - make sure to check both pattern formats
+    let bookingType = 'hourly';
+    if (booking.start_time === '00:00' && booking.end_time === '23:59') {
+      bookingType = 'full-day';
+    } else if (!booking.start_time && !booking.end_time) {
+      bookingType = 'full-day';
+    }
+    
+    console.log(`Detected booking type: ${bookingType} for booking:`, booking.id);
     
     // Send notification with retry attempts
     const notification = await sendNotification(
       ownerId,
       'New Booking Request',
-      `A new booking request for "${booking.venue_name}" on ${bookingDate} has been received.`,
+      `A new ${bookingType} booking request for "${booking.venue_name}" on ${bookingDate} has been received.`,
       'booking',
       '/customer-bookings',
       {
@@ -136,7 +144,9 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
         status: booking.status,
         booking_date: booking.booking_date,
         venue_name: booking.venue_name,
-        booking_type: bookingType
+        booking_type: bookingType,
+        start_time: booking.start_time || '00:00',
+        end_time: booking.end_time || '23:59'
       },
       5
     );
