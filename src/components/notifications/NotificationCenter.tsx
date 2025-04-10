@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +15,7 @@ import {
 import { Bell } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNavigate } from 'react-router-dom';
+import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
 
 type Notification = {
   id: string;
@@ -60,21 +60,16 @@ const NotificationCenter = () => {
 
     fetchNotifications();
 
-    // Enable realtime for notifications table if not already enabled
-    const enableRealtimeForNotifications = async () => {
+    // Enable realtime for notifications table
+    const setupRealtimeNotifications = async () => {
       try {
-        const { error } = await supabase.rpc(
-          'supabase_functions.notify_all',
-          { table: 'notifications' }
-        );
-        if (error) console.error('Error enabling realtime:', error);
+        await enableRealtimeForTable('notifications');
       } catch (e) {
-        console.error('Could not enable realtime:', e);
-        // Continue even if this fails
+        console.error('Could not enable realtime for notifications:', e);
       }
     };
     
-    enableRealtimeForNotifications();
+    setupRealtimeNotifications();
 
     // Subscribe to new notifications
     const channel = supabase
@@ -256,7 +251,6 @@ const NotificationCenter = () => {
   );
 };
 
-// Helper functions
 function getNotificationTypeColor(type: string): string {
   switch (type) {
     case 'booking':

@@ -4,30 +4,21 @@ import { supabase } from '@/integrations/supabase/client';
 // Enable realtime for a specific table
 export const enableRealtimeForTable = async (table: string) => {
   try {
-    // Check if the table is enabled for realtime using direct DB query
-    const { data: realtimeEnabled, error: realtimeCheckError } = await supabase
-      .from(table)
-      .select('id')
-      .limit(1);
-      
-    if (realtimeCheckError) {
-      console.error(`Error checking realtime status for ${table}:`, realtimeCheckError);
-      return false;
-    }
-    
-    // Enable realtime channel for the table
+    // Create a channel for the table
     const channel = supabase
-      .channel(`table:${table}`)
+      .channel(`realtime-${table}`)
       .on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
-        console.log('Realtime change:', payload);
+        console.log(`Realtime change on ${table}:`, payload);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`Realtime subscription status for ${table}:`, status);
+      });
       
     console.log(`Enabled realtime for table: ${table}`);
-    return true;
+    return channel;
   } catch (error) {
     console.error(`Error enabling realtime for ${table}:`, error);
-    return false;
+    return null;
   }
 };
 

@@ -7,5 +7,5 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIU
 
 export const supabase = createClient<Database>(
   supabaseUrl,
-  supabaseAnonKey,
+  supabaseAnonKey
 );

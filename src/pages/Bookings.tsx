@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +9,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import BookingOwnerChat from '@/components/bookings/BookingOwnerChat';
+import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
+import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,9 +52,8 @@ const Bookings = () => {
   
   useEffect(() => {
     if (user) {
-      fetchBookings();
-    } else {
-      setIsLoading(false);
+      enableRealtimeForTable('bookings');
+      enableRealtimeForTable('notifications');
     }
   }, [user]);
   
@@ -98,13 +98,11 @@ const Bookings = () => {
           }
         }
         
-        // Get the venue image from gallery_images
         let venueImage = '';
         if (item.venues && item.venues.gallery_images && Array.isArray(item.venues.gallery_images) && item.venues.gallery_images.length > 0) {
           venueImage = item.venues.gallery_images[0];
         }
         
-        // Ensure we're handling the booking date correctly without timezone shifts
         let formattedDate = item.booking_date;
         
         return {
@@ -138,6 +136,8 @@ const Bookings = () => {
       setIsLoading(false);
     }
   };
+  
+  const { notifyVenueOwner } = useBookingStatusUpdate(() => fetchBookings());
   
   const cancelBooking = async (bookingId: string) => {
     try {
@@ -174,6 +174,21 @@ const Bookings = () => {
             }
           });
       }
+      
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: booking.user_id,
+          title: 'Booking Cancelled',
+          message: `You have cancelled your booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')}.`,
+          type: 'booking',
+          read: false,
+          link: '/bookings',
+          data: {
+            booking_id: bookingId,
+            venue_id: booking.venue_id
+          }
+        });
       
       toast({
         title: 'Booking Cancelled',
@@ -236,19 +251,16 @@ const Bookings = () => {
   
   const formatBookingDate = (dateString: string) => {
     try {
-      // Fix for date display issues - handle date as YYYY-MM-DD without timezone conversion
       if (dateString.includes('-') && dateString.split('-').length === 3) {
         const dateParts = dateString.split('-');
         const year = parseInt(dateParts[0]);
-        const month = parseInt(dateParts[1]) - 1; // JS months are 0-indexed
+        const month = parseInt(dateParts[1]) - 1;
         const day = parseInt(dateParts[2]);
         
-        // Create date object without timezone conversion
         const date = new Date(year, month, day);
         return format(date, 'MMMM d, yyyy');
       }
       
-      // Fallback for other date formats
       const date = new Date(dateString);
       return format(date, 'MMMM d, yyyy');
     } catch (e) {
