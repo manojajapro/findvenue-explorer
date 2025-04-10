@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useEffect } from "react";
-import { useAuth, AuthProvider } from "./hooks/useAuth";
+import { AuthProvider, useAuth } from "./hooks/useAuth";
 import Index from "./pages/Index";
 import VenueDetails from "./pages/VenueDetails";
 import Login from "./pages/Login";
@@ -29,6 +29,9 @@ import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AuthCallback from "./pages/AuthCallback";
 
+const queryClient = new QueryClient();
+
+// Separating the ProtectedRoute into its own component outside of App
 const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element, allowedRoles?: string[] }) => {
   const { user, isLoading, profile } = useAuth();
   
@@ -49,6 +52,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element
   return children;
 };
 
+// Creating a separate HomeRoute component
 const HomeRoute = () => {
   const { user, isVenueOwner } = useAuth();
   
@@ -59,6 +63,7 @@ const HomeRoute = () => {
   return <Index />;
 };
 
+// Creating a separate LoginRoute component
 const LoginRoute = () => {
   const { user, isVenueOwner } = useAuth();
   
@@ -108,62 +113,68 @@ function RevealOnScroll() {
   return null;
 }
 
-const queryClient = new QueryClient();
-
-function App() {
+// Creating a separate AppContent component that uses useAuth
+function AppContent() {
   const { isVenueOwner } = useAuth();
   
   return (
     <div className="app">
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <Navbar />
-            <main className="min-h-screen">
-              <Routes>
-                {/* Common routes for all users */}
-                <Route path="/" element={<HomeRoute />} />
-                <Route path="/login" element={<LoginRoute />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/venue-owner" element={<VenueOwnerPromo />} />
-                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/account" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-                <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-                
-                {/* Customer-only routes that venue owners should not see */}
-                {!isVenueOwner && (
-                  <>
-                    <Route path="/venue/:id" element={<ProtectedRoute><VenueDetails /></ProtectedRoute>} />
-                    <Route path="/venues" element={<Venues />} />
-                    <Route path="/categories" element={<Categories />} />
-                    <Route path="/cities" element={<Cities />} />
-                    <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
-                    <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
-                  </>
-                )}
-                
-                {/* Venue owner-only routes */}
-                <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
-                <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />
-                <Route path="/edit-venue/:id" element={<ProtectedRoute allowedRoles={['venue-owner']}><EditVenue /></ProtectedRoute>} />
-                <Route path="/customer-bookings" element={<ProtectedRoute allowedRoles={['venue-owner']}><CustomerBookings /></ProtectedRoute>} />
-                
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </main>
-            <Footer />
-            <ScrollToTop />
-            <RevealOnScroll />
-          </TooltipProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <Navbar />
+        <main className="min-h-screen">
+          <Routes>
+            {/* Common routes for all users */}
+            <Route path="/" element={<HomeRoute />} />
+            <Route path="/login" element={<LoginRoute />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/venue-owner" element={<VenueOwnerPromo />} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/account" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+            <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+            
+            {/* Customer-only routes that venue owners should not see */}
+            {!isVenueOwner && (
+              <>
+                <Route path="/venue/:id" element={<ProtectedRoute><VenueDetails /></ProtectedRoute>} />
+                <Route path="/venues" element={<Venues />} />
+                <Route path="/categories" element={<Categories />} />
+                <Route path="/cities" element={<Cities />} />
+                <Route path="/bookings" element={<ProtectedRoute><Bookings /></ProtectedRoute>} />
+                <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
+              </>
+            )}
+            
+            {/* Venue owner-only routes */}
+            <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
+            <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />
+            <Route path="/edit-venue/:id" element={<ProtectedRoute allowedRoles={['venue-owner']}><EditVenue /></ProtectedRoute>} />
+            <Route path="/customer-bookings" element={<ProtectedRoute allowedRoles={['venue-owner']}><CustomerBookings /></ProtectedRoute>} />
+            
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </main>
+        <Footer />
+        <ScrollToTop />
+        <RevealOnScroll />
+      </TooltipProvider>
     </div>
+  );
+}
+
+// App component now provides the context and doesn't use useAuth itself
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

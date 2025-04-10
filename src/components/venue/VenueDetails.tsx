@@ -141,7 +141,7 @@ const VenueDetails = () => {
           <div className="mb-4">
             <h4 className="text-sm font-medium mb-2">Categories</h4>
             <div className="flex flex-wrap gap-2">
-              {formatCategoryNames(venue.categoryName).map((category, index) => (
+              {formatCategoryNames(venue.category ? [venue.category] : null).map((category, index) => (
                 <Badge key={index} className="bg-findvenue/20 text-findvenue hover:bg-findvenue/30">
                   {category}
                 </Badge>
