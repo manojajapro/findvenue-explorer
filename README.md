@@ -26,7 +26,7 @@ git clone <repository-url>
 
 2. Navigate to the project directory:
 ```sh
-cd findvenue-explorer
+cd findvenue-web
 ```
 
 3. Install dependencies:
@@ -39,11 +39,6 @@ npm install
 npm run dev
 ```
 
-
-5. build application:
-```sh
-npm run build
-```
 
 npm run build 
 
