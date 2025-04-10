@@ -324,7 +324,7 @@ const EditVenue = () => {
           description: data.description || "",
           address: data.address || "",
           city_id: data.city_id || "",
-          category_id: data.category_id ? Array.isArray(data.category_id) ? data.category_id[0] : data.category_id : "",
+          category_id: Array.isArray(data.category_id) ? data.category_id : [data.category_id],
           min_capacity: data.min_capacity || 1,
           max_capacity: data.max_capacity || 1,
           starting_price: data.starting_price || 0,

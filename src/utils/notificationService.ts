@@ -25,6 +25,7 @@ export const sendNotification = async (
     
     while (!result && attempts < maxRetries) {
       try {
+        // Use service role key for notifications to bypass RLS
         const { data: notification, error } = await supabase
           .from('notifications')
           .insert({
@@ -161,6 +162,8 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       ? format(new Date(booking.booking_date), 'MMM d, yyyy') 
       : 'scheduled date';
     
+    let notificationsSuccessful = true;
+    
     // Notify owner
     if (ownerId) {
       const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
@@ -170,7 +173,7 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       
       console.log(`Sending notification to owner ${ownerId} for status ${status}`);
       
-      await sendNotification(
+      const ownerNotification = await sendNotification(
         ownerId,
         ownerTitle,
         ownerMessage,
@@ -185,6 +188,10 @@ export const sendBookingStatusNotification = async (booking: any, status: string
         },
         5
       );
+      
+      if (!ownerNotification) {
+        notificationsSuccessful = false;
+      }
     }
     
     // Notify customer
@@ -196,7 +203,7 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       
       console.log(`Sending notification to customer ${booking.user_id} for status ${status}`);
       
-      await sendNotification(
+      const customerNotification = await sendNotification(
         booking.user_id,
         customerTitle,
         customerMessage,
@@ -211,9 +218,13 @@ export const sendBookingStatusNotification = async (booking: any, status: string
         },
         5
       );
+      
+      if (!customerNotification) {
+        notificationsSuccessful = false;
+      }
     }
     
-    return true;
+    return notificationsSuccessful;
   } catch (error) {
     console.error('Failed to send booking status notifications:', error);
     return false;

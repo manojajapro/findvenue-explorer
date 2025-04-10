@@ -75,87 +75,14 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         status: status
       };
       
-      // Send notifications to both venue owner and customer
+      // Send notifications to both venue owner and customer using a function with proper permissions
       console.log('Sending notifications for status update:', status);
       
-      try {
-        // Directly send notifications instead of using the helper function
-        const ownerId = await getVenueOwnerId(completeBookingData.venue_id);
-        const formattedDate = completeBookingData.booking_date 
-          ? format(new Date(completeBookingData.booking_date), 'MMM d, yyyy') 
-          : 'scheduled date';
-        
-        // Notify owner
-        if (ownerId) {
-          const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
-          const ownerMessage = status === 'confirmed' 
-            ? `You have confirmed a booking for "${completeBookingData.venue_name}" on ${formattedDate}.`
-            : `You have cancelled a booking for "${completeBookingData.venue_name}" on ${formattedDate}.`;
-          
-          console.log(`Sending notification to owner ${ownerId} for status ${status}`);
-          
-          const { data: ownerNotification, error: ownerNotifError } = await supabase
-            .from('notifications')
-            .insert({
-              user_id: ownerId,
-              title: ownerTitle,
-              message: ownerMessage,
-              type: 'booking',
-              read: false,
-              link: '/customer-bookings',
-              data: {
-                booking_id: completeBookingData.id,
-                venue_id: completeBookingData.venue_id,
-                status: status,
-                booking_date: completeBookingData.booking_date,
-                venue_name: completeBookingData.venue_name
-              }
-            })
-            .select();
-          
-          if (ownerNotifError) {
-            console.error('Error sending notification to owner:', ownerNotifError);
-          } else {
-            console.log('Successfully sent notification to owner:', ownerNotification);
-          }
-        }
-        
-        // Notify customer
-        if (completeBookingData.user_id) {
-          const customerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
-          const customerMessage = status === 'confirmed' 
-            ? `Your booking for ${completeBookingData.venue_name} on ${formattedDate} has been confirmed.`
-            : `Your booking for ${completeBookingData.venue_name} on ${formattedDate} has been cancelled by the venue owner.`;
-          
-          console.log(`Sending notification to customer ${completeBookingData.user_id} for status ${status}`);
-          
-          const { data: customerNotification, error: customerNotifError } = await supabase
-            .from('notifications')
-            .insert({
-              user_id: completeBookingData.user_id,
-              title: customerTitle,
-              message: customerMessage,
-              type: 'booking',
-              read: false,
-              link: '/bookings',
-              data: {
-                booking_id: completeBookingData.id,
-                venue_id: completeBookingData.venue_id,
-                status: status,
-                booking_date: completeBookingData.booking_date,
-                venue_name: completeBookingData.venue_name
-              }
-            })
-            .select();
-          
-          if (customerNotifError) {
-            console.error('Error sending notification to customer:', customerNotifError);
-          } else {
-            console.log('Successfully sent notification to customer:', customerNotification);
-          }
-        }
-      } catch (notifError) {
-        console.error('Error sending notifications:', notifError);
+      // Use the sendBookingStatusNotification function to handle notifications
+      const notificationSent = await sendBookingStatusNotification(completeBookingData, status);
+      
+      if (!notificationSent) {
+        console.warn('Notifications might not have been sent successfully.');
         toast({
           variant: "destructive",
           title: "Notification Warning",
@@ -200,84 +127,53 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     try {
       console.log('Sending notification to venue owner for booking:', booking);
       
-      // First notify venue owner
-      // Get venue owner ID directly
-      const ownerId = await getVenueOwnerId(booking.venue_id);
+      // Use the separate notification service function that handles permissions properly
+      const notification = await sendNotification(
+        await getVenueOwnerId(booking.venue_id),
+        'New Booking Request',
+        `A new booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been received.`,
+        'booking',
+        '/customer-bookings',
+        {
+          booking_id: booking.id,
+          venue_id: booking.venue_id,
+          status: booking.status || 'pending',
+          booking_date: booking.booking_date,
+          venue_name: booking.venue_name,
+          booking_type: booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly'
+        }
+      );
       
-      if (!ownerId) {
-        console.error('Could not find venue owner ID for venue', booking.venue_id);
-        toast({
-          variant: "destructive",
-          title: "Notification Warning",
-          description: "Your booking was created, but the venue owner might not be notified immediately.",
-        });
-        return;
+      if (!notification) {
+        console.error('Failed to send notification to venue owner');
+        return false;
       }
       
-      console.log(`Sending notification to owner ${ownerId} for booking type: ${booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly'}`);
-      
-      // Directly insert notification to database
-      const { data: ownerNotification, error: ownerNotifError } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: ownerId,
-          title: 'New Booking Request',
-          message: `A new booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been received.`,
-          type: 'booking',
-          read: false,
-          link: '/customer-bookings',
-          data: {
-            booking_id: booking.id,
-            venue_id: booking.venue_id,
-            status: 'pending',
-            booking_date: booking.booking_date,
-            venue_name: booking.venue_name
-          }
-        })
-        .select();
-      
-      if (ownerNotifError) {
-        console.error('Failed to send notification to venue owner:', ownerNotifError);
-        toast({
-          variant: "destructive",
-          title: "Notification Warning",
-          description: "Your booking was created, but the venue owner might not be notified immediately.",
-        });
-      } else {
-        console.log('Successfully sent notification to venue owner:', ownerNotification);
-      }
+      console.log('Successfully sent notification to venue owner');
       
       // Also send a confirmation notification to the customer
       if (booking.user_id) {
-        console.log(`Sending confirmation notification to customer ${booking.user_id}`);
-        
-        const { data: customerNotification, error: customerNotifError } = await supabase
-          .from('notifications')
-          .insert({
-            user_id: booking.user_id,
-            title: 'Booking Requested',
-            message: `Your booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been sent to the venue owner.`,
-            type: 'booking',
-            read: false,
-            link: '/bookings',
-            data: {
-              booking_id: booking.id,
-              venue_id: booking.venue_id,
-              status: 'pending',
-              booking_date: booking.booking_date,
-              venue_name: booking.venue_name
-            }
-          })
-          .select();
-        
-        if (customerNotifError) {
-          console.error('Failed to send confirmation notification to customer:', customerNotifError);
-        } else {
-          console.log('Successfully sent confirmation notification to customer:', customerNotification);
-        }
+        await sendNotification(
+          booking.user_id,
+          'Booking Requested',
+          `Your booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been sent to the venue owner.`,
+          'booking',
+          '/bookings',
+          {
+            booking_id: booking.id,
+            venue_id: booking.venue_id,
+            status: booking.status || 'pending',
+            booking_date: booking.booking_date,
+            venue_name: booking.venue_name,
+            booking_type: booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly'
+          }
+        );
       }
+      
+      return true;
     } catch (error) {
-      console.error('Failed to notify users about new booking:', error);
+      console.error('Failed to notify venue owner about new booking:', error);
+      return false;
     }
   };
   
