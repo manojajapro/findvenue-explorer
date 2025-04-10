@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -256,53 +257,68 @@ export const markNotificationAsRead = async (notificationId: string) => {
 
 // Function to ensure rules_and_regulations is properly formatted
 export const formatRulesAndRegulations = (rules: any) => {
-  // Create a proper object structure with default empty arrays
-  let result = {
-    general: [],
-    booking: [],
-    restrictions: []
-  };
-  
-  // If rules is null or undefined, return the default structure
+  // If the input is null or undefined, return an empty array
   if (!rules) {
-    return result;
-  }
-  
-  // If rules is already an object, extract the arrays safely
-  if (typeof rules === 'object' && !Array.isArray(rules)) {
-    // Extract arrays safely, ensuring they're arrays
-    if (Array.isArray(rules.general)) {
-      result.general = rules.general;
-    }
-    
-    if (Array.isArray(rules.booking)) {
-      result.booking = rules.booking;
-    }
-    
-    if (Array.isArray(rules.restrictions)) {
-      result.restrictions = rules.restrictions;
-    }
-    
-    return result;
+    return [];
   }
   
   // If rules is a string, try to parse it
   if (typeof rules === 'string') {
     try {
-      const parsed = JSON.parse(rules);
-      return formatRulesAndRegulations(parsed); // Recursively format the parsed object
+      return JSON.parse(rules);
     } catch (e) {
       console.error('Error parsing rules_and_regulations string:', e);
-      return result;
+      return [];
     }
   }
   
-  // If rules is an array, add it to general rules
-  if (Array.isArray(rules)) {
-    result.general = rules;
-    return result;
+  // If rules is already an array of objects with title, category, description
+  if (Array.isArray(rules) && rules.length > 0 && typeof rules[0] === 'object' && rules[0].title) {
+    return rules;
   }
   
-  // Default case - return the empty structure
-  return result;
+  // If rules is our previous format (object with general, booking, restrictions)
+  if (typeof rules === 'object' && !Array.isArray(rules) && 
+      (Array.isArray(rules.general) || Array.isArray(rules.booking) || Array.isArray(rules.restrictions))) {
+    
+    const formattedRules = [];
+    
+    // Convert general rules
+    if (Array.isArray(rules.general)) {
+      rules.general.forEach((rule: string, index: number) => {
+        formattedRules.push({
+          title: `General Rule ${index + 1}`,
+          category: 'General Policies',
+          description: rule
+        });
+      });
+    }
+    
+    // Convert booking rules
+    if (Array.isArray(rules.booking)) {
+      rules.booking.forEach((rule: string, index: number) => {
+        formattedRules.push({
+          title: `Booking Rule ${index + 1}`,
+          category: 'Reservations and Bookings',
+          description: rule
+        });
+      });
+    }
+    
+    // Convert restriction rules
+    if (Array.isArray(rules.restrictions)) {
+      rules.restrictions.forEach((rule: string, index: number) => {
+        formattedRules.push({
+          title: `Restriction ${index + 1}`,
+          category: 'Conduct and Behavior',
+          description: rule
+        });
+      });
+    }
+    
+    return formattedRules;
+  }
+  
+  // Default - return an empty array
+  return [];
 };
