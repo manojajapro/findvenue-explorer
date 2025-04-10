@@ -100,6 +100,15 @@ export const useVenueData = () => {
             }
             
             if (typeof field === 'string') {
+              // Check if it's already in array format
+              if (field.startsWith('[') && field.endsWith(']')) {
+                try {
+                  return JSON.parse(field);
+                } catch (e) {
+                  // Not valid JSON array
+                }
+              }
+                
               // Try to parse as JSON array first
               try {
                 const parsed = JSON.parse(field);
@@ -115,6 +124,21 @@ export const useVenueData = () => {
             return [];
           };
           
+          // Special handling for category_name which could be a single string or an array
+          const processCategoryName = (category: any): string => {
+            if (!category) return '';
+            
+            if (Array.isArray(category)) {
+              return category.length > 0 ? category[0] : '';
+            }
+            
+            if (typeof category === 'string') {
+              return category;
+            }
+            
+            return '';
+          };
+          
           // Use the first gallery image instead of image_url
           const galleryImages = processArrayField(data.gallery_images);
           const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
@@ -128,7 +152,7 @@ export const useVenueData = () => {
             address: data.address || '',
             city: data.city_name || '',
             cityId: data.city_id || '',
-            category: Array.isArray(data.category_name) ? data.category_name[0] : (data.category_name || ''),
+            category: processCategoryName(data.category_name),
             categoryId: data.category_id || '',
             capacity: {
               min: data.min_capacity || 0,
