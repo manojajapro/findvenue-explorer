@@ -23,6 +23,7 @@ export const useVenueData = () => {
 
         console.log("Fetching venue data for ID:", id);
         
+        // Get venue data
         const { data, error: venueError } = await supabase
           .from('venues')
           .select('*')
@@ -37,6 +38,7 @@ export const useVenueData = () => {
         if (data) {
           console.log("Raw venue data:", data);
           
+          // Process owner_info
           let ownerInfoData = undefined;
           try {
             if (data.owner_info) {
@@ -49,7 +51,6 @@ export const useVenueData = () => {
                 contact: ownerInfo.contact || '',
                 responseTime: ownerInfo.response_time || '',
                 user_id: ownerInfo.user_id || '',
-                // Remove the references to profile_image, online_status, and last_active
                 socialLinks: {
                   facebook: ownerInfo.facebook_url || ownerInfo.facebook || '',
                   twitter: ownerInfo.twitter_url || ownerInfo.twitter || '',
@@ -62,6 +63,7 @@ export const useVenueData = () => {
             console.error("Error parsing owner_info for venue", data.id, e);
           }
           
+          // Process opening_hours
           let openingHoursData = undefined;
           try {
             if (data.opening_hours) {
@@ -73,6 +75,7 @@ export const useVenueData = () => {
             console.error("Error parsing opening_hours for venue", data.id, e);
           }
           
+          // Process rules_and_regulations
           let rulesAndRegulationsData = undefined;
           try {
             if (data.rules_and_regulations) {
@@ -88,21 +91,44 @@ export const useVenueData = () => {
             console.error("Error parsing rules_and_regulations for venue", data.id, e);
           }
           
+          // Process arrays that might be stored as strings 
+          const processArrayField = (field: any): string[] => {
+            if (!field) return [];
+            
+            if (Array.isArray(field)) {
+              return field;
+            }
+            
+            if (typeof field === 'string') {
+              // Try to parse as JSON array first
+              try {
+                const parsed = JSON.parse(field);
+                if (Array.isArray(parsed)) {
+                  return parsed;
+                }
+              } catch (e) {
+                // Not valid JSON, try as comma-separated string
+                return field.split(',').map(item => item.trim());
+              }
+            }
+            
+            return [];
+          };
+          
           // Use the first gallery image instead of image_url
-          const defaultImage = data.gallery_images && data.gallery_images.length > 0 
-            ? data.gallery_images[0] 
-            : '';
+          const galleryImages = processArrayField(data.gallery_images);
+          const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
           
           const transformedVenue: Venue = {
             id: data.id,
             name: data.name,
             description: data.description || '',
             imageUrl: defaultImage, // Use first gallery image instead
-            galleryImages: data.gallery_images || [],
+            galleryImages: processArrayField(data.gallery_images),
             address: data.address || '',
             city: data.city_name || '',
             cityId: data.city_id || '',
-            category: data.category_name || '',
+            category: Array.isArray(data.category_name) ? data.category_name[0] : (data.category_name || ''),
             categoryId: data.category_id || '',
             capacity: {
               min: data.min_capacity || 0,
@@ -114,21 +140,21 @@ export const useVenueData = () => {
               pricePerPerson: data.price_per_person,
               hourlyRate: data.hourly_rate
             },
-            amenities: data.amenities || [],
+            amenities: processArrayField(data.amenities),
             rating: data.rating || 0,
             reviews: data.reviews_count || 0,
             featured: data.featured || false,
             popular: data.popular || false,
-            availability: data.availability || [],
+            availability: processArrayField(data.availability),
             latitude: data.latitude,
             longitude: data.longitude,
             parking: data.parking,
             wifi: data.wifi,
-            accessibilityFeatures: data.accessibility_features || [],
-            acceptedPaymentMethods: data.accepted_payment_methods || [],
+            accessibilityFeatures: processArrayField(data.accessibility_features),
+            acceptedPaymentMethods: processArrayField(data.accepted_payment_methods),
             openingHours: openingHoursData,
             ownerInfo: ownerInfoData,
-            additionalServices: data.additional_services || [],
+            additionalServices: processArrayField(data.additional_services),
             rulesAndRegulations: rulesAndRegulationsData,
             type: data.type || '',
             zipcode: data.zipcode || ''

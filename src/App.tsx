@@ -40,6 +40,8 @@ const ProtectedRoute = ({ children, allowedRoles = [] }: { children: JSX.Element
   }
   
   if (!user) {
+    // Save the current URL to localStorage for post-login redirect
+    localStorage.setItem('redirectAfterLogin', window.location.pathname);
     return <Navigate to="/login" replace />;
   }
   
@@ -68,6 +70,14 @@ const LoginRoute = () => {
   const { user, isVenueOwner } = useAuth();
   
   if (user) {
+    // Check if there's a saved redirect path from before login
+    const savedPath = localStorage.getItem('redirectAfterLogin');
+    if (savedPath) {
+      localStorage.removeItem('redirectAfterLogin');
+      return <Navigate to={savedPath} replace />;
+    }
+    
+    // Default redirects if no saved path exists
     if (isVenueOwner) {
       return <Navigate to="/my-venues?tab=dashboard" replace />;
     } else {
@@ -76,6 +86,20 @@ const LoginRoute = () => {
   }
   
   return <Login />;
+};
+
+// Creating a separate VenueDetailsRoute component to handle venue owner vs customer views
+const VenueDetailsRoute = () => {
+  const { isVenueOwner } = useAuth();
+  const { id } = useParams<{ id: string }>();
+  
+  // Venue owners should be redirected to the edit page or dashboard
+  if (isVenueOwner) {
+    return <Navigate to={`/edit-venue/${id}`} replace />;
+  }
+  
+  // Customers see the normal venue details
+  return <VenueDetails />;
 };
 
 function ScrollToTop() {
@@ -138,10 +162,12 @@ function AppContent() {
             <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             
-            {/* Customer-only routes that venue owners should not see */}
+            {/* Routes accessible to both users, but with different views */}
+            <Route path="/venue/:id" element={<ProtectedRoute><VenueDetailsRoute /></ProtectedRoute>} />
+            
+            {/* Customer-only routes */}
             {!isVenueOwner && (
               <>
-                <Route path="/venue/:id" element={<ProtectedRoute><VenueDetails /></ProtectedRoute>} />
                 <Route path="/venues" element={<Venues />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/cities" element={<Cities />} />
