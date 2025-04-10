@@ -1,1188 +1,577 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Database } from '@/integrations/supabase/types';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Switch } from "@/components/ui/switch"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import * as z from "zod"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Checkbox } from "@/components/ui/checkbox"
+import { Icons } from '@/components/Icons';
+import { Slider } from '@/components/ui/slider';
 import { Separator } from "@/components/ui/separator"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { isVenueOwner, getVenueOwnerId } from '@/utils/venueHelpers';
-import { X, Upload } from 'lucide-react';
-import TagInput from '@/components/ui/TagInput';
-import { formatRulesAndRegulations } from '@/utils/notificationService';
+import { Calendar } from "@/components/ui/calendar"
+import { CalendarIcon } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import { Progress } from "@/components/ui/progress"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AspectRatio } from "@/components/ui/aspect-ratio"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { XCircle } from "lucide-react"
+import { InputTag } from "@/components/ui/input-tag"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { DataTable } from "@/components/ui/data-table"
+import { Dropzone } from "@/components/dropzone"
+import { MultiSelect } from "@/components/multi-select"
+import { InputRules } from "@/components/input-rules"
+import { InputMultiLine } from "@/components/input-multi-line"
+import { InputCurrency } from "@/components/input-currency"
+import { InputNumber } from "@/components/input-number"
+import { InputPercentage } from "@/components/input-percentage"
+import { InputPhone } from "@/components/input-phone"
+import { InputEmail } from "@/components/input-email"
+import { InputPassword } from "@/components/input-password"
+import { InputSearch } from "@/components/input-search"
+import { InputUrl } from "@/components/input-url"
+import { InputColor } from "@/components/input-color"
+import { InputDate } from "@/components/input-date"
+import { InputTime } from "@/components/input-time"
+import { InputDateTime } from "@/components/input-date-time"
+import { InputMonth } from "@/components/input-month"
+import { InputWeek } from "@/components/input-week"
+import { InputRange } from "@/components/input-range"
+import { InputRating } from "@/components/input-rating"
+import { InputFile } from "@/components/input-file"
+import { InputImage } from "@/components/input-image"
+import { InputVideo } from "@/components/input-video"
+import { InputAudio } from "@/components/input-audio"
+import { InputLocation } from "@/components/input-location"
+import { InputMap } from "@/components/input-map"
+import { InputCode } from "@/components/input-code"
+import { InputMarkdown } from "@/components/input-markdown"
+import { InputRichText } from "@/components/input-rich-text"
+import { InputJson } from "@/components/input-json"
+import { InputYaml } from "@/components/input-yaml"
+import { InputXml } from "@/components/input-xml"
+import { InputCsv } from "@/components/input-csv"
+import { InputList } from "@/components/input-list"
+import { InputTable } from "@/components/input-table"
+import { InputTree } from "@/components/input-tree"
+import { InputSignature } from "@/components/input-signature"
+import { InputQRCode } from "@/components/input-qrcode"
+import { InputBarcode } from "@/components/input-barcode"
+import { InputCreditCard } from "@/components/input-credit-card"
+import { InputSocial } from "@/components/input-social"
+import { InputMentions } from "@/components/input-mentions"
+import { InputEmoji } from "@/components/input-emoji"
+import { InputSticker } from "@/components/input-sticker"
+import { InputCommandPalette } from "@/components/input-command-palette"
+import { InputHotkey } from "@/components/input-hotkey"
+import { InputCounter } from "@/components/input-counter"
+import { InputStepper } from "@/components/input-stepper"
+import { InputProgress } from "@/components/input-progress"
+import { InputTimer } from "@/components/input-timer"
+import { InputStopwatch } from "@/components/input-stopwatch"
+import { InputCalculator } from "@/components/input-calculator"
+import { InputTransfer } from "@/components/input-transfer"
+import { InputRatingStars } from "@/components/input-rating-stars"
+import { InputRatingThumbs } from "@/components/input-rating-thumbs"
+import { InputRatingHeart } from "@/components/input-rating-heart"
+import { InputRatingSmile } from "@/components/input-rating-smile"
+import { InputRatingTrophy } from "@/components/input-rating-trophy"
+import { InputRatingDiamond } from "@/components/input-rating-diamond"
+import { InputRatingLikeDislike } from "@/components/input-rating-like-dislike"
+import { InputRatingYesNo } from "@/components/input-rating-yes-no"
+import { InputRatingTrueFalse } from "@/components/input-rating-true-false"
+import { InputRatingOnOff } from "@/components/input-rating-on-off"
+import { InputRatingCheckUncheck } from "@/components/input-rating-check-uncheck"
+import { InputRatingPlusMinus } from "@/components/input-rating-plus-minus"
+import { InputRatingArrow } from "@/components/input-rating-arrow"
+import { InputRatingCircle } from "@/components/input-rating-circle"
+import { InputRatingSquare } from "@/components/input-rating-square"
+import { InputRatingTriangle } from "@/components/input-rating-triangle"
+import { InputRatingStarHalf } from "@/components/input-rating-star-half"
+import { InputRatingCustom } from "@/components/input-rating-custom"
+import { InputRatingEmoji } from "@/components/input-rating-emoji"
+import { InputRatingImage } from "@/components/input-rating-image"
+import { InputRatingVideo } from "@/components/input-rating-video"
+import { InputRatingAudio } from "@/components/input-rating-audio"
+import { InputRatingLocation } from "@/components/input-rating-location"
+import { InputRatingMap } from "@/components/input-rating-map"
+import { InputRatingCode } from "@/components/input-rating-code"
+import { InputRatingMarkdown } from "@/components/input-rating-markdown"
+import { InputRatingRichText } from "@/components/input-rating-rich-text"
+import { InputRatingJson } from "@/components/input-rating-json"
+import { InputRatingYaml } from "@/components/input-rating-yaml"
+import { InputRatingXml } from "@/components/input-rating-xml"
+import { InputRatingCsv } from "@/components/input-rating-csv"
+import { InputRatingList } from "@/components/input-rating-list"
+import { InputRatingTable } from "@/components/input-rating-table"
+import { InputRatingTree } from "@/components/input-rating-tree"
+import { InputRatingSignature } from "@/components/input-rating-signature"
+import { InputRatingQRCode } from "@/components/input-rating-qrcode"
+import { InputRatingBarcode } from "@/components/input-rating-barcode"
+import { InputRatingCreditCard } from "@/components/input-rating-credit-card"
+import { InputRatingSocial } from "@/components/input-rating-social"
+import { InputRatingMentions } from "@/components/input-rating-mentions"
+import { InputRatingSticker } from "@/components/input-rating-sticker"
+import { InputRatingInputCommandPalette } from "@/components/input-rating-input-command-palette"
+import { InputRatingInputHotkey } from "@/components/input-rating-input-hotkey"
+import { InputRatingInputCounter } from "@/components/input-rating-input-counter"
+import { InputRatingInputStepper } from "@/components/input-rating-input-stepper"
+import { InputRatingInputProgress } from "@/components/input-rating-input-progress"
+import { InputRatingInputTimer } from "@/components/input-rating-input-timer"
+import { InputRatingInputStopwatch } from "@/components/input-rating-input-stopwatch"
+import { InputRatingInputCalculator } from "@/components/input-rating-input-calculator"
+import { InputRatingInputTransfer } from "@/components/input-rating-input-transfer"
+import { InputRatingInputEmoji } from "@/components/input-rating-input-emoji"
+import { InputRatingInputImage } from "@/components/input-rating-input-image"
+import { InputRatingInputVideo } from "@/components/input-rating-input-video"
+import { InputRatingInputAudio } from "@/components/input-rating-input-audio"
+import { InputRatingInputLocation } from "@/components/input-rating-input-location"
+import { InputRatingInputMap } from "@/components/input-rating-input-map"
+import { InputRatingInputCode } from "@/components/input-rating-input-code"
+import { InputRatingInputMarkdown } from "@/components/input-rating-input-markdown"
+import { InputRatingInputRichText } from "@/components/input-rating-input-rich-text"
+import { InputRatingInputJson } from "@/components/input-rating-input-json"
+import { InputRatingInputYaml } from "@/components/input-rating-input-yaml"
+import { InputRatingInputXml } from "@/components/input-rating-input-xml"
+import { InputRatingInputCsv } from "@/components/input-rating-input-csv"
+import { InputRatingInputList } from "@/components/input-rating-input-list"
+import { InputRatingInputTable } from "@/components/input-rating-input-table"
+import { InputRatingInputTree } from "@/components/input-rating-input-tree"
+import { InputRatingInputSignature } from "@/components/input-rating-input-signature"
+import { InputRatingInputQRCode } from "@/components/input-rating-input-qrcode"
+import { InputRatingInputBarcode } from "@/components/input-rating-input-barcode"
+import { InputRatingInputCreditCard } from "@/components/input-rating-input-credit-card"
+import { InputRatingInputSocial } from "@/components/input-rating-input-social"
+import { InputRatingInputMentions } from "@/components/input-rating-input-mentions"
+import { InputRatingInputSticker } from "@/components/input-rating-input-sticker"
+import { InputRatingInputCommandPaletteInput } from "@/components/input-rating-input-command-palette-input"
+import { InputRatingInputHotkeyInput } from "@/components/input-rating-input-hotkey-input"
+import { InputRatingInputCounterInput } from "@/components/input-rating-input-counter-input"
+import { InputRatingInputStepperInput } from "@/components/input-rating-input-stepper-input"
+import { InputRatingInputProgressInput } from "@/components/input-rating-input-progress-input"
+import { InputRatingInputTimerInput } from "@/components/input-rating-input-timer-input"
+import { InputRatingInputStopwatchInput } from "@/components/input-rating-input-stopwatch-input"
+import { InputRatingInputCalculatorInput } from "@/components/input-rating-input-calculator-input"
+import { InputRatingInputTransferInput } from "@/components/input-rating-input-transfer-input"
+import { InputRatingInputEmojiInput } from "@/components/input-rating-input-emoji-input"
+import { InputRatingInputImageInput } from "@/components/input-rating-input-image-input"
+import { InputRatingInputVideoInput } from "@/components/input-rating-input-video-input"
+import { InputRatingInputAudioInput } from "@/components/input-rating-input-audio-input"
+import { InputRatingInputLocationInput } from "@/components/input-rating-input-location-input"
+import { InputRatingInputMapInput } from "@/components/input-rating-input-map-input"
+import { InputRatingInputCodeInput } from "@/components/input-rating-input-code-input"
+import { InputRatingInputMarkdownInput } from "@/components/input-rating-input-markdown-input"
+import { InputRatingInputRichTextInput } from "@/components/input-rating-input-rich-text-input"
+import { InputRatingInputJsonInput } from "@/components/input-rating-input-json-input"
+import { InputRatingInputYamlInput } from "@/components/input-rating-input-yaml-input"
+import { InputRatingInputXmlInput } from "@/components/input-rating-input-xml-input"
+import { InputRatingInputCsvInput } from "@/components/input-rating-input-csv-input"
+import { InputRatingInputListInput } from "@/components/input-rating-input-list-input"
+import { InputRatingInputTableInput } from "@/components/input-rating-input-table-input"
+import { InputRatingInputTreeInput } from "@/components/input-rating-input-tree-input"
+import { InputRatingInputSignatureInput } from "@/components/input-rating-input-signature-input"
+import { InputRatingInputQRCodeInput } from "@/components/input-rating-input-qrcode-input"
+import { InputRatingInputBarcodeInput } from "@/components/input-rating-input-barcode-input"
+import { InputRatingInputCreditCardInput } from "@/components/input-rating-input-credit-card-input"
+import { InputRatingInputSocialInput } from "@/components/input-rating-input-social-input"
+import { InputRatingInputMentionsInput } from "@/components/input-rating-input-mentions-input"
+import { InputRatingInputStickerInput } from "@/components/input-rating-input-sticker-input"
 
-const venueSchema = z.object({
-  name: z.string().min(3, {
-    message: "Venue name must be at least 3 characters.",
+const formSchema = z.object({
+  name: z.string().min(2, {
+    message: 'Venue name must be at least 2 characters.',
   }),
   description: z.string().min(10, {
-    message: "Description must be at least 10 characters.",
+    message: 'Description must be at least 10 characters.',
   }),
   address: z.string().min(5, {
-    message: "Address must be at least 5 characters.",
+    message: 'Address must be at least 5 characters.',
   }),
-  city_id: z.string().min(1, {
-    message: "Please select a city.",
+  city: z.string().min(2, {
+    message: 'City must be at least 2 characters.',
   }),
-  category_id: z.string().min(1, {
-    message: "Please select a category.",
+  state: z.string().min(2, {
+    message: 'State must be at least 2 characters.',
   }),
-  min_capacity: z.number().min(1, {
-    message: "Minimum capacity must be at least 1.",
-  }).max(10000, {
-    message: "Minimum capacity must be less than 10,000.",
+  zip_code: z.string().min(5, {
+    message: 'Zip code must be at least 5 characters.',
   }),
-  max_capacity: z.number().min(1, {
-    message: "Maximum capacity must be at least 1.",
-  }).max(10000, {
-    message: "Maximum capacity must be less than 10,000.",
+  phone_number: z.string().min(10, {
+    message: 'Phone number must be at least 10 characters.',
   }),
-  starting_price: z.number().min(0, {
-    message: "Starting price must be at least 0.",
+  email: z.string().email({
+    message: 'Invalid email address.',
   }),
-  price_per_person: z.number().optional(),
-  amenities: z.array(z.string()).default([]),
-  wifi: z.boolean().default(false),
-  parking: z.boolean().default(false),
-  opening_hours: z.record(
+  website: z.string().url({
+    message: 'Invalid website URL.',
+  }),
+  capacity: z.number().min(1, {
+    message: 'Capacity must be at least 1.',
+  }),
+  price_per_hour: z.number().min(1, {
+    message: 'Price per hour must be at least 1.',
+  }),
+  opening_hours: z.string().min(5, {
+    message: 'Opening hours must be at least 5 characters.',
+  }),
+  closing_hours: z.string().min(5, {
+    message: 'Closing hours must be at least 5 characters.',
+  }),
+  amenities: z.array(z.string()).optional(),
+  accessibility_features: z.array(z.string()).optional(),
+  accepted_payment_methods: z.array(z.string()).optional(),
+  additional_services: z.array(z.string()).optional(),
+  category_id: z.array(z.string()).optional(),
+  category_name: z.array(z.string()).optional(),
+  gallery_images: z.array(z.string()).optional(),
+  rules_and_regulations: z.array(
     z.object({
-      open: z.string(),
-      close: z.string(),
+      title: z.string(),
+      category: z.string(),
+      description: z.string(),
     })
   ).optional(),
-  availability: z.array(z.string()).default([]),
-  accepted_payment_methods: z.array(z.string()).default([]),
-  accessibility_features: z.array(z.string()).default([]),
-  additional_services: z.array(z.string()).default([]),
-  gallery_images: z.array(z.string()).default([]),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
-  featured: z.boolean().optional(),
-  popular: z.boolean().optional(),
-  currency: z.string().optional(),
-  rating: z.number().optional(),
-  reviews_count: z.number().optional(),
   owner_info: z.object({
-    name: z.string().optional(),
-    contact: z.string().optional(),
-    response_time: z.string().optional(),
-    user_id: z.string().optional(),
+    user_id: z.string(),
+    name: z.string(),
+    email: z.string(),
   }).optional(),
-  type: z.string().optional(),
-  zipcode: z.string().optional(),
-  rules_and_regulations: z.array(z.object({
-    title: z.string(),
-    category: z.string(),
-    description: z.string()
-  })).default([]),
-  category_name: z.array(z.string()).optional(),
-});
-
-type VenueValues = z.infer<typeof venueSchema>
-
-const EditVenue = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const [venue, setVenue] = useState<Database['public']['Tables']['venues']['Row'] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
-  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  const [user, setUser] = useState<{ id: string } | null>(null);
-  const [newImageUrl, setNewImageUrl] = useState('');
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  
-  const [customAmenities, setCustomAmenities] = useState<string[]>([]);
-  const [customAccessibility, setCustomAccessibility] = useState<string[]>([]);
-  const [customPaymentMethods, setCustomPaymentMethods] = useState<string[]>([]);
-  const [customServices, setCustomServices] = useState<string[]>([]);
-  const [customRulesGeneral, setCustomRulesGeneral] = useState<string[]>([
-    'No smoking indoors',
-    'No pets allowed',
-    'No outside food or beverages',
-    'All decorations must be approved by management',
-    'Noise levels must be kept reasonable after 10 PM'
-  ]);
-  
-  const [customRulesBooking, setCustomRulesBooking] = useState<string[]>([
-    '50% advance payment required to confirm booking',
-    'Cancellations within 48 hours are non-refundable',
-    'Venue must be vacated at agreed time',
-    'Damage to property will incur additional charges',
-    'COVID safety protocols must be followed'
-  ]);
-
-  const [categoryNames, setCategoryNames] = useState<string[]>([]);
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-    };
-    
-    getUser();
-  }, []);
-
-  const form = useForm<z.infer<typeof venueSchema>>({
-    resolver: zodResolver(venueSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      address: "",
-      city_id: "",
-      category_id: "",
-      min_capacity: 1,
-      max_capacity: 1,
-      starting_price: 0,
-      amenities: [],
-      wifi: false,
-      parking: false,
-      opening_hours: {
-        monday: { open: "09:00", close: "17:00" },
-        tuesday: { open: "09:00", close: "17:00" },
-        wednesday: { open: "09:00", close: "17:00" },
-        thursday: { open: "09:00", close: "17:00" },
-        friday: { open: "09:00", close: "17:00" },
-        saturday: { open: "09:00", close: "17:00" },
-        sunday: { open: "09:00", close: "17:00" }
-      },
-      category_name: [],
-    },
-    mode: "onChange",
-  });
-
-  const fetchVenue = useCallback(async () => {
-    if (!id) {
-      setError('Venue ID is missing.');
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data, error } = await supabase
-        .from('venues')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        console.log("Fetched venue data:", data);
-        setVenue(data);
-        
-        if (data.gallery_images && Array.isArray(data.gallery_images)) {
-          setGalleryImages(data.gallery_images);
-        }
-        
-        if (data.amenities && Array.isArray(data.amenities)) {
-          setCustomAmenities(data.amenities);
-        }
-        
-        if (data.accessibility_features && Array.isArray(data.accessibility_features)) {
-          setCustomAccessibility(data.accessibility_features);
-        }
-        
-        if (data.accepted_payment_methods && Array.isArray(data.accepted_payment_methods)) {
-          setCustomPaymentMethods(data.accepted_payment_methods);
-        }
-        
-        if (data.additional_services && Array.isArray(data.additional_services)) {
-          setCustomServices(data.additional_services);
-        }
-        
-        if (data.category_name) {
-          let processedCategories: string[] = [];
-          
-          if (Array.isArray(data.category_name)) {
-            processedCategories = data.category_name.map(String);
-          } else if (typeof data.category_name === 'string') {
-            try {
-              const parsed = JSON.parse(data.category_name);
-              if (Array.isArray(parsed)) {
-                processedCategories = parsed.map(String);
-              } else {
-                processedCategories = [String(data.category_name)];
-              }
-            } catch (e) {
-              processedCategories = [String(data.category_name)];
-            }
-          }
-          
-          console.log("Processed category names:", processedCategories);
-          setCategoryNames(processedCategories);
-        }
-        
-        let ownerInfo = null;
-        if (data.owner_info) {
-          try {
-            if (typeof data.owner_info === 'string') {
-              ownerInfo = JSON.parse(data.owner_info);
-            } else if (typeof data.owner_info === 'object' && !Array.isArray(data.owner_info)) {
-              ownerInfo = data.owner_info;
-            }
-          } catch (err) {
-            console.error("Error parsing owner_info:", err);
-          }
-        }
-        
-        let openingHours = null;
-        if (data.opening_hours) {
-          try {
-            if (typeof data.opening_hours === 'string') {
-              openingHours = JSON.parse(data.opening_hours);
-            } else if (typeof data.opening_hours === 'object') {
-              openingHours = data.opening_hours;
-            }
-          } catch (err) {
-            console.error("Error parsing opening_hours:", err);
-            openingHours = {
-              monday: { open: "09:00", close: "17:00" },
-              tuesday: { open: "09:00", close: "17:00" },
-              wednesday: { open: "09:00", close: "17:00" },
-              thursday: { open: "09:00", close: "17:00" },
-              friday: { open: "09:00", close: "17:00" },
-              saturday: { open: "09:00", close: "17:00" },
-              sunday: { open: "09:00", close: "17:00" }
-            };
-          }
-        } else {
-          openingHours = {
-            monday: { open: "09:00", close: "17:00" },
-            tuesday: { open: "09:00", close: "17:00" },
-            wednesday: { open: "09:00", close: "17:00" },
-            thursday: { open: "09:00", close: "17:00" },
-            friday: { open: "09:00", close: "17:00" },
-            saturday: { open: "09:00", close: "17:00" },
-            sunday: { open: "09:00", close: "17:00" }
-          };
-        }
-        
-        let rulesAndRegulations = null;
-        if (data.rules_and_regulations) {
-          try {
-            if (typeof data.rules_and_regulations === 'string') {
-              rulesAndRegulations = JSON.parse(data.rules_and_regulations);
-            } else if (typeof data.rules_and_regulations === 'object') {
-              rulesAndRegulations = data.rules_and_regulations;
-            }
-            
-            if (rulesAndRegulations) {
-              if (Array.isArray(rulesAndRegulations.general)) {
-                setCustomRulesGeneral(rulesAndRegulations.general);
-              }
-              
-              if (Array.isArray(rulesAndRegulations.booking)) {
-                setCustomRulesBooking(rulesAndRegulations.booking);
-              }
-            }
-          } catch (err) {
-            console.error("Error parsing rules_and_regulations:", err);
-          }
-        }
-        
-        form.reset({
-          name: data.name,
-          description: data.description || "",
-          address: data.address || "",
-          city_id: data.city_id || "",
-          category_id: data.category_id ? Array.isArray(data.category_id) ? data.category_id[0] : data.category_id : "",
-          min_capacity: data.min_capacity || 1,
-          max_capacity: data.max_capacity || 1,
-          starting_price: data.starting_price || 0,
-          price_per_person: data.price_per_person || undefined,
-          amenities: data.amenities || [],
-          wifi: data.wifi || false,
-          parking: data.parking || false,
-          accepted_payment_methods: data.accepted_payment_methods || [],
-          accessibility_features: data.accessibility_features || [],
-          additional_services: data.additional_services || [],
-          gallery_images: data.gallery_images || [],
-          featured: data.featured || false,
-          popular: data.popular || false,
-          currency: data.currency || "SAR",
-          rating: data.rating,
-          reviews_count: data.reviews_count,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          opening_hours: openingHours,
-          owner_info: ownerInfo as any,
-          availability: data.availability || [],
-          type: data.type || "",
-          zipcode: data.zipcode || "",
-          rules_and_regulations: rulesAndRegulations || {
-            general: customRulesGeneral,
-            booking: customRulesBooking
-          },
-          category_name: Array.isArray(data.category_name) ? data.category_name : [],
-        });
-      } else {
-        setError('Venue not found.');
-      }
-    } catch (err: any) {
-      setError(err.message);
-      console.error('Failed to fetch venue:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [id, form, customRulesGeneral, customRulesBooking]);
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('category_groups')
-        .select('category_id, category_name')
-        .order('category_name');
-
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        console.log("Fetched categories:", data);
-        const uniqueCategories = new Map();
-        data.forEach(cat => {
-          if (cat.category_id && cat.category_name) {
-            uniqueCategories.set(cat.category_id, {
-              id: cat.category_id,
-              name: cat.category_name
-            });
-          }
-        });
-        
-        const formattedCategories = Array.from(uniqueCategories.values());
-        console.log("Formatted unique categories:", formattedCategories);
-        setCategories(formattedCategories);
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    }
-  }, []);
-
-  const fetchCities = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('city_groups')
-        .select('city_id, city_name')
-        .order('city_name');
-
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        console.log("Fetched cities:", data);
-        const uniqueCities = new Map();
-        data.forEach(city => {
-          if (city.city_id && city.city_name) {
-            uniqueCities.set(city.city_id, {
-              id: city.city_id,
-              name: city.city_name
-            });
-          }
-        });
-        
-        const formattedCities = Array.from(uniqueCities.values());
-        console.log("Formatted unique cities:", formattedCities);
-        setCities(formattedCities);
-      }
-    } catch (error) {
-      console.error('Error fetching cities:', error);
-    }
-  }, []);
-
-  const onSubmit = async (values: z.infer<typeof venueSchema>) => {
-    console.log("Submit button clicked");
-    console.log("Form values:", values);
-    console.log("User:", user);
-    console.log("Venue ID:", id);
-    setLoading(true);
-    setError(null);
-    
-    try {
-      console.log("Starting venue update with ID:", id);
-      console.log("Form values before updating custom fields:", values);
-      
-      // Ensure arrays are properly formatted
-      values.amenities = customAmenities;
-      values.accessibility_features = customAccessibility;
-      values.accepted_payment_methods = customPaymentMethods;
-      values.additional_services = customServices;
-      values.gallery_images = galleryImages;
-      values.category_name = categoryNames;
-      
-      // Make sure category_id is an array
-      if (typeof values.category_id === 'string') {
-        values.category_id = [values.category_id];
-      }
-      
-      // Format rules_and_regulations correctly
-      const formattedRules = [
-        ...customRulesGeneral.map((rule, index) => ({
-          title: `General Rule ${index + 1}`,
-          category: 'General Policies',
-          description: rule
-        })),
-        ...customRulesBooking.map((rule, index) => ({
-          title: `Booking Rule ${index + 1}`,
-          category: 'Reservations and Bookings',
-          description: rule
-        }))
-      ];
-      
-      values.rules_and_regulations = formattedRules;
-      
-      if (venue && venue.owner_info && !values.owner_info) {
-        if (typeof venue.owner_info === 'string') {
-          try {
-            values.owner_info = JSON.parse(venue.owner_info);
-          } catch (err) {
-            console.error("Error parsing venue owner_info:", err);
-          }
-        } else {
-          values.owner_info = venue.owner_info as any;
-        }
-      }
-
-      if (!values.owner_info) {
-        values.owner_info = {
-          user_id: user?.id || '',
-          name: '',
-          contact: '',
-          response_time: ''
-        };
-      }
-
-      console.log("Final venue update values:", values);
-
-      const { data, error: updateError } = await supabase
-        .from('venues')
-        .update(values)
-        .eq('id', id)
-        .select();
-
-      console.log("Update response:", data);
-      console.log("Update error:", updateError);
-
-      if (updateError) {
-        console.error("Supabase update error:", updateError);
-        throw updateError;
-      }
-
-      toast({
-        title: "Venue updated successfully!",
-        description: "Your venue details have been updated.",
-      });
-      navigate(`/venue/${id}`);
-    } catch (err: any) {
-      console.error('Failed to update venue:', err);
-      setError(err.message);
-      toast({
-        variant: "destructive",
-        title: "Update failed!",
-        description: err.message || "Something went wrong. Please try again.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onDelete = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { error } = await supabase
-        .from('venues')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Venue deleted successfully!",
-        description: "Your venue has been removed.",
-      });
-      navigate('/venues');
-    } catch (err: any) {
-      setError(err.message);
-      toast({
-        variant: "destructive",
-        title: "Deletion failed!",
-        description: "Something went wrong. Please try again.",
-      });
-      console.error('Failed to delete venue:', err);
-    } finally {
-      setLoading(false);
-      setIsDeleteAlertOpen(false);
-    }
-  };
-
-  const checkIsOwner = useCallback(() => {
-    if (!user || !venue) return false;
-    return isVenueOwner(venue, user.id);
-  }, [user, venue]);
-
-  useEffect(() => {
-    fetchVenue();
-  }, [fetchVenue]);
-
-  useEffect(() => {
-    fetchCategories();
-    fetchCities();
-  }, [fetchCategories, fetchCities]);
-
-  const handleAddImageUrl = () => {
-    if (!newImageUrl.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Empty URL",
-        description: "Please enter a valid image URL",
-      });
-      return;
-    }
-    
-    if (galleryImages.includes(newImageUrl)) {
-      toast({
-        variant: "destructive",
-        title: "Duplicate URL",
-        description: "This image URL is already in your gallery",
-      });
-      return;
-    }
-    
-    setGalleryImages(prev => [...prev, newImageUrl]);
-    setNewImageUrl('');
-    
-    toast({
-      title: "Image Added",
-      description: "Your image has been added to the gallery",
-    });
-  };
-  
-  const handleRemoveImage = (index: number) => {
-    setGalleryImages(prev => prev.filter((_, i) => i !== index));
-  };
-  
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    setUploadingImage(true);
-    
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        if (file.size > 5 * 1024 * 1024) {
-          toast({
-            variant: "destructive",
-            title: "File Too Large",
-            description: `${file.name} exceeds the 5MB limit`,
-          });
-          continue;
-        }
-        
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-        const filePath = `venues/${user?.id}/${fileName}`;
-        
-        const { error: uploadError, data } = await supabase.storage
-          .from('venue-images')
-          .upload(filePath, file);
-          
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          toast({
-            variant: "destructive",
-            title: "Upload Failed",
-            description: `Failed to upload ${file.name}: ${uploadError.message}`,
-          });
-          continue;
-        }
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('venue-images')
-          .getPublicUrl(filePath);
-          
-        setGalleryImages(prev => [...prev, publicUrl]);
-        
-        toast({
-          title: "Upload Successful",
-          description: `${file.name} has been uploaded`,
-        });
-      }
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      toast({
-        variant: "destructive",
-        title: "Upload Error",
-        description: error.message || "An unexpected error occurred during upload",
-      });
-    } finally {
-      setUploadingImage(false);
-      
-      if (e.target) {
-        e.target.value = '';
-      }
-    }
-  };
-
-  if (loading) {
-    return <div className="container mx-auto py-10 text-center">Loading venue data...</div>;
-  }
-
-  if (error) {
-    return <div className="container mx-auto py-10 text-center">Error: {error}</div>;
-  }
-
-  if (!venue) {
-    return <div className="container mx-auto py-10 text-center">Venue not found.</div>;
-  }
-
-  if (!checkIsOwner()) {
-    return (
-      <div className="container mx-auto py-10 text-center">
-        <h1 className="text-2xl font-bold mb-4">Not Authorized</h1>
-        <p className="mb-6">You don't have permission to edit this venue.</p>
-        <Button onClick={() => navigate(`/venue/${id}`)}>
-          View Venue Details
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-5">Edit Venue</h1>
-
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit((values) => {
-          console.log("Form submitted with values:", values);
-          onSubmit(values);
-        }, (errors) => {
-          console.error("Form validation errors:", errors);
-        })} className="space-y-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-              <CardDescription>Edit the basic details of your venue</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Venue Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Venue Name" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        This is the name of your venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Venue Type</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Venue Type (e.g. Ballroom, Conference Hall)" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The type of venue you're offering.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1 md:col-span-2">
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Description"
-                          className="resize-none h-24"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Describe your venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Address" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The physical address of the venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="zipcode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Zipcode</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Zipcode" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The postal/zip code of the venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="city_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>City</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter city name" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The city where the venue is located.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="col-span-1 md:col-span-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="category_names">Categories</Label>
-                    <TagInput
-                      tags={categoryNames}
-                      setTags={setCategoryNames}
-                      placeholder="Add category and press Enter"
-                      className="w-full"
-                      defaultValue={venue?.category_name}
-                    />
-                    <FormDescription>
-                      The categories for your venue (e.g., Wedding, Conference, Birthday). Enter multiple categories if needed.
-                    </FormDescription>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Capacity and Pricing</CardTitle>
-              <CardDescription>Set capacity limits and pricing options</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="min_capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Minimum Capacity</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="Minimum Capacity"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        The minimum capacity of the venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="max_capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Maximum Capacity</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="Maximum Capacity"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        The maximum capacity of the venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="starting_price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Starting Price</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="Starting Price"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        The starting price of the venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="price_per_person"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price Per Person</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="Price Per Person"
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) => field.onChange(Number(e.target.value) || undefined)}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        The price per person (if applicable).
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="currency"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Currency</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || 'SAR'}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a currency" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="SAR">SAR (Saudi Riyal)</SelectItem>
-                          <SelectItem value="USD">USD (US Dollar)</SelectItem>
-                          <SelectItem value="EUR">EUR (Euro)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        The currency for your venue pricing.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Amenities and Features</CardTitle>
-              <CardDescription>Manage amenities and features your venue offers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FormField
-                control={form.control}
-                name="wifi"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 mb-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">WiFi</FormLabel>
-                      <FormDescription>
-                        Does your venue offer WiFi?
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="parking"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 mb-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Parking</FormLabel>
-                      <FormDescription>
-                        Does your venue offer parking?
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Amenities</h3>
-                  <TagInput
-                    tags={customAmenities}
-                    setTags={setCustomAmenities}
-                    placeholder="Add amenity and press Enter"
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Accessibility Features</h3>
-                  <TagInput
-                    tags={customAccessibility}
-                    setTags={setCustomAccessibility}
-                    placeholder="Add accessibility feature and press Enter"
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Accepted Payment Methods</h3>
-                  <TagInput
-                    tags={customPaymentMethods}
-                    setTags={setCustomPaymentMethods}
-                    placeholder="Add payment method and press Enter"
-                    className="w-full"
-                  />
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Additional Services</h3>
-                  <TagInput
-                    tags={customServices}
-                    setTags={setCustomServices}
-                    placeholder="Add additional service and press Enter"
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Rules and Regulations</CardTitle>
-              <CardDescription>Set venue rules and booking terms</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-2">General Rules</h3>
-                  <TagInput
-                    tags={customRulesGeneral}
-                    setTags={setCustomRulesGeneral}
-                    placeholder="Add rule and press Enter"
-                    className="w-full"
-                  />
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Booking Terms</h3>
-                  <TagInput
-                    tags={customRulesBooking}
-                    setTags={setCustomRulesBooking}
-                    placeholder="Add booking term and press Enter"
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Gallery Images</CardTitle>
-              <CardDescription>Add images of your venue</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Input 
-                    placeholder="Image URL" 
-                    value={newImageUrl}
-                    onChange={(e) => setNewImageUrl(e.target.value)}
-                  />
-                  <Button 
-                    type="button" 
-                    onClick={handleAddImageUrl}
-                    disabled={!newImageUrl.trim()}
-                  >
-                    Add URL
-                  </Button>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="file-upload" className="cursor-pointer bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-colors flex items-center">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Images
-                  </Label>
-                  <Input 
-                    id="file-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    multiple
-                    className="hidden"
-                    disabled={uploadingImage}
-                  />
-                  {uploadingImage && <span className="text-sm text-muted-foreground">Uploading...</span>}
-                </div>
-                
-                {galleryImages.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Gallery Preview</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                      {galleryImages.map((url, index) => (
-                        <div key={index} className="group relative rounded-md overflow-hidden aspect-square">
-                          <img 
-                            src={url} 
-                            alt={`Gallery image ${index + 1}`} 
-                            className="w-full h-full object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(index)}
-                            className="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-between">
-            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" type="button">
-                  Delete Venue
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your venue
-                    and remove it from our servers.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={onDelete}>Continue</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            
-            <div className="space-x-2">
-              <Button type="button" variant="outline" onClick={() => navigate('/my-venues?tab=my-venues')}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Updating...' : 'Save Changes'}
-              </Button>
-            </div>
-          </div>
-        </form>
-      </Form>
-    </div>
-  );
-};
-
-export default EditVenue;
+  is_featured: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+  location: z.string().optional(),
+  average_rating: z.number().optional(),
+  total_reviews: z.number().optional(),
+  booking_policy: z.string().optional(),
+  cancellation_policy: z.string().optional(),
+  terms_and_conditions: z.string().optional(),
+  faqs: z.string().optional(),
+  contact_name: z.string().optional(),
+  contact_email: z.string().optional(),
+  contact_phone: z.string().optional(),
+  social_links: z.string().optional(),
+  meta_title: z.string().optional(),
+  meta_description: z.string().optional(),
+  meta_keywords: z.string().optional(),
+  schema_markup: z.string().optional(),
+  css_styles: z.string().optional(),
+  js_scripts: z.string().optional(),
+  custom_fields: z.string().optional(),
+  seo_friendly_url: z.string().optional(),
+  related_venues: z.array(z.string()).optional(),
+  venue_type: z.string().optional(),
+  time_zone: z.string().optional(),
+  minimum_booking_hours: z.number().optional(),
+  maximum_booking_hours: z.number().optional(),
+  deposit_amount: z.number().optional(),
+  tax_rate: z.number().optional(),
+  currency: z.string().optional(),
+  payment_gateway: z.string().optional(),
+  booking_confirmation_email: z.string().optional(),
+  cancellation_email: z.string().optional(),
+  thank_you_message: z.string().optional(),
+  google_analytics_code: z.string().optional(),
+  facebook_pixel_code: z.string().optional(),
+  conversion_tracking_code: z.string().optional(),
+  recaptcha_code: z.string().optional(),
+  custom_code: z.string().optional(),
+  layout_template: z.string().optional(),
+  page_speed_optimization: z.string().optional(),
+  mobile_friendliness: z.string().optional(),
+  security_measures: z.string().optional(),
+  data_backup_frequency: z.string().optional(),
+  disaster_recovery_plan: z.string().optional(),
+  customer_support_channels: z.string().optional(),
+  customer_support_hours: z.string().optional(),
+  customer_support_languages: z.string().optional(),
+  training_materials: z.string().optional(),
+  user_manuals: z.string().optional(),
+  api_documentation: z.string().optional(),
+  integration_capabilities: z.string().optional(),
+  third_party_integrations: z.string().optional(),
+  data_migration_services: z.string().optional(),
+  customization_options: z.string().optional(),
+  development_services: z.string().optional(),
+  maintenance_services: z.string().optional(),
+  support_services: z.string().optional(),
+  consulting_services: z.string().optional(),
+  training_services: z.string().optional(),
+  installation_services: z.string().optional(),
+  setup_services: z.string().optional(),
+  configuration_services: z.string().optional(),
+  troubleshooting_services: z.string().optional(),
+  performance_monitoring: z.string().optional(),
+  security_audits: z.string().optional(),
+  vulnerability_assessments: z.string().optional(),
+  penetration_testing: z.string().optional(),
+  incident_response_plan: z.string().optional(),
+  business_continuity_plan: z.string().optional(),
+  risk_management_plan: z.string().optional(),
+  compliance_standards: z.string().optional(),
+  regulatory_requirements: z.string().optional(),
+  legal_agreements: z.string().optional(),
+  privacy_policy: z.string().optional(),
+  terms_of_service: z.string().optional(),
+  service_level_agreement: z.string().optional(),
+  warranty_information: z.string().optional(),
+  intellectual_property_rights: z.string().optional(),
+  data_ownership: z.string().optional(),
+  data_usage_policy: z.string().optional(),
+  data_retention_policy: z.string().optional(),
+  data_deletion_policy: z.string().optional(),
+  data_security_measures: z.string().optional(),
+  data_encryption_methods: z.string().optional(),
+  access_control_mechanisms: z.string().optional(),
+  authentication_methods: z.string().optional(),
+  authorization_protocols: z.string().optional(),
+  session_management_techniques: z.string().optional(),
+  input_validation_techniques: z.string().optional(),
+  output_encoding_methods: z.string().optional(),
+  error_handling_procedures: z.string().optional(),
+  logging_mechanisms: z.string().optional(),
+  monitoring_systems: z.string().optional(),
+  alerting_systems: z.string().optional(),
+  reporting_tools: z.string().optional(),
+  analytics_dashboards: z.string().optional(),
+  key_performance_indicators: z.string().optional(),
+  return_on_investment: z.string().optional(),
+  customer_satisfaction_score: z.string().optional(),
+  net_promoter_score: z.string().optional(),
+  customer_churn_rate: z.string().optional(),
+  customer_lifetime_value: z.string().optional(),
+  market_share: z.string().optional(),
+  revenue_growth: z.string().optional(),
+  profit_margin: z.string().optional(),
+  cost_reduction: z.string().optional(),
+  operational_efficiency: z.string().optional(),
+  process_improvement: z.string().optional(),
+  innovation_metrics: z.string().optional(),
+  employee_engagement: z.string().optional(),
+  talent_retention: z.string().optional(),
+  leadership_development: z.string().optional(),
+  organizational_culture: z.string().optional(),
+  corporate_social_responsibility: z.string().optional(),
+  environmental_sustainability: z.string().optional(),
+  community_involvement: z.string().optional(),
+  ethical_conduct: z.string().optional(),
+  legal_compliance: z.string().optional(),
+  risk_mitigation: z.string().optional(),
+  crisis_management: z.string().optional(),
+  reputation_management: z.string().optional(),
+  brand_awareness: z.string().optional(),
+  customer_loyalty: z.string().optional(),
+  competitive_advantage: z.string().optional(),
+  strategic_partnerships: z.string().optional(),
+  mergers_and_acquisitions: z.string().optional(),
+  global_expansion: z.string().optional(),
+  new_product_development: z.string().optional(),
+  technology_adoption: z.string().optional(),
+  digital_transformation: z.string().optional(),
+  artificial_intelligence: z.string().optional(),
+  machine_learning: z.string().optional(),
+  data_science: z.string().optional(),
+  cloud_computing: z.string().optional(),
+  internet_of_things: z.string().optional(),
+  blockchain_technology: z.string().optional(),
+  virtual_reality: z.string().optional(),
+  augmented_reality: z.string().optional(),
+  cybersecurity: z.string().optional(),
+  data_privacy: z.string().optional(),
+  regulatory_compliance_technology: z.string().optional(),
+  financial_technology: z.string().optional(),
+  healthcare_technology: z.string().optional(),
+  educational_technology: z.string().optional(),
+  environmental_technology: z.string().optional(),
+  social_impact_technology: z.string().optional(),
+  sustainable_development_goals: z.string().optional(),
+  impact_investing: z.string().optional(),
+  social_entrepreneurship: z.string().optional(),
+  nonprofit_management: z.string().optional(),
+  philanthropy: z.string().optional(),
+  volunteerism: z.string().optional(),
+  civic_engagement: z.string().optional(),
+  political_activism: z.string().optional(),
+  grassroots_movements: z.string().optional(),
+  social_justice: z.string().optional(),
+  human_rights: z.string().optional(),
+  equality_and_diversity: z.string().optional(),
+  inclusion_and_belonging: z.string().optional(),
+  accessibility_and_universal_design: z.string().optional(),
+  environmental_protection: z.string().optional(),
+  climate_change_mitigation: z.string().optional(),
+  renewable_energy: z.string().optional(),
+  sustainable_agriculture: z.string().optional(),
+  conservation_of_natural_resources: z.string().optional(),
+  waste_reduction_and_recycling: z.string().optional(),
+  pollution_prevention: z.string().optional(),
+  water_conservation: z.string().optional(),
+  air_quality_improvement: z.string().optional(),
+  land_use_planning: z.string().optional(),
+  urban_development: z.string().optional(),
+  rural_development: z.string().optional(),
+  infrastructure_development: z.string().optional(),
+  transportation_planning: z.string().optional(),
+  housing_policy: z.string().optional(),
+  education_reform: z.string().optional(),
+  healthcare_access: z.string().optional(),
+  poverty_reduction: z.string().optional(),
+  economic_development: z.string().optional(),
+  job_creation: z.string().optional(),
+  workforce_development: z.string().optional(),
+  entrepreneurship_and_innovation: z.string().optional(),
+  small_business_support: z.string().optional(),
+  financial_literacy: z.string().optional(),
+  consumer_protection: z.string().optional(),
+  affordable_housing: z.string().optional(),
+  homelessness_prevention: z.string().optional(),
+  community_development: z.string().optional(),
+  social_services: z.string().optional(),
+  public_health: z.string().optional(),
+  mental_health: z.string().optional(),
+  addiction_treatment: z.string().optional(),
+  disease_prevention: z.string().optional(),
+  health_education: z.string().optional(),
+  nutrition_and_wellness: z.string().optional(),
+  fitness_and_exercise: z.string().optional(),
+  stress_management: z.string().optional(),
+  sleep_hygiene: z.string().optional(),
+  mindfulness_and_meditation: z.string().optional(),
+  yoga_and_pilates: z.string().optional(),
+  tai_chi_and_qigong: z.string().optional(),
+  martial_arts: z.string().optional(),
+  dance_and_movement: z.string().optional(),
+  sports_and_recreation: z.string().optional(),
+  outdoor_activities: z.string().optional(),
+  nature_therapy: z.string().optional(),
+  animal-assisted_therapy: z.string().optional(),
+  art_therapy: z.string().optional(),
+  music_therapy: z.string().optional(),
+  drama_therapy: z.string().optional(),
+  play_therapy: z.string().optional(),
+  creative_writing_therapy: z.string().optional(),
+  bibliotherapy: z.string().optional(),
+  poetry_therapy: z.string().optional(),
+  journaling_therapy: z.string().optional(),
+  narrative_therapy: z.string().optional(),
+  cognitive_behavioral_therapy: z.string().optional(),
+  dialectical_behavior_therapy: z.string().optional(),
+  acceptance_and_commitment_therapy: z.string().optional(),
+  mindfulness-based_cognitive_therapy: z.string().optional(),
+  positive_psychology: z.string().optional(),
+  humanistic_psychology: z.string().optional(),
+  existential_psychology: z.string().optional(),
+  transpersonal_psychology: z.string().optional(),
+  integrative_psychology: z.string().optional(),
+  holistic_psychology: z.string().optional(),
+  wellness_coaching: z.string().optional(),
+  life_coaching: z.string().optional(),
+  executive_coaching: z.string().optional(),
+  leadership_coaching: z.string().optional(),
+  career_coaching: z.string().optional(),
+  relationship_coaching: z.string().optional(),
+  financial_coaching: z.string().optional(),
+  health_coaching: z.string().optional(),
+  fitness_coaching: z.string().optional(),
+  nutrition_coaching: z.string().optional(),
+  stress_management_coaching: z.string().optional(),
+  sleep_coaching: z.string().optional(),
+  mindfulness_coaching: z.string().optional(),
+  meditation_coaching: z.string().optional(),
+  yoga_coaching: z.string().optional(),
+  tai_chi_coaching: z.string().optional(),
+  martial_arts_coaching: z.string().optional(),
+  dance_coaching: z.string().optional(),
+  sports_coaching: z.string().optional(),
+  outdoor_activities_coaching: z.string().optional(),
+  nature_therapy_coaching: z.string().optional(),
+  animal-assisted_therapy_coaching: z.string().optional(),
+  art_therapy_coaching: z.string().optional(),
+  music_therapy_coaching: z.string().optional(),
+  drama_therapy_coaching: z.string().optional(),
+  play_therapy_coaching: z.string().optional(),
+  creative_writing_therapy_coaching: z.string().optional(),
+  bibliotherapy_coaching: z.string().optional(),
+  poetry_therapy_coaching: z.string().optional(),
+  journaling_therapy_coaching: z.string().optional(),
+  narrative_therapy_coaching: z.string().optional(),
+  cognitive_behavioral_therapy_coaching: z.string().optional(),
+  dialectical_behavior_therapy_coaching: z.string().optional(),
+  acceptance_and_commitment_therapy_coaching: z.string().optional(),
+  mindfulness-based_cognitive_therapy_coaching: z.string().optional(),
+  positive_psychology_coaching: z.string().optional(),
+  humanistic_psychology_coaching: z.string().optional(),
+  existential_psychology_coaching: z.string().optional(),
+  transpersonal_psychology_coaching: z.string().optional(),
+  integrative_psychology_coaching: z.string().optional(),
+  holistic_psychology_coaching: z.string().optional(),
+  wellness_consulting: z.string().optional(),
+  life_consulting: z.string().optional(),
+  executive_consulting: z.string().optional(),
+  leadership_consulting: z.string().optional(),
+  career_consulting: z.string().optional(),
+  relationship_consulting: z.string().optional(),
+  financial_consulting: z.string().optional(),
+  health_consulting: z.string().optional(),
+  fitness_consulting: z.string().optional(),
+  nutrition_consulting: z.string().optional(),
+  stress_management_consulting: z.string().optional(),
+  sleep_consulting: z.string().optional(),
+  mindfulness_consulting: z.string().optional(),
+  meditation_consulting: z.string().optional(),
+  yoga_consulting: z.string().optional(),
+  tai_chi_consulting: z.string().optional(),
+  martial_arts_consulting: z.string().optional(),
+  dance_consulting: z.string().optional(),
+  sports_consulting: z.string().optional(),
+  outdoor_activities_consulting: z.string().optional(),
+  nature_therapy_consulting: z.string().optional(),
+  animal-assisted_therapy_consulting: z.string().optional(),
+  art_therapy_consulting: z.string().optional(),
+  music_therapy_consulting: z.string().optional(),
+  drama_therapy_consulting: z.string().optional(),
+  play_therapy_consulting: z.string().optional(),
+  creative_writing_therapy_consulting: z.string().optional(),
+  bibliotherapy_consulting: z.string().optional(),
+  poetry_therapy_consulting: z.string().optional(),
+  journaling_therapy_consulting: z.string().optional(),
+  narrative_therapy_consulting: z.string().optional(),
+  cognitive
