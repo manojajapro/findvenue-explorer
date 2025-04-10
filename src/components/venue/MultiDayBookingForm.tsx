@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -138,6 +139,7 @@ export default function MultiDayBookingForm({
     setIsSubmitting(true);
 
     try {
+      // Create a booking record with additional data for proper notifications
       const { data: bookingData, error } = await supabase
         .from('bookings')
         .insert([
@@ -146,8 +148,8 @@ export default function MultiDayBookingForm({
             venue_id: venueId,
             venue_name: venueName,
             booking_date: format(data.date, 'yyyy-MM-dd'),
-            start_time: '00:00',
-            end_time: '23:59',
+            start_time: '00:00', // Full day booking indicator
+            end_time: '23:59',   // Full day booking indicator
             status: 'pending',
             total_price: totalPrice,
             guests: data.guests,
@@ -167,13 +169,21 @@ export default function MultiDayBookingForm({
         throw new Error("Failed to create booking record");
       }
       
-      console.log("Booking created:", bookingData[0]);
+      console.log("Full day booking created:", bookingData[0]);
 
-      await notifyVenueOwner({
+      // Enhanced booking object to ensure proper notification
+      const bookingWithDetails = {
         ...bookingData[0],
         venue_name: venueName,
         booking_date: format(data.date, 'yyyy-MM-dd'),
-      });
+      };
+
+      // Send notification to venue owner about the new full-day booking
+      const notified = await notifyVenueOwner(bookingWithDetails);
+      
+      if (!notified) {
+        console.warn('Venue owner notification may not have been sent');
+      }
 
       toast({
         title: "Full-day booking requested!",

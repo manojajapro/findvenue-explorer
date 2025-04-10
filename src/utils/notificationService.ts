@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -120,6 +119,9 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
     const bookingDate = booking.booking_date 
       ? format(new Date(booking.booking_date), 'MMM d, yyyy') 
       : 'scheduled date';
+      
+    // Determine booking type
+    const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
     
     // Send notification with retry attempts
     const notification = await sendNotification(
@@ -131,7 +133,10 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       {
         booking_id: booking.id,
         venue_id: booking.venue_id,
-        status: booking.status
+        status: booking.status,
+        booking_date: booking.booking_date,
+        venue_name: booking.venue_name,
+        booking_type: bookingType
       },
       5
     );
@@ -173,6 +178,9 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       
       console.log(`Sending notification to owner ${ownerId} for status ${status}`);
       
+      // Determine booking type
+      const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
+      
       const ownerNotification = await sendNotification(
         ownerId,
         ownerTitle,
@@ -184,7 +192,8 @@ export const sendBookingStatusNotification = async (booking: any, status: string
           venue_id: booking.venue_id,
           status: status,
           booking_date: booking.booking_date,
-          venue_name: booking.venue_name
+          venue_name: booking.venue_name,
+          booking_type: bookingType
         },
         5
       );
@@ -203,6 +212,9 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       
       console.log(`Sending notification to customer ${booking.user_id} for status ${status}`);
       
+      // Determine booking type
+      const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
+      
       const customerNotification = await sendNotification(
         booking.user_id,
         customerTitle,
@@ -214,7 +226,8 @@ export const sendBookingStatusNotification = async (booking: any, status: string
           venue_id: booking.venue_id,
           status: status,
           booking_date: booking.booking_date,
-          venue_name: booking.venue_name
+          venue_name: booking.venue_name,
+          booking_type: bookingType
         },
         5
       );

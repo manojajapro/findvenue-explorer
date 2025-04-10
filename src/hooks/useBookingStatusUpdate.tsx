@@ -7,7 +7,8 @@ import { checkSupabaseConnection, updateBookingStatusInDatabase } from '@/utils/
 import { 
   sendNotification, 
   getVenueOwnerId, 
-  sendBookingStatusNotification
+  sendBookingStatusNotification,
+  notifyVenueOwnerAboutBooking
 } from '@/utils/notificationService';
 
 export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
@@ -122,53 +123,20 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
   
   // Function to send notification to venue owner when a booking is created
   const notifyVenueOwner = async (booking: any) => {
-    if (!booking) return;
+    if (!booking) return false;
     
     try {
       console.log('Sending notification to venue owner for booking:', booking);
       
-      // Use the separate notification service function that handles permissions properly
-      const notification = await sendNotification(
-        await getVenueOwnerId(booking.venue_id),
-        'New Booking Request',
-        `A new booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been received.`,
-        'booking',
-        '/customer-bookings',
-        {
-          booking_id: booking.id,
-          venue_id: booking.venue_id,
-          status: booking.status || 'pending',
-          booking_date: booking.booking_date,
-          venue_name: booking.venue_name,
-          booking_type: booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly'
-        }
-      );
+      // Use the more robust notification service function that handles permissions properly
+      const result = await notifyVenueOwnerAboutBooking(booking);
       
-      if (!notification) {
-        console.error('Failed to send notification to venue owner');
+      if (!result) {
+        console.error('Failed to notify venue owner about new booking');
         return false;
       }
       
       console.log('Successfully sent notification to venue owner');
-      
-      // Also send a confirmation notification to the customer
-      if (booking.user_id) {
-        await sendNotification(
-          booking.user_id,
-          'Booking Requested',
-          `Your booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been sent to the venue owner.`,
-          'booking',
-          '/bookings',
-          {
-            booking_id: booking.id,
-            venue_id: booking.venue_id,
-            status: booking.status || 'pending',
-            booking_date: booking.booking_date,
-            venue_name: booking.venue_name,
-            booking_type: booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly'
-          }
-        );
-      }
       
       return true;
     } catch (error) {
