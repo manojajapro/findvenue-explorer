@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -1158,7 +1157,7 @@ const EditVenue = () => {
             </AlertDialog>
             
             <div className="space-x-2">
-              <Button type="button" variant="outline" onClick={() => navigate(`/venue/${id}`)}>
+              <Button type="button" variant="outline" onClick={() => navigate('/my-venues?tab=my-venues')}>
                 Cancel
               </Button>
               <Button type="submit" disabled={loading}>

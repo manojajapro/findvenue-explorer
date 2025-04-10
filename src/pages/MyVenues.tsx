@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,6 +28,7 @@ import {
   AlertDialogAction, 
   AlertDialogCancel 
 } from '@/components/ui/alert-dialog';
+import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 
 const MyVenues = () => {
   const navigate = useNavigate();
@@ -174,7 +174,7 @@ const MyVenues = () => {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 mt-16">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-findvenue">Venue Owner Dashboard</h1>
@@ -274,6 +274,16 @@ const MyVenues = () => {
             </Card>
           </div>
           
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Bookings Calendar</CardTitle>
+              <CardDescription>View and manage your upcoming bookings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <OwnerBookingsCalendar />
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -495,20 +505,7 @@ const MyVenues = () => {
         </TabsContent>
         
         <TabsContent value="bookings" className="mt-6">
-          <div className="text-center py-12">
-            <Calendar className="mx-auto h-16 w-16 text-findvenue-text-muted opacity-30" />
-            <h3 className="mt-4 text-xl font-medium">No bookings yet</h3>
-            <p className="mt-2 text-findvenue-text-muted">
-              You haven't received any bookings yet.
-            </p>
-            <Button 
-              className="mt-6" 
-              variant="outline" 
-              onClick={() => navigate('/customer-bookings')}
-            >
-              View Booking Management
-            </Button>
-          </div>
+          <OwnerBookingsCalendar />
         </TabsContent>
       </Tabs>
     </div>

@@ -20,6 +20,10 @@ const UserMenu = () => {
   const { toast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
+
   const handleSignOut = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -71,7 +75,7 @@ const UserMenu = () => {
         <DropdownMenuSeparator className="bg-white/10" />
         <DropdownMenuItem 
           className="cursor-pointer hover:bg-white/5" 
-          onClick={() => navigate('/profile')}
+          onClick={() => handleNavigate('/profile')}
         >
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
@@ -80,21 +84,21 @@ const UserMenu = () => {
           <>
             <DropdownMenuItem 
               className="cursor-pointer hover:bg-white/5" 
-              onClick={() => navigate('/my-venues?tab=my-venues')}
+              onClick={() => handleNavigate('/my-venues?tab=my-venues')}
             >
               <Building className="mr-2 h-4 w-4" />
               <span>My Venues</span>
             </DropdownMenuItem>
             <DropdownMenuItem 
               className="cursor-pointer hover:bg-white/5" 
-              onClick={() => navigate('/my-venues?tab=dashboard')}
+              onClick={() => handleNavigate('/my-venues?tab=dashboard')}
             >
               <Settings className="mr-2 h-4 w-4" />
               <span>Dashboard</span>
             </DropdownMenuItem>
             <DropdownMenuItem 
               className="cursor-pointer hover:bg-white/5" 
-              onClick={() => navigate('/my-venues?tab=bookings')}
+              onClick={() => handleNavigate('/my-venues?tab=bookings')}
             >
               <Calendar className="mr-2 h-4 w-4" />
               <span>Bookings</span>
@@ -104,7 +108,7 @@ const UserMenu = () => {
         {!isVenueOwner && (
           <DropdownMenuItem 
             className="cursor-pointer hover:bg-white/5" 
-            onClick={() => navigate('/bookings')}
+            onClick={() => handleNavigate('/bookings')}
           >
             <Calendar className="mr-2 h-4 w-4" />
             <span>My Bookings</span>
