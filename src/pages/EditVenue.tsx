@@ -53,9 +53,7 @@ const venueSchema = z.object({
   city_id: z.string().min(1, {
     message: "Please select a city.",
   }),
-  category_id: z.string().min(1, {
-    message: "Please select a category.",
-  }),
+  category_id: z.union([z.string(), z.array(z.string())]), // Allow both string and array of strings
   min_capacity: z.number().min(1, {
     message: "Minimum capacity must be at least 1.",
   }).max(10000, {
@@ -91,19 +89,10 @@ const venueSchema = z.object({
   currency: z.string().optional(),
   rating: z.number().optional(),
   reviews_count: z.number().optional(),
-  owner_info: z.object({
-    name: z.string().optional(),
-    contact: z.string().optional(),
-    response_time: z.string().optional(),
-    user_id: z.string().optional(),
-  }).optional(),
+  owner_info: z.any().optional(), // Using z.any() for complex objects
   type: z.string().optional(),
   zipcode: z.string().optional(),
-  rules_and_regulations: z.array(z.object({
-    title: z.string(),
-    category: z.string(),
-    description: z.string()
-  })).default([]),
+  rules_and_regulations: z.any().default([]), // Using z.any() for complex objects
   category_name: z.array(z.string()).optional(),
 });
 
