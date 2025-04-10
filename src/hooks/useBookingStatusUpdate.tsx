@@ -70,14 +70,18 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       );
       
       // Ensure the booking data includes all necessary fields for notifications
+      const bookingType = booking.booking_type || 
+        (booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly');
+      
       const completeBookingData = {
         ...booking,
         ...result.data,
-        status: status
+        status: status,
+        booking_type: bookingType
       };
       
       // Send notifications to both venue owner and customer using a function with proper permissions
-      console.log('Sending notifications for status update:', status);
+      console.log('Sending notifications for status update:', status, 'Booking type:', bookingType);
       
       // Use the sendBookingStatusNotification function to handle notifications
       const notificationSent = await sendBookingStatusNotification(completeBookingData, status);
@@ -126,10 +130,19 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     if (!booking) return false;
     
     try {
-      console.log('Sending notification to venue owner for booking:', booking);
+      // Make sure booking has booking_type
+      const bookingType = booking.booking_type || 
+        (booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly');
+      
+      const bookingWithType = {
+        ...booking,
+        booking_type: bookingType
+      };
+      
+      console.log('Sending notification to venue owner for booking:', booking.id, 'Type:', bookingType);
       
       // Use the more robust notification service function that handles permissions properly
-      const result = await notifyVenueOwnerAboutBooking(booking);
+      const result = await notifyVenueOwnerAboutBooking(bookingWithType);
       
       if (!result) {
         console.error('Failed to notify venue owner about new booking');

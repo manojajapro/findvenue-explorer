@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -105,7 +104,7 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
   }
   
   try {
-    console.log('Attempting to notify venue owner about booking:', booking.id);
+    console.log('Attempting to notify venue owner about booking:', booking.id, 'Booking type:', booking.booking_type || 'unknown');
     
     // Get venue owner ID
     const ownerId = await getVenueOwnerId(booking.venue_id);
@@ -120,19 +119,22 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       ? format(new Date(booking.booking_date), 'MMM d, yyyy') 
       : 'scheduled date';
       
-    // Determine booking type
-    const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
+    // Determine booking type - check both from direct property and from time values
+    const bookingType = booking.booking_type || 
+      (booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly');
     
     let title, message;
     
     // Customize message based on auto-confirmation
     if (booking.status === 'confirmed') {
       title = 'New Booking Confirmed';
-      message = `A new booking for "${booking.venue_name}" on ${bookingDate} has been automatically confirmed.`;
+      message = `A new ${bookingType} booking for "${booking.venue_name}" on ${bookingDate} has been automatically confirmed.`;
     } else {
       title = 'New Booking Request';
-      message = `A new booking request for "${booking.venue_name}" on ${bookingDate} has been received.`;
+      message = `A new ${bookingType} booking request for "${booking.venue_name}" on ${bookingDate} has been received.`;
     }
+    
+    console.log(`Sending notification to owner ${ownerId} with booking type ${bookingType}`);
     
     // Send notification with retry attempts
     const notification = await sendNotification(
@@ -170,7 +172,7 @@ export const sendBookingStatusNotification = async (booking: any, status: string
   if (!booking) return null;
   
   try {
-    console.log('Sending booking status notification for booking:', booking.id, 'Status:', status);
+    console.log('Sending booking status notification for booking:', booking.id, 'Status:', status, 'Booking type:', booking.booking_type || 'unspecified');
     
     // Get venue owner ID
     const ownerId = await getVenueOwnerId(booking.venue_id);
@@ -180,17 +182,20 @@ export const sendBookingStatusNotification = async (booking: any, status: string
     
     let notificationsSuccessful = true;
     
+    // Determine booking type - check both from direct property and from time values
+    const bookingType = booking.booking_type || 
+      (booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly');
+    
+    console.log(`Identified booking type: ${bookingType}`);
+    
     // Notify owner
     if (ownerId) {
       const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
       const ownerMessage = status === 'confirmed' 
-        ? `A booking for "${booking.venue_name}" on ${formattedDate} has been confirmed${booking.status === 'confirmed' ? ' automatically' : ''}.`
-        : `You have cancelled a booking for "${booking.venue_name}" on ${formattedDate}.`;
+        ? `A ${bookingType} booking for "${booking.venue_name}" on ${formattedDate} has been confirmed${booking.status === 'confirmed' ? ' automatically' : ''}.`
+        : `You have cancelled a ${bookingType} booking for "${booking.venue_name}" on ${formattedDate}.`;
       
       console.log(`Sending notification to owner ${ownerId} for status ${status}`);
-      
-      // Determine booking type
-      const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
       
       const ownerNotification = await sendNotification(
         ownerId,
@@ -221,13 +226,10 @@ export const sendBookingStatusNotification = async (booking: any, status: string
     if (booking.user_id) {
       const customerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
       const customerMessage = status === 'confirmed' 
-        ? `Your booking for ${booking.venue_name} on ${formattedDate} has been ${booking.status === 'confirmed' ? 'automatically ' : ''}confirmed.`
-        : `Your booking for ${booking.venue_name} on ${formattedDate} has been cancelled by the venue owner.`;
+        ? `Your ${bookingType} booking for ${booking.venue_name} on ${formattedDate} has been ${booking.status === 'confirmed' ? 'automatically ' : ''}confirmed.`
+        : `Your ${bookingType} booking for ${booking.venue_name} on ${formattedDate} has been cancelled by the venue owner.`;
       
       console.log(`Sending notification to customer ${booking.user_id} for status ${status}`);
-      
-      // Determine booking type
-      const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
       
       const customerNotification = await sendNotification(
         booking.user_id,
