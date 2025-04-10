@@ -96,7 +96,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       }
       
       // Dismiss the processing toast and show success
-      processingToast.dismiss();
+      processingToast.dismiss && processingToast.dismiss();
       toast({
         title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
         description: `The booking has been ${status} successfully.`,

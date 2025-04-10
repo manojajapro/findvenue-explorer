@@ -118,7 +118,8 @@ export default function MultiDayBookingForm({
       // Notify the venue owner about the new booking
       if (data && data[0]) {
         console.log('Notifying venue owner about new booking');
-        await notifyVenueOwner(data[0]);
+        const notificationResult = await notifyVenueOwner(data[0]);
+        console.log('Notification result:', notificationResult);
       }
 
       // Show success message
@@ -162,7 +163,7 @@ export default function MultiDayBookingForm({
   const formattedBookedDates = bookedDates.map(date => {
     try {
       // Check if the date is already a Date object
-      if (date instanceof Date) return date;
+      if (date && typeof date === 'object' && date instanceof Date) return date;
       
       // Try to parse as ISO date
       const parsedDate = new Date(date);
@@ -205,7 +206,6 @@ export default function MultiDayBookingForm({
               onSelect={handleDateChange}
               className="rounded-md border"
               disabled={isDateDisabled}
-              loading={isLoading}
             />
           </CardContent>
         </Card>
