@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -257,28 +256,53 @@ export const markNotificationAsRead = async (notificationId: string) => {
 
 // Function to ensure rules_and_regulations is properly formatted
 export const formatRulesAndRegulations = (rules: any) => {
-  // If rules is already an object with the right structure, return as-is
-  if (rules && typeof rules === 'object' && !Array.isArray(rules)) {
-    return {
-      general: Array.isArray(rules.general) ? rules.general : [],
-      booking: Array.isArray(rules.booking) ? rules.booking : [],
-      restrictions: Array.isArray(rules.restrictions) ? rules.restrictions : []
-    };
-  }
-  
-  // If rules is an array, convert to expected object format
-  if (Array.isArray(rules)) {
-    return {
-      general: rules,
-      booking: [],
-      restrictions: []
-    };
-  }
-  
-  // Default empty structure
-  return {
+  // Create a proper object structure with default empty arrays
+  let result = {
     general: [],
     booking: [],
     restrictions: []
   };
+  
+  // If rules is null or undefined, return the default structure
+  if (!rules) {
+    return result;
+  }
+  
+  // If rules is already an object, extract the arrays safely
+  if (typeof rules === 'object' && !Array.isArray(rules)) {
+    // Extract arrays safely, ensuring they're arrays
+    if (Array.isArray(rules.general)) {
+      result.general = rules.general;
+    }
+    
+    if (Array.isArray(rules.booking)) {
+      result.booking = rules.booking;
+    }
+    
+    if (Array.isArray(rules.restrictions)) {
+      result.restrictions = rules.restrictions;
+    }
+    
+    return result;
+  }
+  
+  // If rules is a string, try to parse it
+  if (typeof rules === 'string') {
+    try {
+      const parsed = JSON.parse(rules);
+      return formatRulesAndRegulations(parsed); // Recursively format the parsed object
+    } catch (e) {
+      console.error('Error parsing rules_and_regulations string:', e);
+      return result;
+    }
+  }
+  
+  // If rules is an array, add it to general rules
+  if (Array.isArray(rules)) {
+    result.general = rules;
+    return result;
+  }
+  
+  // Default case - return the empty structure
+  return result;
 };

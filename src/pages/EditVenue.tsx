@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -449,11 +450,12 @@ const EditVenue = () => {
       
       values.category_name = categoryNames;
       
-      values.rules_and_regulations = formatRulesAndRegulations({
+      // Fix: Use proper object structure for rules_and_regulations
+      values.rules_and_regulations = {
         general: customRulesGeneral,
         booking: customRulesBooking,
         restrictions: []
-      });
+      };
       
       if (venue && venue.owner_info && !values.owner_info) {
         if (typeof venue.owner_info === 'string') {
