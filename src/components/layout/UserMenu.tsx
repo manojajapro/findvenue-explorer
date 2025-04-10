@@ -11,14 +11,36 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Settings, LogOut, User, Building } from 'lucide-react';
+import { useState } from 'react';
+import { useToast } from '@/components/ui/use-toast';
 
 const UserMenu = () => {
   const { user, signOut, isVenueOwner } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+    if (isSigningOut) return; // Prevent multiple clicks
+    
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been signed out of your account.",
+      });
+      navigate('/');
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      toast({
+        variant: "destructive",
+        title: "Sign out failed",
+        description: "There was a problem signing you out. Please try again.",
+      });
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   const getInitials = () => {
@@ -71,9 +93,10 @@ const UserMenu = () => {
         <DropdownMenuItem 
           className="cursor-pointer hover:bg-white/5 focus:bg-destructive/10" 
           onClick={handleSignOut}
+          disabled={isSigningOut}
         >
           <LogOut className="mr-2 h-4 w-4" />
-          <span>Sign out</span>
+          <span>{isSigningOut ? "Signing out..." : "Sign out"}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

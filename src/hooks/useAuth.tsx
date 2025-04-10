@@ -153,13 +153,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      throw error;
+    try {
+      // First clear local state
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      
+      // Then attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("Error during signOut:", error);
+        throw error;
+      }
+    } catch (error) {
+      console.error("SignOut error:", error);
+      // Even if there's an error, we want to make sure the user is signed out locally
+      setUser(null);
+      setSession(null);
+      setProfile(null);
     }
-    setUser(null);
-    setSession(null);
-    setProfile(null);
   };
 
   const checkIsFavorite = (venueId: string) => {
