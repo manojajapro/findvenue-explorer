@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Input } from './input';
 import { Button } from './button';
@@ -10,10 +10,45 @@ interface TagInputProps {
   placeholder?: string;
   label?: string;
   className?: string;
+  defaultValue?: string | string[];
 }
 
-const TagInput = ({ tags, setTags, placeholder = "Add new item...", label, className }: TagInputProps) => {
+const TagInput = ({ 
+  tags, 
+  setTags, 
+  placeholder = "Add new item...", 
+  label, 
+  className,
+  defaultValue 
+}: TagInputProps) => {
   const [inputValue, setInputValue] = useState('');
+
+  // Process default values if provided
+  useEffect(() => {
+    if (defaultValue && tags.length === 0) {
+      let initialTags: string[] = [];
+      
+      if (typeof defaultValue === 'string') {
+        // Handle string that might be JSON array representation
+        try {
+          const parsed = JSON.parse(defaultValue);
+          if (Array.isArray(parsed)) {
+            initialTags = parsed;
+          } else {
+            initialTags = [defaultValue];
+          }
+        } catch (e) {
+          // If parsing fails, use as single tag
+          initialTags = [defaultValue];
+        }
+      } else if (Array.isArray(defaultValue)) {
+        initialTags = defaultValue;
+      }
+      
+      setTags(initialTags);
+      console.log("TagInput: Initialized with default values:", initialTags);
+    }
+  }, [defaultValue, setTags, tags.length]);
 
   const handleAddTag = () => {
     const trimmedValue = inputValue.trim();

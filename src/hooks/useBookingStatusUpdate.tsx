@@ -60,25 +60,39 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         )
       );
       
-      // Get venue owner ID for notification
+      // Get venue owner ID for notification - Use direct function call
       const ownerId = await getVenueOwnerId(booking.venue_id);
+      console.log(`Got venue owner ID for notification: ${ownerId}`);
       
-      // Send notification to venue owner about status change
+      // Send notification to venue owner about status change - Direct call
       if (ownerId) {
-        console.log(`Sending notification to venue owner ${ownerId} about booking status change`);
-        await sendNotification(
-          ownerId,
-          status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
-          status === 'confirmed' 
-            ? `You have confirmed a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')}.`
-            : `You have cancelled a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')}.`,
-          'booking',
-          '/customer-bookings',
-          {
-            booking_id: bookingId,
-            venue_id: booking.venue_id
-          }
-        );
+        console.log(`Sending direct notification to venue owner ${ownerId} about booking status change`);
+        const notificationTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
+        const notificationMessage = status === 'confirmed' 
+          ? `You have confirmed a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')}.`
+          : `You have cancelled a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')}.`;
+          
+        // Direct notification insertion for owner
+        const { error: ownerNotificationError } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: ownerId,
+            title: notificationTitle,
+            message: notificationMessage,
+            type: 'booking',
+            read: false,
+            link: '/customer-bookings',
+            data: {
+              booking_id: bookingId,
+              venue_id: booking.venue_id
+            }
+          });
+          
+        if (ownerNotificationError) {
+          console.error('Error sending direct notification to owner:', ownerNotificationError);
+        } else {
+          console.log('Direct notification successfully sent to venue owner');
+        }
       } else {
         console.error('Could not find venue owner ID for notification');
       }
@@ -166,28 +180,35 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
           continue;
         }
         
-        // Send notification directly to ensure it works
-        result = await sendNotification(
-          ownerId,
-          'New Booking Request',
-          `A new booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been received.`,
-          'booking',
-          '/customer-bookings',
-          {
-            booking_id: booking.id,
-            venue_id: booking.venue_id
-          }
-        );
+        console.log(`Attempting direct notification insertion for owner ${ownerId}`);
         
-        if (result) {
-          console.log('Successfully sent notification to venue owner:', result);
-        } else {
+        // Direct notification insertion for better reliability
+        const { error } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: ownerId,
+            title: 'New Booking Request',
+            message: `A new booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been received.`,
+            type: 'booking',
+            read: false,
+            link: '/customer-bookings',
+            data: {
+              booking_id: booking.id,
+              venue_id: booking.venue_id
+            }
+          });
+          
+        if (error) {
+          console.error('Error inserting owner notification:', error);
           attempts++;
-          console.log(`Attempt ${attempts} failed, ${attempts < 3 ? 'retrying' : 'giving up'}...`);
-          if (attempts < 3) {
-            // Wait a bit before retrying
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
-          }
+        } else {
+          result = true;
+          console.log('Successfully sent direct notification to venue owner');
+        }
+        
+        if (!result && attempts < 3) {
+          console.log(`Attempt ${attempts} failed, retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
         }
       }
       

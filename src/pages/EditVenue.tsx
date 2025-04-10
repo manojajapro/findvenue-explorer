@@ -142,6 +142,8 @@ const EditVenue = () => {
     'COVID safety protocols must be followed'
   ]);
 
+  const [categoryNames, setCategoryNames] = useState<string[]>([]);
+
   useEffect(() => {
     const getUser = async () => {
       const { data } = await supabase.auth.getUser();
@@ -221,6 +223,28 @@ const EditVenue = () => {
         
         if (data.additional_services && Array.isArray(data.additional_services)) {
           setCustomServices(data.additional_services);
+        }
+        
+        if (data.category_name) {
+          let processedCategories: string[] = [];
+          
+          if (Array.isArray(data.category_name)) {
+            processedCategories = data.category_name.map(String);
+          } else if (typeof data.category_name === 'string') {
+            try {
+              const parsed = JSON.parse(data.category_name);
+              if (Array.isArray(parsed)) {
+                processedCategories = parsed.map(String);
+              } else {
+                processedCategories = [String(data.category_name)];
+              }
+            } catch (e) {
+              processedCategories = [String(data.category_name)];
+            }
+          }
+          
+          console.log("Processed category names:", processedCategories);
+          setCategoryNames(processedCategories);
         }
         
         let ownerInfo = null;
@@ -349,7 +373,6 @@ const EditVenue = () => {
 
       if (data) {
         console.log("Fetched categories:", data);
-        // Ensure unique categories by using a Map
         const uniqueCategories = new Map();
         data.forEach(cat => {
           if (cat.category_id && cat.category_name) {
@@ -382,7 +405,6 @@ const EditVenue = () => {
 
       if (data) {
         console.log("Fetched cities:", data);
-        // Ensure unique cities by using a Map
         const uniqueCities = new Map();
         data.forEach(city => {
           if (city.city_id && city.city_name) {
@@ -420,10 +442,7 @@ const EditVenue = () => {
       values.additional_services = customServices;
       values.gallery_images = galleryImages;
       
-      // Remove this code that references image_url
-      // if (!values.image_url && galleryImages.length > 0) {
-      //   values.image_url = galleryImages[0];
-      // }
+      values.category_name = categoryNames;
       
       if (venue && venue.owner_info && !values.owner_info) {
         if (typeof venue.owner_info === 'string') {
@@ -771,22 +790,20 @@ const EditVenue = () => {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="category_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter venue category" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The category of the venue.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="col-span-1 md:col-span-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="category_names">Categories</Label>
+                    <TagInput
+                      tags={categoryNames}
+                      setTags={setCategoryNames}
+                      placeholder="Add category and press Enter"
+                      className="w-full"
+                    />
+                    <FormDescription>
+                      The categories for your venue (e.g., Wedding, Conference, Birthday). Enter multiple categories if needed.
+                    </FormDescription>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
