@@ -6,7 +6,7 @@ export const enableRealtimeForTable = async (table: string) => {
   try {
     // Check if the table is enabled for realtime using direct DB query
     const { data: realtimeEnabled, error: realtimeCheckError } = await supabase
-      .from('venues')
+      .from(table)
       .select('id')
       .limit(1);
       
