@@ -83,7 +83,6 @@ const venueSchema = z.object({
   accessibility_features: z.array(z.string()).default([]),
   additional_services: z.array(z.string()).default([]),
   gallery_images: z.array(z.string()).default([]),
-  image_url: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   featured: z.boolean().optional(),
@@ -99,6 +98,10 @@ const venueSchema = z.object({
   }).optional(),
   type: z.string().optional(),
   zipcode: z.string().optional(),
+  rules_and_regulations: z.object({
+    general: z.array(z.string()).optional(),
+    booking: z.array(z.string()).optional()
+  }).optional(),
 });
 
 type VenueValues = z.infer<typeof venueSchema>
@@ -123,6 +126,21 @@ const EditVenue = () => {
   const [customAccessibility, setCustomAccessibility] = useState<string[]>([]);
   const [customPaymentMethods, setCustomPaymentMethods] = useState<string[]>([]);
   const [customServices, setCustomServices] = useState<string[]>([]);
+  const [customRulesGeneral, setCustomRulesGeneral] = useState<string[]>([
+    'No smoking indoors',
+    'No pets allowed',
+    'No outside food or beverages',
+    'All decorations must be approved by management',
+    'Noise levels must be kept reasonable after 10 PM'
+  ]);
+  
+  const [customRulesBooking, setCustomRulesBooking] = useState<string[]>([
+    '50% advance payment required to confirm booking',
+    'Cancellations within 48 hours are non-refundable',
+    'Venue must be vacated at agreed time',
+    'Damage to property will incur additional charges',
+    'COVID safety protocols must be followed'
+  ]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -250,6 +268,29 @@ const EditVenue = () => {
           };
         }
         
+        let rulesAndRegulations = null;
+        if (data.rules_and_regulations) {
+          try {
+            if (typeof data.rules_and_regulations === 'string') {
+              rulesAndRegulations = JSON.parse(data.rules_and_regulations);
+            } else if (typeof data.rules_and_regulations === 'object') {
+              rulesAndRegulations = data.rules_and_regulations;
+            }
+            
+            if (rulesAndRegulations) {
+              if (Array.isArray(rulesAndRegulations.general)) {
+                setCustomRulesGeneral(rulesAndRegulations.general);
+              }
+              
+              if (Array.isArray(rulesAndRegulations.booking)) {
+                setCustomRulesBooking(rulesAndRegulations.booking);
+              }
+            }
+          } catch (err) {
+            console.error("Error parsing rules_and_regulations:", err);
+          }
+        }
+        
         form.reset({
           name: data.name,
           description: data.description || "",
@@ -280,6 +321,10 @@ const EditVenue = () => {
           availability: data.availability || [],
           type: data.type || "",
           zipcode: data.zipcode || "",
+          rules_and_regulations: rulesAndRegulations || {
+            general: customRulesGeneral,
+            booking: customRulesBooking
+          },
         });
       } else {
         setError('Venue not found.');
@@ -1140,6 +1185,42 @@ const EditVenue = () => {
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Rules and Regulations</CardTitle>
+              <CardDescription>Set rules and terms for your venue</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label>General Rules</Label>
+                  <TagInput 
+                    tags={customRulesGeneral} 
+                    setTags={setCustomRulesGeneral}
+                    placeholder="Add general rule..."
+                    className="mt-2"
+                  />
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Add rules like "No smoking", "No outside food", etc.
+                  </p>
+                </div>
+                
+                <div>
+                  <Label>Booking Terms</Label>
+                  <TagInput 
+                    tags={customRulesBooking} 
+                    setTags={setCustomRulesBooking}
+                    placeholder="Add booking rule..."
+                    className="mt-2"
+                  />
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Add booking terms like "50% advance payment", "Cancellation policy", etc.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

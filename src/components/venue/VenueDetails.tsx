@@ -66,22 +66,38 @@ const VenueDetails = () => {
 
   const isOwner = user?.id === venue.ownerInfo?.user_id;
   
+  // Function to format category names with proper spacing
+  const formatCategoryNames = (categories: string[] | null) => {
+    if (!categories || categories.length === 0) return [];
+    
+    // Split each category name by capital letter and join with a space
+    return categories.map(category => {
+      // Split camelCase or concatenated category names
+      return category.replace(/([A-Z])/g, ' $1').trim();
+    });
+  };
+  
+  // Get the main image from gallery images
+  const mainImage = venue.galleryImages && venue.galleryImages.length > 0 
+    ? venue.galleryImages[0] 
+    : 'https://placehold.co/600x400?text=No+Image';
+  
   return (
     <div className="container mx-auto p-4">
       <div className="md:flex md:gap-8">
         <div className="md:w-2/3 space-y-4">
           <div className="grid grid-cols-12 gap-4 h-96">
             <div className="col-span-8 h-full">
-              <img src={venue.imageUrl} alt={venue.name} className="w-full h-full rounded-lg object-cover" />
+              <img src={mainImage} alt={venue.name} className="w-full h-full rounded-lg object-cover" />
             </div>
             
             <div className="col-span-4 grid grid-rows-2 gap-4 h-full">
-              {venue.galleryImages && venue.galleryImages.slice(0, 2).map((image, index) => (
+              {venue.galleryImages && venue.galleryImages.slice(1, 3).map((image, index) => (
                 <div key={index} className="relative rounded-lg overflow-hidden">
                   <img src={image} alt={`${venue.name} Gallery ${index + 1}`} className="w-full h-full object-cover" />
-                  {index === 1 && venue.galleryImages && venue.galleryImages.length > 2 && (
+                  {index === 1 && venue.galleryImages && venue.galleryImages.length > 3 && (
                     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                      <span className="text-white text-lg font-medium">+{venue.galleryImages.length - 2} photos</span>
+                      <span className="text-white text-lg font-medium">+{venue.galleryImages.length - 3} photos</span>
                     </div>
                   )}
                 </div>
@@ -120,6 +136,17 @@ const VenueDetails = () => {
           <div className="flex items-center gap-2 mb-2">
             <Users className="h-4 w-4 text-gray-500" />
             <span className="text-gray-600">Capacity: {venue.capacity.min} - {venue.capacity.max}</span>
+          </div>
+          
+          <div className="mb-4">
+            <h4 className="text-sm font-medium mb-2">Categories</h4>
+            <div className="flex flex-wrap gap-2">
+              {formatCategoryNames(venue.categoryName).map((category, index) => (
+                <Badge key={index} className="bg-findvenue/20 text-findvenue hover:bg-findvenue/30">
+                  {category}
+                </Badge>
+              ))}
+            </div>
           </div>
           
           <div className="flex flex-wrap gap-2 mb-4">
