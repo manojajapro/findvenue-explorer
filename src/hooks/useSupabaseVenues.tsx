@@ -211,6 +211,51 @@ export const useSupabaseVenues = () => {
             console.error("Error parsing rules_and_regulations for venue", venue.id, e);
           }
 
+          const processCategoryNames = (categories: any): string[] => {
+            if (!categories) return [];
+            
+            if (Array.isArray(categories)) {
+              return categories.map(cat => typeof cat === 'string' ? cat.trim() : String(cat).trim());
+            }
+            
+            if (typeof categories === 'string') {
+              // Check if comma-separated list
+              if (categories.includes(',')) {
+                return categories.split(',').map(cat => cat.trim());
+              }
+              
+              // Try to parse as JSON
+              try {
+                const parsed = JSON.parse(categories);
+                if (Array.isArray(parsed)) {
+                  return parsed.map(item => String(item).trim());
+                }
+              } catch (e) {
+                // Not JSON, continue processing
+              }
+              
+              // Handle CamelCase concatenated categories (e.g., "ExhibitionsConferencesGraduation")
+              if (/[a-z][A-Z]/.test(categories)) {
+                return categories.replace(/([a-z])([A-Z])/g, '$1,$2').split(',')
+                  .map(cat => cat.trim());
+              }
+              
+              return [categories.trim()];
+            }
+            
+            return [];
+          };
+          
+          const categoryNames = processCategoryNames(venue.category_name);
+          
+          const minCapacity = typeof venue.min_capacity === 'string' 
+            ? parseInt(venue.min_capacity, 10) || 0 
+            : Number(venue.min_capacity) || 0;
+            
+          const maxCapacity = typeof venue.max_capacity === 'string' 
+            ? parseInt(venue.max_capacity, 10) || 0 
+            : Number(venue.max_capacity) || 0;
+            
           const defaultImage = venue.gallery_images && venue.gallery_images.length > 0 
             ? venue.gallery_images[0] 
             : '';
@@ -227,8 +272,8 @@ export const useSupabaseVenues = () => {
             category: venue.category_name || '',
             categoryId: venue.category_id || '',
             capacity: {
-              min: venue.min_capacity || 0,
-              max: venue.max_capacity || 0
+              min: minCapacity,
+              max: maxCapacity
             },
             pricing: {
               currency: venue.currency || 'SAR',
@@ -254,7 +299,7 @@ export const useSupabaseVenues = () => {
             rulesAndRegulations: rulesAndRegulationsData,
             type: venue.type || '',           
             zipcode: venue.zipcode || '',
-            categoryNames: venue.category_names || []
+            categoryNames: categoryNames
           } as Venue;
         });
         

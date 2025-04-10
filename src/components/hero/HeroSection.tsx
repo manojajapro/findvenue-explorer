@@ -4,6 +4,7 @@ import { Search, Users, Calendar, MapPin, ChevronDown, X, Building } from 'lucid
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -20,18 +21,15 @@ const HeroSection = () => {
   const [venueTypes, setVenueTypes] = useState<{value: string, label: string}[]>([]);
   const [date, setDate] = useState<Date | undefined>(undefined);
   
-  // Fetch categories from Supabase with deduplication
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        // First check if we have category_groups table data
         const { data: categoryGroupsData, error: categoryGroupsError } = await supabase
           .from('category_groups')
           .select('category_id, category_name')
           .order('category_name');
         
         if (categoryGroupsError || !categoryGroupsData || categoryGroupsData.length === 0) {
-          // Fallback: Get all venues to extract unique categories
           const { data: venuesData, error: venuesError } = await supabase
             .from('venues')
             .select('category_id, category_name')
@@ -44,7 +42,6 @@ const HeroSection = () => {
             
             venuesData.forEach(venue => {
               if (Array.isArray(venue.category_id)) {
-                // Handle only first category to avoid duplicates in dropdown
                 const catId = venue.category_id[0];
                 if (!catId) return;
                 
@@ -93,11 +90,9 @@ const HeroSection = () => {
             setCategories(formattedCategories);
           }
         } else {
-          // Use pre-aggregated category data from the database
           const formattedCategories = categoryGroupsData.map(cat => {
             let categoryName = cat.category_name || '';
             
-            // Process string array format if present
             if (typeof categoryName === 'string' && categoryName.startsWith('[')) {
               try {
                 const parsedCategories = JSON.parse(categoryName.replace(/'/g, '"'));
@@ -124,7 +119,6 @@ const HeroSection = () => {
     fetchCategories();
   }, []);
   
-  // Fetch venue types from the database
   useEffect(() => {
     const fetchVenueTypes = async () => {
       try {
@@ -140,7 +134,6 @@ const HeroSection = () => {
           
           data.forEach(venue => {
             if (venue.type && typeof venue.type === 'string') {
-              // Format the type for display (capitalize first letter)
               const formattedType = venue.type.charAt(0).toUpperCase() + venue.type.slice(1);
               uniqueTypes.set(venue.type, {
                 value: venue.type,
@@ -151,11 +144,9 @@ const HeroSection = () => {
           
           const typeArray = Array.from(uniqueTypes.values());
           
-          // Only update if we found venue types
           if (typeArray.length > 0) {
             setVenueTypes(typeArray);
           } else {
-            // Fallback to default venue types
             setVenueTypes([
               { value: 'hall', label: 'Hall' },
               { value: 'restaurant', label: 'Restaurant' },
@@ -168,7 +159,6 @@ const HeroSection = () => {
         }
       } catch (error) {
         console.error('Error fetching venue types:', error);
-        // Fallback to default venue types
         setVenueTypes([
           { value: 'hall', label: 'Hall' },
           { value: 'restaurant', label: 'Restaurant' },
@@ -183,7 +173,6 @@ const HeroSection = () => {
     fetchVenueTypes();
   }, []);
   
-  // Fetch cities from Supabase
   useEffect(() => {
     const fetchCities = async () => {
       try {
@@ -218,7 +207,6 @@ const HeroSection = () => {
     if (location) params.append('cityId', location);
     if (date) params.append('date', format(date, 'yyyy-MM-dd'));
     
-    // Navigate to venues page with map view
     navigate(`/venues?view=map&${params.toString()}`);
   };
   
@@ -232,7 +220,6 @@ const HeroSection = () => {
   
   return (
     <section className="relative min-h-screen flex items-center justify-center py-20 overflow-hidden">
-      {/* Background Image - Using a high-quality venue image */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-findvenue-dark-bg/70 via-findvenue-dark-bg/90 to-findvenue-dark-bg z-10" />
         <img 
@@ -255,13 +242,11 @@ const HeroSection = () => {
           </p>
         </div>
         
-        {/* Search Form */}
         <form 
           onSubmit={handleSearch}
           className="bg-findvenue-card-bg/80 backdrop-blur-xl p-4 md:p-6 rounded-lg border border-white/10 max-w-5xl mx-auto shadow-xl"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Event Type / Category */}
             <div className="lg:col-span-1">
               <Popover>
                 <PopoverTrigger asChild>
@@ -286,7 +271,7 @@ const HeroSection = () => {
                         className="justify-start text-findvenue-text hover:text-white hover:bg-findvenue-surface"
                         onClick={() => {
                           setEventType(category.id);
-                          document.body.click(); // Close popover
+                          document.body.click();
                         }}
                       >
                         {category.name}
@@ -297,7 +282,6 @@ const HeroSection = () => {
               </Popover>
             </div>
             
-            {/* Venue Type */}
             <div className="lg:col-span-1">
               <Popover>
                 <PopoverTrigger asChild>
@@ -322,7 +306,7 @@ const HeroSection = () => {
                         className="justify-start text-findvenue-text hover:text-white hover:bg-findvenue-surface"
                         onClick={() => {
                           setVenueType(type.value);
-                          document.body.click(); // Close popover
+                          document.body.click();
                         }}
                       >
                         {type.label}
@@ -333,7 +317,6 @@ const HeroSection = () => {
               </Popover>
             </div>
             
-            {/* Number of Guests */}
             <div className="lg:col-span-1">
               <div className="relative">
                 <Input
@@ -347,7 +330,6 @@ const HeroSection = () => {
               </div>
             </div>
             
-            {/* Location / City */}
             <div className="lg:col-span-1">
               <Popover>
                 <PopoverTrigger asChild>
@@ -372,7 +354,7 @@ const HeroSection = () => {
                         className="justify-start text-findvenue-text hover:text-white hover:bg-findvenue-surface"
                         onClick={() => {
                           setLocation(city.id);
-                          document.body.click(); // Close popover
+                          document.body.click();
                         }}
                       >
                         {city.name}
@@ -383,7 +365,6 @@ const HeroSection = () => {
               </Popover>
             </div>
             
-            {/* Search Button */}
             <div className="lg:col-span-1">
               <Button
                 type="submit"
@@ -395,7 +376,6 @@ const HeroSection = () => {
             </div>
           </div>
           
-          {/* Advanced Filters Toggle */}
           <div className="mt-4 flex justify-between items-center">
             <Button
               type="button"
@@ -420,7 +400,6 @@ const HeroSection = () => {
             )}
           </div>
           
-          {/* Advanced Filters (hidden by default) */}
           {showFilters && (
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-white/10 animate-fade-in">
               <div>

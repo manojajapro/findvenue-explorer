@@ -124,42 +124,39 @@ export const useVenueData = () => {
             return [String(field)];
           };
           
-          // Special handling for category_name which could be a single string or an array
+          // Enhanced function to better process category names
           const processCategoryNames = (categories: any): string[] => {
             if (!categories) return [];
             
+            // Handle array directly
             if (Array.isArray(categories)) {
-              return categories.map(category => {
-                if (typeof category === 'string') {
-                  return category.trim();
-                }
-                return String(category).trim();
-              });
+              return categories.map(cat => typeof cat === 'string' ? cat.trim() : String(cat).trim());
             }
             
+            // Handle string formats
             if (typeof categories === 'string') {
-              // Check if this is a comma-separated string
+              // Check if comma-separated list
               if (categories.includes(',')) {
-                return categories.split(',').map(c => c.trim());
+                return categories.split(',').map(cat => cat.trim());
               }
               
-              // Check if it's a JSON string
+              // Try to parse as JSON
               try {
                 const parsed = JSON.parse(categories);
                 if (Array.isArray(parsed)) {
-                  return parsed.map(item => item.toString().trim());
+                  return parsed.map(item => String(item).trim());
                 }
               } catch (e) {
                 // Not JSON, continue processing
               }
               
-              // It might be a concatenated string without proper separators
-              // Try to split by capital letters (e.g., "ExhibitionsConferencesGraduation")
+              // Handle CamelCase concatenated categories (e.g., "ExhibitionsConferencesGraduation")
               if (/[a-z][A-Z]/.test(categories)) {
-                const splitByCapitals = categories.replace(/([a-z])([A-Z])/g, '$1,$2').split(',');
-                return splitByCapitals.map(part => part.trim());
+                return categories.replace(/([a-z])([A-Z])/g, '$1,$2').split(',')
+                  .map(cat => cat.trim());
               }
               
+              // Return as single item if nothing else worked
               return [categories.trim()];
             }
             
@@ -172,8 +169,13 @@ export const useVenueData = () => {
           const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
           
           // Ensure capacity values are numbers
-          const minCapacity = Number(data.min_capacity) || 0;
-          const maxCapacity = Number(data.max_capacity) || 0;
+          const minCapacity = typeof data.min_capacity === 'string' 
+            ? parseInt(data.min_capacity, 10) || 0 
+            : Number(data.min_capacity) || 0;
+            
+          const maxCapacity = typeof data.max_capacity === 'string' 
+            ? parseInt(data.max_capacity, 10) || 0 
+            : Number(data.max_capacity) || 0;
           
           // Ensure pricing values are numbers
           const startingPrice = Number(data.starting_price) || 0;
