@@ -219,6 +219,11 @@ export default function VenueBookingTabs({
     );
   }
 
+  // Parse pricePerHour to ensure it's a number
+  const parsedPricePerHour = Number(pricePerHour) || 0;
+  const parsedMinCapacity = Number(minCapacity) || 1;
+  const parsedMaxCapacity = Number(maxCapacity) || 100;
+
   return (
     <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
       <h3 className="text-lg font-semibold mb-4">Book this venue</h3>
@@ -255,7 +260,7 @@ export default function VenueBookingTabs({
             <BookingForm 
               venueId={venueId} 
               venueName={venueName} 
-              pricePerHour={pricePerHour} 
+              pricePerHour={parsedPricePerHour} 
               ownerId={ownerId}
               ownerName={ownerName}
               bookedTimeSlots={bookedTimeSlots}
@@ -267,9 +272,9 @@ export default function VenueBookingTabs({
             <MultiDayBookingForm 
               venueId={venueId} 
               venueName={venueName} 
-              pricePerHour={pricePerHour}
-              minCapacity={minCapacity}
-              maxCapacity={maxCapacity}
+              pricePerHour={parsedPricePerHour}
+              minCapacity={parsedMinCapacity}
+              maxCapacity={parsedMaxCapacity}
               bookedDates={[...fullyBookedDates, ...hourlyBookedDates]} // Disable dates with hourly bookings for day booking
               isLoading={isLoadingBookings}
             />

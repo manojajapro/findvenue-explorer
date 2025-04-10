@@ -87,12 +87,12 @@ export default function MultiDayBookingForm({
         if (data) {
           // Set price per person if available
           if (data.price_per_person) {
-            setPricePerPerson(data.price_per_person);
+            setPricePerPerson(Number(data.price_per_person) || 0);
           }
           
           // Set base price
           if (data.starting_price) {
-            setBasePrice(data.starting_price);
+            setBasePrice(Number(data.starting_price) || 0);
           }
         }
       } catch (error) {
@@ -169,6 +169,39 @@ export default function MultiDayBookingForm({
 
       if (error) {
         throw error;
+      }
+
+      // Send notification to venue owner
+      const { data: venueData } = await supabase
+        .from('venues')
+        .select('owner_info')
+        .eq('id', venueId)
+        .single();
+        
+      if (venueData?.owner_info) {
+        const ownerInfo = typeof venueData.owner_info === 'string'
+          ? JSON.parse(venueData.owner_info)
+          : venueData.owner_info;
+            
+        const ownerId = ownerInfo.user_id;
+        
+        if (ownerId) {
+          // Create a notification for the venue owner
+          await supabase.from('notifications').insert([{
+            user_id: ownerId,
+            type: 'booking',
+            message: `New booking for ${venueName} on ${format(data.date, 'PPP')}`,
+            data: { 
+              booking_date: format(data.date, 'yyyy-MM-dd'),
+              venue_id: venueId,
+              venue_name: venueName,
+              guests: data.guests,
+              total_price: totalPrice,
+              customer_email: data.customerEmail
+            },
+            read: false
+          }]);
+        }
       }
 
       // If booking successful, redirect to bookings page

@@ -129,7 +129,7 @@ export const useVenueData = () => {
             if (!category) return '';
             
             if (Array.isArray(category)) {
-              return category.length > 0 ? category[0] : '';
+              return category.length > 0 ? String(category[0]) : '';
             }
             
             if (typeof category === 'string') {
@@ -141,13 +141,22 @@ export const useVenueData = () => {
               return category;
             }
             
-            return '';
+            return String(category);
           };
           
           // Process gallery images - ensure we have an array of strings
           const galleryImages = processArrayField(data.gallery_images);
           // Use the first gallery image as default image
           const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
+          
+          // Ensure capacity values are numbers
+          const minCapacity = Number(data.min_capacity) || 0;
+          const maxCapacity = Number(data.max_capacity) || 0;
+          
+          // Ensure pricing values are numbers
+          const startingPrice = Number(data.starting_price) || 0;
+          const pricePerPerson = data.price_per_person ? Number(data.price_per_person) : undefined;
+          const hourlyRate = data.hourly_rate ? Number(data.hourly_rate) : undefined;
           
           const transformedVenue: Venue = {
             id: data.id,
@@ -161,14 +170,14 @@ export const useVenueData = () => {
             category: processCategoryName(data.category_name),
             categoryId: data.category_id || '',
             capacity: {
-              min: data.min_capacity || 0,
-              max: data.max_capacity || 0
+              min: minCapacity,
+              max: maxCapacity
             },
             pricing: {
               currency: data.currency || 'SAR',
-              startingPrice: data.starting_price || 0,
-              pricePerPerson: data.price_per_person,
-              hourlyRate: data.hourly_rate
+              startingPrice: startingPrice,
+              pricePerPerson: pricePerPerson,
+              hourlyRate: hourlyRate
             },
             amenities: processArrayField(data.amenities),
             rating: data.rating || 0,
