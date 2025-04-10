@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -68,6 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           setUser(null);
           setProfile(null);
+          setIsVenueOwner(false);
         }
       }
     );
@@ -88,6 +90,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         setIsLoading(false);
         setUser(null);
+        setProfile(null);
+        setIsVenueOwner(false);
       }
     });
 
@@ -153,25 +157,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
+      // First clear local state to avoid UI issues
       setUser(null);
       setSession(null);
       setProfile(null);
       setIsVenueOwner(false);
       
+      // Clear local storage items used by Supabase Auth
       try {
-        localStorage.removeItem('supabase.auth.token');
-        localStorage.removeItem('sb-esdmelfzeszjtbnoajig-auth-token');
+        const localStorageKeys = Object.keys(localStorage);
+        // Clean up any Supabase auth related items
+        localStorageKeys.forEach(key => {
+          if (key.includes('supabase.auth') || key.includes('-auth-token')) {
+            localStorage.removeItem(key);
+          }
+        });
       } catch (e) {
         console.warn("Could not clear local storage items:", e);
       }
       
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error("Error during signOut:", error);
-      }
+      // Now call the signOut method
+      await supabase.auth.signOut();
     } catch (error) {
       console.error("SignOut error:", error);
+      throw error;
     }
   };
 

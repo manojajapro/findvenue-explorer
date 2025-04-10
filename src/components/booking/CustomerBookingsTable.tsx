@@ -97,105 +97,113 @@ export const CustomerBookingsTable = ({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {Object.keys(bookingGroups).map(groupKey => {
-          const group = bookingGroups[groupKey];
-          const hasMultipleBookings = group.length > 1;
-          
-          return group.map((booking, idx) => (
-            <TableRow key={booking.id} className={`border-white/10 ${hasMultipleBookings ? 'bg-findvenue-surface/20' : ''}`}>
-              <TableCell className="font-medium">{booking.user_name}</TableCell>
-              <TableCell>
-                <div className="text-xs space-y-1">
-                  {booking.user_email && (
-                    <div className="flex items-center gap-1 text-findvenue-text-muted">
-                      <Mail className="h-3 w-3" />
-                      <span>{booking.user_email}</span>
+        {Object.keys(bookingGroups).length > 0 ? (
+          Object.keys(bookingGroups).map(groupKey => {
+            const group = bookingGroups[groupKey];
+            const hasMultipleBookings = group.length > 1;
+            
+            return group.map((booking, idx) => (
+              <TableRow key={booking.id} className={`border-white/10 ${hasMultipleBookings ? 'bg-findvenue-surface/20' : ''}`}>
+                <TableCell className="font-medium">{booking.user_name || 'Unknown'}</TableCell>
+                <TableCell>
+                  <div className="text-xs space-y-1">
+                    {booking.user_email && (
+                      <div className="flex items-center gap-1 text-findvenue-text-muted">
+                        <Mail className="h-3 w-3" />
+                        <span>{booking.user_email}</span>
+                      </div>
+                    )}
+                    {booking.customer_phone && (
+                      <div className="flex items-center gap-1 text-findvenue-text-muted">
+                        <Phone className="h-3 w-3" />
+                        <span>{booking.customer_phone}</span>
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>{booking.venue_name || 'Unnamed Venue'}</TableCell>
+                <TableCell>{formatBookingDate(booking.booking_date)}</TableCell>
+                <TableCell>{booking.start_time} - {booking.end_time}</TableCell>
+                <TableCell>{booking.guests}</TableCell>
+                <TableCell>
+                  {booking.payment_method ? (
+                    <div className="flex items-center gap-1">
+                      <CreditCard className="h-3 w-3" />
+                      <span className="text-xs bg-findvenue/10 text-findvenue px-2 py-1 rounded">
+                        {booking.payment_method}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-findvenue-text-muted">Not specified</span>
+                  )}
+                </TableCell>
+                <TableCell>SAR {booking.total_price.toFixed(2)}</TableCell>
+                <TableCell>
+                  <Badge className={getStatusColor(booking.status)}>
+                    {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  {booking.status === 'pending' && activeTab === 'upcoming' && (
+                    <div className="flex space-x-2 justify-end">
+                      <Button 
+                        variant="outline"
+                        className="border-green-500 text-green-500 hover:bg-green-500/10"
+                        size="sm"
+                        onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
+                        disabled={processingBookingIds.has(booking.id) || isBusy}
+                      >
+                        {processingBookingIds.has(booking.id) ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full mr-1"></div>
+                        ) : (
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                        )}
+                        Confirm
+                      </Button>
+                      
+                      <Button 
+                        variant="outline"
+                        className="border-destructive text-destructive hover:bg-destructive/10"
+                        size="sm"
+                        onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
+                        disabled={processingBookingIds.has(booking.id) || isBusy}
+                      >
+                        {processingBookingIds.has(booking.id) ? (
+                          <div className="animate-spin h-4 w-4 border-2 border-destructive border-t-transparent rounded-full mr-1"></div>
+                        ) : (
+                          <XCircle className="h-4 w-4 mr-1" />
+                        )}
+                        Cancel
+                      </Button>
                     </div>
                   )}
-                  {booking.customer_phone && (
-                    <div className="flex items-center gap-1 text-findvenue-text-muted">
-                      <Phone className="h-3 w-3" />
-                      <span>{booking.customer_phone}</span>
+                  {!processingBookingIds.has(booking.id) && booking.status !== 'pending' && (
+                    <div className="flex space-x-2 justify-end">
+                      <span className="text-findvenue-text-muted text-sm mr-2">
+                        {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-findvenue text-findvenue hover:bg-findvenue/10"
+                        onClick={() => initiateChat(booking.user_id)}
+                      >
+                        <MessageCircle className="h-4 w-4 mr-1" />
+                        Chat
+                      </Button>
                     </div>
                   )}
-                </div>
-              </TableCell>
-              <TableCell>{booking.venue_name}</TableCell>
-              <TableCell>{formatBookingDate(booking.booking_date)}</TableCell>
-              <TableCell>{booking.start_time} - {booking.end_time}</TableCell>
-              <TableCell>{booking.guests}</TableCell>
-              <TableCell>
-                {booking.payment_method ? (
-                  <div className="flex items-center gap-1">
-                    <CreditCard className="h-3 w-3" />
-                    <span className="text-xs bg-findvenue/10 text-findvenue px-2 py-1 rounded">
-                      {booking.payment_method}
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-xs text-findvenue-text-muted">Not specified</span>
-                )}
-              </TableCell>
-              <TableCell>SAR {booking.total_price.toFixed(2)}</TableCell>
-              <TableCell>
-                <Badge className={getStatusColor(booking.status)}>
-                  {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right">
-                {booking.status === 'pending' && activeTab === 'upcoming' && (
-                  <div className="flex space-x-2 justify-end">
-                    <Button 
-                      variant="outline"
-                      className="border-green-500 text-green-500 hover:bg-green-500/10"
-                      size="sm"
-                      onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
-                      disabled={processingBookingIds.has(booking.id) || isBusy}
-                    >
-                      {processingBookingIds.has(booking.id) ? (
-                        <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full mr-1"></div>
-                      ) : (
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                      )}
-                      Confirm
-                    </Button>
-                    
-                    <Button 
-                      variant="outline"
-                      className="border-destructive text-destructive hover:bg-destructive/10"
-                      size="sm"
-                      onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
-                      disabled={processingBookingIds.has(booking.id) || isBusy}
-                    >
-                      {processingBookingIds.has(booking.id) ? (
-                        <div className="animate-spin h-4 w-4 border-2 border-destructive border-t-transparent rounded-full mr-1"></div>
-                      ) : (
-                        <XCircle className="h-4 w-4 mr-1" />
-                      )}
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-                {!processingBookingIds.has(booking.id) && booking.status !== 'pending' && (
-                  <div className="flex space-x-2 justify-end">
-                    <span className="text-findvenue-text-muted text-sm mr-2">
-                      {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-findvenue text-findvenue hover:bg-findvenue/10"
-                      onClick={() => initiateChat(booking.user_id)}
-                    >
-                      <MessageCircle className="h-4 w-4 mr-1" />
-                      Chat
-                    </Button>
-                  </div>
-                )}
-              </TableCell>
-            </TableRow>
-          ));
-        })}
+                </TableCell>
+              </TableRow>
+            ));
+          })
+        ) : (
+          <TableRow>
+            <TableCell colSpan={10} className="text-center py-4 text-findvenue-text-muted">
+              No bookings found
+            </TableCell>
+          </TableRow>
+        )}
       </TableBody>
     </Table>
   );

@@ -42,6 +42,22 @@ const VenuesList = ({
       navigate('/login');
     }
   };
+
+  // Make sure venue images use the first image from gallery_images if available
+  const processVenueImages = (venues: Venue[]) => {
+    return venues.map(venue => {
+      // If the venue has gallery_images, use the first one
+      if (venue.gallery_images && Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) {
+        return {
+          ...venue,
+          image_url: venue.gallery_images[0]
+        };
+      }
+      return venue;
+    });
+  };
+
+  const processedVenues = processVenueImages(venues);
   
   if (isLoading) {
     return (
@@ -78,7 +94,7 @@ const VenuesList = ({
   
   return (
     <div className={`grid grid-cols-2 ${compact ? '' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-4`}>
-      {venues.map((venue) => (
+      {processedVenues.map((venue) => (
         <div 
           key={venue.id} 
           className={`h-full ${compact ? 'mb-3 last:mb-0' : ''} cursor-pointer`}

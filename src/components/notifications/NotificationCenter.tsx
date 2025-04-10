@@ -60,6 +60,22 @@ const NotificationCenter = () => {
 
     fetchNotifications();
 
+    // Enable realtime for notifications table if not already enabled
+    const enableRealtimeForNotifications = async () => {
+      try {
+        const { error } = await supabase.rpc(
+          'supabase_functions.notify_all',
+          { table: 'notifications' }
+        );
+        if (error) console.error('Error enabling realtime:', error);
+      } catch (e) {
+        console.error('Could not enable realtime:', e);
+        // Continue even if this fails
+      }
+    };
+    
+    enableRealtimeForNotifications();
+
     // Subscribe to new notifications
     const channel = supabase
       .channel('notification_changes')

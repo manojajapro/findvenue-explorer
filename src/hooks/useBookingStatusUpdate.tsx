@@ -117,5 +117,61 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     }
   };
   
-  return { updateBookingStatus, isBusy };
+  // Add function to send notification to venue owner when a booking is created
+  const notifyVenueOwner = async (booking: any) => {
+    try {
+      // First, get the venue owner's user_id from the venue data
+      const { data: venueData, error: venueError } = await supabase
+        .from('venues')
+        .select('owner_info')
+        .eq('id', booking.venue_id)
+        .single();
+      
+      if (venueError || !venueData) {
+        console.error('Error fetching venue data:', venueError);
+        return;
+      }
+      
+      let ownerId;
+      try {
+        const ownerInfo = typeof venueData.owner_info === 'string' 
+          ? JSON.parse(venueData.owner_info) 
+          : venueData.owner_info;
+        
+        ownerId = ownerInfo?.user_id;
+      } catch (e) {
+        console.error('Error parsing owner_info:', e);
+        return;
+      }
+      
+      if (!ownerId) {
+        console.error('Could not find owner ID for this venue');
+        return;
+      }
+      
+      // Send notification to venue owner
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: ownerId,
+          title: 'New Booking Request',
+          message: `A new booking request for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been received.`,
+          type: 'booking',
+          read: false,
+          link: '/customer-bookings',
+          data: {
+            booking_id: booking.id,
+            venue_id: booking.venue_id
+          }
+        });
+      
+      if (notificationError) {
+        console.error('Error sending notification to venue owner:', notificationError);
+      }
+    } catch (error) {
+      console.error('Failed to notify venue owner about new booking:', error);
+    }
+  };
+  
+  return { updateBookingStatus, notifyVenueOwner, isBusy };
 };

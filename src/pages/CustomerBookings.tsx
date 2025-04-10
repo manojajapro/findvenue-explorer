@@ -11,6 +11,7 @@ import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
 import { CustomerBookingsTable } from '@/components/booking/CustomerBookingsTable';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
 
 const CustomerBookings = () => {
   const { user, isVenueOwner } = useAuth();
@@ -22,6 +23,11 @@ const CustomerBookings = () => {
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('calendar');
   const [error, setError] = useState<string | null>(null);
   const [processingBookingIds, setProcessingBookingIds] = useState<Set<string>>(new Set());
+  
+  // Enable realtime for the bookings table
+  useEffect(() => {
+    enableRealtimeForTable('bookings');
+  }, []);
   
   const fetchBookings = useCallback(async () => {
     if (!user) return;
@@ -144,6 +150,7 @@ const CustomerBookings = () => {
           throw error;
         }
         
+        console.log('Customer bookings fetched:', data);
         setBookings(data || []);
       }
     } catch (error: any) {
@@ -167,7 +174,70 @@ const CustomerBookings = () => {
     }
   }, [user, fetchBookings]);
   
-  const { updateBookingStatus, isBusy } = useBookingStatusUpdate(fetchBookings);
+  // Set up realtime subscription for bookings
+  useEffect(() => {
+    if (!user) return;
+
+    // Subscribe to bookings changes for this user
+    const channel = supabase
+      .channel('bookings_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'bookings',
+          filter: isVenueOwner 
+            ? undefined 
+            : `user_id=eq.${user.id}`
+        }, 
+        (payload) => {
+          console.log('Booking change detected:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newBooking = payload.new;
+            
+            // For venue owners, check if this booking is for one of their venues
+            if (isVenueOwner) {
+              const venueIds = bookings.map(b => b.venue_id);
+              if (!venueIds.includes(newBooking.venue_id)) {
+                // Not for owner's venue, ignore
+                return;
+              }
+            }
+            
+            // Add the new booking to the list
+            setBookings(prev => [newBooking, ...prev]);
+            toast({
+              title: 'New Booking',
+              description: `A new booking has been created for ${newBooking.venue_name}.`
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            // Update existing booking
+            setBookings(prev => 
+              prev.map(b => b.id === payload.new.id ? { ...b, ...payload.new } : b)
+            );
+            
+            if (payload.old.status !== payload.new.status) {
+              toast({
+                title: 'Booking Status Changed',
+                description: `Booking for ${payload.new.venue_name} is now ${payload.new.status}.`,
+                variant: payload.new.status === 'confirmed' ? 'default' : 'destructive'
+              });
+            }
+          } else if (payload.eventType === 'DELETE') {
+            // Remove deleted booking
+            setBookings(prev => prev.filter(b => b.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, isVenueOwner, bookings, toast]);
+  
+  const { updateBookingStatus, notifyVenueOwner, isBusy } = useBookingStatusUpdate(fetchBookings);
 
   const handleStatusUpdate = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
     if (processingBookingIds.has(bookingId) || isBusy) {
