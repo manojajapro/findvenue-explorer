@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -100,11 +99,11 @@ const venueSchema = z.object({
   }).optional(),
   type: z.string().optional(),
   zipcode: z.string().optional(),
-  rules_and_regulations: z.object({
-    general: z.array(z.string()).default([]),
-    booking: z.array(z.string()).default([]),
-    restrictions: z.array(z.string()).optional().default([])
-  }).optional(),
+  rules_and_regulations: z.array(z.object({
+    title: z.string(),
+    category: z.string(),
+    description: z.string()
+  })).default([]),
   category_name: z.array(z.string()).optional(),
 });
 
@@ -450,12 +449,18 @@ const EditVenue = () => {
       
       values.category_name = categoryNames;
       
-      // Fix: Use proper object structure for rules_and_regulations
-      values.rules_and_regulations = {
-        general: customRulesGeneral,
-        booking: customRulesBooking,
-        restrictions: []
-      };
+      values.rules_and_regulations = [
+        ...customRulesGeneral.map((rule, index) => ({
+          title: `General Rule ${index + 1}`,
+          category: 'General Policies',
+          description: rule
+        })),
+        ...customRulesBooking.map((rule, index) => ({
+          title: `Booking Rule ${index + 1}`,
+          category: 'Reservations and Bookings',
+          description: rule
+        }))
+      ];
       
       if (venue && venue.owner_info && !values.owner_info) {
         if (typeof venue.owner_info === 'string') {
