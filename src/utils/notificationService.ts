@@ -256,7 +256,7 @@ export const formatRulesAndRegulations = (rules: any) => {
   if (Array.isArray(rules)) {
     return {
       general: rules,
-      cancellation: [],
+      booking: [],
       restrictions: []
     };
   }
@@ -264,7 +264,7 @@ export const formatRulesAndRegulations = (rules: any) => {
   // Default empty structure
   return {
     general: [],
-    cancellation: [],
+    booking: [],
     restrictions: []
   };
 };
