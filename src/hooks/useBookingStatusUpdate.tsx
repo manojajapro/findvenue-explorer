@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { checkSupabaseConnection, updateBookingStatusInDatabase } from '@/utils/supabaseHealthCheck';
-import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
+import { notifyVenueOwnerAboutBooking, sendNotification, getVenueOwnerId } from '@/utils/notificationService';
 
 export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
   const { toast } = useToast();
@@ -60,8 +60,32 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         )
       );
       
+      // Get venue owner ID for notification
+      const ownerId = await getVenueOwnerId(booking.venue_id);
+      
+      // Send notification to venue owner about status change
+      if (ownerId) {
+        console.log(`Sending notification to venue owner ${ownerId} about booking status change`);
+        await sendNotification(
+          ownerId,
+          status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
+          status === 'confirmed' 
+            ? `You have confirmed a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')}.`
+            : `You have cancelled a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')}.`,
+          'booking',
+          '/customer-bookings',
+          {
+            booking_id: bookingId,
+            venue_id: booking.venue_id
+          }
+        );
+      } else {
+        console.error('Could not find venue owner ID for notification');
+      }
+      
       // Send notification to customer
       try {
+        console.log(`Sending notification to customer ${booking.user_id} about booking status change`);
         const { error: notificationError } = await supabase
           .from('notifications')
           .insert({
@@ -132,8 +156,28 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       let result = null;
       
       while (!result && attempts < 3) {
-        // Use our notifyVenueOwnerAboutBooking function from notificationService
-        result = await notifyVenueOwnerAboutBooking(booking);
+        // Get venue owner ID directly
+        const ownerId = await getVenueOwnerId(booking.venue_id);
+        
+        if (!ownerId) {
+          console.error('Could not find venue owner ID for venue', booking.venue_id);
+          attempts++;
+          if (attempts < 3) await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+          continue;
+        }
+        
+        // Send notification directly to ensure it works
+        result = await sendNotification(
+          ownerId,
+          'New Booking Request',
+          `A new booking request for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been received.`,
+          'booking',
+          '/customer-bookings',
+          {
+            booking_id: booking.id,
+            venue_id: booking.venue_id
+          }
+        );
         
         if (result) {
           console.log('Successfully sent notification to venue owner:', result);
