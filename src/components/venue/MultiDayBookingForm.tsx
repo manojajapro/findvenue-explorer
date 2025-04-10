@@ -166,6 +166,7 @@ export default function MultiDayBookingForm({
         .select();
 
       if (error) {
+        console.error("Error creating booking:", error);
         throw error;
       }
       

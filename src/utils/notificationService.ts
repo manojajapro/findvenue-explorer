@@ -210,7 +210,10 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       );
       
       if (!ownerNotification) {
+        console.error("Failed to send notification to venue owner");
         notificationsSuccessful = false;
+      } else {
+        console.log("Successfully sent notification to venue owner");
       }
     }
     
@@ -244,7 +247,10 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       );
       
       if (!customerNotification) {
+        console.error("Failed to send notification to customer");
         notificationsSuccessful = false;
+      } else {
+        console.log("Successfully sent notification to customer");
       }
     }
     
