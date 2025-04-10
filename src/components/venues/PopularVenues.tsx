@@ -112,7 +112,7 @@ const PopularVenues = () => {
               Discover our most sought-after venues in Saudi Arabia's capital city
             </p>
           </div>
-          <Link to="/?cityId=riyadh" className="mt-4 md:mt-0">
+          <Link to="/venues?cityId=riyadh&view=map" className="mt-4 md:mt-0">
             <Button variant="outline" className="border-findvenue text-findvenue hover:bg-findvenue/10">
               View All in Riyadh
               <ArrowRight className="ml-2 h-4 w-4" />

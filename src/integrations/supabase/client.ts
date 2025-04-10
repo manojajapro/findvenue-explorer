@@ -1,5 +1,5 @@
 
-// Fix the import by using the correct syntax for supabase-js v2
+// Using the correct import syntax for supabase-js v2
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

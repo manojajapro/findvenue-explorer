@@ -72,7 +72,7 @@ const CitiesSection = () => {
           const formattedCities = cityGroupsData.map(city => ({
             id: city.city_id,
             name: city.city_name,
-            gallery_images: city.image_url ? [city.image_url] : [],
+            gallery_images: city.gallery_images || [],
             venueCount: city.venue_count || 0,
             featured: true
           }));

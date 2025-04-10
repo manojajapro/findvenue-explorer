@@ -118,7 +118,7 @@ const TopVenues = ({ cityId, cityName }: TopVenuesProps) => {
               Explore the finest venues with premium amenities and exceptional service
             </p>
           </div>
-          <Link to={`/?cityId=${cityId}`} className="mt-4 md:mt-0">
+          <Link to={`/venues?cityId=${cityId}&view=map`} className="mt-4 md:mt-0">
             <Button variant="outline" className="border-findvenue text-findvenue hover:bg-findvenue/10">
               View All in {cityName}
               <ArrowRight className="ml-2 h-4 w-4" />
