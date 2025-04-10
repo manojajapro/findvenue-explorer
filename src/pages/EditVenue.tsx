@@ -964,3 +964,457 @@ const EditVenue = () => {
             <CardHeader>
               <CardTitle>Amenities and Features</CardTitle>
               <CardDescription>Manage amenities and features your venue offers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="amenities"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Amenities</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter amenities and press Enter"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        List all amenities offered by your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="wifi"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Wi-Fi</FormLabel>
+                      <FormControl>
+                        <Switch {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Does your venue have Wi-Fi?
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="parking"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parking</FormLabel>
+                      <FormControl>
+                        <Switch {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Does your venue have parking?
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="opening_hours"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Opening Hours</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter opening hours"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter the opening hours of your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="availability"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Availability</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter availability"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter any availability restrictions.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="accepted_payment_methods"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Accepted Payment Methods</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter accepted payment methods"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter the payment methods accepted by your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="accessibility_features"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Accessibility Features</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter accessibility features"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter any accessibility features offered by your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="additional_services"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Additional Services</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter additional services"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter any additional services offered by your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="gallery_images"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gallery Images</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter gallery images"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter any gallery images for your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="latitude"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Latitude</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Latitude"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter the latitude of your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="longitude"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Longitude</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Longitude"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter the longitude of your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="featured"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Featured</FormLabel>
+                      <FormControl>
+                        <Switch {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Is your venue featured?
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="popular"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Popular</FormLabel>
+                      <FormControl>
+                        <Switch {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Is your venue popular?
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="currency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Currency</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || 'SAR'}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a currency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="SAR">SAR (Saudi Riyal)</SelectItem>
+                          <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                          <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        The currency for your venue pricing.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="rating"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rating</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Rating"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter the rating of your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="reviews_count"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reviews Count</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Reviews Count"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter the number of reviews for your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="owner_info"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Owner Info</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter owner info"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter any owner information for your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Venue Type</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Venue Type (e.g. Ballroom, Conference Hall)" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The type of venue you're offering.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="zipcode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zipcode</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Zipcode" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        The postal/zip code of the venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="rules_and_regulations"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rules and Regulations</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter rules and regulations"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter any rules and regulations for your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="category_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category Names</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter category names"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Enter any category names for your venue.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-between mt-8">
+            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">Delete Venue</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete your venue
+                    and remove all associated data.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <div>
+              <Button type="button" variant="outline" className="mr-4" onClick={() => navigate(`/venue/${id}`)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Form>
+    </div>
+  );
+};
+
+export default EditVenue;
