@@ -441,15 +441,21 @@ const EditVenue = () => {
       console.log("Starting venue update with ID:", id);
       console.log("Form values before updating custom fields:", values);
       
+      // Ensure arrays are properly formatted
       values.amenities = customAmenities;
       values.accessibility_features = customAccessibility;
       values.accepted_payment_methods = customPaymentMethods;
       values.additional_services = customServices;
       values.gallery_images = galleryImages;
-      
       values.category_name = categoryNames;
       
-      values.rules_and_regulations = [
+      // Make sure category_id is an array
+      if (typeof values.category_id === 'string') {
+        values.category_id = [values.category_id];
+      }
+      
+      // Format rules_and_regulations correctly
+      const formattedRules = [
         ...customRulesGeneral.map((rule, index) => ({
           title: `General Rule ${index + 1}`,
           category: 'General Policies',
@@ -461,6 +467,8 @@ const EditVenue = () => {
           description: rule
         }))
       ];
+      
+      values.rules_and_regulations = formattedRules;
       
       if (venue && venue.owner_info && !values.owner_info) {
         if (typeof venue.owner_info === 'string') {
