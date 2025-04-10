@@ -102,6 +102,7 @@ const venueSchema = z.object({
     general: z.array(z.string()).optional(),
     booking: z.array(z.string()).optional()
   }).optional(),
+  category_name: z.array(z.string()).optional(),
 });
 
 type VenueValues = z.infer<typeof venueSchema>
@@ -175,7 +176,8 @@ const EditVenue = () => {
         friday: { open: "09:00", close: "17:00" },
         saturday: { open: "09:00", close: "17:00" },
         sunday: { open: "09:00", close: "17:00" }
-      }
+      },
+      category_name: [],
     },
     mode: "onChange",
   });
@@ -320,7 +322,7 @@ const EditVenue = () => {
           description: data.description || "",
           address: data.address || "",
           city_id: data.city_id || "",
-          category_id: data.category_id || "",
+          category_id: data.category_id ? Array.isArray(data.category_id) ? data.category_id[0] : data.category_id : "",
           min_capacity: data.min_capacity || 1,
           max_capacity: data.max_capacity || 1,
           starting_price: data.starting_price || 0,
@@ -348,6 +350,7 @@ const EditVenue = () => {
             general: customRulesGeneral,
             booking: customRulesBooking
           },
+          category_name: Array.isArray(data.category_name) ? data.category_name : [],
         });
       } else {
         setError('Venue not found.');
@@ -358,7 +361,7 @@ const EditVenue = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, form]);
+  }, [id, form, customRulesGeneral, customRulesBooking]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -443,6 +446,16 @@ const EditVenue = () => {
       values.gallery_images = galleryImages;
       
       values.category_name = categoryNames;
+      
+      if (values.rules_and_regulations) {
+        values.rules_and_regulations.general = customRulesGeneral;
+        values.rules_and_regulations.booking = customRulesBooking;
+      } else {
+        values.rules_and_regulations = {
+          general: customRulesGeneral,
+          booking: customRulesBooking
+        };
+      }
       
       if (venue && venue.owner_info && !values.owner_info) {
         if (typeof venue.owner_info === 'string') {
@@ -798,6 +811,7 @@ const EditVenue = () => {
                       setTags={setCategoryNames}
                       placeholder="Add category and press Enter"
                       className="w-full"
+                      defaultValue={venue?.category_name}
                     />
                     <FormDescription>
                       The categories for your venue (e.g., Wedding, Conference, Birthday). Enter multiple categories if needed.

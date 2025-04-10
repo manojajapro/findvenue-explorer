@@ -72,26 +72,38 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
           ? `You have confirmed a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')}.`
           : `You have cancelled a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM d, yyyy')}.`;
           
-        // Direct notification insertion for owner
-        const { error: ownerNotificationError } = await supabase
-          .from('notifications')
-          .insert({
-            user_id: ownerId,
-            title: notificationTitle,
-            message: notificationMessage,
-            type: 'booking',
-            read: false,
-            link: '/customer-bookings',
-            data: {
-              booking_id: bookingId,
-              venue_id: booking.venue_id
-            }
-          });
-          
-        if (ownerNotificationError) {
-          console.error('Error sending direct notification to owner:', ownerNotificationError);
-        } else {
-          console.log('Direct notification successfully sent to venue owner');
+        // Direct notification insertion for owner - with multiple attempts for reliability
+        let ownerNotificationSuccess = false;
+        let attempts = 0;
+        
+        while (!ownerNotificationSuccess && attempts < 3) {
+          const { error: ownerNotificationError } = await supabase
+            .from('notifications')
+            .insert({
+              user_id: ownerId,
+              title: notificationTitle,
+              message: notificationMessage,
+              type: 'booking',
+              read: false,
+              link: '/customer-bookings',
+              data: {
+                booking_id: bookingId,
+                venue_id: booking.venue_id
+              }
+            });
+            
+          if (!ownerNotificationError) {
+            ownerNotificationSuccess = true;
+            console.log('Direct notification successfully sent to venue owner');
+          } else {
+            attempts++;
+            console.error(`Error sending owner notification (attempt ${attempts}):`, ownerNotificationError);
+            if (attempts < 3) await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        if (!ownerNotificationSuccess) {
+          console.error('Failed to send notification to venue owner after multiple attempts');
         }
       } else {
         console.error('Could not find venue owner ID for notification');
@@ -119,13 +131,11 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         
         if (notificationError) {
           console.error('Error sending notification:', notificationError);
-          // Don't throw here, just log the error since the main update succeeded
         } else {
           console.log('Notification sent successfully to customer');
         }
       } catch (notifyError) {
         console.error('Failed to send notification:', notifyError);
-        // Continue with success even if notification fails
       }
       
       // Dismiss the processing toast and show success

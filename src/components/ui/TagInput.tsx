@@ -42,7 +42,7 @@ const TagInput = ({
           initialTags = [defaultValue];
         }
       } else if (Array.isArray(defaultValue)) {
-        initialTags = defaultValue;
+        initialTags = defaultValue.map(item => item?.toString() || '').filter(Boolean);
       }
       
       setTags(initialTags);
