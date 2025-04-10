@@ -153,6 +153,8 @@ export const sendBookingStatusNotification = async (booking: any, status: string
   if (!booking) return null;
   
   try {
+    console.log('Sending booking status notification for booking:', booking.id, 'Status:', status);
+    
     // Get venue owner ID
     const ownerId = await getVenueOwnerId(booking.venue_id);
     const formattedDate = booking.booking_date 
@@ -166,6 +168,8 @@ export const sendBookingStatusNotification = async (booking: any, status: string
         ? `You have confirmed a booking for "${booking.venue_name}" on ${formattedDate}.`
         : `You have cancelled a booking for "${booking.venue_name}" on ${formattedDate}.`;
       
+      console.log(`Sending notification to owner ${ownerId} for status ${status}`);
+      
       await sendNotification(
         ownerId,
         ownerTitle,
@@ -175,7 +179,9 @@ export const sendBookingStatusNotification = async (booking: any, status: string
         {
           booking_id: booking.id,
           venue_id: booking.venue_id,
-          status
+          status: status,
+          booking_date: booking.booking_date,
+          venue_name: booking.venue_name
         },
         5
       );
@@ -188,6 +194,8 @@ export const sendBookingStatusNotification = async (booking: any, status: string
         ? `Your booking for ${booking.venue_name} on ${formattedDate} has been confirmed.`
         : `Your booking for ${booking.venue_name} on ${formattedDate} has been cancelled by the venue owner.`;
       
+      console.log(`Sending notification to customer ${booking.user_id} for status ${status}`);
+      
       await sendNotification(
         booking.user_id,
         customerTitle,
@@ -197,7 +205,9 @@ export const sendBookingStatusNotification = async (booking: any, status: string
         {
           booking_id: booking.id,
           venue_id: booking.venue_id,
-          status
+          status: status,
+          booking_date: booking.booking_date,
+          venue_name: booking.venue_name
         },
         5
       );
@@ -249,7 +259,11 @@ export const markNotificationAsRead = async (notificationId: string) => {
 export const formatRulesAndRegulations = (rules: any) => {
   // If rules is already an object with the right structure, return as-is
   if (rules && typeof rules === 'object' && !Array.isArray(rules)) {
-    return rules;
+    return {
+      general: Array.isArray(rules.general) ? rules.general : [],
+      booking: Array.isArray(rules.booking) ? rules.booking : [],
+      restrictions: Array.isArray(rules.restrictions) ? rules.restrictions : []
+    };
   }
   
   // If rules is an array, convert to expected object format

@@ -50,8 +50,10 @@ export const updateBookingStatusInDatabase = async (bookingId: string, status: s
     }
     
     if (data && data.length > 0) {
+      console.log('Successfully updated booking status:', data[0]);
       return { data: data[0] };
     } else {
+      console.error('No data returned from booking update');
       return { data: null };
     }
   } catch (error) {

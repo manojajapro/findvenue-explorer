@@ -68,8 +68,16 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         )
       );
       
-      // Send notifications to both venue owner and customer using our enhanced service
-      const notificationSent = await sendBookingStatusNotification(booking, status);
+      // Ensure the booking data includes all necessary fields for notifications
+      const completeBookingData = {
+        ...booking,
+        ...result.data,
+        status: status
+      };
+      
+      // Send notifications to both venue owner and customer
+      console.log('Sending notifications for status update:', status);
+      const notificationSent = await sendBookingStatusNotification(completeBookingData, status);
       
       if (!notificationSent) {
         console.warn('Notifications might not have been sent properly');
@@ -143,7 +151,9 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         {
           booking_id: booking.id,
           venue_id: booking.venue_id,
-          status: 'pending'
+          status: 'pending',
+          booking_date: booking.booking_date,
+          venue_name: booking.venue_name
         },
         5
       );
@@ -172,7 +182,9 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
           {
             booking_id: booking.id,
             venue_id: booking.venue_id,
-            status: 'pending'
+            status: 'pending',
+            booking_date: booking.booking_date,
+            venue_name: booking.venue_name
           },
           5
         );

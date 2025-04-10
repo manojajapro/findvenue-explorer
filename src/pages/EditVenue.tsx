@@ -38,6 +38,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { isVenueOwner, getVenueOwnerId } from '@/utils/venueHelpers';
 import { X, Upload } from 'lucide-react';
 import TagInput from '@/components/ui/TagInput';
+import { formatRulesAndRegulations } from '@/utils/notificationService';
 
 const venueSchema = z.object({
   name: z.string().min(3, {
@@ -99,8 +100,9 @@ const venueSchema = z.object({
   type: z.string().optional(),
   zipcode: z.string().optional(),
   rules_and_regulations: z.object({
-    general: z.array(z.string()).optional(),
-    booking: z.array(z.string()).optional()
+    general: z.array(z.string()).default([]),
+    booking: z.array(z.string()).default([]),
+    restrictions: z.array(z.string()).optional().default([])
   }).optional(),
   category_name: z.array(z.string()).optional(),
 });
@@ -447,10 +449,11 @@ const EditVenue = () => {
       
       values.category_name = categoryNames;
       
-      values.rules_and_regulations = {
+      values.rules_and_regulations = formatRulesAndRegulations({
         general: customRulesGeneral,
-        booking: customRulesBooking
-      };
+        booking: customRulesBooking,
+        restrictions: []
+      });
       
       if (venue && venue.owner_info && !values.owner_info) {
         if (typeof venue.owner_info === 'string') {
