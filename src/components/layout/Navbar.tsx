@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Search, LogIn, Menu, X, Heart, 
   Calendar, User, Building, PlusCircle, LogOut,
-  Home, MessageCircle
+  Home, MessageCircle, Book
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
@@ -49,8 +49,10 @@ const Navbar = () => {
     if (path === '/my-venues') {
       return location.pathname.startsWith(path) || 
         location.pathname === '/list-venue' || 
-        location.pathname.startsWith('/edit-venue') ||
-        location.pathname === '/customer-bookings';
+        location.pathname.startsWith('/edit-venue');
+    }
+    if (path === '/customer-bookings') {
+      return location.pathname === path;
     }
     return location.pathname.startsWith(path);
   };
@@ -149,6 +151,16 @@ const Navbar = () => {
                     className={isActive('/list-venue') ? 'bg-findvenue-surface' : ''}
                   >
                     List Venue
+                  </Button>
+                </Link>
+                
+                <Link to="/customer-bookings">
+                  <Button 
+                    variant={isActive('/customer-bookings') ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className={isActive('/customer-bookings') ? 'bg-findvenue-surface' : ''}
+                  >
+                    Bookings
                   </Button>
                 </Link>
               </>
@@ -371,6 +383,17 @@ const Navbar = () => {
                     >
                       <PlusCircle className="mr-2 h-4 w-4" />
                       List Venue
+                    </Button>
+                  </Link>
+                  
+                  <Link to="/customer-bookings">
+                    <Button 
+                      variant={isActive('/customer-bookings') ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={`w-full justify-start ${isActive('/customer-bookings') ? 'bg-findvenue-surface' : ''}`}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Bookings
                     </Button>
                   </Link>
                 </>
