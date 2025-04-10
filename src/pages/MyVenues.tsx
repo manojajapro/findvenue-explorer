@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -118,21 +119,62 @@ const MyVenues = () => {
     try {
       if (!user) return;
       
-      const { data, error } = await supabase
+      // First, get all venues owned by the current user
+      const { data: venuesData, error: venuesError } = await supabase
+        .from('venues')
+        .select('id, owner_info');
+      
+      if (venuesError) {
+        console.error('Error fetching venues for booking stats:', venuesError);
+        return;
+      }
+      
+      // Filter venues to only include those owned by this user
+      const ownerVenues = venuesData?.filter(venue => {
+        if (!venue.owner_info) return false;
+        
+        try {
+          const ownerInfo = typeof venue.owner_info === 'string' 
+            ? JSON.parse(venue.owner_info) 
+            : venue.owner_info;
+            
+          return ownerInfo.user_id === user.id;
+        } catch (e) {
+          console.error("Error parsing owner_info for venue", venue.id, e);
+          return false;
+        }
+      });
+      
+      if (!ownerVenues || ownerVenues.length === 0) {
+        console.log('No venues found for booking stats');
+        return;
+      }
+      
+      const venueIds = ownerVenues.map(venue => venue.id);
+      console.log('Venue IDs for booking stats:', venueIds);
+      
+      // Then fetch all bookings for these venues
+      const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select('status')
-        .eq('user_id', user.id);
+        .in('venue_id', venueIds);
+        
+      if (bookingsError) {
+        console.error('Error fetching bookings stats:', bookingsError);
+        return;
+      }
       
-      if (error) throw error;
+      console.log('Bookings data for stats:', bookingsData);
       
       const stats = {
-        total: data.length,
-        pending: data.filter(b => b.status === 'pending').length,
-        confirmed: data.filter(b => b.status === 'confirmed').length,
-        completed: data.filter(b => b.status === 'completed').length,
-        cancelled: data.filter(b => b.status === 'cancelled').length
+        total: bookingsData?.length || 0,
+        pending: bookingsData?.filter(b => b.status === 'pending').length || 0,
+        confirmed: bookingsData?.filter(b => b.status === 'confirmed').length || 0,
+        completed: bookingsData?.filter(b => b.status === 'completed').length || 0,
+        cancelled: bookingsData?.filter(b => b.status === 'cancelled').length || 0
       };
       
+      console.log('Calculated booking stats:', stats);
       setBookingStats(stats);
     } catch (err) {
       console.error('Error fetching booking stats:', err);
