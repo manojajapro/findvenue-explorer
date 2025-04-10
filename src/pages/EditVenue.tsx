@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -420,9 +421,10 @@ const EditVenue = () => {
       values.additional_services = customServices;
       values.gallery_images = galleryImages;
       
-      if (!values.image_url && galleryImages.length > 0) {
-        values.image_url = galleryImages[0];
-      }
+      // Remove this code that references image_url
+      // if (!values.image_url && galleryImages.length > 0) {
+      //   values.image_url = galleryImages[0];
+      // }
       
       if (venue && venue.owner_info && !values.owner_info) {
         if (typeof venue.owner_info === 'string') {
@@ -977,4 +979,197 @@ const EditVenue = () => {
                 name="parking"
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 mb-4">
-                    <div className="space-y
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Parking</FormLabel>
+                      <FormDescription>
+                        Does your venue offer parking?
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Amenities</h3>
+                  <TagInput
+                    tags={customAmenities}
+                    setTags={setCustomAmenities}
+                    placeholder="Add amenity and press Enter"
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Accessibility Features</h3>
+                  <TagInput
+                    tags={customAccessibility}
+                    setTags={setCustomAccessibility}
+                    placeholder="Add accessibility feature and press Enter"
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Accepted Payment Methods</h3>
+                  <TagInput
+                    tags={customPaymentMethods}
+                    setTags={setCustomPaymentMethods}
+                    placeholder="Add payment method and press Enter"
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Additional Services</h3>
+                  <TagInput
+                    tags={customServices}
+                    setTags={setCustomServices}
+                    placeholder="Add additional service and press Enter"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Rules and Regulations</CardTitle>
+              <CardDescription>Set venue rules and booking terms</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-2">General Rules</h3>
+                  <TagInput
+                    tags={customRulesGeneral}
+                    setTags={setCustomRulesGeneral}
+                    placeholder="Add rule and press Enter"
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Booking Terms</h3>
+                  <TagInput
+                    tags={customRulesBooking}
+                    setTags={setCustomRulesBooking}
+                    placeholder="Add booking term and press Enter"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Gallery Images</CardTitle>
+              <CardDescription>Add images of your venue</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Input 
+                    placeholder="Image URL" 
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                  />
+                  <Button 
+                    type="button" 
+                    onClick={handleAddImageUrl}
+                    disabled={!newImageUrl.trim()}
+                  >
+                    Add URL
+                  </Button>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="file-upload" className="cursor-pointer bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition-colors flex items-center">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Images
+                  </Label>
+                  <Input 
+                    id="file-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    multiple
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
+                  {uploadingImage && <span className="text-sm text-muted-foreground">Uploading...</span>}
+                </div>
+                
+                {galleryImages.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Gallery Preview</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {galleryImages.map((url, index) => (
+                        <div key={index} className="group relative rounded-md overflow-hidden aspect-square">
+                          <img 
+                            src={url} 
+                            alt={`Gallery image ${index + 1}`} 
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-between">
+            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" type="button">
+                  Delete Venue
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete your venue
+                    and remove it from our servers.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete}>Continue</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            
+            <div className="space-x-2">
+              <Button type="button" variant="outline" onClick={() => navigate(`/venue/${id}`)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Updating...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </Form>
+    </div>
+  );
+};
+
+export default EditVenue;
