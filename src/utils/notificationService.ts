@@ -70,7 +70,7 @@ export const getVenueOwnerId = async (venueId: string): Promise<string | null> =
       .from('venues')
       .select('owner_info')
       .eq('id', venueId)
-      .single();
+      .maybeSingle();
     
     if (venueError || !venueData?.owner_info) {
       console.error('Error fetching venue owner info:', venueError);
@@ -129,7 +129,8 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       '/customer-bookings',
       {
         booking_id: booking.id,
-        venue_id: booking.venue_id
+        venue_id: booking.venue_id,
+        status: booking.status
       },
       5
     );
@@ -144,6 +145,68 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
   } catch (error) {
     console.error('Failed to notify venue owner about booking:', error);
     return null;
+  }
+};
+
+// Send status update notification to both customer and venue owner
+export const sendBookingStatusNotification = async (booking: any, status: string) => {
+  if (!booking) return null;
+  
+  try {
+    // Get venue owner ID
+    const ownerId = await getVenueOwnerId(booking.venue_id);
+    const formattedDate = booking.booking_date 
+      ? format(new Date(booking.booking_date), 'MMM d, yyyy') 
+      : 'scheduled date';
+    
+    // Notify owner
+    if (ownerId) {
+      const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
+      const ownerMessage = status === 'confirmed' 
+        ? `You have confirmed a booking for "${booking.venue_name}" on ${formattedDate}.`
+        : `You have cancelled a booking for "${booking.venue_name}" on ${formattedDate}.`;
+      
+      await sendNotification(
+        ownerId,
+        ownerTitle,
+        ownerMessage,
+        'booking',
+        '/customer-bookings',
+        {
+          booking_id: booking.id,
+          venue_id: booking.venue_id,
+          status
+        },
+        5
+      );
+    }
+    
+    // Notify customer
+    if (booking.user_id) {
+      const customerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
+      const customerMessage = status === 'confirmed' 
+        ? `Your booking for ${booking.venue_name} on ${formattedDate} has been confirmed.`
+        : `Your booking for ${booking.venue_name} on ${formattedDate} has been cancelled by the venue owner.`;
+      
+      await sendNotification(
+        booking.user_id,
+        customerTitle,
+        customerMessage,
+        'booking',
+        '/bookings',
+        {
+          booking_id: booking.id,
+          venue_id: booking.venue_id,
+          status
+        },
+        5
+      );
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Failed to send booking status notifications:', error);
+    return false;
   }
 };
 
