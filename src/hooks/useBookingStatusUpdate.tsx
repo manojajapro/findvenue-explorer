@@ -214,7 +214,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         return;
       }
       
-      console.log(`Sending notification to owner ${ownerId}`);
+      console.log(`Sending notification to owner ${ownerId} for booking type: ${booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly'}`);
       
       // Directly insert notification to database
       const { data: ownerNotification, error: ownerNotifError } = await supabase

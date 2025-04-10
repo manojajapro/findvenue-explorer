@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
 import {
   Select,
   SelectContent,
@@ -70,6 +71,7 @@ export default function MultiDayBookingForm({
   const [totalPrice, setTotalPrice] = useState(0);
   const [pricePerPerson, setPricePerPerson] = useState(0);
   const [basePrice, setBasePrice] = useState(0);
+  const { notifyVenueOwner } = useBookingStatusUpdate(() => Promise.resolve());
   
   useEffect(() => {
     const fetchVenuePricing = async () => {
@@ -167,61 +169,11 @@ export default function MultiDayBookingForm({
       
       console.log("Booking created:", bookingData[0]);
 
-      try {
-        const { data: venueData } = await supabase
-          .from('venues')
-          .select('owner_info')
-          .eq('id', venueId)
-          .single();
-          
-        if (venueData?.owner_info) {
-          let ownerInfo;
-          
-          try {
-            ownerInfo = typeof venueData.owner_info === 'string'
-              ? JSON.parse(venueData.owner_info)
-              : venueData.owner_info;
-                
-            const ownerId = ownerInfo?.user_id;
-            
-            if (ownerId) {
-              console.log("Sending notification to venue owner:", ownerId);
-              const notificationData = {
-                user_id: ownerId,
-                title: 'New Booking Request',
-                message: `New booking for ${venueName} on ${format(data.date, 'PPP')}`,
-                type: 'booking' as const,
-                read: false,
-                link: '/customer-bookings',
-                data: { 
-                  booking_id: bookingData[0].id,
-                  venue_id: venueId,
-                  venue_name: venueName,
-                  guests: data.guests,
-                  total_price: totalPrice,
-                  customer_email: data.customerEmail,
-                  booking_date: format(data.date, 'yyyy-MM-dd')
-                }
-              };
-              
-              const { data: notification, error: notificationError } = await supabase
-                .from('notifications')
-                .insert([notificationData])
-                .select();
-                
-              if (notificationError) {
-                console.error("Error sending notification:", notificationError);
-              } else {
-                console.log("Notification sent successfully:", notification);
-              }
-            }
-          } catch (parseError) {
-            console.error("Error parsing owner_info:", parseError);
-          }
-        }
-      } catch (notifError) {
-        console.error("Error in notification process:", notifError);
-      }
+      await notifyVenueOwner({
+        ...bookingData[0],
+        venue_name: venueName,
+        booking_date: format(data.date, 'yyyy-MM-dd'),
+      });
 
       toast({
         title: "Full-day booking requested!",
