@@ -125,23 +125,45 @@ export const useVenueData = () => {
           };
           
           // Special handling for category_name which could be a single string or an array
-          const processCategoryName = (category: any): string => {
-            if (!category) return '';
+          const processCategoryNames = (categories: any): string[] => {
+            if (!categories) return [];
             
-            if (Array.isArray(category)) {
-              return category.length > 0 ? String(category[0]) : '';
+            if (Array.isArray(categories)) {
+              return categories.map(category => {
+                if (typeof category === 'string') {
+                  return category.trim();
+                }
+                return String(category).trim();
+              });
             }
             
-            if (typeof category === 'string') {
+            if (typeof categories === 'string') {
               // Check if this is a comma-separated string
-              if (category.includes(',')) {
-                const categories = category.split(',').map(c => c.trim());
-                return categories[0] || '';
+              if (categories.includes(',')) {
+                return categories.split(',').map(c => c.trim());
               }
-              return category;
+              
+              // Check if it's a JSON string
+              try {
+                const parsed = JSON.parse(categories);
+                if (Array.isArray(parsed)) {
+                  return parsed.map(item => item.toString().trim());
+                }
+              } catch (e) {
+                // Not JSON, continue processing
+              }
+              
+              // It might be a concatenated string without proper separators
+              // Try to split by capital letters (e.g., "ExhibitionsConferencesGraduation")
+              if (/[a-z][A-Z]/.test(categories)) {
+                const splitByCapitals = categories.replace(/([a-z])([A-Z])/g, '$1,$2').split(',');
+                return splitByCapitals.map(part => part.trim());
+              }
+              
+              return [categories.trim()];
             }
             
-            return String(category);
+            return [];
           };
           
           // Process gallery images - ensure we have an array of strings
@@ -158,6 +180,9 @@ export const useVenueData = () => {
           const pricePerPerson = data.price_per_person ? Number(data.price_per_person) : undefined;
           const hourlyRate = data.hourly_rate ? Number(data.hourly_rate) : undefined;
           
+          // Process category names with improved handling
+          const categoryNames = processCategoryNames(data.category_name);
+          
           const transformedVenue: Venue = {
             id: data.id,
             name: data.name,
@@ -167,7 +192,7 @@ export const useVenueData = () => {
             address: data.address || '',
             city: data.city_name || '',
             cityId: data.city_id || '',
-            category: processCategoryName(data.category_name),
+            category: categoryNames.join(', '), // Join with comma and space for UI display
             categoryId: data.category_id || '',
             capacity: {
               min: minCapacity,
@@ -196,7 +221,8 @@ export const useVenueData = () => {
             additionalServices: processArrayField(data.additional_services),
             rulesAndRegulations: rulesAndRegulationsData,
             type: data.type || '',
-            zipcode: data.zipcode || ''
+            zipcode: data.zipcode || '',
+            categoryNames: categoryNames // Add separate field for category names array
           };
           
           console.log("Transformed venue data:", transformedVenue);

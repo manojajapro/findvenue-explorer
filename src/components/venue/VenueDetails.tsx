@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
 import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard } from 'lucide-react';
@@ -8,23 +8,8 @@ import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
 import { FacebookIcon, TwitterIcon, InstagramIcon, LinkedinIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
-
-interface VenueOwnerInfo {
-  name: string;
-  contact: string;
-  responseTime: string;
-  user_id: string;
-  socialLinks?: {
-    facebook?: string;
-    twitter?: string;
-    instagram?: string;
-    linkedin?: string;
-  };
-}
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -65,16 +50,8 @@ const VenueDetails = () => {
 
   const isOwner = user?.id === venue.ownerInfo?.user_id;
   
-  // Function to format category names with proper spacing
-  const formatCategoryNames = (categories: string[] | null) => {
-    if (!categories || categories.length === 0) return [];
-    
-    // Split each category name by capital letter and join with a space
-    return categories.map(category => {
-      // Split camelCase or concatenated category names
-      return category.replace(/([A-Z])/g, ' $1').trim();
-    });
-  };
+  // Get array of category names
+  const categoryNames = venue.categoryNames || [];
   
   // Get the main image from gallery images
   const mainImage = venue.galleryImages && venue.galleryImages.length > 0 
@@ -140,7 +117,7 @@ const VenueDetails = () => {
           <div className="mb-4">
             <h4 className="text-sm font-medium mb-2">Categories</h4>
             <div className="flex flex-wrap gap-2">
-              {formatCategoryNames(venue.category ? [venue.category] : null).map((category, index) => (
+              {categoryNames.map((category, index) => (
                 <Badge key={index} className="bg-findvenue/20 text-findvenue hover:bg-findvenue/30">
                   {category}
                 </Badge>

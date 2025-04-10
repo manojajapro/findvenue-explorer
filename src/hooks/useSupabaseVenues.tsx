@@ -68,7 +68,8 @@ export interface Venue {
   status?: string;
   rulesAndRegulations?: VenueRule[];
   type?: string;       
-  zipcode?: string;    
+  zipcode?: string;
+  categoryNames?: string[];
 }
 
 export const useSupabaseVenues = () => {
@@ -252,7 +253,8 @@ export const useSupabaseVenues = () => {
             additionalServices: venue.additional_services || [],
             rulesAndRegulations: rulesAndRegulationsData,
             type: venue.type || '',           
-            zipcode: venue.zipcode || ''      
+            zipcode: venue.zipcode || '',
+            categoryNames: venue.category_names || []
           } as Venue;
         });
         

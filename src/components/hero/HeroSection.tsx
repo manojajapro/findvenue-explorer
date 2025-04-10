@@ -1,10 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Users, Calendar, MapPin, ChevronDown, X, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -19,14 +17,7 @@ const HeroSection = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [cities, setCities] = useState<{id: string, name: string}[]>([]);
-  const [venueTypes, setVenueTypes] = useState<{value: string, label: string}[]>([
-    { value: 'hall', label: 'Hall' },
-    { value: 'restaurant', label: 'Restaurant' },
-    { value: 'hotel', label: 'Hotel' },
-    { value: 'outdoor', label: 'Outdoor' },
-    { value: 'lounge', label: 'Lounge' },
-    { value: 'rooftop', label: 'Rooftop' }
-  ]);
+  const [venueTypes, setVenueTypes] = useState<{value: string, label: string}[]>([]);
   const [date, setDate] = useState<Date | undefined>(undefined);
   
   // Fetch categories from Supabase with deduplication
@@ -131,6 +122,65 @@ const HeroSection = () => {
     };
     
     fetchCategories();
+  }, []);
+  
+  // Fetch venue types from the database
+  useEffect(() => {
+    const fetchVenueTypes = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('venues')
+          .select('type')
+          .not('type', 'is', null);
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          const uniqueTypes = new Map();
+          
+          data.forEach(venue => {
+            if (venue.type && typeof venue.type === 'string') {
+              // Format the type for display (capitalize first letter)
+              const formattedType = venue.type.charAt(0).toUpperCase() + venue.type.slice(1);
+              uniqueTypes.set(venue.type, {
+                value: venue.type,
+                label: formattedType
+              });
+            }
+          });
+          
+          const typeArray = Array.from(uniqueTypes.values());
+          
+          // Only update if we found venue types
+          if (typeArray.length > 0) {
+            setVenueTypes(typeArray);
+          } else {
+            // Fallback to default venue types
+            setVenueTypes([
+              { value: 'hall', label: 'Hall' },
+              { value: 'restaurant', label: 'Restaurant' },
+              { value: 'hotel', label: 'Hotel' },
+              { value: 'outdoor', label: 'Outdoor' },
+              { value: 'lounge', label: 'Lounge' },
+              { value: 'rooftop', label: 'Rooftop' }
+            ]);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching venue types:', error);
+        // Fallback to default venue types
+        setVenueTypes([
+          { value: 'hall', label: 'Hall' },
+          { value: 'restaurant', label: 'Restaurant' },
+          { value: 'hotel', label: 'Hotel' },
+          { value: 'outdoor', label: 'Outdoor' },
+          { value: 'lounge', label: 'Lounge' },
+          { value: 'rooftop', label: 'Rooftop' }
+        ]);
+      }
+    };
+    
+    fetchVenueTypes();
   }, []);
   
   // Fetch cities from Supabase
