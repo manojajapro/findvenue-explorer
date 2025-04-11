@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -188,6 +187,7 @@ export default function MultiDayBookingForm({
       if (autoConfirm) {
         console.log("Sending auto-confirm notification for full day booking");
         try {
+          // Use the enhanced sendBookingStatusNotification function
           const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
           
           if (!notified) {
@@ -206,6 +206,7 @@ export default function MultiDayBookingForm({
       } else {
         console.log("Sending booking request notification for full day booking");
         try {
+          // Use the enhanced notifyVenueOwnerAboutBooking function
           const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
           
           if (!notified) {

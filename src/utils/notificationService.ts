@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -63,6 +64,11 @@ export const sendNotification = async (
 // Extract venue owner ID from venue data
 export const getVenueOwnerId = async (venueId: string): Promise<string | null> => {
   try {
+    if (!venueId) {
+      console.error('Cannot get venue owner: Missing venue ID');
+      return null;
+    }
+    
     console.log('Getting venue owner ID for venue:', venueId);
     
     const { data: venueData, error: venueError } = await supabase
@@ -133,13 +139,14 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       message = `A new booking request for "${booking.venue_name}" on ${bookingDate} has been received.`;
     }
     
-    // Create the notification data in the consistent format
+    // Create the notification data in the consistent requested format
     const notificationData = {
       booking_id: booking.id,
       venue_id: booking.venue_id,
       status: booking.status,
       booking_date: bookingDate,
-      venue_name: booking.venue_name
+      venue_name: booking.venue_name,
+      booking_type: bookingType
     };
     
     console.log('Notification data being sent:', notificationData);
@@ -183,13 +190,17 @@ export const sendBookingStatusNotification = async (booking: any, status: string
     
     let notificationsSuccessful = true;
     
-    // Create consistent notification data format regardless of booking type
+    // Determine booking type
+    const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
+    
+    // Create consistent notification data format with booking type
     const notificationData = {
       booking_id: booking.id,
       venue_id: booking.venue_id,
       status: status,
       booking_date: formattedDate,
-      venue_name: booking.venue_name
+      venue_name: booking.venue_name,
+      booking_type: bookingType
     };
     
     console.log('Status notification data:', notificationData);

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -73,7 +74,7 @@ export default function BookingForm({
   bookedTimeSlots,
   fullyBookedDates,
   availableTimeSlots,
-  autoConfirm = false // Default to false
+  autoConfirm = false
 }: BookingFormProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -138,6 +139,7 @@ export default function BookingForm({
       
       // Create a booking record with status set based on autoConfirm
       const initialStatus = autoConfirm ? 'confirmed' : 'pending';
+      const formattedDate = format(data.date, 'yyyy-MM-dd');
       
       const { data: bookingData, error } = await supabase
         .from('bookings')
@@ -146,7 +148,7 @@ export default function BookingForm({
             user_id: user.id,
             venue_id: venueId,
             venue_name: venueName,
-            booking_date: format(data.date, 'yyyy-MM-dd'),
+            booking_date: formattedDate,
             start_time: data.startTime,
             end_time: data.endTime,
             status: initialStatus,
@@ -172,7 +174,7 @@ export default function BookingForm({
       const bookingWithDetails = {
         ...bookingData[0],
         venue_name: venueName,
-        booking_date: format(data.date, 'yyyy-MM-dd'),
+        booking_date: formattedDate,
       };
 
       // Send notifications about the booking

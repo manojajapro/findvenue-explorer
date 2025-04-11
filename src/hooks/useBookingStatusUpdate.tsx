@@ -69,11 +69,21 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         )
       );
       
+      // Determine booking type for the notification data
+      const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
+      
+      // Format booking date
+      const formattedDate = booking.booking_date 
+        ? format(new Date(booking.booking_date), 'yyyy-MM-dd') 
+        : 'scheduled date';
+      
       // Ensure the booking data includes all necessary fields for notifications
       const completeBookingData = {
         ...booking,
         ...result.data,
-        status: status
+        status: status,
+        booking_date: formattedDate,
+        booking_type: bookingType
       };
       
       // Send notifications to both venue owner and customer using a function with proper permissions

@@ -46,6 +46,19 @@ export const isTableRealtimeEnabled = async (table: string) => {
 // Function to send a notification to a user
 export const sendNotification = async (userId: string, title: string, message: string, type: 'booking' | 'message' | 'system', link?: string, data?: any) => {
   try {
+    // Determine booking type if this is a booking notification
+    const bookingType = data?.start_time === '00:00' && data?.end_time === '23:59' ? 'full-day' : 'hourly';
+    
+    // Ensure data format is consistent
+    const notificationData = type === 'booking' ? {
+      booking_id: data?.booking_id || data?.id,
+      venue_id: data?.venue_id,
+      status: data?.status,
+      booking_date: data?.booking_date,
+      venue_name: data?.venue_name,
+      booking_type: bookingType
+    } : data;
+    
     const { data: notification, error } = await supabase
       .from('notifications')
       .insert({
@@ -55,7 +68,7 @@ export const sendNotification = async (userId: string, title: string, message: s
         type,
         read: false,
         link,
-        data
+        data: notificationData
       })
       .select('*')
       .single();
