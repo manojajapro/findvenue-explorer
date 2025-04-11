@@ -43,11 +43,11 @@ export const isTableRealtimeEnabled = async (table: string) => {
   }
 };
 
-// Function to send a notification to a user
+// Function to send a notification to a user - enhanced for clarity
 export const sendNotification = async (userId: string, title: string, message: string, type: 'booking' | 'message' | 'system', link?: string, data?: any) => {
   try {
     if (!userId) {
-      console.error('Cannot send notification: Missing user ID');
+      console.error('[SUPABASE_REALTIME] Cannot send notification: Missing user ID');
       return null;
     }
 
@@ -64,7 +64,7 @@ export const sendNotification = async (userId: string, title: string, message: s
       booking_type: bookingType
     } : data;
     
-    console.log(`Sending notification to user ${userId} with data:`, notificationData);
+    console.log(`[SUPABASE_REALTIME] Sending notification to user ${userId} with data:`, notificationData);
     
     const { data: notification, error } = await supabase
       .from('notifications')
@@ -81,27 +81,27 @@ export const sendNotification = async (userId: string, title: string, message: s
       .single();
       
     if (error) {
-      console.error('Error sending notification:', error);
+      console.error('[SUPABASE_REALTIME] Error sending notification:', error);
       return null;
     }
     
-    console.log('Notification sent successfully:', notification);
+    console.log('[SUPABASE_REALTIME] Notification sent successfully:', notification);
     return notification;
   } catch (error) {
-    console.error('Error in sendNotification:', error);
+    console.error('[SUPABASE_REALTIME] Error in sendNotification:', error);
     return null;
   }
 };
 
-// Function to get venue owner ID from venue ID
+// Function to get venue owner ID from venue ID - enhanced for better parsing
 export const getVenueOwnerId = async (venueId: string): Promise<string | null> => {
   try {
     if (!venueId) {
-      console.error('Cannot get venue owner: Missing venue ID');
+      console.error('[SUPABASE_REALTIME] Cannot get venue owner: Missing venue ID');
       return null;
     }
     
-    console.log('Getting venue owner ID for venue:', venueId);
+    console.log('[SUPABASE_REALTIME] Getting venue owner ID for venue:', venueId);
     
     const { data, error } = await supabase
       .from('venues')
@@ -110,33 +110,50 @@ export const getVenueOwnerId = async (venueId: string): Promise<string | null> =
       .maybeSingle();
       
     if (error) {
-      console.error('Error fetching venue owner info:', error);
+      console.error('[SUPABASE_REALTIME] Error fetching venue owner info:', error);
       return null;
     }
     
     if (!data || !data.owner_info) {
-      console.error('No owner_info found for venue:', venueId);
+      console.error('[SUPABASE_REALTIME] No owner_info found for venue:', venueId);
       return null;
     }
     
     let ownerId: string | null = null;
     
-    if (data.owner_info) {
+    // Handle string format
+    if (typeof data.owner_info === 'string') {
       try {
-        const ownerInfo = typeof data.owner_info === 'string' 
-          ? JSON.parse(data.owner_info) 
-          : data.owner_info;
-          
+        const ownerInfo = JSON.parse(data.owner_info);
         ownerId = ownerInfo.user_id || null;
-        console.log('Found venue owner ID:', ownerId, 'from owner_info:', ownerInfo);
+        console.log('[SUPABASE_REALTIME] Parsed owner ID from string:', ownerId);
       } catch (e) {
-        console.error('Error parsing owner_info:', e, 'Raw data:', data.owner_info);
+        console.error('[SUPABASE_REALTIME] Error parsing owner_info string:', e);
+        // Try to extract user_id directly if it's a malformed JSON
+        if (data.owner_info.includes('user_id')) {
+          const match = data.owner_info.match(/"user_id"\s*:\s*"([^"]+)"/);
+          if (match && match[1]) ownerId = match[1];
+          console.log('[SUPABASE_REALTIME] Extracted owner ID from string using regex:', ownerId);
+        }
       }
+    } 
+    // Handle object format
+    else if (typeof data.owner_info === 'object' && data.owner_info !== null) {
+      try {
+        ownerId = (data.owner_info as any).user_id || null;
+        console.log('[SUPABASE_REALTIME] Found owner ID directly from object:', ownerId);
+      } catch (e) {
+        console.error('[SUPABASE_REALTIME] Error accessing owner_info object:', e);
+      }
+    }
+    
+    if (!ownerId) {
+      console.error('[SUPABASE_REALTIME] Could not extract owner ID from:', data.owner_info);
     }
     
     return ownerId;
   } catch (error) {
-    console.error('Error in getVenueOwnerId:', error);
+    console.error('[SUPABASE_REALTIME] Error in getVenueOwnerId:', error);
     return null;
   }
 };
