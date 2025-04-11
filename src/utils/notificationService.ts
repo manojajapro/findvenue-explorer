@@ -18,7 +18,7 @@ export const sendNotification = async (
       return null;
     }
 
-    console.log(`Sending ${type} notification to user ${userId}`);
+    console.log(`Sending ${type} notification to user ${userId} with data:`, data);
     
     let attempts = 0;
     let result = null;
@@ -77,19 +77,25 @@ export const getVenueOwnerId = async (venueId: string): Promise<string | null> =
       .eq('id', venueId)
       .maybeSingle();
     
-    if (venueError || !venueData?.owner_info) {
+    if (venueError) {
       console.error('Error fetching venue owner info:', venueError);
+      return null;
+    }
+    
+    if (!venueData || !venueData.owner_info) {
+      console.error('No owner_info found for venue:', venueId, 'Data:', venueData);
       return null;
     }
     
     // Parse owner info
     try {
+      console.log('Raw owner_info:', venueData.owner_info);
       const ownerInfo = typeof venueData.owner_info === 'string'
         ? JSON.parse(venueData.owner_info)
         : venueData.owner_info;
         
       const ownerId = ownerInfo?.user_id || null;
-      console.log('Found venue owner ID:', ownerId);
+      console.log('Parsed venue owner ID:', ownerId, 'from owner_info:', ownerInfo);
       return ownerId;
       
     } catch (e) {
@@ -110,7 +116,7 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
   }
   
   try {
-    console.log('Attempting to notify venue owner about booking:', booking.id);
+    console.log('Attempting to notify venue owner about booking:', booking.id, 'Venue ID:', booking.venue_id);
     
     // Get venue owner ID
     const ownerId = await getVenueOwnerId(booking.venue_id);
@@ -119,6 +125,8 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       console.error('No owner ID found for venue', booking.venue_id);
       return null;
     }
+    
+    console.log('Found venue owner ID to notify:', ownerId);
     
     // Format booking date
     const bookingDate = booking.booking_date 
@@ -149,7 +157,7 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       booking_type: bookingType
     };
     
-    console.log('Notification data being sent:', notificationData);
+    console.log('Sending notification to venue owner with data:', notificationData);
     
     // Send notification with retry attempts
     const notification = await sendNotification(
@@ -180,10 +188,17 @@ export const sendBookingStatusNotification = async (booking: any, status: string
   if (!booking) return null;
   
   try {
-    console.log('Sending booking status notification for booking:', booking.id, 'Status:', status);
+    console.log('Sending booking status notification for booking:', booking.id, 'Status:', status, 'Venue ID:', booking.venue_id);
     
     // Get venue owner ID
     const ownerId = await getVenueOwnerId(booking.venue_id);
+    
+    if (!ownerId) {
+      console.error('No owner ID found for venue', booking.venue_id);
+    } else {
+      console.log('Found venue owner ID to notify about status update:', ownerId);
+    }
+    
     const formattedDate = booking.booking_date 
       ? format(new Date(booking.booking_date), 'yyyy-MM-dd') 
       : 'scheduled date';
@@ -230,6 +245,9 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       } else {
         console.log("Successfully sent notification to venue owner");
       }
+    } else {
+      console.error("Unable to notify venue owner - owner ID not found");
+      notificationsSuccessful = false;
     }
     
     // Notify customer

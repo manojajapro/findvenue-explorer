@@ -34,7 +34,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     try {
       if (!booking) throw new Error('Booking not found');
       
-      console.log(`Updating booking ${bookingId} status to ${status}`);
+      console.log(`Updating booking ${bookingId} status to ${status}, venue ID: ${booking.venue_id}`);
       
       // Check Supabase connection before attempting update
       const isConnected = await checkSupabaseConnection();
@@ -86,14 +86,50 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
         booking_type: bookingType
       };
       
-      // Send notifications to both venue owner and customer using a function with proper permissions
+      // Send notifications to both venue owner and customer
       console.log('Sending notifications for status update:', status);
+      
+      // Get venue owner ID directly since this function may be called from various places
+      const ownerId = await getVenueOwnerId(booking.venue_id);
+      if (ownerId) {
+        console.log('Found venue owner ID to notify about status update:', ownerId);
+      } else {
+        console.warn('Could not find venue owner ID for venue:', booking.venue_id);
+      }
       
       // Use the sendBookingStatusNotification function to handle notifications
       const notificationSent = await sendBookingStatusNotification(completeBookingData, status);
       
       if (!notificationSent) {
-        console.warn('Notifications might not have been sent successfully.');
+        console.warn('Notifications might not have been sent successfully. Attempting direct notification...');
+        
+        // Try a direct notification to venue owner if we have their ID
+        if (ownerId) {
+          const notificationData = {
+            booking_id: booking.id,
+            venue_id: booking.venue_id,
+            status: status,
+            booking_date: formattedDate,
+            venue_name: booking.venue_name,
+            booking_type: bookingType
+          };
+          
+          const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
+          const ownerMessage = status === 'confirmed' 
+            ? `A booking for "${booking.venue_name}" on ${formattedDate} has been confirmed.`
+            : `You have cancelled a booking for "${booking.venue_name}" on ${formattedDate}.`;
+          
+          await sendNotification(
+            ownerId,
+            ownerTitle,
+            ownerMessage,
+            'booking',
+            '/customer-bookings',
+            notificationData,
+            5
+          );
+        }
+        
         toast({
           variant: "destructive",
           title: "Notification Warning",
@@ -136,13 +172,45 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
     if (!booking) return false;
     
     try {
-      console.log('Sending notification to venue owner for booking:', booking);
+      console.log('Sending notification to venue owner for booking:', booking.id, 'Venue ID:', booking.venue_id);
       
       // Use the more robust notification service function that handles permissions properly
       const result = await notifyVenueOwnerAboutBooking(booking);
       
       if (!result) {
-        console.error('Failed to notify venue owner about new booking');
+        console.error('Failed to notify venue owner about new booking. Attempting direct notification...');
+        
+        // Try a direct notification
+        const ownerId = await getVenueOwnerId(booking.venue_id);
+        if (ownerId) {
+          const formattedDate = booking.booking_date 
+            ? format(new Date(booking.booking_date), 'yyyy-MM-dd') 
+            : 'scheduled date';
+            
+          const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
+          
+          const notificationData = {
+            booking_id: booking.id,
+            venue_id: booking.venue_id,
+            status: booking.status,
+            booking_date: formattedDate,
+            venue_name: booking.venue_name,
+            booking_type: bookingType
+          };
+          
+          await sendNotification(
+            ownerId,
+            'New Booking Request',
+            `A new booking request for "${booking.venue_name}" on ${formattedDate} has been received.`,
+            'booking',
+            '/customer-bookings',
+            notificationData,
+            5
+          );
+          
+          return true;
+        }
+        
         return false;
       }
       

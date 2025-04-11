@@ -12,7 +12,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
 import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification } from '@/utils/notificationService';
 import {
   Select,
@@ -143,7 +142,7 @@ export default function MultiDayBookingForm({
       const initialStatus = autoConfirm ? 'confirmed' : 'pending';
       const formattedDate = format(data.date, 'yyyy-MM-dd');
       
-      console.log("Creating full day booking with status:", initialStatus);
+      console.log("Creating full day booking with status:", initialStatus, "for venue ID:", venueId);
       
       const { data: bookingData, error } = await supabase
         .from('bookings')
@@ -187,7 +186,7 @@ export default function MultiDayBookingForm({
       if (autoConfirm) {
         console.log("Sending auto-confirm notification for full day booking");
         try {
-          // Use the enhanced sendBookingStatusNotification function
+          // Use the enhanced sendBookingStatusNotification function for owner notification
           const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
           
           if (!notified) {
@@ -204,13 +203,35 @@ export default function MultiDayBookingForm({
           description: `Your booking for ${venueName} on ${format(data.date, 'PPP')} has been automatically confirmed. Total: SAR ${totalPrice}`,
         });
       } else {
-        console.log("Sending booking request notification for full day booking");
+        console.log("Sending booking request notification for full day booking to venue owner");
         try {
           // Use the enhanced notifyVenueOwnerAboutBooking function
           const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
           
           if (!notified) {
             console.warn('Venue owner notification may not have been sent');
+            // Attempt a second notification to the owner
+            console.log('Attempting fallback notification to venue owner...');
+            const venueOwnerId = await getVenueOwnerId(venueId);
+            if (venueOwnerId) {
+              const { getVenueOwnerId, sendNotification } = await import('@/utils/notificationService');
+              await sendNotification(
+                venueOwnerId,
+                'New Booking Request',
+                `A new booking request for "${venueName}" on ${formattedDate} has been received.`,
+                'booking',
+                '/customer-bookings',
+                {
+                  booking_id: bookingWithDetails.id,
+                  venue_id: venueId,
+                  status: 'pending',
+                  booking_date: formattedDate,
+                  venue_name: venueName,
+                  booking_type: 'full-day'
+                },
+                5
+              );
+            }
           } else {
             console.log('Venue owner notification sent successfully');
           }
@@ -418,4 +439,14 @@ export default function MultiDayBookingForm({
       </form>
     </Form>
   );
+}
+
+async function getVenueOwnerId(venueId: string): Promise<string | null> {
+  try {
+    const { getVenueOwnerId } = await import('@/utils/notificationService');
+    return await getVenueOwnerId(venueId);
+  } catch (error) {
+    console.error('Error getting venue owner ID:', error);
+    return null;
+  }
 }

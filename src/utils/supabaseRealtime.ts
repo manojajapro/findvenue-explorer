@@ -46,6 +46,11 @@ export const isTableRealtimeEnabled = async (table: string) => {
 // Function to send a notification to a user
 export const sendNotification = async (userId: string, title: string, message: string, type: 'booking' | 'message' | 'system', link?: string, data?: any) => {
   try {
+    if (!userId) {
+      console.error('Cannot send notification: Missing user ID');
+      return null;
+    }
+
     // Determine booking type if this is a booking notification
     const bookingType = data?.start_time === '00:00' && data?.end_time === '23:59' ? 'full-day' : 'hourly';
     
@@ -58,6 +63,8 @@ export const sendNotification = async (userId: string, title: string, message: s
       venue_name: data?.venue_name,
       booking_type: bookingType
     } : data;
+    
+    console.log(`Sending notification to user ${userId} with data:`, notificationData);
     
     const { data: notification, error } = await supabase
       .from('notifications')
@@ -78,7 +85,7 @@ export const sendNotification = async (userId: string, title: string, message: s
       return null;
     }
     
-    console.log('Notification sent:', notification);
+    console.log('Notification sent successfully:', notification);
     return notification;
   } catch (error) {
     console.error('Error in sendNotification:', error);
@@ -89,14 +96,26 @@ export const sendNotification = async (userId: string, title: string, message: s
 // Function to get venue owner ID from venue ID
 export const getVenueOwnerId = async (venueId: string): Promise<string | null> => {
   try {
+    if (!venueId) {
+      console.error('Cannot get venue owner: Missing venue ID');
+      return null;
+    }
+    
+    console.log('Getting venue owner ID for venue:', venueId);
+    
     const { data, error } = await supabase
       .from('venues')
       .select('owner_info')
       .eq('id', venueId)
-      .single();
+      .maybeSingle();
       
-    if (error || !data) {
+    if (error) {
       console.error('Error fetching venue owner info:', error);
+      return null;
+    }
+    
+    if (!data || !data.owner_info) {
+      console.error('No owner_info found for venue:', venueId);
       return null;
     }
     
@@ -109,8 +128,9 @@ export const getVenueOwnerId = async (venueId: string): Promise<string | null> =
           : data.owner_info;
           
         ownerId = ownerInfo.user_id || null;
+        console.log('Found venue owner ID:', ownerId, 'from owner_info:', ownerInfo);
       } catch (e) {
-        console.error('Error parsing owner_info:', e);
+        console.error('Error parsing owner_info:', e, 'Raw data:', data.owner_info);
       }
     }
     

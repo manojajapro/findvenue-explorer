@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -13,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification, getVenueOwnerId } from '@/utils/notificationService';
 import {
   Select,
   SelectContent,
@@ -44,7 +44,7 @@ interface BookingFormProps {
   bookedTimeSlots: Record<string, string[]>;
   fullyBookedDates: string[];
   availableTimeSlots: string[];
-  autoConfirm?: boolean;  // Added auto-confirm flag
+  autoConfirm?: boolean;
 }
 
 const formSchema = z.object({
@@ -99,11 +99,9 @@ export default function BookingForm({
   const selectedDate = form.watch('date');
   const selectedStartTime = form.watch('startTime');
 
-  // Function to filter available end times based on the selected start time
   const updateAvailableEndTimes = (startTime: string) => {
     const startIndex = availableTimeSlots.indexOf(startTime);
     if (startIndex !== -1) {
-      // End times should start from the next time slot after the start time
       setAvailableEndTimes(availableTimeSlots.slice(startIndex + 1));
     } else {
       setAvailableEndTimes([]);
@@ -131,15 +129,15 @@ export default function BookingForm({
     setIsSubmitting(true);
 
     try {
-      // Calculate total price (hours * price per hour)
       const startHour = parseInt(data.startTime.split(':')[0]);
       const endHour = parseInt(data.endTime.split(':')[0]);
       const hours = endHour - startHour;
       const totalPrice = hours * pricePerHour;
       
-      // Create a booking record with status set based on autoConfirm
       const initialStatus = autoConfirm ? 'confirmed' : 'pending';
       const formattedDate = format(data.date, 'yyyy-MM-dd');
+      
+      console.log("Creating hourly booking with status:", initialStatus, "for venue ID:", venueId);
       
       const { data: bookingData, error } = await supabase
         .from('bookings')
@@ -168,27 +166,87 @@ export default function BookingForm({
         throw new Error("Failed to create booking record");
       }
       
-      console.log("Booking created:", bookingData[0]);
+      console.log("Hourly booking created:", bookingData[0]);
       
-      // Enhanced booking object to ensure proper notification
       const bookingWithDetails = {
         ...bookingData[0],
         venue_name: venueName,
         booking_date: formattedDate,
       };
 
-      // Send notifications about the booking
       if (autoConfirm) {
-        // Send confirmation notification to both customer and owner
-        await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
+        console.log("Sending auto-confirm notification for hourly booking");
+        try {
+          const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
+          
+          if (!notified) {
+            console.warn('Booking confirmation notification may not have been sent');
+            const venueOwnerId = await getVenueOwnerId(venueId);
+            if (venueOwnerId) {
+              console.log("Found venue owner ID for direct notification:", venueOwnerId);
+              const { sendNotification } = await import('@/utils/notificationService');
+              await sendNotification(
+                venueOwnerId,
+                'Booking Confirmed',
+                `A booking for "${venueName}" on ${formattedDate} has been automatically confirmed.`,
+                'booking',
+                '/customer-bookings',
+                {
+                  booking_id: bookingWithDetails.id,
+                  venue_id: venueId,
+                  status: 'confirmed',
+                  booking_date: formattedDate,
+                  venue_name: venueName,
+                  booking_type: 'hourly'
+                },
+                5
+              );
+            }
+          } else {
+            console.log('Booking confirmation notification sent successfully');
+          }
+        } catch (notifyError) {
+          console.error("Error sending booking notifications:", notifyError);
+        }
         
         toast({
           title: "Booking confirmed!",
           description: `Your booking for ${venueName} on ${format(data.date, 'PPP')} from ${data.startTime} to ${data.endTime} has been automatically confirmed. Total: SAR ${totalPrice}`,
         });
       } else {
-        // Send pending notification to venue owner
-        await notifyVenueOwner(bookingWithDetails);
+        console.log("Sending pending notification to venue owner for hourly booking");
+        try {
+          const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
+          
+          if (!notified) {
+            console.warn('Venue owner notification may not have been sent, trying direct method');
+            const venueOwnerId = await getVenueOwnerId(venueId);
+            if (venueOwnerId) {
+              console.log("Found venue owner ID for direct notification:", venueOwnerId);
+              const { sendNotification } = await import('@/utils/notificationService');
+              await sendNotification(
+                venueOwnerId,
+                'New Booking Request',
+                `A new booking request for "${venueName}" on ${formattedDate} has been received.`,
+                'booking',
+                '/customer-bookings',
+                {
+                  booking_id: bookingWithDetails.id,
+                  venue_id: venueId,
+                  status: 'pending',
+                  booking_date: formattedDate,
+                  venue_name: venueName,
+                  booking_type: 'hourly'
+                },
+                5
+              );
+            }
+          } else {
+            console.log('Venue owner notification sent successfully');
+          }
+        } catch (notifyError) {
+          console.error("Error notifying venue owner:", notifyError);
+        }
         
         toast({
           title: "Booking requested!",
@@ -209,7 +267,6 @@ export default function BookingForm({
     }
   };
 
-  // Function to check if a time slot is booked
   const isTimeSlotBooked = (date: Date, timeSlot: string): boolean => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return bookedTimeSlots[dateStr]?.includes(timeSlot) || false;
@@ -430,28 +487,4 @@ export default function BookingForm({
       </form>
     </Form>
   );
-}
-
-// Helper function directly in this component to send notifications
-async function sendBookingStatusNotification(booking: any, status: string) {
-  try {
-    // Import this function dynamically to avoid circular dependencies
-    const { sendBookingStatusNotification } = await import('@/utils/notificationService');
-    return await sendBookingStatusNotification(booking, status);
-  } catch (error) {
-    console.error('Error sending booking notification:', error);
-    return false;
-  }
-}
-
-// Helper function to notify venue owner
-async function notifyVenueOwner(booking: any) {
-  try {
-    // Import this function dynamically to avoid circular dependencies
-    const { notifyVenueOwnerAboutBooking } = await import('@/utils/notificationService');
-    return await notifyVenueOwnerAboutBooking(booking);
-  } catch (error) {
-    console.error('Error notifying venue owner:', error);
-    return false;
-  }
 }
