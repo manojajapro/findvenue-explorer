@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification } from '@/utils/notificationService';
+import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification, getVenueOwnerId, sendNotification } from '@/utils/notificationService';
 import {
   Select,
   SelectContent,
@@ -181,16 +181,45 @@ export default function MultiDayBookingForm({
         ...bookingData[0],
         venue_name: venueName,
         booking_date: formattedDate,
+        booking_type: 'full-day'
       };
 
       if (autoConfirm) {
         console.log("Sending auto-confirm notification for full day booking");
         try {
-          // Use the enhanced sendBookingStatusNotification function for owner notification
+          // First, try to notify the venue owner directly with all details
+          const venueOwnerId = await getVenueOwnerId(venueId);
+          
+          if (venueOwnerId) {
+            console.log("Found venue owner ID for direct notification:", venueOwnerId);
+            
+            const notificationData = {
+              booking_id: bookingWithDetails.id,
+              venue_id: venueId,
+              status: 'confirmed',
+              booking_date: formattedDate,
+              venue_name: venueName,
+              booking_type: 'full-day'
+            };
+            
+            await sendNotification(
+              venueOwnerId,
+              'Booking Confirmed',
+              `A booking for "${venueName}" on ${formattedDate} has been automatically confirmed.`,
+              'booking',
+              '/customer-bookings',
+              notificationData,
+              5
+            );
+          } else {
+            console.error("Could not find venue owner ID for direct notification");
+          }
+          
+          // Also use the standard notification function as a backup
           const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
           
           if (!notified) {
-            console.warn('Booking confirmation notification may not have been sent');
+            console.warn('Booking confirmation notification may not have been sent through standard channel');
           } else {
             console.log('Booking confirmation notification sent successfully');
           }
@@ -205,35 +234,47 @@ export default function MultiDayBookingForm({
       } else {
         console.log("Sending booking request notification for full day booking to venue owner");
         try {
-          // Use the enhanced notifyVenueOwnerAboutBooking function
-          const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
+          // First, try to notify using the direct method with explicit owner ID lookup
+          const venueOwnerId = await getVenueOwnerId(venueId);
+          let notificationSent = false;
           
-          if (!notified) {
-            console.warn('Venue owner notification may not have been sent');
-            // Attempt a second notification to the owner
-            console.log('Attempting fallback notification to venue owner...');
-            const venueOwnerId = await getVenueOwnerId(venueId);
-            if (venueOwnerId) {
-              const { getVenueOwnerId, sendNotification } = await import('@/utils/notificationService');
-              await sendNotification(
-                venueOwnerId,
-                'New Booking Request',
-                `A new booking request for "${venueName}" on ${formattedDate} has been received.`,
-                'booking',
-                '/customer-bookings',
-                {
-                  booking_id: bookingWithDetails.id,
-                  venue_id: venueId,
-                  status: 'pending',
-                  booking_date: formattedDate,
-                  venue_name: venueName,
-                  booking_type: 'full-day'
-                },
-                5
-              );
+          if (venueOwnerId) {
+            console.log("Found venue owner ID for direct notification:", venueOwnerId);
+            
+            const notificationData = {
+              booking_id: bookingWithDetails.id,
+              venue_id: venueId,
+              status: 'pending',
+              booking_date: formattedDate,
+              venue_name: venueName,
+              booking_type: 'full-day'
+            };
+            
+            const result = await sendNotification(
+              venueOwnerId,
+              'New Booking Request',
+              `A new booking request for "${venueName}" on ${formattedDate} has been received.`,
+              'booking',
+              '/customer-bookings',
+              notificationData,
+              5
+            );
+            
+            if (result) {
+              console.log("Direct notification to venue owner successful");
+              notificationSent = true;
             }
-          } else {
-            console.log('Venue owner notification sent successfully');
+          }
+          
+          // Also try the standard notification method as a backup
+          if (!notificationSent) {
+            const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
+            
+            if (notified) {
+              console.log('Standard notification to venue owner successful');
+            } else {
+              console.warn('All notification attempts to venue owner failed');
+            }
           }
         } catch (notifyError) {
           console.error("Error notifying venue owner:", notifyError);

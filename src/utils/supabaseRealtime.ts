@@ -123,14 +123,44 @@ export const getVenueOwnerId = async (venueId: string): Promise<string | null> =
     
     if (data.owner_info) {
       try {
-        const ownerInfo = typeof data.owner_info === 'string' 
-          ? JSON.parse(data.owner_info) 
-          : data.owner_info;
-          
-        ownerId = ownerInfo.user_id || null;
+        // Log exact format of owner_info for debugging
+        console.log('Raw owner_info data type:', typeof data.owner_info);
+        console.log('Raw owner_info content:', data.owner_info);
+        
+        let ownerInfo: any = data.owner_info;
+        
+        // Parse owner_info if it's a string
+        if (typeof data.owner_info === 'string') {
+          try {
+            ownerInfo = JSON.parse(data.owner_info);
+          } catch (parseErr) {
+            console.error('Error parsing owner_info string:', parseErr);
+            // Try additional parsing methods
+            if (data.owner_info.includes('{') && data.owner_info.includes('}')) {
+              // Try to clean up the string for parsing
+              const cleanedStr = data.owner_info
+                .replace(/'/g, '"')
+                .replace(/(\w+):/g, '"$1":');
+              try {
+                ownerInfo = JSON.parse(cleanedStr);
+              } catch (cleanParseErr) {
+                console.error('Error parsing cleaned owner_info string:', cleanParseErr);
+              }
+            }
+          }
+        }
+        
+        // If owner_info is an object but user_id is missing, check other properties
+        ownerId = ownerInfo.user_id || ownerInfo.userId || ownerInfo.owner_id || ownerInfo.ownerId || null;
+        
+        // If still no ID, check if the full object itself is the user ID
+        if (!ownerId && typeof ownerInfo === 'string' && ownerInfo.length > 30) {
+          ownerId = ownerInfo;
+        }
+        
         console.log('Found venue owner ID:', ownerId, 'from owner_info:', ownerInfo);
       } catch (e) {
-        console.error('Error parsing owner_info:', e, 'Raw data:', data.owner_info);
+        console.error('Error processing owner_info:', e);
       }
     }
     

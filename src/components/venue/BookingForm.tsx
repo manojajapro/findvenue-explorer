@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -12,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification, getVenueOwnerId } from '@/utils/notificationService';
+import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification, getVenueOwnerId, sendNotification } from '@/utils/notificationService';
 import {
   Select,
   SelectContent,
@@ -172,38 +173,53 @@ export default function BookingForm({
         ...bookingData[0],
         venue_name: venueName,
         booking_date: formattedDate,
+        booking_type: 'hourly'  // Explicitly set booking type
       };
 
       if (autoConfirm) {
         console.log("Sending auto-confirm notification for hourly booking");
         try {
-          const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
+          // Get owner ID either from props or by looking it up
+          const venueOwnerId = ownerId || await getVenueOwnerId(venueId);
+          let notificationSent = false;
           
-          if (!notified) {
-            console.warn('Booking confirmation notification may not have been sent');
-            const venueOwnerId = await getVenueOwnerId(venueId);
-            if (venueOwnerId) {
-              console.log("Found venue owner ID for direct notification:", venueOwnerId);
-              const { sendNotification } = await import('@/utils/notificationService');
-              await sendNotification(
-                venueOwnerId,
-                'Booking Confirmed',
-                `A booking for "${venueName}" on ${formattedDate} has been automatically confirmed.`,
-                'booking',
-                '/customer-bookings',
-                {
-                  booking_id: bookingWithDetails.id,
-                  venue_id: venueId,
-                  status: 'confirmed',
-                  booking_date: formattedDate,
-                  venue_name: venueName,
-                  booking_type: 'hourly'
-                },
-                5
-              );
+          if (venueOwnerId) {
+            console.log("Found venue owner ID for direct notification:", venueOwnerId);
+            
+            const notificationData = {
+              booking_id: bookingWithDetails.id,
+              venue_id: venueId,
+              status: 'confirmed',
+              booking_date: formattedDate,
+              venue_name: venueName,
+              booking_type: 'hourly'
+            };
+            
+            const result = await sendNotification(
+              venueOwnerId,
+              'Booking Confirmed',
+              `A booking for "${venueName}" on ${formattedDate} has been automatically confirmed.`,
+              'booking',
+              '/customer-bookings',
+              notificationData,
+              5
+            );
+            
+            if (result) {
+              console.log("Direct notification to venue owner successful");
+              notificationSent = true;
             }
-          } else {
-            console.log('Booking confirmation notification sent successfully');
+          }
+          
+          // Also try the standard notification method
+          if (!notificationSent) {
+            const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
+            
+            if (notified) {
+              console.log('Standard notification method successful');
+            } else {
+              console.warn('All notification attempts to venue owner failed');
+            }
           }
         } catch (notifyError) {
           console.error("Error sending booking notifications:", notifyError);
@@ -216,33 +232,47 @@ export default function BookingForm({
       } else {
         console.log("Sending pending notification to venue owner for hourly booking");
         try {
-          const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
+          // Get owner ID either from props or by looking it up
+          const venueOwnerId = ownerId || await getVenueOwnerId(venueId);
+          let notificationSent = false;
           
-          if (!notified) {
-            console.warn('Venue owner notification may not have been sent, trying direct method');
-            const venueOwnerId = await getVenueOwnerId(venueId);
-            if (venueOwnerId) {
-              console.log("Found venue owner ID for direct notification:", venueOwnerId);
-              const { sendNotification } = await import('@/utils/notificationService');
-              await sendNotification(
-                venueOwnerId,
-                'New Booking Request',
-                `A new booking request for "${venueName}" on ${formattedDate} has been received.`,
-                'booking',
-                '/customer-bookings',
-                {
-                  booking_id: bookingWithDetails.id,
-                  venue_id: venueId,
-                  status: 'pending',
-                  booking_date: formattedDate,
-                  venue_name: venueName,
-                  booking_type: 'hourly'
-                },
-                5
-              );
+          if (venueOwnerId) {
+            console.log("Found venue owner ID for direct notification:", venueOwnerId);
+            
+            const notificationData = {
+              booking_id: bookingWithDetails.id,
+              venue_id: venueId,
+              status: 'pending',
+              booking_date: formattedDate,
+              venue_name: venueName,
+              booking_type: 'hourly'
+            };
+            
+            const result = await sendNotification(
+              venueOwnerId,
+              'New Booking Request',
+              `A new booking request for "${venueName}" on ${formattedDate} has been received.`,
+              'booking',
+              '/customer-bookings',
+              notificationData,
+              5
+            );
+            
+            if (result) {
+              console.log("Direct notification to venue owner successful");
+              notificationSent = true;
             }
-          } else {
-            console.log('Venue owner notification sent successfully');
+          }
+          
+          // Also try the standard notification method
+          if (!notificationSent) {
+            const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
+            
+            if (notified) {
+              console.log('Standard notification method successful');
+            } else {
+              console.warn('All notification attempts to venue owner failed');
+            }
           }
         } catch (notifyError) {
           console.error("Error notifying venue owner:", notifyError);

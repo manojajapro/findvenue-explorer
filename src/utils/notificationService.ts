@@ -25,6 +25,16 @@ export const sendNotification = async (
     
     while (!result && attempts < maxRetries) {
       try {
+        // Ensure data has the correct format
+        const formattedData = type === 'booking' ? {
+          booking_id: data?.booking_id || data?.id,
+          venue_id: data?.venue_id,
+          status: data?.status,
+          booking_date: data?.booking_date,
+          venue_name: data?.venue_name,
+          booking_type: data?.booking_type || (data?.start_time === '00:00' && data?.end_time === '23:59' ? 'full-day' : 'hourly')
+        } : data;
+        
         const { data: notification, error } = await supabase
           .from('notifications')
           .insert({
@@ -34,7 +44,7 @@ export const sendNotification = async (
             type,
             read: false,
             link,
-            data
+            data: formattedData
           })
           .select();
         
@@ -90,12 +100,52 @@ export const getVenueOwnerId = async (venueId: string): Promise<string | null> =
     // Parse owner info
     try {
       console.log('Raw owner_info:', venueData.owner_info);
-      const ownerInfo = typeof venueData.owner_info === 'string'
-        ? JSON.parse(venueData.owner_info)
-        : venueData.owner_info;
-        
-      const ownerId = ownerInfo?.user_id || null;
+      
+      let ownerInfo: any = venueData.owner_info;
+      
+      // Parse string if needed
+      if (typeof venueData.owner_info === 'string') {
+        try {
+          ownerInfo = JSON.parse(venueData.owner_info);
+        } catch (parseErr) {
+          console.error('Failed to parse owner_info JSON:', parseErr);
+          
+          // Try alternative parsing for malformed JSON
+          if (venueData.owner_info.includes('{') && venueData.owner_info.includes('}')) {
+            const cleanedStr = venueData.owner_info
+              .replace(/'/g, '"')
+              .replace(/(\w+):/g, '"$1":');
+            try {
+              ownerInfo = JSON.parse(cleanedStr);
+            } catch (e) {
+              console.error('Failed to parse cleaned owner_info:', e);
+            }
+          }
+        }
+      }
+      
+      // Check various possible property names for user ID
+      let ownerId = null;
+      
+      if (typeof ownerInfo === 'object' && ownerInfo !== null) {
+        ownerId = ownerInfo.user_id || ownerInfo.userId || ownerInfo.owner_id || ownerInfo.ownerId;
+      } else if (typeof ownerInfo === 'string' && ownerInfo.length > 30) {
+        // If ownerInfo is a string and looks like a UUID, use it directly
+        ownerId = ownerInfo;
+      }
+      
       console.log('Parsed venue owner ID:', ownerId, 'from owner_info:', ownerInfo);
+      
+      if (!ownerId) {
+        console.error('Failed to extract owner ID from owner_info');
+        
+        // Try direct raw value as a last resort
+        if (typeof venueData.owner_info === 'string' && venueData.owner_info.length > 30) {
+          ownerId = venueData.owner_info;
+          console.log('Using raw owner_info string as ID:', ownerId);
+        }
+      }
+      
       return ownerId;
       
     } catch (e) {
