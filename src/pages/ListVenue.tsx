@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -428,8 +427,6 @@ const ListVenue = () => {
       // Get city and category information
       let cityId = '';
       let cityName = '';
-      let categoryId = '';
-      let categoryName = '';
       
       if (cityInputMode === 'dropdown') {
         const cityObject = saudiCities.find(city => city.id === formData.city);
@@ -441,14 +438,20 @@ const ListVenue = () => {
         cityName = manualCity;
       }
       
+      // Format category arrays
+      let categoryIdArray: string[] = [];
+      let categoryNameArray: string[] = [];
+      
       if (categoryInputMode === 'dropdown') {
         const categoryObject = categories.find(cat => cat.id === formData.category);
-        categoryId = categoryObject?.id || '';
-        categoryName = categoryObject?.name || '';
+        if (categoryObject) {
+          categoryIdArray = [categoryObject.id];
+          categoryNameArray = [categoryObject.name];
+        }
       } else {
         // For manually entered categories, use the input as both ID and name
-        categoryId = manualCategory;
-        categoryName = manualCategory;
+        categoryIdArray = [manualCategory];
+        categoryNameArray = [manualCategory];
       }
       
       // Prepare owner info
@@ -469,8 +472,8 @@ const ListVenue = () => {
         address: formData.address,
         city_id: cityId,
         city_name: cityName,
-        category_id: categoryId,
-        category_name: categoryName,
+        category_id: categoryIdArray,
+        category_name: categoryNameArray,
         min_capacity: parseInt(formData.minCapacity),
         max_capacity: parseInt(formData.maxCapacity),
         starting_price: startingPrice,
