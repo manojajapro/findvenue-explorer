@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import BookingForm from '@/components/venue/BookingForm';
@@ -210,8 +209,9 @@ export default function VenueBookingTabs({
     );
   }
 
-  // Don't allow bookings if venue is not confirmed
-  if (venueStatus !== 'confirmed' && venueStatus !== 'active') {
+  // Allow bookings for venues with status pending, confirmed, or active
+  const bookableStatuses = ['pending', 'confirmed', 'active'];
+  if (!bookableStatuses.includes(venueStatus)) {
     return (
       <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
         <p className="text-center text-findvenue-text-muted">

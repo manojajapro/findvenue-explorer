@@ -75,7 +75,7 @@ export const processCategoryNames = (categories: any): string[] => {
     if (categories.startsWith('[') && categories.endsWith(']')) {
       try {
         // Try to parse as JSON
-        const parsed = JSON.parse(categories.replace(/'/g, '"'));
+        const parsed = JSON.parse(categories);
         if (Array.isArray(parsed)) {
           return parsed.map(item => String(item).trim());
         }

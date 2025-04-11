@@ -214,6 +214,7 @@ export type Database = {
           featured: boolean | null
           gallery_images: string[] | null
           id: string
+          image_url: string | null
           latitude: number | null
           longitude: number | null
           max_capacity: number | null
@@ -228,6 +229,7 @@ export type Database = {
           reviews_count: number | null
           rules_and_regulations: Json | null
           starting_price: number | null
+          status: string | null
           type: string | null
           updated_at: string | null
           wifi: boolean | null
@@ -250,6 +252,7 @@ export type Database = {
           featured?: boolean | null
           gallery_images?: string[] | null
           id?: string
+          image_url?: string | null
           latitude?: number | null
           longitude?: number | null
           max_capacity?: number | null
@@ -264,6 +267,7 @@ export type Database = {
           reviews_count?: number | null
           rules_and_regulations?: Json | null
           starting_price?: number | null
+          status?: string | null
           type?: string | null
           updated_at?: string | null
           wifi?: boolean | null
@@ -286,6 +290,7 @@ export type Database = {
           featured?: boolean | null
           gallery_images?: string[] | null
           id?: string
+          image_url?: string | null
           latitude?: number | null
           longitude?: number | null
           max_capacity?: number | null
@@ -300,6 +305,7 @@ export type Database = {
           reviews_count?: number | null
           rules_and_regulations?: Json | null
           starting_price?: number | null
+          status?: string | null
           type?: string | null
           updated_at?: string | null
           wifi?: boolean | null
