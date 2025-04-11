@@ -1,4 +1,3 @@
-
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { Json } from '@/integrations/supabase/types';
 
@@ -74,16 +73,17 @@ export const processCategoryNames = (categories: any): string[] => {
     // Check if the string looks like an array representation
     if (categories.startsWith('[') && categories.endsWith(']')) {
       try {
-        // Try to parse as JSON
-        const parsed = JSON.parse(categories);
+        // Try to parse as JSON - first replace single quotes with double quotes if needed
+        const normalizedJson = categories.replace(/'/g, '"');
+        const parsed = JSON.parse(normalizedJson);
         if (Array.isArray(parsed)) {
           return parsed.map(item => String(item).trim());
         }
       } catch (e) {
         // If parsing fails, try to extract from the string format ['item1', 'item2']
-        const matches = categories.match(/'([^']+)'/g) || [];
+        const matches = categories.match(/'([^']+)'/g) || categories.match(/"([^"]+)"/g) || [];
         if (matches.length > 0) {
-          return matches.map(m => m.replace(/'/g, '').trim());
+          return matches.map(m => m.replace(/['"]/g, '').trim());
         }
       }
     }
@@ -91,16 +91,6 @@ export const processCategoryNames = (categories: any): string[] => {
     // Check if comma-separated list
     if (categories.includes(',')) {
       return categories.split(',').map(cat => cat.trim());
-    }
-    
-    // Try to parse as JSON
-    try {
-      const parsed = JSON.parse(categories);
-      if (Array.isArray(parsed)) {
-        return parsed.map(item => String(item).trim());
-      }
-    } catch (e) {
-      // Not JSON, continue processing
     }
     
     // Handle CamelCase concatenated categories (e.g., "ExhibitionsConferencesGraduation")

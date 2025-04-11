@@ -142,6 +142,7 @@ export default function MultiDayBookingForm({
 
     try {
       const initialStatus = autoConfirm ? 'confirmed' : 'pending';
+      const formattedDate = format(data.date, 'yyyy-MM-dd');
       
       console.log("Creating full day booking with status:", initialStatus);
       
@@ -152,7 +153,7 @@ export default function MultiDayBookingForm({
             user_id: user.id,
             venue_id: venueId,
             venue_name: venueName,
-            booking_date: format(data.date, 'yyyy-MM-dd'),
+            booking_date: formattedDate,
             start_time: '00:00',
             end_time: '23:59',
             status: initialStatus,
@@ -177,10 +178,11 @@ export default function MultiDayBookingForm({
       
       console.log("Full day booking created:", bookingData[0]);
 
+      // Ensure we have consistent booking data format for notifications
       const bookingWithDetails = {
         ...bookingData[0],
         venue_name: venueName,
-        booking_date: format(data.date, 'yyyy-MM-dd'),
+        booking_date: formattedDate,
       };
 
       if (autoConfirm) {
@@ -211,8 +213,7 @@ export default function MultiDayBookingForm({
           } else {
             console.log('Venue owner notification sent successfully');
           }
-        } catch (notifyError: unknown) {
-          // Fixed: Using 'unknown' type instead of 'instanceof Error'
+        } catch (notifyError) {
           console.error("Error notifying venue owner:", notifyError);
         }
         
@@ -223,8 +224,7 @@ export default function MultiDayBookingForm({
       }
 
       navigate('/bookings');
-    } catch (error: unknown) {
-      // Fixed: Using 'unknown' type instead of Error
+    } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "There was a problem creating your booking.";
       toast({
         title: "Booking failed",

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
@@ -117,7 +116,7 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
     
     // Format booking date
     const bookingDate = booking.booking_date 
-      ? format(new Date(booking.booking_date), 'MMM d, yyyy') 
+      ? format(new Date(booking.booking_date), 'yyyy-MM-dd') 
       : 'scheduled date';
       
     // Determine booking type
@@ -134,6 +133,17 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       message = `A new booking request for "${booking.venue_name}" on ${bookingDate} has been received.`;
     }
     
+    // Create the notification data in the consistent format
+    const notificationData = {
+      booking_id: booking.id,
+      venue_id: booking.venue_id,
+      status: booking.status,
+      booking_date: bookingDate,
+      venue_name: booking.venue_name
+    };
+    
+    console.log('Notification data being sent:', notificationData);
+    
     // Send notification with retry attempts
     const notification = await sendNotification(
       ownerId,
@@ -141,14 +151,7 @@ export const notifyVenueOwnerAboutBooking = async (booking: any) => {
       message,
       'booking',
       '/customer-bookings',
-      {
-        booking_id: booking.id,
-        venue_id: booking.venue_id,
-        status: booking.status,
-        booking_date: booking.booking_date,
-        venue_name: booking.venue_name,
-        booking_type: bookingType
-      },
+      notificationData,
       5
     );
     
@@ -175,10 +178,21 @@ export const sendBookingStatusNotification = async (booking: any, status: string
     // Get venue owner ID
     const ownerId = await getVenueOwnerId(booking.venue_id);
     const formattedDate = booking.booking_date 
-      ? format(new Date(booking.booking_date), 'MMM d, yyyy') 
+      ? format(new Date(booking.booking_date), 'yyyy-MM-dd') 
       : 'scheduled date';
     
     let notificationsSuccessful = true;
+    
+    // Create consistent notification data format regardless of booking type
+    const notificationData = {
+      booking_id: booking.id,
+      venue_id: booking.venue_id,
+      status: status,
+      booking_date: formattedDate,
+      venue_name: booking.venue_name
+    };
+    
+    console.log('Status notification data:', notificationData);
     
     // Notify owner
     if (ownerId) {
@@ -189,23 +203,13 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       
       console.log(`Sending notification to owner ${ownerId} for status ${status}`);
       
-      // Determine booking type
-      const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
-      
       const ownerNotification = await sendNotification(
         ownerId,
         ownerTitle,
         ownerMessage,
         'booking',
         '/customer-bookings',
-        {
-          booking_id: booking.id,
-          venue_id: booking.venue_id,
-          status: status,
-          booking_date: booking.booking_date,
-          venue_name: booking.venue_name,
-          booking_type: bookingType
-        },
+        notificationData,
         5
       );
       
@@ -226,23 +230,13 @@ export const sendBookingStatusNotification = async (booking: any, status: string
       
       console.log(`Sending notification to customer ${booking.user_id} for status ${status}`);
       
-      // Determine booking type
-      const bookingType = booking.start_time === '00:00' && booking.end_time === '23:59' ? 'full-day' : 'hourly';
-      
       const customerNotification = await sendNotification(
         booking.user_id,
         customerTitle,
         customerMessage,
         'booking',
         '/bookings',
-        {
-          booking_id: booking.id,
-          venue_id: booking.venue_id,
-          status: status,
-          booking_date: booking.booking_date,
-          venue_name: booking.venue_name,
-          booking_type: bookingType
-        },
+        notificationData,
         5
       );
       
