@@ -75,6 +75,9 @@ const MapView = ({
   const [mapZoom, setMapZoom] = useState(12);
   const [searchText, setSearchText] = useState('');
   const [currentAddress, setCurrentAddress] = useState('');
+  const [radiusActive, setRadiusActive] = useState(false);
+  const [radiusSize, setRadiusSize] = useState(1); // km
+  
   const mapRef = useRef<any>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -137,6 +140,22 @@ const MapView = ({
     setMapZoom(14);
     setCurrentAddress(address);
   };
+  
+  // Handle manual location
+  const handleManualLocationSetting = (coordinates: [number, number]) => {
+    setMapCenter(coordinates);
+    setMapZoom(14);
+  };
+  
+  // Toggle radius search
+  const toggleRadiusSearch = () => {
+    setRadiusActive(!radiusActive);
+  };
+  
+  // Update radius size
+  const handleRadiusSizeChange = (size: number) => {
+    setRadiusSize(size);
+  };
 
   if (isLoading) {
     return (
@@ -189,7 +208,7 @@ const MapView = ({
                 minWidth={280} 
                 maxWidth={320}
               >
-                <Card className="bg-findvenue-surface/95 backdrop-blur-md border-white/10 overflow-hidden">
+                <Card className="bg-findvenue-surface/95 backdrop-blur-md border border-findvenue/20 overflow-hidden">
                   <div className="relative h-32 overflow-hidden">
                     {venue.imageUrl && (
                       <img 
@@ -247,7 +266,15 @@ const MapView = ({
           searchText={searchText}
         />
         
-        <MapControls />
+        <MapControls 
+          isCompactControls={true}
+          isRadiusActive={radiusActive}
+          toggleRadiusSearch={toggleRadiusSearch}
+          handleManualLocationSetting={handleManualLocationSetting}
+          radiusSize={radiusSize}
+          setRadiusSize={handleRadiusSizeChange}
+          currentLocation={mapCenter}
+        />
       </MapContainer>
     </div>
   );

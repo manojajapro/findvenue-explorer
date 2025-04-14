@@ -22,71 +22,74 @@ const Cities = () => {
         setIsLoading(true);
         
         // First try to get the pre-aggregated city data
-        const { data: cityGroupsData, error: cityGroupsError } = await supabase
-          .from('city_groups')
-          .select('*')
-          .order('city_name', { ascending: true });
-          
-        if (cityGroupsError) {
-          console.error('Error fetching city groups:', cityGroupsError);
-          
-          // Fallback: Get all venues to extract unique cities
-          const { data: venuesData, error: venuesError } = await supabase
-            .from('venues')
-            .select('city_id, city_name, gallery_images')
+        try {
+          const { data: cityGroupsData, error: cityGroupsError } = await supabase
+            .from('city_groups')
+            .select('*')
             .order('city_name', { ascending: true });
             
-          if (venuesError) throw venuesError;
-          
-          if (venuesData) {
-            // Process cities data to avoid duplicates and prefer gallery_images
-            const uniqueCities = new Map();
+          if (!cityGroupsError && cityGroupsData && cityGroupsData.length > 0) {
+            // Use pre-aggregated city data from the database
+            const formattedCities = cityGroupsData.map(city => ({
+              id: city.city_id,
+              name: city.city_name,
+              gallery_images: city.gallery_images || [],
+              venueCount: city.venue_count || 0
+            }));
             
-            venuesData.forEach(venue => {
-              if (!venue.city_id) return; // Skip venues without city_id
-              
-              // Create or update city entry
-              if (!uniqueCities.has(venue.city_id)) {
-                uniqueCities.set(venue.city_id, {
-                  id: venue.city_id,
-                  name: venue.city_name || 'Unknown City',
-                  gallery_images: venue.gallery_images || [],
-                  venueCount: 1
-                });
-              } else {
-                // Update existing city with better data if available
-                const existingCity = uniqueCities.get(venue.city_id);
-                existingCity.venueCount += 1;
-                
-                // Update gallery_images if the current city doesn't have any
-                if ((!existingCity.gallery_images || existingCity.gallery_images.length === 0) && 
-                    venue.gallery_images && venue.gallery_images.length > 0) {
-                  existingCity.gallery_images = venue.gallery_images;
-                }
-                
-                uniqueCities.set(venue.city_id, existingCity);
-              }
-            });
-            
-            const citiesData = Array.from(uniqueCities.values());
-            console.log("Extracted unique cities from venues:", citiesData);
-            
-            setCities(citiesData);
-            setFilteredCities(citiesData);
+            setCities(formattedCities);
+            setFilteredCities(formattedCities);
+            setIsLoading(false);
+            return;
           }
-        } else if (cityGroupsData && cityGroupsData.length > 0) {
-          // Use pre-aggregated city data from the database
-          const formattedCities = cityGroupsData.map(city => ({
-            id: city.city_id,
-            name: city.city_name,
-            gallery_images: city.image_url ? [city.image_url] : [],
-            venueCount: city.venue_count || 0
-          }));
+        } catch (error) {
+          console.error('Error fetching city groups:', error);
+          console.info('Falling back to venues table for cities');
+        }
           
-          console.log("Using city groups data:", formattedCities);
+        // Fallback: Get all venues to extract unique cities
+        const { data: venuesData, error: venuesError } = await supabase
+          .from('venues')
+          .select('city_id, city_name, gallery_images')
+          .order('city_name', { ascending: true });
           
-          setCities(formattedCities);
-          setFilteredCities(formattedCities);
+        if (venuesError) throw venuesError;
+        
+        if (venuesData) {
+          // Process cities data to avoid duplicates and prefer gallery_images
+          const uniqueCities = new Map();
+          
+          venuesData.forEach(venue => {
+            if (!venue.city_id) return; // Skip venues without city_id
+            
+            // Create or update city entry
+            if (!uniqueCities.has(venue.city_id)) {
+              uniqueCities.set(venue.city_id, {
+                id: venue.city_id,
+                name: venue.city_name || 'Unknown City',
+                gallery_images: venue.gallery_images || [],
+                venueCount: 1
+              });
+            } else {
+              // Update existing city with better data if available
+              const existingCity = uniqueCities.get(venue.city_id);
+              existingCity.venueCount += 1;
+              
+              // Update gallery_images if the current city doesn't have any
+              if ((!existingCity.gallery_images || existingCity.gallery_images.length === 0) && 
+                  venue.gallery_images && venue.gallery_images.length > 0) {
+                existingCity.gallery_images = venue.gallery_images;
+              }
+              
+              uniqueCities.set(venue.city_id, existingCity);
+            }
+          });
+          
+          const citiesData = Array.from(uniqueCities.values());
+          console.log("Extracted unique cities from venues:", citiesData);
+          
+          setCities(citiesData);
+          setFilteredCities(citiesData);
         }
       } catch (error) {
         console.error('Error fetching cities:', error);
@@ -98,15 +101,16 @@ const Cities = () => {
     fetchCities();
   }, []);
   
-  // Filter cities based on search term
+  // Filter cities based on search term - case insensitive
   useEffect(() => {
     if (!searchTerm.trim()) {
       setFilteredCities(cities);
       return;
     }
     
+    const searchTermLower = searchTerm.toLowerCase();
     const filtered = cities.filter(city => 
-      city.name.toLowerCase().includes(searchTerm.toLowerCase())
+      city.name.toLowerCase().includes(searchTermLower)
     );
     
     setFilteredCities(filtered);

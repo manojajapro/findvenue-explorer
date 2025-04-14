@@ -17,7 +17,9 @@ serve(async (req) => {
   }
 
   try {
-    const { query, venueId, type } = await req.json();
+    // Parse the request body
+    const body = await req.json();
+    const { query, venueId, type } = body;
 
     // Log the incoming request for debugging
     console.log(`Received ${type} request for venue ${venueId}: ${query}`);
@@ -30,8 +32,8 @@ serve(async (req) => {
       );
     }
 
-    // Simulate venue information lookup
-    // In a real implementation, you would fetch this from your database
+    // In a real implementation, you would fetch venue info from your database using venueId
+    // For now, we'll use mock data
     const venueInfo = {
       name: "Sample Venue",
       location: "Riyadh",
@@ -78,7 +80,7 @@ serve(async (req) => {
     console.error("Error processing venue assistant request:", error);
     
     return new Response(
-      JSON.stringify({ error: "Failed to process your request" }),
+      JSON.stringify({ error: "Failed to process your request", message: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
