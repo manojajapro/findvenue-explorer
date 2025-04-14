@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue, VenueFilter } from '@/hooks/useSupabaseVenues';
@@ -8,6 +9,9 @@ export const useRealTimeVenues = (filter: VenueFilter = {}) => {
   const [venues, setVenues] = useState<Venue[]>(initialVenues);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Array<{id: string, name: string}>>([]);
+  const [cities, setCities] = useState<Array<{id: string, name: string}>>([]);
+  const [totalCount, setTotalCount] = useState(0);
 
   const fetchVenues = useCallback(async () => {
     setLoading(true);
@@ -57,6 +61,49 @@ export const useRealTimeVenues = (filter: VenueFilter = {}) => {
       setError(error.message);
     } else {
       setVenues(data || []);
+      setTotalCount(data?.length || 0);
+    }
+
+    // Fetch categories
+    const { data: categoriesData } = await supabase
+      .from('venues')
+      .select('category_id, category_name')
+      .not('category_id', 'is', null);
+
+    if (categoriesData) {
+      const uniqueCategories = new Map();
+      categoriesData.forEach(item => {
+        if (item.category_id && item.category_name) {
+          // Handle both array and string cases for categories
+          const categoryIds = Array.isArray(item.category_id) ? item.category_id : [item.category_id];
+          const categoryNames = Array.isArray(item.category_name) ? item.category_name : [item.category_name];
+          
+          categoryIds.forEach((id, index) => {
+            if (id && categoryNames[index]) {
+              uniqueCategories.set(id, { id, name: categoryNames[index] });
+            }
+          });
+        }
+      });
+      
+      setCategories(Array.from(uniqueCategories.values()));
+    }
+
+    // Fetch cities
+    const { data: citiesData } = await supabase
+      .from('venues')
+      .select('city_id, city_name')
+      .not('city_id', 'is', null);
+
+    if (citiesData) {
+      const uniqueCities = new Map();
+      citiesData.forEach(item => {
+        if (item.city_id && item.city_name) {
+          uniqueCities.set(item.city_id, { id: item.city_id, name: item.city_name });
+        }
+      });
+      
+      setCities(Array.from(uniqueCities.values()));
     }
 
     setLoading(false);
@@ -82,5 +129,5 @@ export const useRealTimeVenues = (filter: VenueFilter = {}) => {
     }
   }, [fetchVenues]);
 
-  return { venues, loading, error };
+  return { venues, loading, error, categories, cities, isLoading: loading, totalCount };
 };
