@@ -44,6 +44,7 @@ export const useVenueData = () => {
           let ownerInfoData = undefined;
           try {
             if (data.owner_info) {
+              console.log("Processing owner_info:", data.owner_info);
               const ownerInfo = typeof data.owner_info === 'string'
                 ? JSON.parse(data.owner_info)
                 : (data.owner_info as Record<string, any>);
@@ -60,6 +61,9 @@ export const useVenueData = () => {
                   linkedin: ownerInfo.linkedin_url || ownerInfo.linkedin || ''
                 }
               };
+              console.log("Processed owner info:", ownerInfoData);
+            } else {
+              console.log("No owner_info found in venue data");
             }
           } catch (e) {
             console.error("Error parsing owner_info for venue", data.id, e);
