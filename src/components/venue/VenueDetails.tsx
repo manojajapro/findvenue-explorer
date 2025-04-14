@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
-import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import VenueBookingTabs from '@/components/venue/VenueBookingTabs';
 import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
@@ -49,10 +49,8 @@ const VenueDetails = () => {
 
   const isOwner = user?.id === venue.ownerInfo?.user_id;
   
-  // Get array of category names
   const categoryNames = venue.categoryNames || [];
   
-  // Get the main image from gallery images
   const mainImage = venue.galleryImages && venue.galleryImages.length > 0 
     ? venue.galleryImages[0] 
     : 'https://placehold.co/600x400?text=No+Image';
@@ -240,22 +238,22 @@ const VenueDetails = () => {
               <div className="mt-4 flex space-x-3">
                 {venue.ownerInfo.socialLinks.facebook && (
                   <a href={venue.ownerInfo.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                    <FacebookIcon className="h-5 w-5" />
+                    <Facebook className="h-5 w-5" />
                   </a>
                 )}
                 {venue.ownerInfo.socialLinks.twitter && (
                   <a href={venue.ownerInfo.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                    <TwitterIcon className="h-5 w-5" />
+                    <Twitter className="h-5 w-5" />
                   </a>
                 )}
                 {venue.ownerInfo.socialLinks.instagram && (
                   <a href={venue.ownerInfo.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300">
-                    <InstagramIcon className="h-5 w-5" />
+                    <Instagram className="h-5 w-5" />
                   </a>
                 )}
                 {venue.ownerInfo.socialLinks.linkedin && (
                   <a href={venue.ownerInfo.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500">
-                    <LinkedinIcon className="h-5 w-5" />
+                    <Linkedin className="h-5 w-5" />
                   </a>
                 )}
               </div>
