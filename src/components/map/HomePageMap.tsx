@@ -61,7 +61,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
             description: venue.description,
             address: venue.address,
             city: venue.city_name,
-            imageUrl: venue.image_url,
+            imageUrl: venue.image_url || (venue.gallery_images && venue.gallery_images.length > 0 ? venue.gallery_images[0] : ''),
             galleryImages: venue.gallery_images,
             featured: venue.featured,
             popular: venue.popular,
