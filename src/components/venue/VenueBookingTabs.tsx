@@ -1,8 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import BookingForm from '@/components/venue/BookingForm';
-import MultiDayBookingForm from '@/components/venue/MultiDayBookingForm';
 import { Calendar, Clock, Calendar as CalendarIcon, LogIn, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +12,7 @@ import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -46,13 +45,15 @@ export default function VenueBookingTabs({
   const [hourlyBookedDates, setHourlyBookedDates] = useState<string[]>([]);
   const [dayBookedDates, setDayBookedDates] = useState<string[]>([]);
   const [venueStatus, setVenueStatus] = useState<string>('active');
-  const [bookingType, setBookingType] = useState<'hourly' | 'full-day'>('hourly');
+  const [showDetails, setShowDetails] = useState<boolean>(false);
   
   // New fields for unified booking form
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [peopleCount, setPeopleCount] = useState<string>(minCapacity.toString());
   const [fromTime, setFromTime] = useState<string>('09:00');
   const [toTime, setToTime] = useState<string>('17:00');
+  const [bookingType, setBookingType] = useState<'hourly' | 'full-day'>('full-day');
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
 
   // Fetch venue status
   useEffect(() => {
@@ -179,6 +180,37 @@ export default function VenueBookingTabs({
       fetchBookings();
     }
   }, [venueId]);
+
+  // Update available time slots whenever the selected date changes
+  useEffect(() => {
+    if (selectedDate) {
+      // Generate all time slots
+      const allTimeSlots = generateTimeSlots();
+      
+      // Filter out booked time slots for the selected date
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const bookedSlots = bookedTimeSlots[dateStr] || [];
+      
+      // Get booked hours for this date
+      const bookedHours = new Set<number>();
+      bookedSlots.forEach(slot => {
+        const [start, end] = slot.split(' - ');
+        const startHour = parseInt(start.split(':')[0]);
+        const endHour = parseInt(end.split(':')[0]);
+        for (let hour = startHour; hour < endHour; hour++) {
+          bookedHours.add(hour);
+        }
+      });
+      
+      // Filter available time slots
+      const available = allTimeSlots.filter(time => {
+        const hour = parseInt(time.split(':')[0]);
+        return !bookedHours.has(hour);
+      });
+      
+      setAvailableTimeSlots(available);
+    }
+  }, [selectedDate, bookedTimeSlots]);
   
   // Helper function to generate time slots - Updated for 24 hours
   const generateTimeSlots = (): string[] => {
@@ -189,7 +221,25 @@ export default function VenueBookingTabs({
     return slots;
   };
   
-  const handleBookRequest = () => {
+  // Check if a date is fully booked (can't book anymore)
+  const isDateFullyBooked = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return fullyBookedDates.includes(dateStr);
+  };
+  
+  // Check if a date has day booking already
+  const isDateDayBooked = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return dayBookedDates.includes(dateStr);
+  };
+  
+  // Check if a date has hourly bookings
+  const isDateHourlyBooked = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return hourlyBookedDates.includes(dateStr);
+  };
+  
+  const handleBookRequest = async () => {
     if (!user) {
       toast({
         title: "Login required",
@@ -200,13 +250,148 @@ export default function VenueBookingTabs({
       return;
     }
     
-    // Here you would implement the booking logic
-    toast({
-      title: "Booking request sent",
-      description: "We'll contact you shortly to confirm your booking"
-    });
+    if (!selectedDate) {
+      toast({
+        title: "Date required",
+        description: "Please select a booking date",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Format date
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+    
+    // Validate people count
+    const guests = parseInt(peopleCount);
+    if (isNaN(guests) || guests < 1 || guests > maxCapacity) {
+      toast({
+        title: "Invalid guest count",
+        description: `Please enter a number between 1 and ${maxCapacity}`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      let startTime = fromTime;
+      let endTime = toTime;
+      let totalPrice = 0;
+      
+      // Calculate price based on booking type
+      if (bookingType === 'full-day') {
+        startTime = '00:00';
+        endTime = '23:59';
+        totalPrice = pricePerHour * 10; // Day rate
+      } else {
+        // Calculate hourly price
+        const startHour = parseInt(fromTime.split(':')[0]);
+        const endHour = parseInt(toTime.split(':')[0]);
+        const hours = endHour - startHour;
+        
+        if (hours <= 0) {
+          toast({
+            title: "Invalid time range",
+            description: "End time must be after start time",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        totalPrice = hours * pricePerHour;
+      }
+      
+      // Check if the slot is already booked
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const timeSlot = `${startTime} - ${endTime}`;
+      
+      if (bookedTimeSlots[dateStr]?.includes(timeSlot)) {
+        toast({
+          title: "Time slot not available",
+          description: "This time slot is already booked. Please select another time.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Create booking
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([
+          {
+            user_id: user.id,
+            venue_id: venueId,
+            venue_name: venueName,
+            booking_date: formattedDate,
+            start_time: startTime,
+            end_time: endTime,
+            status: 'pending',
+            total_price: totalPrice,
+            guests: guests,
+            customer_email: user.email,
+          }
+        ])
+        .select();
+        
+      if (error) {
+        console.error('Booking error:', error);
+        toast({
+          title: "Booking failed",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Send notification to venue owner
+      try {
+        const { data: notificationData, error: notificationError } = await supabase
+          .from('notifications')
+          .insert([
+            {
+              user_id: ownerId,
+              title: 'New Booking Request',
+              message: `New booking request for ${venueName} on ${formattedDate}`,
+              type: 'booking',
+              link: '/customer-bookings',
+              data: {
+                booking_id: data?.[0]?.id,
+                venue_id: venueId,
+                status: 'pending',
+                booking_date: formattedDate,
+                venue_name: venueName,
+                booking_type: bookingType === 'full-day' ? 'day' : 'hourly'
+              }
+            }
+          ]);
+          
+        if (notificationError) {
+          console.warn('Failed to send notification to owner:', notificationError);
+        }
+      } catch (notifyError) {
+        console.warn('Error in notification process:', notifyError);
+      }
+      
+      toast({
+        title: "Booking requested!",
+        description: `You've successfully requested ${venueName} on ${format(selectedDate, 'PPP')}${
+          bookingType === 'hourly' ? ` from ${fromTime} to ${toTime}` : ' for the entire day'
+        }. Total: ${totalPrice} ${venue.currency || 'SAR'}`,
+      });
+      
+      // Redirect to bookings page
+      navigate('/bookings');
+      
+    } catch (err) {
+      console.error('Error during booking process:', err);
+      toast({
+        title: "Booking failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
-
+  
   // Don't show booking tabs for the venue owner
   if (isOwner) {
     return (
@@ -255,6 +440,9 @@ export default function VenueBookingTabs({
   const parsedPricePerHour = Number(pricePerHour) || 0;
   const parsedMinCapacity = Number(minCapacity) || 1;
   const parsedMaxCapacity = Number(maxCapacity) || 100;
+  
+  // Format day price
+  const dayPrice = parsedPricePerHour * 10;
 
   return (
     <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
@@ -264,92 +452,204 @@ export default function VenueBookingTabs({
         <div className="flex justify-between mb-2">
           <div>
             <div className="font-bold text-xl">
-              from <span className="text-2xl">${parsedPricePerHour}</span> / hour
-              <span className="ml-6 text-2xl">${parsedPricePerHour * 10}</span> / day
+              {!showDetails ? (
+                <>
+                  from <span className="text-2xl">${parsedPricePerHour}</span> / hour
+                  <span className="ml-6 text-2xl">${dayPrice}</span> / day
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl">${bookingType === 'hourly' ? parsedPricePerHour : dayPrice}</span> / {bookingType === 'hourly' ? 'hour' : 'day'}
+                </>
+              )}
             </div>
-            <div className="text-sm text-findvenue-text-muted">Minimum 2 hours</div>
+            <div className="text-sm text-findvenue-text-muted">
+              {bookingType === 'hourly' ? 'Minimum 2 hours' : 'Full day booking (24 hours)'}
+            </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        {!showDetails ? (
+          <Button 
+            onClick={() => setShowDetails(true)}
+            className="w-full bg-red-400 hover:bg-red-500 text-white h-12 text-lg mt-4"
+          >
+            Request to book
+          </Button>
+        ) : (
           <div>
-            <label className="block text-sm font-medium mb-1">Date and time</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "MM/dd/yyyy") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                {/* Calendar component would go here */}
-              </PopoverContent>
-            </Popover>
-            
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <Select value={fromTime} onValueChange={setFromTime}>
-                <SelectTrigger className="w-full">
-                  <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                  <SelectValue placeholder="From" />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateTimeSlots().map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Booking type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    type="button"
+                    variant={bookingType === 'hourly' ? 'default' : 'outline'}
+                    className={bookingType === 'hourly' ? 'bg-findvenue text-white' : ''}
+                    onClick={() => setBookingType('hourly')}
+                  >
+                    <Clock className="h-4 w-4 mr-2" />
+                    Hourly
+                  </Button>
+                  <Button 
+                    type="button"
+                    variant={bookingType === 'full-day' ? 'default' : 'outline'}
+                    className={bookingType === 'full-day' ? 'bg-findvenue text-white' : ''}
+                    onClick={() => setBookingType('full-day')}
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Full day
+                  </Button>
+                </div>
+              </div>
               
-              <Select value={toTime} onValueChange={setToTime}>
-                <SelectTrigger className="w-full">
-                  <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                  <SelectValue placeholder="To" />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateTimeSlots().map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="block text-sm font-medium mb-1">Select date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      disabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        
+                        // Can't book dates in the past
+                        if (date < today) return true;
+                        
+                        // For full-day bookings, can't select dates that are fully booked or have day bookings
+                        if (bookingType === 'full-day' && (isDateFullyBooked(date) || isDateDayBooked(date))) {
+                          return true;
+                        }
+                        
+                        // For hourly bookings, can't select dates with day bookings
+                        if (bookingType === 'hourly' && isDateDayBooked(date)) {
+                          return true;
+                        }
+                        
+                        return false;
+                      }}
+                      modifiers={{
+                        booked: (date) => isDateFullyBooked(date),
+                        dayBooked: (date) => isDateDayBooked(date),
+                        hourlyBooked: (date) => isDateHourlyBooked(date),
+                      }}
+                      modifiersStyles={{
+                        booked: { backgroundColor: '#FEE2E2', textDecoration: 'line-through', color: '#B91C1C' },
+                        dayBooked: { backgroundColor: '#DBEAFE', color: '#1E40AF' },
+                        hourlyBooked: { backgroundColor: '#FEF3C7', color: '#92400E' },
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              {bookingType === 'hourly' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Start time</label>
+                    <Select value={fromTime} onValueChange={setFromTime}>
+                      <SelectTrigger className="w-full">
+                        <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                        <SelectValue placeholder="From" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableTimeSlots.map((time) => (
+                          <SelectItem key={time} value={time}>
+                            {time}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">End time</label>
+                    <Select value={toTime} onValueChange={setToTime}>
+                      <SelectTrigger className="w-full">
+                        <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                        <SelectValue placeholder="To" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableTimeSlots
+                          .filter(time => {
+                            // Only show end times that are after the start time
+                            const startHour = parseInt(fromTime.split(':')[0]);
+                            const timeHour = parseInt(time.split(':')[0]);
+                            return timeHour > startHour;
+                          })
+                          .map((time) => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">People (max {maxCapacity})</label>
+                <div className="flex items-center border rounded-md px-3 py-2">
+                  <Users className="h-5 w-5 mr-2 text-gray-400" />
+                  <Input 
+                    type="number" 
+                    placeholder={`Number of guests (max ${maxCapacity})`}
+                    value={peopleCount} 
+                    min={1}
+                    max={maxCapacity}
+                    onChange={e => setPeopleCount(e.target.value)}
+                    className="border-0 p-0 focus-visible:ring-0"
+                  />
+                </div>
+              </div>
+              
+              <Button 
+                onClick={handleBookRequest}
+                className="w-full bg-red-400 hover:bg-red-500 text-white h-12 text-lg mt-4"
+                disabled={isLoadingBookings}
+              >
+                {isLoadingBookings ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  'Request to book'
+                )}
+              </Button>
+              
+              <p className="text-center text-sm text-gray-500 mt-2">
+                You won't be charged yet
+              </p>
+              
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setShowDetails(false)}
+              >
+                Cancel
+              </Button>
             </div>
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-1">People (max {maxCapacity})</label>
-            <div className="flex items-center border rounded-md px-3 py-2">
-              <Users className="h-5 w-5 mr-2 text-gray-400" />
-              <Input 
-                type="number" 
-                placeholder={`Number of guests (max ${maxCapacity})`}
-                value={peopleCount} 
-                min={1}
-                max={maxCapacity}
-                onChange={e => setPeopleCount(e.target.value)}
-                className="border-0 p-0 focus-visible:ring-0"
-              />
-            </div>
-          </div>
-        </div>
-        
-        <Button 
-          onClick={handleBookRequest}
-          className="w-full bg-red-400 hover:bg-red-500 text-white h-12 text-lg mt-4"
-        >
-          Request to book
-        </Button>
-        
-        <p className="text-center text-sm text-gray-500 mt-2">
-          You won't be charged yet
-        </p>
+        )}
       </div>
       
       <div className="flex items-center pt-4 border-t border-gray-200">

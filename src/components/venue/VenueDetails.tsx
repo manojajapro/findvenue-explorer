@@ -11,6 +11,8 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -18,6 +20,7 @@ const VenueDetails = () => {
   const { venue, isLoading, error } = useVenueData();
   const { user } = useAuth();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const { toast } = useToast();
   
   useEffect(() => {
     if (!isLoading && !user) {
@@ -29,14 +32,20 @@ const VenueDetails = () => {
     return (
       <div className="container mx-auto p-4">
         <Skeleton className="h-10 w-full mb-4" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Skeleton className="h-64 w-full" />
-          <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-full mb-1" />
-            <Skeleton className="h-4 w-full mb-1" />
-            <Skeleton className="h-4 w-full mb-1" />
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-8">
+            <Skeleton className="h-[500px] w-full rounded-lg" />
           </div>
+          <div className="md:col-span-4 grid grid-rows-4 gap-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-[120px] w-full rounded-lg" />
+            ))}
+          </div>
+        </div>
+        <div className="mt-6">
+          <Skeleton className="h-8 w-32 mb-2" />
+          <Skeleton className="h-4 w-full mb-1" />
+          <Skeleton className="h-4 w-full mb-1" />
         </div>
       </div>
     );
@@ -58,7 +67,8 @@ const VenueDetails = () => {
   // Check if current user is the owner
   const isOwner = user?.id === ownerId;
   
-  const categoryNames = venue.categoryNames || [];
+  const categoryNames = Array.isArray(venue.category_name) ? venue.category_name : 
+                        (venue.category_name ? [venue.category_name] : []);
   
   const mainImage = venue.galleryImages && venue.galleryImages.length > 0 
     ? venue.galleryImages[0] 
@@ -68,110 +78,148 @@ const VenueDetails = () => {
     setSelectedImage(image);
   };
   
+  const shareVenue = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: venue.name,
+          text: `Check out this venue: ${venue.name}`,
+          url: window.location.href,
+        });
+        toast({
+          title: "Shared successfully",
+          description: "Venue link has been shared",
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    } else {
+      // Fallback for browsers that don't support the Web Share API
+      navigator.clipboard.writeText(window.location.href);
+      toast({
+        title: "Link copied",
+        description: "Venue link has been copied to clipboard",
+      });
+    }
+  };
+  
+  // Helper function to determine if we have enough images for gallery layout
+  const hasEnoughImages = venue.galleryImages && venue.galleryImages.length >= 4;
+
   return (
     <div className="container mx-auto p-4">
-      <div className="md:flex md:gap-8">
-        <div className="md:w-2/3 space-y-4">
-          {/* New Gallery Layout - Similar to the reference image */}
-          <div className="grid grid-cols-12 gap-2 h-[600px]">
-            {/* Main large image - takes up 2/3 of space */}
-            <div className="col-span-8 h-full relative rounded-lg overflow-hidden group cursor-pointer" 
-                onClick={() => handleImageClick(venue.galleryImages[0])}>
+      {/* Modern Gallery Layout - Matches the reference image */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-2 h-[550px] mb-6">
+        {/* Main large image - takes up more space */}
+        <div 
+          className="md:col-span-8 h-full relative rounded-lg overflow-hidden group cursor-pointer" 
+          onClick={() => venue.galleryImages?.[0] && handleImageClick(venue.galleryImages[0])}
+        >
+          <img 
+            src={venue.galleryImages?.[0] || mainImage} 
+            alt={venue.name} 
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+          />
+          {venue?.featured && (
+            <Badge className="absolute top-4 left-4 bg-amber-500 text-white">
+              Featured
+            </Badge>
+          )}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-4 right-4 bg-black/30 text-white hover:bg-black/50"
+            onClick={(e) => {
+              e.stopPropagation();
+              shareVenue();
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-share-2">
+              <circle cx="18" cy="5" r="3"/>
+              <circle cx="6" cy="12" r="3"/>
+              <circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+          </Button>
+        </div>
+        
+        {/* Right column with additional images stacked vertically */}
+        <div className="md:col-span-4 grid grid-rows-4 gap-2 h-full">
+          {venue.galleryImages?.slice(1, 5).map((img, index) => (
+            <div 
+              key={index}
+              className="relative rounded-lg overflow-hidden cursor-pointer group"
+              onClick={() => handleImageClick(img)}
+            >
               <img 
-                src={venue.galleryImages[0]} 
-                alt={venue.name} 
+                src={img} 
+                alt={`${venue.name} Gallery ${index+1}`} 
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
               />
-            </div>
-            
-            {/* Right column with additional images */}
-            <div className="col-span-4 grid grid-rows-3 gap-2 h-full">
-              {/* Top right image */}
-              {venue.galleryImages && venue.galleryImages[1] && (
-                <div className="relative rounded-lg overflow-hidden cursor-pointer group"
-                    onClick={() => handleImageClick(venue.galleryImages[1])}>
-                  <img 
-                    src={venue.galleryImages[1]} 
-                    alt={`${venue.name} Gallery 1`} 
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                  />
-                </div>
-              )}
-              
-              {/* Middle right image */}
-              {venue.galleryImages && venue.galleryImages[2] && (
-                <div className="relative rounded-lg overflow-hidden cursor-pointer group"
-                    onClick={() => handleImageClick(venue.galleryImages[2])}>
-                  <img 
-                    src={venue.galleryImages[2]} 
-                    alt={`${venue.name} Gallery 2`} 
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                  />
-                </div>
-              )}
-              
-              {/* Bottom right image with overlay for more photos */}
-              {venue.galleryImages && venue.galleryImages[3] && (
-                <div className="relative rounded-lg overflow-hidden cursor-pointer group"
-                    onClick={() => handleImageClick(venue.galleryImages[3])}>
-                  <img 
-                    src={venue.galleryImages[3]} 
-                    alt={`${venue.name} Gallery 3`} 
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                  />
-                  {venue.galleryImages.length > 4 && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity duration-300">
-                      <span className="text-white text-lg font-medium">
-                        See all<br/>{venue.galleryImages.length} photos
-                      </span>
-                    </div>
-                  )}
+              {index === 3 && venue.galleryImages && venue.galleryImages.length > 5 && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity duration-300">
+                  <span className="text-white text-lg font-medium">
+                    +{venue.galleryImages.length - 5} more
+                  </span>
                 </div>
               )}
             </div>
-          </div>
-          
-          {/* Image Gallery Dialog */}
-          <Dialog>
-            <DialogTrigger asChild>
-              <button className="px-4 py-2 bg-findvenue text-white rounded-md hover:bg-findvenue-dark">
-                View All Photos
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                {venue.galleryImages && venue.galleryImages.map((image, index) => (
-                  <img 
-                    key={index} 
-                    src={image} 
-                    alt={`${venue.name} Gallery ${index + 1}`} 
-                    className="w-full h-64 object-cover rounded cursor-pointer"
-                    onClick={() => handleImageClick(image)}
-                  />
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
-          
-          <div className="flex overflow-x-auto gap-2 pb-2">
-            {venue.galleryImages && venue.galleryImages.slice(0, 6).map((image, index) => (
+          ))}
+        </div>
+      </div>
+      
+      {/* Image Gallery Dialog */}
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button className="mb-6 bg-findvenue text-white hover:bg-findvenue-dark">
+            View All Photos
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            {venue.galleryImages && venue.galleryImages.map((image, index) => (
               <img 
                 key={index} 
                 src={image} 
                 alt={`${venue.name} Gallery ${index + 1}`} 
-                className="w-20 h-20 rounded-md object-cover flex-shrink-0 cursor-pointer"
+                className="w-full h-64 object-cover rounded cursor-pointer"
                 onClick={() => handleImageClick(image)}
               />
             ))}
-            {venue.galleryImages && venue.galleryImages.length > 6 && (
-              <div className="w-20 h-20 rounded-md bg-findvenue flex items-center justify-center flex-shrink-0 cursor-pointer text-white">
-                +{venue.galleryImages.length - 6}
-              </div>
-            )}
           </div>
-        </div>
-        
-        <div className="md:w-1/3">
+        </DialogContent>
+      </Dialog>
+      
+      {/* Selected Image Dialog */}
+      {selectedImage && (
+        <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+          <DialogContent className="max-w-4xl p-0">
+            <div className="relative">
+              <img 
+                src={selectedImage} 
+                alt={venue.name} 
+                className="w-full max-h-[80vh] object-contain"
+              />
+              <Button 
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 bg-black/50 text-white hover:bg-black/70 rounded-full"
+                onClick={() => setSelectedImage(null)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x">
+                  <path d="M18 6 6 18"/>
+                  <path d="m6 6 12 12"/>
+                </svg>
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Main content and sidebar layout */}
+      <div className="md:flex md:gap-8">
+        <div className="md:w-2/3 space-y-4">
           <h1 className="text-2xl font-semibold mb-2">{venue.name}</h1>
           <div className="flex items-center gap-2 mb-2">
             <MapPin className="h-4 w-4 text-gray-500" />
@@ -180,12 +228,6 @@ const VenueDetails = () => {
           <div className="flex items-center gap-2 mb-2">
             <Star className="h-4 w-4 text-yellow-500" />
             <span className="text-gray-600">{venue.rating} ({venue.reviews} reviews)</span>
-          </div>
-          <div className="flex items-center gap-2 mb-2">
-            <CalendarDays className="h-4 w-4 text-gray-500" />
-            <span className="text-gray-600">
-              {venue.availability && venue.availability.length > 0 ? 'Available' : 'Not Available'}
-            </span>
           </div>
           <div className="flex items-center gap-2 mb-2">
             <Users className="h-4 w-4 text-gray-500" />
@@ -213,74 +255,46 @@ const VenueDetails = () => {
             {venue.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0 && <Badge>Payment Options</Badge>}
           </div>
           
+          <Separator className="my-4" />
+          
           <div className="mb-4">
-            <h4 className="text-lg font-semibold">Pricing</h4>
-            <p className="text-gray-700">
-              {venue.pricing.pricePerPerson ? (
-                <>
-                  <span className="font-bold">{venue.pricing.currency} {venue.pricing.pricePerPerson}</span> per person
-                </>
-              ) : (
-                <>
-                  Starting from <span className="font-bold">{venue.pricing.currency} {venue.pricing.startingPrice}</span>
-                  {venue.pricing.hourlyRate && <span> / {venue.pricing.currency} {venue.pricing.hourlyRate} per hour</span>}
-                </>
-              )}
-            </p>
+            <h4 className="text-lg font-semibold">About This Venue</h4>
+            <p className="text-gray-700">{venue.description}</p>
           </div>
-        </div>
-      </div>
-      
-      <Separator className="my-4" />
-      
-      <div className="mb-4">
-        <h4 className="text-lg font-semibold">About This Venue</h4>
-        <p className="text-gray-700">{venue.description}</p>
-      </div>
-      
-      <Separator className="my-4" />
-      
-      <div className="mb-4">
-        <h4 className="text-lg font-semibold">Rules and Regulations</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-          <div className="bg-findvenue-surface/10 p-4 rounded-lg">
-            <h5 className="font-medium mb-2">General Rules</h5>
-            <ul className="list-disc list-inside text-gray-700 space-y-1">
-              <li>No smoking indoors</li>
-              <li>No pets allowed</li>
-              <li>No outside food or beverages</li>
-              <li>All decorations must be approved by management</li>
-              <li>Noise levels must be kept reasonable after 10 PM</li>
-            </ul>
+          
+          <Separator className="my-4" />
+          
+          <div className="mb-4">
+            <h4 className="text-lg font-semibold">Rules and Regulations</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+              <div className="bg-findvenue-surface/10 p-4 rounded-lg">
+                <h5 className="font-medium mb-2">General Rules</h5>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>No smoking indoors</li>
+                  <li>No pets allowed</li>
+                  <li>No outside food or beverages</li>
+                  <li>All decorations must be approved by management</li>
+                  <li>Noise levels must be kept reasonable after 10 PM</li>
+                </ul>
+              </div>
+              <div className="bg-findvenue-surface/10 p-4 rounded-lg">
+                <h5 className="font-medium mb-2">Booking Terms</h5>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>50% advance payment required to confirm booking</li>
+                  <li>Cancellations within 48 hours are non-refundable</li>
+                  <li>Venue must be vacated at agreed time</li>
+                  <li>Damage to property will incur additional charges</li>
+                  <li>COVID safety protocols must be followed</li>
+                </ul>
+              </div>
+            </div>
           </div>
-          <div className="bg-findvenue-surface/10 p-4 rounded-lg">
-            <h5 className="font-medium mb-2">Booking Terms</h5>
-            <ul className="list-disc list-inside text-gray-700 space-y-1">
-              <li>50% advance payment required to confirm booking</li>
-              <li>Cancellations within 48 hours are non-refundable</li>
-              <li>Venue must be vacated at agreed time</li>
-              <li>Damage to property will incur additional charges</li>
-              <li>COVID safety protocols must be followed</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-      
-      <Separator className="my-4" />
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          {!isOwner && (
-            <VenueBookingInquiry 
-              venueId={venue.id}
-              venueName={venue.name}
-              ownerInfo={ownerInfo}
-              maxCapacity={venue.capacity.max}
-            />
-          )}
+          
+          <VenueAIAssistants venue={venue} />
         </div>
         
-        <div>
+        <div className="md:w-1/3 mt-6 md:mt-0">
+          {/* Use the VenueBookingTabs component but with simpler initial view */}
           <VenueBookingTabs 
             venueId={venue.id}
             venueName={venue.name}
@@ -292,8 +306,6 @@ const VenueDetails = () => {
           />
         </div>
       </div>
-      
-      <VenueAIAssistants venue={venue} />
     </div>
   );
 };
