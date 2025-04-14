@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Users, Calendar, MapPin, ChevronDown, X, Building } from 'lucide-react';
@@ -43,28 +44,29 @@ const HeroSection = () => {
             
             venuesData.forEach(venue => {
               if (Array.isArray(venue.category_id)) {
-                const catId = venue.category_id[0];
-                if (!catId) return;
-                
-                let categoryName = '';
-                if (Array.isArray(venue.category_name) && venue.category_name[0]) {
-                  categoryName = venue.category_name[0];
-                } else if (typeof venue.category_name === 'string' && venue.category_name.startsWith('[')) {
-                  try {
-                    const parsedCategories = JSON.parse(venue.category_name.replace(/'/g, '"'));
-                    categoryName = parsedCategories[0] || 'Unnamed Category';
-                  } catch (e) {
-                    const match = venue.category_name.match(/'([^']+)'/);
-                    categoryName = match ? match[1] : 'Unnamed Category';
+                venue.category_id.forEach((catId, index) => {
+                  if (!catId) return;
+                  
+                  let categoryName = '';
+                  if (Array.isArray(venue.category_name) && venue.category_name[index]) {
+                    categoryName = venue.category_name[index];
+                  } else if (typeof venue.category_name === 'string' && venue.category_name.startsWith('[')) {
+                    try {
+                      const parsedCategories = JSON.parse(venue.category_name.replace(/'/g, '"'));
+                      categoryName = parsedCategories[index] || 'Unnamed Category';
+                    } catch (e) {
+                      const match = venue.category_name.match(/'([^']+)'/);
+                      categoryName = match ? match[1] : 'Unnamed Category';
+                    }
                   }
-                }
-                
-                if (categoryName && catId && !uniqueCategories.has(catId)) {
-                  uniqueCategories.set(catId, {
-                    id: catId,
-                    name: categoryName
-                  });
-                }
+                  
+                  if (categoryName && catId && !uniqueCategories.has(catId)) {
+                    uniqueCategories.set(catId, {
+                      id: catId,
+                      name: categoryName
+                    });
+                  }
+                });
               } else if (venue.category_id) {
                 let categoryName = venue.category_name || 'Unnamed Category';
                 
@@ -195,6 +197,11 @@ const HeroSection = () => {
     setGuests('');
     setLocation('');
     setDate(undefined);
+  };
+  
+  // Case-insensitive search helper for categories
+  const matchesSearchTerm = (name: string, term: string): boolean => {
+    return name.toLowerCase().includes(term.toLowerCase());
   };
   
   return (

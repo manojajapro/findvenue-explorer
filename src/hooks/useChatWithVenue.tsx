@@ -33,11 +33,14 @@ export const useChatWithVenue = () => {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error from function:', error);
+        throw error;
+      }
       
       const assistantResponse = { 
         role: 'assistant' as const, 
-        content: data.answer || "I'm sorry, I couldn't process your request at this time." 
+        content: data?.answer || "I'm sorry, I couldn't process your request at this time." 
       };
       
       setMessages(prev => [...prev, assistantResponse]);
@@ -55,7 +58,7 @@ export const useChatWithVenue = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [venue, isLoading, supabase.functions]);
+  }, [venue, isLoading]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);
