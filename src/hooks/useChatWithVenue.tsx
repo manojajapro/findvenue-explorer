@@ -18,7 +18,7 @@ export const useChatWithVenue = () => {
     if (venue && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: `Hello! I'm your assistant for ${venue.name}. You can ask me about pricing, capacity, amenities, booking information, or anything else you'd like to know about this venue!`
+        content: `Hello! I'm your AI assistant for ${venue.name}. You can ask me about pricing, capacity, amenities, booking information, or anything else you'd like to know about this venue!`
       }]);
     }
   }, [venue, messages.length]);
