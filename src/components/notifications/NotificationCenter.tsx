@@ -13,10 +13,9 @@ import {
   Card, 
   CardContent
 } from '@/components/ui/card';
-import { Bell } from 'lucide-react';
+import { Bell, CheckCircle, Calendar, AlertCircle, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNavigate } from 'react-router-dom';
-import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
 import { markAllNotificationsAsRead, markNotificationAsRead } from '@/utils/notificationService';
 
 type Notification = {
@@ -51,7 +50,6 @@ const NotificationCenter = () => {
 
     const fetchNotifications = async () => {
       try {
-        console.log('Fetching notifications for user:', user.id);
         const { data, error } = await supabase
           .from('notifications')
           .select('*')
@@ -64,7 +62,6 @@ const NotificationCenter = () => {
           return;
         }
         
-        console.log('Fetched notifications:', data);
         setNotifications(data as Notification[]);
         setUnreadCount(data.filter((n: any) => !n.read).length);
       } catch (error) {
@@ -77,15 +74,15 @@ const NotificationCenter = () => {
     fetchNotifications();
 
     // Enable realtime for notifications table
-    const setupRealtimeNotifications = async () => {
+    const enableRealtimeForNotifications = async () => {
       try {
-        await enableRealtimeForTable('notifications');
+        await supabase.rpc('enable_realtime_for_table', { table_name: 'notifications' });
       } catch (e) {
         console.error('Could not enable realtime for notifications:', e);
       }
     };
     
-    setupRealtimeNotifications();
+    enableRealtimeForNotifications();
 
     // Subscribe to new notifications
     const channel = supabase
@@ -152,9 +149,13 @@ const NotificationCenter = () => {
     try {
       if (id) {
         // Mark single notification as read
-        const success = await markNotificationAsRead(id);
-        
-        if (success) {
+        const { data, error } = await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', id)
+          .select();
+          
+        if (!error && data) {
           setNotifications(prev => 
             prev.map(n => n.id === id ? { ...n, read: true } : n)
           );
@@ -162,9 +163,13 @@ const NotificationCenter = () => {
         }
       } else {
         // Mark all as read
-        const success = await markAllNotificationsAsRead(user.id);
-        
-        if (success) {
+        const { error } = await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('user_id', user.id)
+          .eq('read', false);
+          
+        if (!error) {
           setNotifications(prev => 
             prev.map(n => ({ ...n, read: true }))
           );
@@ -184,6 +189,46 @@ const NotificationCenter = () => {
     }
     
     setOpen(false);
+  };
+
+  const getBookingStatusLabel = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'Confirmed';
+      case 'cancelled': return 'Cancelled';
+      case 'pending': return 'Pending';
+      default: return status;
+    }
+  };
+
+  const getBookingStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'bg-green-500/10 text-green-500';
+      case 'cancelled': return 'bg-red-500/10 text-red-500';
+      case 'pending': return 'bg-yellow-500/10 text-yellow-500';
+      default: return 'bg-blue-500/10 text-blue-500';
+    }
+  };
+
+  const getNotificationIcon = (notification: Notification) => {
+    if (notification.type === 'booking') {
+      const status = notification.data?.status;
+      switch (status) {
+        case 'confirmed':
+          return <CheckCircle className="h-5 w-5 text-green-500" />;
+        case 'cancelled':
+          return <X className="h-5 w-5 text-red-500" />;
+        default:
+          return <Calendar className="h-5 w-5 text-amber-500" />;
+      }
+    } else if (notification.type === 'message') {
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
+          <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>
+        </svg>
+      );
+    } else {
+      return <AlertCircle className="h-5 w-5 text-blue-500" />;
+    }
   };
 
   if (!user) return null;
@@ -218,11 +263,18 @@ const NotificationCenter = () => {
           <ScrollArea className="h-[350px]">
             {isLoading ? (
               <div className="p-4 text-center text-findvenue-text-muted">
-                Loading notifications...
+                <svg className="animate-spin mx-auto h-5 w-5 text-findvenue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="mt-2">Loading notifications...</p>
               </div>
             ) : notifications.length === 0 ? (
               <div className="p-4 text-center text-findvenue-text-muted">
-                No notifications
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-findvenue-surface/20 flex items-center justify-center">
+                  <Bell className="h-6 w-6 text-findvenue-text-muted" />
+                </div>
+                <p>No notifications yet</p>
               </div>
             ) : (
               <div>
@@ -236,7 +288,7 @@ const NotificationCenter = () => {
                   >
                     <div className="flex items-start gap-3">
                       <div className={`rounded-full p-2 ${getNotificationTypeColor(notification.type)}`}>
-                        {getNotificationIcon(notification.type)}
+                        {getNotificationIcon(notification)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium ${!notification.read ? 'text-white' : 'text-findvenue-text'}`}>
@@ -245,6 +297,13 @@ const NotificationCenter = () => {
                         <p className="text-xs text-findvenue-text-muted line-clamp-2 mt-1">
                           {notification.message}
                         </p>
+                        {notification.data?.status && (
+                          <div className="mt-1">
+                            <span className={`inline-block text-xs px-2 py-0.5 rounded-full ${getBookingStatusColor(notification.data.status)}`}>
+                              {getBookingStatusLabel(notification.data.status)}
+                            </span>
+                          </div>
+                        )}
                         <p className="text-xs text-findvenue-text-muted mt-1">
                           {formatNotificationTime(notification.created_at)}
                         </p>
@@ -272,19 +331,7 @@ function getNotificationTypeColor(type: string): string {
       return 'bg-green-500/10 text-green-500';
     case 'system':
     default:
-      return 'bg-yellow-500/10 text-yellow-500';
-  }
-}
-
-function getNotificationIcon(type: string): JSX.Element {
-  switch (type) {
-    case 'booking':
-      return <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>;
-    case 'message':
-      return <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>;
-    case 'system':
-    default:
-      return <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>;
+      return 'bg-blue-500/10 text-blue-500';
   }
 }
 

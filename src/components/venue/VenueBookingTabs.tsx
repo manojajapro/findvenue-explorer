@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Clock, Calendar as CalendarIcon, LogIn, Users } from 'lucide-react';
@@ -12,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import BookingCalendar from './BookingCalendar';
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -45,6 +47,7 @@ export default function VenueBookingTabs({
   const [dayBookedDates, setDayBookedDates] = useState<string[]>([]);
   const [venueStatus, setVenueStatus] = useState<string>('active');
   const [showDetails, setShowDetails] = useState<boolean>(false);
+  const [processingBooking, setProcessingBooking] = useState<boolean>(false);
   
   // New fields for unified booking form
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -208,8 +211,31 @@ export default function VenueBookingTabs({
       });
       
       setAvailableTimeSlots(available);
+      
+      // Reset time selections if there are no available times or if current selections are no longer valid
+      if (available.length === 0) {
+        // No times available
+        setFromTime('');
+        setToTime('');
+      } else {
+        // Set default from time to first available slot
+        if (!available.includes(fromTime)) {
+          setFromTime(available[0]);
+        }
+        
+        // Set default to time if current one is invalid
+        const validToTimes = available.filter(time => {
+          const fromHour = fromTime ? parseInt(fromTime.split(':')[0]) : 0;
+          const timeHour = parseInt(time.split(':')[0]);
+          return timeHour > fromHour;
+        });
+        
+        if (!validToTimes.includes(toTime)) {
+          setToTime(validToTimes.length > 0 ? validToTimes[0] : '');
+        }
+      }
     }
-  }, [selectedDate, bookedTimeSlots]);
+  }, [selectedDate, bookedTimeSlots, fromTime, toTime]);
   
   // Helper function to generate time slots - Updated for 24 hours
   const generateTimeSlots = (): string[] => {
@@ -218,24 +244,6 @@ export default function VenueBookingTabs({
       slots.push(`${i.toString().padStart(2, '0')}:00`);
     }
     return slots;
-  };
-  
-  // Check if a date is fully booked (can't book anymore)
-  const isDateFullyBooked = (date: Date): boolean => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return fullyBookedDates.includes(dateStr);
-  };
-  
-  // Check if a date has day booking already
-  const isDateDayBooked = (date: Date): boolean => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return dayBookedDates.includes(dateStr);
-  };
-  
-  // Check if a date has hourly bookings
-  const isDateHourlyBooked = (date: Date): boolean => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return hourlyBookedDates.includes(dateStr);
   };
   
   const handleBookRequest = async () => {
@@ -271,8 +279,10 @@ export default function VenueBookingTabs({
       });
       return;
     }
-    
+
     try {
+      setProcessingBooking(true);
+      
       let startTime = fromTime;
       let endTime = toTime;
       let totalPrice = 0;
@@ -294,6 +304,7 @@ export default function VenueBookingTabs({
             description: "End time must be after start time",
             variant: "destructive"
           });
+          setProcessingBooking(false);
           return;
         }
         
@@ -310,6 +321,7 @@ export default function VenueBookingTabs({
           description: "This time slot is already booked. Please select another time.",
           variant: "destructive"
         });
+        setProcessingBooking(false);
         return;
       }
       
@@ -339,6 +351,7 @@ export default function VenueBookingTabs({
           description: error.message,
           variant: "destructive"
         });
+        setProcessingBooking(false);
         return;
       }
       
@@ -350,7 +363,7 @@ export default function VenueBookingTabs({
             {
               user_id: ownerId,
               title: 'New Booking Request',
-              message: `New booking request for ${venueName} on ${formattedDate}`,
+              message: `New booking request for ${venueName} on ${format(selectedDate, 'MMM dd, yyyy')}`,
               type: 'booking',
               link: '/customer-bookings',
               data: {
@@ -371,6 +384,37 @@ export default function VenueBookingTabs({
         console.warn('Error in notification process:', notifyError);
       }
       
+      // Send notification to customer
+      try {
+        const { error: customerNotificationError } = await supabase
+          .from('notifications')
+          .insert([
+            {
+              user_id: user.id,
+              title: 'Booking Requested',
+              message: `You've requested to book ${venueName} on ${format(selectedDate, 'MMM dd, yyyy')}${
+                bookingType === 'hourly' ? ` from ${fromTime} to ${toTime}` : ' for the entire day'
+              }. Total: ${totalPrice} ${pricePerHour > 0 ? 'SAR' : ''}`,
+              type: 'booking',
+              link: '/bookings',
+              data: {
+                booking_id: data?.[0]?.id,
+                venue_id: venueId,
+                status: 'pending',
+                booking_date: formattedDate,
+                venue_name: venueName,
+                booking_type: bookingType === 'full-day' ? 'day' : 'hourly'
+              }
+            }
+          ]);
+          
+        if (customerNotificationError) {
+          console.warn('Failed to send notification to customer:', customerNotificationError);
+        }
+      } catch (notifyError) {
+        console.warn('Error in customer notification process:', notifyError);
+      }
+      
       toast({
         title: "Booking requested!",
         description: `You've successfully requested ${venueName} on ${format(selectedDate, 'PPP')}${
@@ -380,7 +424,6 @@ export default function VenueBookingTabs({
       
       // Redirect to bookings page
       navigate('/bookings');
-      
     } catch (err) {
       console.error('Error during booking process:', err);
       toast({
@@ -388,13 +431,15 @@ export default function VenueBookingTabs({
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setProcessingBooking(false);
     }
   };
   
   // Don't show booking tabs for the venue owner
   if (isOwner) {
     return (
-      <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
+      <div className="glass-card p-4 rounded-lg shadow-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
         <p className="text-center text-findvenue-text-muted">
           This is your venue. You cannot book your own venue.
         </p>
@@ -405,11 +450,11 @@ export default function VenueBookingTabs({
   // If user is not logged in, show login prompt
   if (!user) {
     return (
-      <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
+      <div className="glass-card p-5 rounded-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
         <h3 className="text-lg font-semibold mb-4">Book this venue</h3>
         <div className="text-center py-8">
           <p className="text-findvenue-text-muted mb-4">
-            You need to be logged in to book this venue.
+            Sign in to book this venue and get access to exclusive offers.
           </p>
           <Button 
             onClick={() => navigate('/login')} 
@@ -427,7 +472,7 @@ export default function VenueBookingTabs({
   const bookableStatuses = ['pending', 'confirmed', 'active'];
   if (!bookableStatuses.includes(venueStatus)) {
     return (
-      <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
+      <div className="glass-card p-5 rounded-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
         <p className="text-center text-findvenue-text-muted">
           This venue is not available for booking at the moment.
         </p>
@@ -443,26 +488,39 @@ export default function VenueBookingTabs({
   // Format day price
   const dayPrice = parsedPricePerHour * 10;
 
+  // Check if there are no available time slots for the current date
+  const currentDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const isCurrentDateFullyBooked = bookingType === 'full-day' 
+    ? fullyBookedDates.includes(currentDateStr) || dayBookedDates.includes(currentDateStr)
+    : dayBookedDates.includes(currentDateStr) || availableTimeSlots.length === 0;
+
   return (
-    <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
-      <h3 className="text-lg font-semibold mb-4">Book this venue</h3>
+    <div className="glass-card p-5 rounded-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
+      <h3 className="text-xl font-semibold mb-4">Book this venue</h3>
       
       <div className="mb-6">
         <div className="flex justify-between mb-2">
           <div>
             <div className="font-bold text-xl">
               {!showDetails ? (
-                <>
-                  from <span className="text-2xl">${parsedPricePerHour}</span> / hour
-                  <span className="ml-6 text-2xl">${dayPrice}</span> / day
-                </>
+                <div className="space-y-1">
+                  <div>
+                    <span className="text-gray-500">From </span>
+                    <span className="text-2xl">${parsedPricePerHour}</span>
+                    <span className="text-gray-500"> / hour</span>
+                  </div>
+                  <div>
+                    <span className="text-2xl">${dayPrice}</span>
+                    <span className="text-gray-500"> / day</span>
+                  </div>
+                </div>
               ) : (
                 <>
                   <span className="text-2xl">${bookingType === 'hourly' ? parsedPricePerHour : dayPrice}</span> / {bookingType === 'hourly' ? 'hour' : 'day'}
                 </>
               )}
             </div>
-            <div className="text-sm text-findvenue-text-muted">
+            <div className="text-sm text-findvenue-text-muted mt-1">
               {bookingType === 'hourly' ? 'Minimum 2 hours' : 'Full day booking (24 hours)'}
             </div>
           </div>
@@ -471,7 +529,7 @@ export default function VenueBookingTabs({
         {!showDetails ? (
           <Button 
             onClick={() => setShowDetails(true)}
-            className="w-full bg-red-400 hover:bg-red-500 text-white h-12 text-lg mt-4"
+            className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg mt-4 shadow-md"
           >
             Request to book
           </Button>
@@ -484,7 +542,7 @@ export default function VenueBookingTabs({
                   <Button 
                     type="button"
                     variant={bookingType === 'hourly' ? 'default' : 'outline'}
-                    className={bookingType === 'hourly' ? 'bg-findvenue text-white' : ''}
+                    className={bookingType === 'hourly' ? 'bg-findvenue text-white shadow-md' : ''}
                     onClick={() => setBookingType('hourly')}
                   >
                     <Clock className="h-4 w-4 mr-2" />
@@ -493,7 +551,7 @@ export default function VenueBookingTabs({
                   <Button 
                     type="button"
                     variant={bookingType === 'full-day' ? 'default' : 'outline'}
-                    className={bookingType === 'full-day' ? 'bg-findvenue text-white' : ''}
+                    className={bookingType === 'full-day' ? 'bg-findvenue text-white shadow-md' : ''}
                     onClick={() => setBookingType('full-day')}
                   >
                     <Calendar className="h-4 w-4 mr-2" />
@@ -504,59 +562,26 @@ export default function VenueBookingTabs({
               
               <div>
                 <label className="block text-sm font-medium mb-1">Select date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !selectedDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      disabled={(date) => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        
-                        // Can't book dates in the past
-                        if (date < today) return true;
-                        
-                        // For full-day bookings, can't select dates that are fully booked or have day bookings
-                        if (bookingType === 'full-day' && (isDateFullyBooked(date) || isDateDayBooked(date))) {
-                          return true;
-                        }
-                        
-                        // For hourly bookings, can't select dates with day bookings
-                        if (bookingType === 'hourly' && isDateDayBooked(date)) {
-                          return true;
-                        }
-                        
-                        return false;
-                      }}
-                      modifiers={{
-                        booked: (date) => isDateFullyBooked(date),
-                        dayBooked: (date) => isDateDayBooked(date),
-                        hourlyBooked: (date) => isDateHourlyBooked(date),
-                      }}
-                      modifiersStyles={{
-                        booked: { backgroundColor: '#FEE2E2', textDecoration: 'line-through', color: '#B91C1C' },
-                        dayBooked: { backgroundColor: '#DBEAFE', color: '#1E40AF' },
-                        hourlyBooked: { backgroundColor: '#FEF3C7', color: '#92400E' },
-                      }}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <BookingCalendar
+                  selectedDate={selectedDate}
+                  onDateSelect={setSelectedDate}
+                  bookedDates={bookedDates}
+                  fullyBookedDates={fullyBookedDates}
+                  dayBookedDates={dayBookedDates}
+                  hourlyBookedDates={hourlyBookedDates}
+                  bookingType={bookingType}
+                />
+                
+                {isCurrentDateFullyBooked && selectedDate && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {bookingType === 'full-day' 
+                      ? 'This date is not available for full day booking' 
+                      : 'No available time slots on this date'}
+                  </p>
+                )}
               </div>
               
-              {bookingType === 'hourly' && (
+              {bookingType === 'hourly' && selectedDate && availableTimeSlots.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-sm font-medium mb-1">Start time</label>
@@ -619,17 +644,19 @@ export default function VenueBookingTabs({
               
               <Button 
                 onClick={handleBookRequest}
-                className="w-full bg-red-400 hover:bg-red-500 text-white h-12 text-lg mt-4"
-                disabled={isLoadingBookings}
+                className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg mt-4 shadow-md"
+                disabled={isLoadingBookings || processingBooking || isCurrentDateFullyBooked}
               >
-                {isLoadingBookings ? (
-                  <span className="flex items-center">
+                {isLoadingBookings || processingBooking ? (
+                  <span className="flex items-center justify-center">
                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Loading...
+                    {processingBooking ? "Processing..." : "Loading..."}
                   </span>
+                ) : isCurrentDateFullyBooked ? (
+                  'Not Available'
                 ) : (
                   'Request to book'
                 )}
@@ -643,6 +670,7 @@ export default function VenueBookingTabs({
                 variant="outline" 
                 className="w-full"
                 onClick={() => setShowDetails(false)}
+                disabled={processingBooking}
               >
                 Cancel
               </Button>
@@ -660,7 +688,7 @@ export default function VenueBookingTabs({
         <div className="flex-1">
           <h4 className="font-medium">{ownerName}</h4>
           <p className="text-sm text-gray-500">Your Personal Event Manager from {venueName}</p>
-          <div className="flex items-center gap-4 mt-1 text-sm">
+          <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
             <div>Response rate - 96%</div>
             <div>Response time - 1h</div>
           </div>

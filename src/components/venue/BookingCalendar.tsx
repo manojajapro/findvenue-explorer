@@ -68,16 +68,6 @@ export function BookingCalendar({
     return false;
   };
   
-  // Navigate to previous month
-  const previousMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-  };
-  
-  // Navigate to next month
-  const nextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-  };
-  
   return (
     <div className="w-full">
       <Popover>
@@ -109,20 +99,23 @@ export function BookingCalendar({
               dayBooked: { backgroundColor: '#DBEAFE', color: '#1E40AF' },
               hourlyBooked: { backgroundColor: '#FEF3C7', color: '#92400E' },
             }}
+            className="rounded-md border"
           />
           
-          <div className="p-3 border-t border-border">
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-3 h-3 bg-[#FEE2E2] rounded-full"></span>
-              <span className="text-sm">Fully booked</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-3 h-3 bg-[#DBEAFE] rounded-full"></span>
-              <span className="text-sm">Day booked</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-3 h-3 bg-[#FEF3C7] rounded-full"></span>
-              <span className="text-sm">Some hours booked</span>
+          <div className="p-3 border-t border-border bg-muted/20">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#FEE2E2] rounded-full"></span>
+                <span className="text-xs">Fully booked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#DBEAFE] rounded-full"></span>
+                <span className="text-xs">Day booked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#FEF3C7] rounded-full"></span>
+                <span className="text-xs">Some hours booked</span>
+              </div>
             </div>
           </div>
         </PopoverContent>
