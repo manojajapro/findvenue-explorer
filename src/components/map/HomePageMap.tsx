@@ -77,7 +77,9 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     let filtered = [...mockVenues];
     
     if (venueType) {
-      filtered = filtered.filter(venue => venue.type === venueType);
+      filtered = filtered.filter(venue => 
+        venue.type ? venue.type === venueType : false
+      );
     }
     
     if (guestCount) {
@@ -146,7 +148,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
                   </div>
                 </SelectTrigger>
                 <SelectContent className="bg-findvenue-card-bg border-white/10">
-                  <SelectItem value="">Any type</SelectItem>
+                  <SelectItem value="all">Any type</SelectItem>
                   {venueTypes.map(type => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}

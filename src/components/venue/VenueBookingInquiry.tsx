@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -47,13 +46,11 @@ const VenueBookingInquiry = ({
   const [isFlexible, setIsFlexible] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
-  // Extract owner information or use defaults
   const ownerName = ownerInfo?.name || 'Venue Manager';
   const ownerId = ownerInfo?.user_id || '';
   const responseTime = ownerInfo?.response_time || '24 hours';
   const responseRate = ownerInfo?.response_rate || '95%';
   
-  // Format owner name for display
   const ownerFirstName = ownerName.split(' ')[0];
   const ownerInitial = ownerFirstName[0] || 'M';
   
@@ -81,7 +78,6 @@ const VenueBookingInquiry = ({
     setIsSubmitting(true);
     
     try {
-      // Create a message to the venue owner
       const messageContent = `Inquiry for ${venueName}: I'm interested in booking this venue for ${people} people${layout ? ' with a ' + layout + ' layout' : ''}. ${isFlexible ? 'I am flexible on dates and times.' : ''}`;
       
       const { data, error } = await supabase
@@ -107,7 +103,6 @@ const VenueBookingInquiry = ({
         description: `Your inquiry has been sent to ${ownerFirstName}. They typically respond within ${responseTime}.`,
       });
       
-      // Navigate to messages page to see the conversation
       navigate('/messages');
       
     } catch (error: any) {
