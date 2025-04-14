@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -47,7 +48,13 @@ const VenueDetails = () => {
     return <div className="container mx-auto p-4">Venue not found.</div>;
   }
 
-  const isOwner = user?.id === venue.ownerInfo?.user_id;
+  // Get owner info from venue data
+  const ownerInfo = venue.ownerInfo || null;
+  const ownerId = ownerInfo?.user_id || '';
+  const ownerName = ownerInfo?.name || '';
+  
+  // Check if current user is the owner
+  const isOwner = user?.id === ownerId;
   
   const categoryNames = venue.categoryNames || [];
   
@@ -148,12 +155,13 @@ const VenueDetails = () => {
             </p>
           </div>
           
-          {venue.ownerInfo && !isOwner && user && (
+          {/* Only show ContactVenueOwner if user is not the owner and owner info exists */}
+          {!isOwner && ownerInfo && user && (
             <ContactVenueOwner 
               venueId={venue.id}
               venueName={venue.name}
-              ownerId={venue.ownerInfo.user_id}
-              ownerName={venue.ownerInfo.name}
+              ownerId={ownerId}
+              ownerName={ownerName}
             />
           )}
         </div>
@@ -202,8 +210,8 @@ const VenueDetails = () => {
         pricePerHour={venue.pricing.hourlyRate}
         minCapacity={venue.capacity.min}
         maxCapacity={venue.capacity.max}
-        ownerId={venue.ownerInfo?.user_id || ''}
-        ownerName={venue.ownerInfo?.name || ''}
+        ownerId={ownerId}
+        ownerName={ownerName}
       />
       
       <VenueAIAssistants venue={venue} />
