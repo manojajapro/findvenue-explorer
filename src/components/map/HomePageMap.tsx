@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
-import { Building, Search, MapPin, X } from 'lucide-react';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF } from '@react-google-maps/api';
+import { Building, Search, MapPin, X, Target, Locate, Filter } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,8 @@ import { useNavigate } from 'react-router-dom';
 import { useGeocode } from '@/hooks/useGeocode';
 import { venues as mockVenues } from '@/data/venues';
 import { supabase } from '@/integrations/supabase/client';
+import EnhancedMapSearch from './EnhancedMapSearch';
+import LocationSearchInput from './LocationSearchInput';
 
 const mapContainerStyle = {
   width: '100%',
@@ -34,8 +37,15 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
   const [isSearching, setIsSearching] = useState(false);
   const [realVenues, setRealVenues] = useState<Venue[]>([]);
   
+  // Radius search state
+  const [radiusInKm, setRadiusInKm] = useState(5);
+  const [isRadiusActive, setIsRadiusActive] = useState(false);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [filteredByRadius, setFilteredByRadius] = useState<Venue[]>([]);
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([]);
+  
   const navigate = useNavigate();
-  const { geocodePinCode } = useGeocode();
+  const { geocodePinCode, isLoading: isGeocodingLoading } = useGeocode();
   
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -78,7 +88,11 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
             rating: venue.rating || 0,
             latitude: venue.latitude,
             longitude: venue.longitude,
-            type: venue.type || '' // Ensure type is always defined
+            type: venue.type || '', // Ensure type is always defined
+            cityId: venue.city_id || '',
+            category: venue.category_name || [],
+            categoryId: venue.category_id || [],
+            reviews: venue.reviews_count || 0
           }));
           
           setRealVenues(formattedVenues);
@@ -97,6 +111,110 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     setVenues(realVenues.length > 0 ? realVenues : mockVenues);
   }, [realVenues]);
 
+  // Calculate distance between two coordinates in km using the Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Filter venues by radius around a point
+  const filterByRadius = useCallback(() => {
+    if (!userLocation || !isRadiusActive) {
+      setFilteredByRadius([]);
+      return;
+    }
+
+    const filtered = venues.filter(venue => {
+      if (!venue.latitude || !venue.longitude) return false;
+      
+      const distance = calculateDistance(
+        userLocation.lat,
+        userLocation.lng,
+        venue.latitude,
+        venue.longitude
+      );
+      
+      return distance <= radiusInKm;
+    });
+    
+    setFilteredByRadius(filtered);
+    toast.success(`Found ${filtered.length} venues within ${radiusInKm}km radius`);
+  }, [userLocation, radiusInKm, venues, isRadiusActive]);
+
+  // Update filtered venues when radius or location changes
+  useEffect(() => {
+    filterByRadius();
+  }, [filterByRadius, userLocation, radiusInKm, isRadiusActive]);
+
+  // Get current user location
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      toast.info("Getting your current location...");
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const currentLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          
+          setUserLocation(currentLocation);
+          setMapCenter(currentLocation);
+          setMapZoom(13);
+          setIsRadiusActive(true);
+          
+          // Add "Current Location" to applied filters if not already there
+          if (!appliedFilters.includes("Current Location")) {
+            setAppliedFilters([...appliedFilters.filter(f => f !== "Current Location"), "Current Location"]);
+          }
+          
+          toast.success("Location found! Showing venues nearby.");
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          toast.error("Couldn't access your location. Please check your browser settings.");
+        }
+      );
+    } else {
+      toast.error("Geolocation is not supported by your browser");
+    }
+  };
+
+  // Set manual location by clicking on map
+  const handleMapClick = (event: google.maps.MapMouseEvent) => {
+    if (!isRadiusActive) return;
+    
+    const clickedLocation = {
+      lat: event.latLng?.lat() || 0,
+      lng: event.latLng?.lng() || 0
+    };
+    
+    setUserLocation(clickedLocation);
+    toast.success("Location updated! Showing venues nearby.");
+  };
+
+  // Set location from search
+  const handleLocationSelect = (lat: number, lng: number, address: string) => {
+    const newLocation = { lat, lng };
+    setUserLocation(newLocation);
+    setMapCenter(newLocation);
+    setMapZoom(13);
+    setIsRadiusActive(true);
+    
+    // Add location to applied filters if not already there
+    const filterName = `Location: ${address.split(',')[0]}`;
+    if (!appliedFilters.includes(filterName)) {
+      setAppliedFilters([...appliedFilters.filter(f => f.startsWith("Location:")), filterName]);
+    }
+  };
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       toast.error("Please enter a location to search");
@@ -111,6 +229,17 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
       if (coordinates) {
         setMapCenter({ lat: coordinates.lat, lng: coordinates.lng });
         setMapZoom(12);
+        
+        // Set user location for radius search
+        setUserLocation({ lat: coordinates.lat, lng: coordinates.lng });
+        setIsRadiusActive(true);
+        
+        // Add location to applied filters
+        const filterName = `Location: ${coordinates.formattedAddress.split(',')[0]}`;
+        if (!appliedFilters.includes(filterName)) {
+          setAppliedFilters([...appliedFilters.filter(f => f.startsWith("Location:")), filterName]);
+        }
+        
         toast.success(`Showing venues near ${coordinates.formattedAddress}`);
       }
     } catch (error) {
@@ -136,6 +265,15 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
       filtered = filtered.filter(venue => 
         venue.type && venue.type === venueType
       );
+      
+      // Add venue type to applied filters if not already there
+      const filterName = `Type: ${venueType}`;
+      if (!appliedFilters.includes(filterName)) {
+        setAppliedFilters([...appliedFilters.filter(f => !f.startsWith("Type:")), filterName]);
+      }
+    } else {
+      // Remove venue type from applied filters
+      setAppliedFilters(appliedFilters.filter(f => !f.startsWith("Type:")));
     }
     
     if (guestCount) {
@@ -144,7 +282,16 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
         filtered = filtered.filter(venue => 
           venue.capacity && venue.capacity.min <= guests && venue.capacity.max >= guests
         );
+        
+        // Add guest count to applied filters if not already there
+        const filterName = `Guests: ${guests}`;
+        if (!appliedFilters.includes(filterName)) {
+          setAppliedFilters([...appliedFilters.filter(f => !f.startsWith("Guests:")), filterName]);
+        }
       }
+    } else {
+      // Remove guest count from applied filters
+      setAppliedFilters(appliedFilters.filter(f => !f.startsWith("Guests:")));
     }
     
     setVenues(filtered);
@@ -153,6 +300,20 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
   useEffect(() => {
     filterVenues();
   }, [venueType, guestCount, realVenues]);
+  
+  // Clear a specific filter
+  const handleClearFilter = (filter: string) => {
+    if (filter.startsWith("Type:")) {
+      setVenueType('');
+    } else if (filter.startsWith("Guests:")) {
+      setGuestCount('');
+    } else if (filter.startsWith("Location:") || filter === "Current Location") {
+      setIsRadiusActive(false);
+      setUserLocation(null);
+    }
+    
+    setAppliedFilters(appliedFilters.filter(f => f !== filter));
+  };
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -169,30 +330,21 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     { value: "rooftop", label: "Rooftop" }
   ];
 
+  // Display venues based on radius search if active, otherwise show all venues
+  const displayVenues = isRadiusActive && userLocation ? filteredByRadius : venues;
+
   return (
     <div style={{ height }} className="relative w-full rounded-lg overflow-hidden shadow-xl border border-white/10">
       <div className="absolute top-4 left-4 right-4 z-10 max-w-5xl mx-auto">
         <Card className="bg-findvenue-card-bg/80 backdrop-blur-xl p-4 shadow-lg border border-white/10 rounded-lg">
           <div className="flex flex-col md:flex-row gap-2">
             <div className="relative flex-1">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
-              <Input
-                type="text"
-                placeholder="Search venues by location..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="pl-10 bg-findvenue-surface/50 border-white/10"
+              <LocationSearchInput 
+                onSearch={setSearchQuery} 
+                onLocationSelect={handleLocationSelect}
+                searchText={searchQuery}
+                setSearchText={setSearchQuery}
               />
-              {searchQuery && (
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                  onClick={() => setSearchQuery('')}
-                >
-                  <X className="h-4 w-4 text-findvenue-text-muted hover:text-white" />
-                </button>
-              )}
             </div>
             
             <div className="w-full md:w-40">
@@ -236,7 +388,45 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
               )}
               Search Map
             </Button>
+            
+            <Button 
+              className={`${isRadiusActive ? 'bg-findvenue-dark' : 'bg-findvenue-surface/50'} hover:bg-findvenue-dark transition-colors`}
+              onClick={() => {
+                if (!isRadiusActive) {
+                  setIsRadiusActive(true);
+                  if (!userLocation) {
+                    getCurrentLocation();
+                  }
+                } else {
+                  setIsRadiusActive(false);
+                  setAppliedFilters(appliedFilters.filter(f => !f.startsWith("Location:") && f !== "Current Location"));
+                }
+              }}
+            >
+              <Target className="w-4 h-4 mr-2" />
+              {isRadiusActive ? 'Disable Radius' : 'Enable Radius'}
+            </Button>
           </div>
+          
+          {/* Enhanced Map Search Controls */}
+          {isRadiusActive && (
+            <div className="mt-3">
+              <EnhancedMapSearch
+                onSearch={setSearchQuery}
+                onLocationSelect={handleLocationSelect}
+                onRadiusChange={setRadiusInKm}
+                onManualLocation={() => toast.info("Click anywhere on the map to set your location")}
+                onCurrentLocation={getCurrentLocation}
+                venueCount={filteredByRadius.length}
+                radiusInKm={radiusInKm}
+                isRadiusActive={isRadiusActive}
+                searchText={searchQuery}
+                setSearchText={setSearchQuery}
+                appliedFilters={appliedFilters}
+                onClearFilter={handleClearFilter}
+              />
+            </div>
+          )}
         </Card>
       </div>
       
@@ -245,6 +435,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
           mapContainerStyle={mapContainerStyle}
           center={mapCenter}
           zoom={mapZoom}
+          onClick={handleMapClick}
           options={{
             mapTypeControl: false,
             streetViewControl: false,
@@ -344,7 +535,37 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
             ]
           }}
         >
-          {venues.map((venue) => {
+          {/* Draw radius circle if radius search is active */}
+          {isRadiusActive && userLocation && (
+            <CircleF
+              center={userLocation}
+              radius={radiusInKm * 1000} // Convert km to meters
+              options={{
+                fillColor: '#4f46e5',
+                fillOpacity: 0.15,
+                strokeColor: '#4f46e5',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+              }}
+            />
+          )}
+          
+          {/* Draw user location marker if radius search is active */}
+          {isRadiusActive && userLocation && (
+            <MarkerF
+              position={userLocation}
+              icon={{
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 7,
+                fillColor: '#4f46e5',
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+              }}
+            />
+          )}
+          
+          {displayVenues.map((venue) => {
             if (!venue.latitude || !venue.longitude) return null;
             
             return (
