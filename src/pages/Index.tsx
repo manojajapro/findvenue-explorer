@@ -11,6 +11,7 @@ import AdviceSection from '@/components/advice/AdviceSection';
 import { useSearch } from '@/hooks/useSearch';
 import MapView from '@/components/map/MapView';
 import { Card } from '@/components/ui/card';
+import HomePageMap from '@/components/map/HomePageMap';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -106,19 +107,15 @@ const Index = () => {
     <>
       <HeroSection />
       
-      {showMap && (
-        <div className="container mx-auto px-4 py-8">
-          <Card className="rounded-lg overflow-hidden shadow-xl border border-white/10">
-            <div className="h-[500px] w-full">
-              <MapView 
-                venues={venues} 
-                isLoading={isLoading} 
-                onFilteredVenuesChange={() => {}}
-              />
-            </div>
-          </Card>
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold mb-2">Find Venues on Map</h2>
+          <p className="text-findvenue-text-muted">
+            Explore venues visually and find the perfect location for your event
+          </p>
         </div>
-      )}
+        <HomePageMap height="550px" />
+      </div>
       
       <CitiesSection />
       <CategoriesSection />
