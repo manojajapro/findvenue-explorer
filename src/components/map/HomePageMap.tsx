@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useGeocode } from '@/hooks/useGeocode';
 import { venues as mockVenues } from '@/data/venues';
+import { supabase } from '@/integrations/supabase/client';
 
 const mapContainerStyle = {
   width: '100%',
@@ -32,6 +33,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
   const [venueType, setVenueType] = useState('');
   const [guestCount, setGuestCount] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [realVenues, setRealVenues] = useState<Venue[]>([]);
   
   const navigate = useNavigate();
   const { geocodePinCode } = useGeocode();
@@ -40,6 +42,61 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     id: 'google-map-script',
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
   });
+
+  useEffect(() => {
+    const fetchVenues = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('venues')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Format venues to match Venue interface
+          const formattedVenues = data.map(venue => ({
+            id: venue.id,
+            name: venue.name,
+            description: venue.description,
+            address: venue.address,
+            city: venue.city_name,
+            imageUrl: venue.image_url,
+            galleryImages: venue.gallery_images,
+            featured: venue.featured,
+            popular: venue.popular,
+            capacity: {
+              min: venue.min_capacity || 0,
+              max: venue.max_capacity || 100
+            },
+            pricing: {
+              startingPrice: venue.starting_price || 0,
+              currency: venue.currency || 'SAR',
+              pricePerPerson: venue.price_per_person
+            },
+            amenities: venue.amenities || [],
+            rating: venue.rating || 0,
+            latitude: venue.latitude,
+            longitude: venue.longitude,
+            type: venue.type
+          }));
+          
+          setRealVenues(formattedVenues);
+        }
+      } catch (error) {
+        console.error("Error fetching venues:", error);
+        setRealVenues(mockVenues); // Fallback to mock data
+      }
+    };
+    
+    fetchVenues();
+  }, []);
+  
+  useEffect(() => {
+    // Use real venues from API if available, fallback to mock data
+    setVenues(realVenues.length > 0 ? realVenues : mockVenues);
+  }, [realVenues]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -74,11 +131,11 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
   };
   
   const filterVenues = () => {
-    let filtered = [...mockVenues];
+    let filtered = [...(realVenues.length > 0 ? realVenues : mockVenues)];
     
-    if (venueType) {
+    if (venueType && venueType !== 'all') {
       filtered = filtered.filter(venue => 
-        venue.type ? venue.type === venueType : false
+        venue.type && venue.type === venueType
       );
     }
     
@@ -86,7 +143,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
       const guests = parseInt(guestCount);
       if (!isNaN(guests)) {
         filtered = filtered.filter(venue => 
-          venue.capacity.min <= guests && venue.capacity.max >= guests
+          venue.capacity && venue.capacity.min <= guests && venue.capacity.max >= guests
         );
       }
     }
@@ -96,7 +153,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
   
   useEffect(() => {
     filterVenues();
-  }, [venueType, guestCount]);
+  }, [venueType, guestCount, realVenues]);
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

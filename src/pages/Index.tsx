@@ -9,8 +9,6 @@ import TopVenues from '@/components/venues/TopVenues';
 import GlobalVenues from '@/components/global/GlobalVenues';
 import AdviceSection from '@/components/advice/AdviceSection';
 import { useSearch } from '@/hooks/useSearch';
-import MapView from '@/components/map/MapView';
-import { Card } from '@/components/ui/card';
 import HomePageMap from '@/components/map/HomePageMap';
 
 const Index = () => {

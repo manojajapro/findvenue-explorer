@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Users, Calendar, MapPin, ChevronDown, X, Building } from 'lucide-react';
@@ -9,7 +10,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useGeocode } from '@/hooks/useGeocode';
-import MapSearchSection from '@/components/map/MapSearchSection';
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -193,15 +193,6 @@ const HeroSection = () => {
     navigate(`/?${params.toString()}`);
   };
   
-  const handleMapSearch = async (location: string) => {
-    const params = new URLSearchParams();
-    if (location) {
-      params.append('search', location);
-    }
-    params.append('showMap', 'true');
-    navigate(`/?${params.toString()}`);
-  };
-  
   const clearForm = () => {
     setEventType('');
     setVenueType('');
@@ -237,8 +228,18 @@ const HeroSection = () => {
             Discover the perfect space for your next event in Saudi Arabia with our curated selection of premium venues
           </p>
           
-          <div className="mb-10">
-            <MapSearchSection onLocationSelected={handleMapSearch} />
+          <div className="mb-4">
+            <Button 
+              onClick={() => {
+                const params = new URLSearchParams();
+                params.append('showMap', 'true');
+                navigate(`/?${params.toString()}`);
+              }}
+              className="bg-findvenue hover:bg-findvenue-dark text-white px-6 py-3 rounded-md text-lg"
+            >
+              <Search className="w-5 h-5 mr-2" />
+              Explore on Map
+            </Button>
           </div>
         </div>
         
