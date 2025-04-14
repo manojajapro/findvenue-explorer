@@ -16,13 +16,10 @@ const HeroSection = () => {
   const [venueType, setVenueType] = useState('');
   const [guests, setGuests] = useState('');
   const [location, setLocation] = useState('');
-  const [manualLocation, setManualLocation] = useState('');
+  const [date, setDate] = useState<Date | undefined>(undefined);
   const [showFilters, setShowFilters] = useState(false);
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
-  const [cities, setCities] = useState<{id: string, name: string}[]>([]);
   const [venueTypes, setVenueTypes] = useState<{value: string, label: string}[]>([]);
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [useManualLocation, setUseManualLocation] = useState(false);
   const { geocodePinCode, isLoading } = useGeocode();
   
   useEffect(() => {
@@ -177,30 +174,6 @@ const HeroSection = () => {
     fetchVenueTypes();
   }, []);
   
-  useEffect(() => {
-    const fetchCities = async () => {
-      try {
-        const { data } = await supabase
-          .from('city_groups')
-          .select('city_id, city_name')
-          .order('city_name');
-        
-        if (data) {
-          const formattedCities = data.map(city => ({
-            id: city.city_id || '',
-            name: city.city_name || ''
-          })).filter(city => city.id && city.name);
-          
-          setCities(formattedCities);
-        }
-      } catch (error) {
-        console.error('Error fetching cities:', error);
-      }
-    };
-    
-    fetchCities();
-  }, []);
-  
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const params = new URLSearchParams();
@@ -209,11 +182,7 @@ const HeroSection = () => {
     if (venueType) params.append('type', venueType);
     if (guests) params.append('guests', guests);
     
-    if (useManualLocation && manualLocation) {
-      params.append('search', manualLocation);
-    } else if (location) {
-      params.append('cityId', location);
-    }
+    if (location) params.append('search', location);
     
     if (date) params.append('date', format(date, 'yyyy-MM-dd'));
     
@@ -225,8 +194,6 @@ const HeroSection = () => {
     setVenueType('');
     setGuests('');
     setLocation('');
-    setManualLocation('');
-    setUseManualLocation(false);
     setDate(undefined);
   };
   
@@ -343,76 +310,26 @@ const HeroSection = () => {
             </div>
             
             <div className="lg:col-span-1">
-              {useManualLocation ? (
-                <div className="relative">
-                  <Input
-                    type="text"
-                    placeholder="Enter location"
-                    value={manualLocation}
-                    onChange={(e) => setManualLocation(e.target.value)}
-                    className="bg-findvenue-surface/50 border-white/10 pl-10 h-12"
-                  />
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Enter location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="bg-findvenue-surface/50 border-white/10 pl-10 h-12"
+                />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-findvenue-text-muted" />
+                {location && (
                   <Button 
                     type="button" 
                     variant="ghost" 
                     className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-                    onClick={() => {
-                      setUseManualLocation(false);
-                      setManualLocation('');
-                    }}
+                    onClick={() => setLocation('')}
                   >
                     <X className="h-4 w-4" />
                   </Button>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className={`w-full justify-between border-white/10 bg-findvenue-surface/50 hover:bg-findvenue-surface h-12 ${location ? 'text-white' : 'text-findvenue-text-muted'}`}
-                      >
-                        <div className="flex items-center">
-                          <MapPin className="mr-2 h-4 w-4" />
-                          {cities.find(city => city.id === location)?.name || 'Location'}
-                        </div>
-                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0 max-h-[300px] overflow-y-auto bg-findvenue-card-bg border-white/10">
-                      <div className="p-2">
-                        <Button
-                          variant="ghost"
-                          className="justify-start w-full text-findvenue hover:text-white hover:bg-findvenue-surface mb-2"
-                          onClick={() => {
-                            setUseManualLocation(true);
-                            setLocation('');
-                            document.body.click();
-                          }}
-                        >
-                          Enter manual location...
-                        </Button>
-                        <div className="h-[1px] bg-white/10 my-2"></div>
-                        {cities.map((city) => (
-                          <Button
-                            key={city.id}
-                            variant="ghost"
-                            className="justify-start text-findvenue-text hover:text-white hover:bg-findvenue-surface w-full"
-                            onClick={() => {
-                              setLocation(city.id);
-                              document.body.click();
-                            }}
-                          >
-                            {city.name}
-                          </Button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
+                )}
+              </div>
             </div>
             
             <div className="lg:col-span-1">
@@ -442,7 +359,7 @@ const HeroSection = () => {
               <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </Button>
             
-            {(eventType || venueType || guests || location || manualLocation || date) && (
+            {(eventType || venueType || guests || location || date) && (
               <Button
                 type="button"
                 variant="ghost"
