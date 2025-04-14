@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,7 +24,6 @@ export const useVenueData = () => {
 
         console.log("Fetching venue data for ID:", id);
         
-        // Get venue data
         const { data, error: venueError } = await supabase
           .from('venues')
           .select('*')
@@ -40,7 +38,6 @@ export const useVenueData = () => {
         if (data) {
           console.log("Raw venue data:", data);
           
-          // Process owner_info
           let ownerInfoData = undefined;
           try {
             if (data.owner_info) {
@@ -69,7 +66,6 @@ export const useVenueData = () => {
             console.error("Error parsing owner_info for venue", data.id, e);
           }
           
-          // Process opening_hours
           let openingHoursData = undefined;
           try {
             if (data.opening_hours) {
@@ -81,7 +77,6 @@ export const useVenueData = () => {
             console.error("Error parsing opening_hours for venue", data.id, e);
           }
           
-          // Process rules_and_regulations
           let rulesAndRegulationsData = undefined;
           try {
             if (data.rules_and_regulations) {
@@ -97,7 +92,6 @@ export const useVenueData = () => {
             console.error("Error parsing rules_and_regulations for venue", data.id, e);
           }
           
-          // Process arrays that might be stored as strings 
           const processArrayField = (field: any): string[] => {
             if (!field) return [];
             
@@ -106,96 +100,76 @@ export const useVenueData = () => {
             }
             
             if (typeof field === 'string') {
-              // Check if it looks like a CSV format
               if (field.includes(',') && !field.includes('[') && !field.includes('{')) {
                 return field.split(',').map(item => item.trim());
               }
               
-              // If it's a JSON string, try to parse it
               try {
                 const parsed = JSON.parse(field);
                 if (Array.isArray(parsed)) {
                   return parsed;
                 }
-                return [field]; // Not an array, use as a single item
+                return [field];
               } catch (e) {
-                // Not valid JSON, return as single item
+                console.error("Error parsing array field", field, e);
                 return [field];
               }
             }
             
-            // If it's anything else, convert to string and return as single item
             return [String(field)];
           };
           
-          // Enhanced function to better process category names
           const processCategoryNames = (categories: any): string[] => {
             if (!categories) return [];
             
-            // Handle array directly
             if (Array.isArray(categories)) {
               return categories.map(cat => {
                 if (typeof cat === 'string') {
-                  // Remove any square brackets, quotes, etc. that might be in the string
                   return cat.replace(/[[\]']/g, '').trim();
                 }
                 return String(cat).trim();
               });
             }
             
-            // Handle string formats
             if (typeof categories === 'string') {
-              // Check if the string looks like an array representation
               if (categories.startsWith('[') && categories.endsWith(']')) {
                 try {
-                  // Try to parse as JSON
                   const parsed = JSON.parse(categories.replace(/'/g, '"'));
                   if (Array.isArray(parsed)) {
                     return parsed.map(item => String(item).trim());
                   }
                 } catch (e) {
-                  // If parsing fails, try to extract from the string format ['item1', 'item2']
-                  const matches = categories.match(/'([^']+)'/g) || [];
-                  if (matches.length > 0) {
-                    return matches.map(m => m.replace(/'/g, '').trim());
-                  }
+                  console.error("Error parsing category names array", categories, e);
                 }
               }
               
-              // Check if comma-separated list
               if (categories.includes(',')) {
                 return categories.split(',').map(cat => cat.trim());
               }
               
-              // Try to parse as JSON
               try {
                 const parsed = JSON.parse(categories);
                 if (Array.isArray(parsed)) {
                   return parsed.map(item => String(item).trim());
                 }
               } catch (e) {
-                // Not JSON, continue processing
+                console.error("Error parsing category names JSON", categories, e);
               }
               
-              // Handle CamelCase concatenated categories (e.g., "ExhibitionsConferencesGraduation")
               if (/[a-z][A-Z]/.test(categories)) {
                 return categories.replace(/([a-z])([A-Z])/g, '$1,$2').split(',')
                   .map(cat => cat.trim());
               }
               
-              // Return as single item if nothing else worked
               return [categories.trim()];
             }
             
             return [];
           };
           
-          // Process gallery images - ensure we have an array of strings
           const galleryImages = processArrayField(data.gallery_images);
-          // Use the first gallery image as default image
           const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
           
-          // Ensure capacity values are numbers
           const minCapacity = typeof data.min_capacity === 'string' 
             ? parseInt(data.min_capacity, 10) || 0 
             : Number(data.min_capacity) || 0;
@@ -204,12 +178,10 @@ export const useVenueData = () => {
             ? parseInt(data.max_capacity, 10) || 0 
             : Number(data.max_capacity) || 0;
           
-          // Ensure pricing values are numbers
           const startingPrice = Number(data.starting_price) || 0;
           const pricePerPerson = data.price_per_person ? Number(data.price_per_person) : undefined;
           const hourlyRate = data.hourly_rate ? Number(data.hourly_rate) : undefined;
           
-          // Process category names with improved handling
           const categoryNames = processCategoryNames(data.category_name);
           
           const transformedVenue: Venue = {
@@ -251,7 +223,7 @@ export const useVenueData = () => {
             rulesAndRegulations: rulesAndRegulationsData,
             type: data.type || '',
             zipcode: data.zipcode || '',
-            categoryNames: categoryNames // Add separate field for category names array
+            categoryNames: categoryNames
           };
           
           console.log("Transformed venue data:", transformedVenue);

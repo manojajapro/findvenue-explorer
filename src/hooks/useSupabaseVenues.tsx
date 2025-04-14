@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -19,6 +20,7 @@ export interface Venue {
   pricing: {
     startingPrice: number;
     pricePerPerson?: number;
+    hourlyRate?: number;
     currency: string;
   };
   amenities?: string[];
@@ -47,4 +49,17 @@ export interface Venue {
     title: string;
     description: string;
   }>;
+  zipcode?: string;
+  categoryNames?: string[];
+}
+
+export interface VenueFilter {
+  city?: string;
+  category?: string;
+  minCapacity?: number;
+  maxPrice?: number;
+  amenities?: string[];
+  priceRange?: [number, number];
+  capacityRange?: [number, number];
+  searchTerm?: string;
 }

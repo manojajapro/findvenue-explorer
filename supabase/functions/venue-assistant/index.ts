@@ -71,11 +71,15 @@ serve(async (req) => {
       
       const startingPrice = formatPrice(venueInfo.starting_price);
       const pricePerPerson = venueInfo.price_per_person ? formatPrice(venueInfo.price_per_person) : null;
+      const hourlyRate = venueInfo.hourly_rate ? formatPrice(venueInfo.hourly_rate) : null;
       
       if (queryLower.includes("price") || queryLower.includes("cost") || queryLower.includes("fee")) {
         answer = `${venueInfo.name} pricing starts at ${venueInfo.currency || 'SAR'} ${startingPrice}.`;
         if (pricePerPerson) {
           answer += ` There's also a price per person of ${venueInfo.currency || 'SAR'} ${pricePerPerson}.`;
+        }
+        if (hourlyRate) {
+          answer += ` Hourly rate is ${venueInfo.currency || 'SAR'} ${hourlyRate}.`;
         }
       } 
       else if (queryLower.includes("capacity") || queryLower.includes("guests") || queryLower.includes("people")) {
@@ -141,4 +145,4 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
-})
+});

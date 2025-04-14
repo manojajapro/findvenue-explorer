@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { useVenueData } from '@/hooks/useVenueData';
 import { supabase } from '@/integrations/supabase/client';
