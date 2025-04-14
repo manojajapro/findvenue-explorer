@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF } from '@react-google-maps/api';
@@ -37,7 +36,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
   const [isSearching, setIsSearching] = useState(false);
   const [realVenues, setRealVenues] = useState<Venue[]>([]);
   
-  // Radius search state
   const [radiusInKm, setRadiusInKm] = useState(5);
   const [isRadiusActive, setIsRadiusActive] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
@@ -64,7 +62,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
         if (error) throw error;
         
         if (data && data.length > 0) {
-          // Format venues to match Venue interface
           const formattedVenues = data.map(venue => ({
             id: venue.id,
             name: venue.name,
@@ -88,7 +85,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
             rating: venue.rating || 0,
             latitude: venue.latitude,
             longitude: venue.longitude,
-            type: venue.type || '', // Ensure type is always defined
+            type: venue.type || '',
             cityId: venue.city_id || '',
             category: venue.category_name || [],
             categoryId: venue.category_id || [],
@@ -99,7 +96,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
         }
       } catch (error) {
         console.error("Error fetching venues:", error);
-        setRealVenues(mockVenues); // Fallback to mock data
+        setRealVenues(mockVenues);
       }
     };
     
@@ -107,13 +104,11 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
   }, []);
   
   useEffect(() => {
-    // Use real venues from API if available, fallback to mock data
     setVenues(realVenues.length > 0 ? realVenues : mockVenues);
   }, [realVenues]);
 
-  // Calculate distance between two coordinates in km using the Haversine formula
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Radius of the Earth in km
+    const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
     const a = 
@@ -124,7 +119,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     return R * c;
   };
 
-  // Filter venues by radius around a point
   const filterByRadius = useCallback(() => {
     if (!userLocation || !isRadiusActive) {
       setFilteredByRadius([]);
@@ -148,12 +142,10 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     toast.success(`Found ${filtered.length} venues within ${radiusInKm}km radius`);
   }, [userLocation, radiusInKm, venues, isRadiusActive]);
 
-  // Update filtered venues when radius or location changes
   useEffect(() => {
     filterByRadius();
   }, [filterByRadius, userLocation, radiusInKm, isRadiusActive]);
 
-  // Get current user location
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
       toast.info("Getting your current location...");
@@ -170,7 +162,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
           setMapZoom(13);
           setIsRadiusActive(true);
           
-          // Add "Current Location" to applied filters if not already there
           if (!appliedFilters.includes("Current Location")) {
             setAppliedFilters([...appliedFilters.filter(f => f !== "Current Location"), "Current Location"]);
           }
@@ -187,7 +178,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     }
   };
 
-  // Set manual location by clicking on map
   const handleMapClick = (event: google.maps.MapMouseEvent) => {
     if (!isRadiusActive) return;
     
@@ -200,7 +190,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     toast.success("Location updated! Showing venues nearby.");
   };
 
-  // Set location from search
   const handleLocationSelect = (lat: number, lng: number, address: string) => {
     const newLocation = { lat, lng };
     setUserLocation(newLocation);
@@ -208,7 +197,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     setMapZoom(13);
     setIsRadiusActive(true);
     
-    // Add location to applied filters if not already there
     const filterName = `Location: ${address.split(',')[0]}`;
     if (!appliedFilters.includes(filterName)) {
       setAppliedFilters([...appliedFilters.filter(f => f.startsWith("Location:")), filterName]);
@@ -224,17 +212,14 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     setIsSearching(true);
     
     try {
-      // Try to geocode the location to center the map
       const coordinates = await geocodePinCode(searchQuery.trim());
       if (coordinates) {
         setMapCenter({ lat: coordinates.lat, lng: coordinates.lng });
         setMapZoom(12);
         
-        // Set user location for radius search
         setUserLocation({ lat: coordinates.lat, lng: coordinates.lng });
         setIsRadiusActive(true);
         
-        // Add location to applied filters
         const filterName = `Location: ${coordinates.formattedAddress.split(',')[0]}`;
         if (!appliedFilters.includes(filterName)) {
           setAppliedFilters([...appliedFilters.filter(f => f.startsWith("Location:")), filterName]);
@@ -263,16 +248,14 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     
     if (venueType && venueType !== 'all') {
       filtered = filtered.filter(venue => 
-        venue.type && venue.type === venueType
+        venue.type !== undefined && venue.type === venueType
       );
       
-      // Add venue type to applied filters if not already there
       const filterName = `Type: ${venueType}`;
       if (!appliedFilters.includes(filterName)) {
         setAppliedFilters([...appliedFilters.filter(f => !f.startsWith("Type:")), filterName]);
       }
     } else {
-      // Remove venue type from applied filters
       setAppliedFilters(appliedFilters.filter(f => !f.startsWith("Type:")));
     }
     
@@ -283,14 +266,12 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
           venue.capacity && venue.capacity.min <= guests && venue.capacity.max >= guests
         );
         
-        // Add guest count to applied filters if not already there
         const filterName = `Guests: ${guests}`;
         if (!appliedFilters.includes(filterName)) {
           setAppliedFilters([...appliedFilters.filter(f => !f.startsWith("Guests:")), filterName]);
         }
       }
     } else {
-      // Remove guest count from applied filters
       setAppliedFilters(appliedFilters.filter(f => !f.startsWith("Guests:")));
     }
     
@@ -301,7 +282,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     filterVenues();
   }, [venueType, guestCount, realVenues]);
   
-  // Clear a specific filter
   const handleClearFilter = (filter: string) => {
     if (filter.startsWith("Type:")) {
       setVenueType('');
@@ -330,7 +310,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     { value: "rooftop", label: "Rooftop" }
   ];
 
-  // Display venues based on radius search if active, otherwise show all venues
   const displayVenues = isRadiusActive && userLocation ? filteredByRadius : venues;
 
   return (
@@ -408,7 +387,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
             </Button>
           </div>
           
-          {/* Enhanced Map Search Controls */}
           {isRadiusActive && (
             <div className="mt-3">
               <EnhancedMapSearch
@@ -535,11 +513,10 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
             ]
           }}
         >
-          {/* Draw radius circle if radius search is active */}
           {isRadiusActive && userLocation && (
             <CircleF
               center={userLocation}
-              radius={radiusInKm * 1000} // Convert km to meters
+              radius={radiusInKm * 1000}
               options={{
                 fillColor: '#4f46e5',
                 fillOpacity: 0.15,
@@ -550,7 +527,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
             />
           )}
           
-          {/* Draw user location marker if radius search is active */}
           {isRadiusActive && userLocation && (
             <MarkerF
               position={userLocation}
