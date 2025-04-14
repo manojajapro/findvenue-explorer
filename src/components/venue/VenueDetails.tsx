@@ -5,7 +5,7 @@ import { useVenueData } from '@/hooks/useVenueData';
 import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import VenueBookingTabs from '@/components/venue/VenueBookingTabs';
-import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
+import VenueBookingInquiry from '@/components/venue/VenueBookingInquiry';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
@@ -154,16 +154,6 @@ const VenueDetails = () => {
               )}
             </p>
           </div>
-          
-          {/* Only show ContactVenueOwner if user is not the owner and owner info exists */}
-          {!isOwner && ownerInfo && user && (
-            <ContactVenueOwner 
-              venueId={venue.id}
-              venueName={venue.name}
-              ownerId={ownerId}
-              ownerName={ownerName}
-            />
-          )}
         </div>
       </div>
       
@@ -204,15 +194,30 @@ const VenueDetails = () => {
       
       <Separator className="my-4" />
       
-      <VenueBookingTabs 
-        venueId={venue.id}
-        venueName={venue.name}
-        pricePerHour={venue.pricing.hourlyRate}
-        minCapacity={venue.capacity.min}
-        maxCapacity={venue.capacity.max}
-        ownerId={ownerId}
-        ownerName={ownerName}
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div>
+          {!isOwner && (
+            <VenueBookingInquiry 
+              venueId={venue.id}
+              venueName={venue.name}
+              ownerInfo={ownerInfo}
+              maxCapacity={venue.capacity.max}
+            />
+          )}
+        </div>
+        
+        <div>
+          <VenueBookingTabs 
+            venueId={venue.id}
+            venueName={venue.name}
+            pricePerHour={venue.pricing.hourlyRate}
+            minCapacity={venue.capacity.min}
+            maxCapacity={venue.capacity.max}
+            ownerId={ownerId}
+            ownerName={ownerName}
+          />
+        </div>
+      </div>
       
       <VenueAIAssistants venue={venue} />
     </div>
