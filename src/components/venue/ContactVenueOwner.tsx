@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Loader2, Clock, BarChart2 } from 'lucide-react';
+import { MessageCircle, Loader2, Clock, BarChart2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -15,7 +15,6 @@ import {
   DialogDescription 
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 
 type ContactVenueOwnerProps = {
@@ -34,6 +33,9 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
   const [isInitiating, setIsInitiating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState(`Hello! I'm interested in your venue "${venueName}". Can you provide more information?`);
+
+  // Display an error if we don't have valid owner information
+  const ownerError = !ownerId || !ownerName;
 
   const initiateChat = async () => {
     if (!user) {
@@ -54,7 +56,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
       });
       
       if (!ownerId) {
-        throw new Error("Could not identify venue owner");
+        throw new Error("Unable to connect to the venue host at this time");
       }
 
       // Get user profile if not available in context
@@ -150,13 +152,15 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
         <div className="p-4 flex items-start gap-4">
           <div className="flex-shrink-0">
             <div className="w-14 h-14 bg-[#a1c181] rounded-full flex items-center justify-center text-white text-lg font-bold">
-              {ownerName.charAt(0)}
+              {ownerName ? ownerName.charAt(0) : 'V'}
             </div>
           </div>
           
           <div className="flex-grow">
-            <h4 className="font-semibold text-gray-900 dark:text-white">{ownerName}</h4>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Your Personal Event Manager from The Preserve</p>
+            <h4 className="font-semibold text-gray-900 dark:text-white">{ownerName || 'Venue Host'}</h4>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Event Manager for {venueName}
+            </p>
             
             <div className="mt-3 space-y-1.5">
               <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
@@ -173,10 +177,18 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
               variant="default"
               className="w-full mt-4 bg-findvenue hover:bg-findvenue-dark"
               onClick={() => setIsDialogOpen(true)}
+              disabled={ownerError}
             >
               <MessageCircle className="mr-2 h-4 w-4" />
-              Message {ownerName}
+              Message {ownerName || 'Venue Host'}
             </Button>
+            
+            {ownerError && (
+              <div className="mt-2 text-sm text-red-500 flex items-center">
+                <AlertCircle className="h-4 w-4 mr-1" />
+                <span>Host information unavailable</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -186,15 +198,17 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
           <DialogHeader>
             <DialogTitle>Contact Venue Host</DialogTitle>
             <DialogDescription className="text-findvenue-text-muted">
-              Start a conversation with {ownerName}, the host of {venueName}.
+              Start a conversation with {ownerName || 'the host'} about {venueName}.
             </DialogDescription>
           </DialogHeader>
           
-          {error ? (
+          {error || ownerError ? (
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertTitle>Unable to connect</AlertTitle>
+              <AlertDescription>
+                {error || (ownerError ? "Host information is currently unavailable. Please try again later or contact support." : "")}
+              </AlertDescription>
             </Alert>
           ) : (
             <div className="py-4">
