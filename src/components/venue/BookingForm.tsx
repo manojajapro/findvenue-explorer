@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -202,8 +201,7 @@ export default function BookingForm({
                   booking_date: formattedDate,
                   venue_name: venueName,
                   booking_type: 'hourly'
-                },
-                5
+                }
               );
               
               console.log('[HOURLY_BOOKING] Fallback notification sent to venue owner');
@@ -246,8 +244,7 @@ export default function BookingForm({
                   booking_date: formattedDate,
                   venue_name: venueName,
                   booking_type: 'hourly'
-                },
-                5
+                }
               );
               
               console.log('[HOURLY_BOOKING] Fallback notification sent to venue owner');

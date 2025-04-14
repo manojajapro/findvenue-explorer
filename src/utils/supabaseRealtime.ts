@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { sendNotification, getVenueOwnerId } from '@/utils/notificationService';
 
 /**
  * Enables realtime functionality for a specific table
@@ -51,3 +52,6 @@ export const setupRealtimeChannel = (
     .on('postgres_changes', channelConfig, callback)
     .subscribe();
 };
+
+// Export the notificationService functions to avoid import errors
+export { sendNotification, getVenueOwnerId };

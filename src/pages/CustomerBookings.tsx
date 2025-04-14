@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,8 @@ import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
 import { CustomerBookingsTable } from '@/components/booking/CustomerBookingsTable';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { enableRealtimeForTable, sendNotification, getVenueOwnerId } from '@/utils/supabaseRealtime';
+import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
+import { sendNotification, getVenueOwnerId } from '@/utils/notificationService';
 import BookingOwnerChat from '@/components/bookings/BookingOwnerChat';
 
 const CustomerBookings = () => {

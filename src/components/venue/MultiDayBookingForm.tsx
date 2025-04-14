@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -234,8 +233,7 @@ export default function MultiDayBookingForm({
                   booking_date: formattedDate,
                   venue_name: venueName,
                   booking_type: 'full-day'
-                },
-                5
+                }
               );
               
               console.log('[FULL_DAY_BOOKING] Fallback notification sent to venue owner');

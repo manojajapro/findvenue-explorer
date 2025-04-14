@@ -130,8 +130,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
               ownerMessage,
               'booking',
               '/customer-bookings',
-              notificationData,
-              5
+              notificationData
             );
             
             if (ownerNotification) {
@@ -167,8 +166,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
               customerMessage,
               'booking',
               '/bookings',
-              notificationData,
-              5
+              notificationData
             );
           } catch (notifyError) {
             console.error('[STATUS_UPDATE] Error in direct customer notification attempt:', notifyError);
@@ -258,8 +256,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
             `A new booking request for "${booking.venue_name}" on ${formattedDate} has been received.`,
             'booking',
             '/customer-bookings',
-            notificationData,
-            5
+            notificationData
           );
           
           return true;

@@ -114,6 +114,25 @@ export const getVenueOwnerId = async (venueOrId: any): Promise<string | null> =>
 };
 
 /**
+ * Formats rules and regulations for display or storage
+ * @param rules Raw rules and regulations data
+ * @returns Formatted rules and regulations
+ */
+export const formatRulesAndRegulations = (rules: any): any => {
+  if (!rules) return {};
+  
+  try {
+    if (typeof rules === 'string') {
+      return JSON.parse(rules);
+    }
+    return rules;
+  } catch (error) {
+    console.error('Error formatting rules and regulations:', error);
+    return {};
+  }
+};
+
+/**
  * Sends a booking status notification to both venue owner and customer
  * @param booking Booking object with all required data
  * @param status New booking status
