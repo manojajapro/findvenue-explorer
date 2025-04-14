@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -6,7 +5,6 @@ import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard } from 
 import { Badge } from '@/components/ui/badge';
 import VenueBookingTabs from '@/components/venue/VenueBookingTabs';
 import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
-import { FacebookIcon, TwitterIcon, InstagramIcon, LinkedinIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';

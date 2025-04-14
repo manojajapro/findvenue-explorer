@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Loader2 } from 'lucide-react';
+import { MessageCircle, Loader2, Clock, BarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -146,14 +146,40 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
   
   return (
     <>
-      <Button 
-        variant="outline" 
-        className="w-full mt-2 border-white/20 hover:bg-findvenue/10 transition-colors"
-        onClick={() => setIsDialogOpen(true)}
-      >
-        <MessageCircle className="mr-2 h-4 w-4" />
-        Message Venue Host
-      </Button>
+      <div className="bg-white dark:bg-findvenue-card-bg rounded-lg overflow-hidden shadow-sm border border-gray-100 dark:border-white/10">
+        <div className="p-4 flex items-start gap-4">
+          <div className="flex-shrink-0">
+            <div className="w-14 h-14 bg-[#a1c181] rounded-full flex items-center justify-center text-white text-lg font-bold">
+              {ownerName.charAt(0)}
+            </div>
+          </div>
+          
+          <div className="flex-grow">
+            <h4 className="font-semibold text-gray-900 dark:text-white">{ownerName}</h4>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Your Personal Event Manager from The Preserve</p>
+            
+            <div className="mt-3 space-y-1.5">
+              <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                <BarChart2 className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
+                <span>Response rate - 99%</span>
+              </div>
+              <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                <Clock className="h-4 w-4 mr-2 text-gray-500 dark:text-gray-400" />
+                <span>Response time - 1h</span>
+              </div>
+            </div>
+            
+            <Button 
+              variant="default"
+              className="w-full mt-4 bg-findvenue hover:bg-findvenue-dark"
+              onClick={() => setIsDialogOpen(true)}
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Message {ownerName}
+            </Button>
+          </div>
+        </div>
+      </div>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md bg-findvenue-card-bg border-white/10">
