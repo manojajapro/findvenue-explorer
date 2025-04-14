@@ -20,13 +20,6 @@ const containerStyle = {
   borderRadius: '0.5rem'
 };
 
-interface MapViewProps {
-  venues: Venue[];
-  isLoading?: boolean;
-  highlightedVenueId?: string;
-  onFilteredVenuesChange?: (venues: Venue[]) => void;
-}
-
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Radius of the Earth in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -39,6 +32,13 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   const distance = R * c; // Distance in km
   return distance;
 };
+
+interface MapViewProps {
+  venues: Venue[];
+  isLoading?: boolean;
+  highlightedVenueId?: string;
+  onFilteredVenuesChange?: (venues: Venue[]) => void;
+}
 
 const MapView = ({
   venues,
@@ -69,9 +69,7 @@ const MapView = ({
     mapRef.current = map;
   }, []);
 
-  // Filter venues based on search text, radius, and other filters
   const filteredVenues = venues.filter(venue => {
-    // Text search filter
     if (searchText && !venue.name.toLowerCase().includes(searchText.toLowerCase()) && 
         !venue.city?.toLowerCase().includes(searchText.toLowerCase()) &&
         !venue.description?.toLowerCase().includes(searchText.toLowerCase()) &&
@@ -79,9 +77,7 @@ const MapView = ({
       return false;
     }
     
-    // Radius filter
     if (radiusActive && venue.latitude && venue.longitude) {
-      // Calculate distance between venue and map center
       const distance = calculateDistance(
         mapCenter.lat, 
         mapCenter.lng, 
@@ -89,7 +85,6 @@ const MapView = ({
         venue.longitude
       );
       
-      // Convert km to meters for comparison
       if (distance > radiusSize) {
         return false;
       }
@@ -98,7 +93,6 @@ const MapView = ({
     return true;
   });
 
-  // When highlighted venue ID changes from hovering on list, focus on that venue
   useEffect(() => {
     if (highlightedVenueId && venues) {
       const venue = venues.find(v => v.id === highlightedVenueId);
@@ -110,7 +104,6 @@ const MapView = ({
     }
   }, [highlightedVenueId, venues]);
 
-  // When filtered venues change, notify parent component
   useEffect(() => {
     if (onFilteredVenuesChange) {
       onFilteredVenuesChange(filteredVenues);
@@ -131,57 +124,47 @@ const MapView = ({
     }
   };
 
-  // Handle search
   const handleSearch = (term: string) => {
     setSearchText(term);
   };
 
-  // Handle location select
   const handleLocationSelect = (lat: number, lng: number, address: string) => {
     setMapCenter({lat, lng});
     setMapZoom(14);
     setCurrentAddress(address);
     
-    // Activate radius search if not already active
     if (!radiusActive) {
       setRadiusActive(true);
     }
   };
   
-  // Handle manual location
   const handleManualLocationSetting = (coordinates?: [number, number]) => {
     if (coordinates) {
       setMapCenter({lat: coordinates[0], lng: coordinates[1]});
       setMapZoom(14);
       
-      // Activate radius search if not already active
       if (!radiusActive) {
         setRadiusActive(true);
       }
     }
   };
   
-  // Toggle radius search
   const toggleRadiusSearch = () => {
     setRadiusActive(!radiusActive);
   };
   
-  // Handle radius size changes
   const handleRadiusSizeChange = (size: number) => {
     setRadiusSize(size);
   };
   
-  // Increase radius
   const increaseRadius = () => {
     setRadiusSize(prev => Math.min(prev + 1, 20));
   };
   
-  // Decrease radius
   const decreaseRadius = () => {
     setRadiusSize(prev => Math.max(prev - 1, 1));
   };
   
-  // Get current location
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -190,12 +173,10 @@ const MapView = ({
           setMapCenter({lat: latitude, lng: longitude});
           setMapZoom(15);
           
-          // Activate radius search if not already active
           if (!radiusActive) {
             setRadiusActive(true);
           }
           
-          // Show toast notification
           toast({
             title: "Location Set",
             description: "Using your current location",
@@ -221,12 +202,10 @@ const MapView = ({
     }
   };
   
-  // Handle clear search
   const handleClearSearch = () => {
     setSearchText('');
   };
   
-  // Fit bounds to markers
   const fitBoundsToMarkers = () => {
     if (!mapRef.current || filteredVenues.length === 0) return;
     
@@ -240,7 +219,6 @@ const MapView = ({
     
     mapRef.current.fitBounds(bounds);
     
-    // Adjust zoom if too high
     setTimeout(() => {
       if (mapRef.current && mapRef.current.getZoom() && mapRef.current.getZoom()! > 16) {
         mapRef.current.setZoom(16);
@@ -248,18 +226,15 @@ const MapView = ({
     }, 100);
   };
   
-  // Reset to default location
   const resetToDefaultLocation = () => {
     setMapCenter({lat: 24.7136, lng: 46.6753}); // Default to Riyadh
     setMapZoom(12);
   };
 
-  // Handle clear filter
   const handleClearFilter = (filter: string) => {
     setAppliedFilters(prev => prev.filter(f => f !== filter));
   };
   
-  // Callback for EnhancedMapSearch component
   const handleRadiusChange = (size: number) => {
     setRadiusSize(size);
   };
@@ -315,9 +290,96 @@ const MapView = ({
             streetViewControl: false,
             styles: [
               {
-                featureType: 'poi',
-                elementType: 'labels',
-                stylers: [{ visibility: 'off' }]
+                "elementType": "geometry",
+                "stylers": [{"color": "#242f3e"}]
+              },
+              {
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#746855"}]
+              },
+              {
+                "elementType": "labels.text.stroke",
+                "stylers": [{"color": "#242f3e"}]
+              },
+              {
+                "featureType": "administrative.locality",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#d59563"}]
+              },
+              {
+                "featureType": "poi",
+                "elementType": "labels",
+                "stylers": [{"visibility": "off"}]
+              },
+              {
+                "featureType": "poi",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#d59563"}]
+              },
+              {
+                "featureType": "poi.park",
+                "elementType": "geometry",
+                "stylers": [{"color": "#263c3f"}]
+              },
+              {
+                "featureType": "poi.park",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#6b9a76"}]
+              },
+              {
+                "featureType": "road",
+                "elementType": "geometry",
+                "stylers": [{"color": "#38414e"}]
+              },
+              {
+                "featureType": "road",
+                "elementType": "geometry.stroke",
+                "stylers": [{"color": "#212a37"}]
+              },
+              {
+                "featureType": "road",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#9ca5b3"}]
+              },
+              {
+                "featureType": "road.highway",
+                "elementType": "geometry",
+                "stylers": [{"color": "#746855"}]
+              },
+              {
+                "featureType": "road.highway",
+                "elementType": "geometry.stroke",
+                "stylers": [{"color": "#1f2835"}]
+              },
+              {
+                "featureType": "road.highway",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#f3d19c"}]
+              },
+              {
+                "featureType": "transit",
+                "elementType": "geometry",
+                "stylers": [{"color": "#2f3948"}]
+              },
+              {
+                "featureType": "transit.station",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#d59563"}]
+              },
+              {
+                "featureType": "water",
+                "elementType": "geometry",
+                "stylers": [{"color": "#17263c"}]
+              },
+              {
+                "featureType": "water",
+                "elementType": "labels.text.fill",
+                "stylers": [{"color": "#515c6d"}]
+              },
+              {
+                "featureType": "water",
+                "elementType": "labels.text.stroke",
+                "stylers": [{"color": "#17263c"}]
               }
             ]
           }}
@@ -343,11 +405,10 @@ const MapView = ({
             );
           })}
           
-          {/* Display radius circle when radius search is active */}
           {radiusActive && (
             <CircleF
               center={mapCenter}
-              radius={radiusSize * 1000} // Convert km to meters
+              radius={radiusSize * 1000}
               options={{
                 fillColor: '#5046E4',
                 fillOpacity: 0.1,
@@ -414,8 +475,8 @@ const MapView = ({
           )}
         </GoogleMap>
       ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-100">
-          <p>Loading Map...</p>
+        <div className="w-full h-full flex items-center justify-center bg-findvenue-dark-bg">
+          <p className="text-findvenue-text">Loading Map...</p>
         </div>
       )}
       

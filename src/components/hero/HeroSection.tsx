@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useGeocode } from '@/hooks/useGeocode';
+import MapSearchSection from '@/components/map/MapSearchSection';
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -223,9 +224,14 @@ const HeroSection = () => {
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white leading-tight">
             Find and book venues for any event imaginable
           </h1>
-          <p className="text-xl text-findvenue-text mb-10 max-w-3xl mx-auto">
+          <p className="text-xl text-findvenue-text mb-6 max-w-3xl mx-auto">
             Discover the perfect space for your next event in Saudi Arabia with our curated selection of premium venues
           </p>
+          
+          {/* Add Map Search Section */}
+          <div className="mb-10">
+            <MapSearchSection />
+          </div>
         </div>
         
         <form 
