@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
 import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
@@ -10,12 +10,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
   const navigate = useNavigate();
   const { venue, isLoading, error } = useVenueData();
   const { user } = useAuth();
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   useEffect(() => {
     if (!isLoading && !user) {
@@ -62,38 +64,110 @@ const VenueDetails = () => {
     ? venue.galleryImages[0] 
     : 'https://placehold.co/600x400?text=No+Image';
   
+  const handleImageClick = (image: string) => {
+    setSelectedImage(image);
+  };
+  
   return (
     <div className="container mx-auto p-4">
       <div className="md:flex md:gap-8">
         <div className="md:w-2/3 space-y-4">
-          <div className="grid grid-cols-12 gap-4 h-96">
-            <div className="col-span-8 h-full">
-              <img src={mainImage} alt={venue.name} className="w-full h-full rounded-lg object-cover" />
+          {/* New Gallery Layout - Similar to the reference image */}
+          <div className="grid grid-cols-12 gap-2 h-[600px]">
+            {/* Main large image - takes up 2/3 of space */}
+            <div className="col-span-8 h-full relative rounded-lg overflow-hidden group cursor-pointer" 
+                onClick={() => handleImageClick(venue.galleryImages[0])}>
+              <img 
+                src={venue.galleryImages[0]} 
+                alt={venue.name} 
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+              />
             </div>
             
-            <div className="col-span-4 grid grid-rows-2 gap-4 h-full">
-              {venue.galleryImages && venue.galleryImages.slice(1, 3).map((image, index) => (
-                <div key={index} className="relative rounded-lg overflow-hidden">
-                  <img src={image} alt={`${venue.name} Gallery ${index + 1}`} className="w-full h-full object-cover" />
-                  {index === 1 && venue.galleryImages && venue.galleryImages.length > 3 && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                      <span className="text-white text-lg font-medium">+{venue.galleryImages.length - 3} photos</span>
+            {/* Right column with additional images */}
+            <div className="col-span-4 grid grid-rows-3 gap-2 h-full">
+              {/* Top right image */}
+              {venue.galleryImages && venue.galleryImages[1] && (
+                <div className="relative rounded-lg overflow-hidden cursor-pointer group"
+                    onClick={() => handleImageClick(venue.galleryImages[1])}>
+                  <img 
+                    src={venue.galleryImages[1]} 
+                    alt={`${venue.name} Gallery 1`} 
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                  />
+                </div>
+              )}
+              
+              {/* Middle right image */}
+              {venue.galleryImages && venue.galleryImages[2] && (
+                <div className="relative rounded-lg overflow-hidden cursor-pointer group"
+                    onClick={() => handleImageClick(venue.galleryImages[2])}>
+                  <img 
+                    src={venue.galleryImages[2]} 
+                    alt={`${venue.name} Gallery 2`} 
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                  />
+                </div>
+              )}
+              
+              {/* Bottom right image with overlay for more photos */}
+              {venue.galleryImages && venue.galleryImages[3] && (
+                <div className="relative rounded-lg overflow-hidden cursor-pointer group"
+                    onClick={() => handleImageClick(venue.galleryImages[3])}>
+                  <img 
+                    src={venue.galleryImages[3]} 
+                    alt={`${venue.name} Gallery 3`} 
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                  />
+                  {venue.galleryImages.length > 4 && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity duration-300">
+                      <span className="text-white text-lg font-medium">
+                        See all<br/>{venue.galleryImages.length} photos
+                      </span>
                     </div>
                   )}
                 </div>
-              ))}
+              )}
             </div>
           </div>
           
+          {/* Image Gallery Dialog */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <button className="px-4 py-2 bg-findvenue text-white rounded-md hover:bg-findvenue-dark">
+                View All Photos
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto p-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {venue.galleryImages && venue.galleryImages.map((image, index) => (
+                  <img 
+                    key={index} 
+                    src={image} 
+                    alt={`${venue.name} Gallery ${index + 1}`} 
+                    className="w-full h-64 object-cover rounded cursor-pointer"
+                    onClick={() => handleImageClick(image)}
+                  />
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+          
           <div className="flex overflow-x-auto gap-2 pb-2">
-            {venue.galleryImages && venue.galleryImages.map((image, index) => (
+            {venue.galleryImages && venue.galleryImages.slice(0, 6).map((image, index) => (
               <img 
                 key={index} 
                 src={image} 
                 alt={`${venue.name} Gallery ${index + 1}`} 
-                className="w-20 h-20 rounded-md object-cover flex-shrink-0"
+                className="w-20 h-20 rounded-md object-cover flex-shrink-0 cursor-pointer"
+                onClick={() => handleImageClick(image)}
               />
             ))}
+            {venue.galleryImages && venue.galleryImages.length > 6 && (
+              <div className="w-20 h-20 rounded-md bg-findvenue flex items-center justify-center flex-shrink-0 cursor-pointer text-white">
+                +{venue.galleryImages.length - 6}
+              </div>
+            )}
           </div>
         </div>
         

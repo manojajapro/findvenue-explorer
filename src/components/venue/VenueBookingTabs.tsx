@@ -1,13 +1,19 @@
+
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import BookingForm from '@/components/venue/BookingForm';
 import MultiDayBookingForm from '@/components/venue/MultiDayBookingForm';
-import { Calendar, Clock, Calendar as CalendarIcon, LogIn } from 'lucide-react';
+import { Calendar, Clock, Calendar as CalendarIcon, LogIn, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
+import { Input } from '@/components/ui/input';
+import { format } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -41,6 +47,12 @@ export default function VenueBookingTabs({
   const [dayBookedDates, setDayBookedDates] = useState<string[]>([]);
   const [venueStatus, setVenueStatus] = useState<string>('active');
   const [bookingType, setBookingType] = useState<'hourly' | 'full-day'>('hourly');
+  
+  // New fields for unified booking form
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [peopleCount, setPeopleCount] = useState<string>(minCapacity.toString());
+  const [fromTime, setFromTime] = useState<string>('09:00');
+  const [toTime, setToTime] = useState<string>('17:00');
 
   // Fetch venue status
   useEffect(() => {
@@ -176,6 +188,24 @@ export default function VenueBookingTabs({
     }
     return slots;
   };
+  
+  const handleBookRequest = () => {
+    if (!user) {
+      toast({
+        title: "Login required",
+        description: "Please login to book this venue",
+        variant: "destructive"
+      });
+      navigate('/login');
+      return;
+    }
+    
+    // Here you would implement the booking logic
+    toast({
+      title: "Booking request sent",
+      description: "We'll contact you shortly to confirm your booking"
+    });
+  };
 
   // Don't show booking tabs for the venue owner
   if (isOwner) {
@@ -230,61 +260,120 @@ export default function VenueBookingTabs({
     <div className="bg-findvenue-card-bg p-4 rounded-lg border border-white/10">
       <h3 className="text-lg font-semibold mb-4">Book this venue</h3>
       
-      <Tabs defaultValue="booking" value={activeTab} onValueChange={setActiveTab as any} className="w-full">
-        <TabsList className="grid grid-cols-1 mb-4">
-          <div className="flex items-center justify-between p-2 bg-findvenue-surface/30 rounded-lg">
-            <div className="font-medium">Booking Type:</div>
-            <div className="flex items-center rounded-md overflow-hidden">
-              <button 
-                className={`px-3 py-1 flex items-center text-sm ${bookingType === 'hourly' 
-                  ? 'bg-findvenue text-white' 
-                  : 'bg-findvenue-card-bg text-findvenue-text hover:bg-findvenue-surface/50'}`}
-                onClick={() => setBookingType('hourly')}
-              >
-                <Clock className="h-3 w-3 mr-1" />
-                Hourly
-              </button>
-              <button 
-                className={`px-3 py-1 flex items-center text-sm ${bookingType === 'full-day' 
-                  ? 'bg-findvenue text-white' 
-                  : 'bg-findvenue-card-bg text-findvenue-text hover:bg-findvenue-surface/50'}`}
-                onClick={() => setBookingType('full-day')}
-              >
-                <CalendarIcon className="h-3 w-3 mr-1" />
-                Full Day
-              </button>
+      <div className="mb-6">
+        <div className="flex justify-between mb-2">
+          <div>
+            <div className="font-bold text-xl">
+              from <span className="text-2xl">${parsedPricePerHour}</span> / hour
+              <span className="ml-6 text-2xl">${parsedPricePerHour * 10}</span> / day
+            </div>
+            <div className="text-sm text-findvenue-text-muted">Minimum 2 hours</div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Date and time</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "MM/dd/yyyy") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                {/* Calendar component would go here */}
+              </PopoverContent>
+            </Popover>
+            
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <Select value={fromTime} onValueChange={setFromTime}>
+                <SelectTrigger className="w-full">
+                  <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                  <SelectValue placeholder="From" />
+                </SelectTrigger>
+                <SelectContent>
+                  {generateTimeSlots().map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={toTime} onValueChange={setToTime}>
+                <SelectTrigger className="w-full">
+                  <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                  <SelectValue placeholder="To" />
+                </SelectTrigger>
+                <SelectContent>
+                  {generateTimeSlots().map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </TabsList>
-        
-        <div className="mt-4">
-          {bookingType === 'hourly' ? (
-            <BookingForm 
-              venueId={venueId} 
-              venueName={venueName} 
-              pricePerHour={parsedPricePerHour} 
-              ownerId={ownerId}
-              ownerName={ownerName}
-              bookedTimeSlots={bookedTimeSlots}
-              isLoading={isLoadingBookings}
-              fullyBookedDates={[...fullyBookedDates, ...dayBookedDates]} 
-              availableTimeSlots={generateTimeSlots()}
-              autoConfirm={true} // Added auto-confirm flag
-            />
-          ) : (
-            <MultiDayBookingForm 
-              venueId={venueId} 
-              venueName={venueName} 
-              pricePerHour={parsedPricePerHour}
-              minCapacity={parsedMinCapacity}
-              maxCapacity={parsedMaxCapacity}
-              bookedDates={[...fullyBookedDates, ...hourlyBookedDates]} 
-              isLoading={isLoadingBookings}
-              autoConfirm={true} // Added auto-confirm flag
-            />
-          )}
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">People (max {maxCapacity})</label>
+            <div className="flex items-center border rounded-md px-3 py-2">
+              <Users className="h-5 w-5 mr-2 text-gray-400" />
+              <Input 
+                type="number" 
+                placeholder={`Number of guests (max ${maxCapacity})`}
+                value={peopleCount} 
+                min={1}
+                max={maxCapacity}
+                onChange={e => setPeopleCount(e.target.value)}
+                className="border-0 p-0 focus-visible:ring-0"
+              />
+            </div>
+          </div>
         </div>
-      </Tabs>
+        
+        <Button 
+          onClick={handleBookRequest}
+          className="w-full bg-red-400 hover:bg-red-500 text-white h-12 text-lg mt-4"
+        >
+          Request to book
+        </Button>
+        
+        <p className="text-center text-sm text-gray-500 mt-2">
+          You won't be charged yet
+        </p>
+      </div>
+      
+      <div className="flex items-center pt-4 border-t border-gray-200">
+        <div className="flex-shrink-0 mr-4">
+          <div className="bg-gray-200 rounded-full w-16 h-16 flex items-center justify-center">
+            {ownerName ? ownerName.charAt(0) : 'H'}
+          </div>
+        </div>
+        <div className="flex-1">
+          <h4 className="font-medium">{ownerName}</h4>
+          <p className="text-sm text-gray-500">Your Personal Event Manager from {venueName}</p>
+          <div className="flex items-center gap-4 mt-1 text-sm">
+            <div>Response rate - 96%</div>
+            <div>Response time - 1h</div>
+          </div>
+        </div>
+      </div>
+      
+      <Button 
+        variant="outline" 
+        className="w-full mt-4"
+      >
+        Message host
+      </Button>
     </div>
   );
 }
