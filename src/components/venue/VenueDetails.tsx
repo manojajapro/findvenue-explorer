@@ -66,8 +66,7 @@ const VenueDetails = () => {
   // Check if current user is the owner
   const isOwner = user?.id === ownerId;
   
-  const categoryNames = Array.isArray(venue.category_name) ? venue.category_name : 
-                        (venue.category_name ? [venue.category_name] : []);
+  const categoryNames = venue.categoryNames || [];
   
   const mainImage = venue.galleryImages && venue.galleryImages.length > 0 
     ? venue.galleryImages[0] 
