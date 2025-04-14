@@ -142,9 +142,11 @@ const MapView = ({
   };
   
   // Handle manual location
-  const handleManualLocationSetting = (coordinates: [number, number]) => {
-    setMapCenter(coordinates);
-    setMapZoom(14);
+  const handleManualLocationSetting = (coordinates?: [number, number]) => {
+    if (coordinates) {
+      setMapCenter(coordinates);
+      setMapZoom(14);
+    }
   };
   
   // Toggle radius search
@@ -155,6 +157,23 @@ const MapView = ({
   // Update radius size
   const handleRadiusSizeChange = (size: number) => {
     setRadiusSize(size);
+  };
+
+  // Handle clear search
+  const handleClearSearch = () => {
+    setSearchText('');
+  };
+
+  // Fit bounds to markers
+  const fitBoundsToMarkers = () => {
+    // Implementation would go here
+    console.log("Fit to markers clicked");
+  };
+
+  // Reset to default location
+  const resetToDefaultLocation = () => {
+    setMapCenter([24.7136, 46.6753]); // Default to Riyadh
+    setMapZoom(12);
   };
 
   if (isLoading) {
@@ -274,6 +293,9 @@ const MapView = ({
           radiusSize={radiusSize}
           setRadiusSize={handleRadiusSizeChange}
           currentLocation={mapCenter}
+          fitBoundsToMarkers={fitBoundsToMarkers}
+          resetToDefaultLocation={resetToDefaultLocation}
+          handleClearSearch={handleClearSearch}
         />
       </MapContainer>
     </div>

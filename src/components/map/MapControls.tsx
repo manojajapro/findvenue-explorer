@@ -11,13 +11,15 @@ interface MapControlsProps {
   isRadiusActive: boolean;
   radiusSize?: number;
   toggleRadiusSearch: () => void;
-  handleManualLocationSetting: () => void;
-  handleClearSearch: () => void;
+  handleManualLocationSetting: (coordinates?: [number, number]) => void;
+  handleClearSearch?: () => void;
   fitBoundsToMarkers: () => void;
   resetToDefaultLocation: () => void;
   getCurrentLocation?: () => void;
   increaseRadius?: () => void;
   decreaseRadius?: () => void;
+  currentLocation?: [number, number];
+  setRadiusSize?: (size: number) => void;
 }
 
 const MapControls = ({
@@ -31,7 +33,9 @@ const MapControls = ({
   resetToDefaultLocation,
   getCurrentLocation,
   increaseRadius,
-  decreaseRadius
+  decreaseRadius,
+  currentLocation,
+  setRadiusSize
 }: MapControlsProps) => {
   const [showControls, setShowControls] = useState(!isCompactControls);
   const isMobile = useIsMobile();
@@ -77,7 +81,7 @@ const MapControls = ({
                     variant="ghost"
                     size="icon"
                     className="hover:bg-white/10 text-white/80"
-                    onClick={handleManualLocationSetting}
+                    onClick={() => handleManualLocationSetting(currentLocation)}
                   >
                     <MapPin className="h-5 w-5" />
                   </Button>
