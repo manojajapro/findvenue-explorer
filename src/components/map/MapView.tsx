@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/button';
 import LocationSearchInput from './LocationSearchInput';
 import { Skeleton } from '@/components/ui/skeleton';
 import MapControls from './MapControls';
+import EnhancedMapSearch from './EnhancedMapSearch';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from "@/components/ui/use-toast";
 import { useTranslation } from '@/hooks/useTranslation';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF } from '@react-google-maps/api';
 
 const containerStyle = {
   width: '100%',
@@ -40,6 +41,7 @@ const MapView = ({
   const [currentAddress, setCurrentAddress] = useState('');
   const [radiusActive, setRadiusActive] = useState(false);
   const [radiusSize, setRadiusSize] = useState(1); // km
+  const [appliedFilters, setAppliedFilters] = useState<string[]>([]);
   
   const mapRef = useRef<google.maps.Map | null>(null);
   const navigate = useNavigate();
@@ -55,18 +57,48 @@ const MapView = ({
     mapRef.current = map;
   }, []);
 
-  // Filter venues based on search text or location
+  // Filter venues based on search text, radius, and other filters
   const filteredVenues = venues.filter(venue => {
-    if (!searchText) return true;
+    // Text search filter
+    if (searchText && !venue.name.toLowerCase().includes(searchText.toLowerCase()) && 
+        !venue.city?.toLowerCase().includes(searchText.toLowerCase()) &&
+        !venue.description?.toLowerCase().includes(searchText.toLowerCase()) &&
+        !venue.address?.toLowerCase().includes(searchText.toLowerCase())) {
+      return false;
+    }
     
-    const searchLower = searchText.toLowerCase();
-    return (
-      venue.name.toLowerCase().includes(searchLower) ||
-      (venue.city && venue.city.toLowerCase().includes(searchLower)) ||
-      (venue.description && venue.description.toLowerCase().includes(searchLower)) ||
-      (venue.address && venue.address.toLowerCase().includes(searchLower))
-    );
+    // Radius filter
+    if (radiusActive && venue.latitude && venue.longitude) {
+      // Calculate distance between venue and map center
+      const distance = calculateDistance(
+        mapCenter.lat, 
+        mapCenter.lng, 
+        venue.latitude, 
+        venue.longitude
+      );
+      
+      // Convert km to meters for comparison
+      if (distance > radiusSize) {
+        return false;
+      }
+    }
+    
+    return true;
   });
+
+  // Calculate distance between two coordinates using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c; // Distance in km
+    return distance;
+  };
 
   // When highlighted venue ID changes from hovering on list, focus on that venue
   useEffect(() => {
@@ -111,6 +143,11 @@ const MapView = ({
     setMapCenter({lat, lng});
     setMapZoom(14);
     setCurrentAddress(address);
+    
+    // Activate radius search if not already active
+    if (!radiusActive) {
+      setRadiusActive(true);
+    }
   };
   
   // Handle manual location
@@ -118,6 +155,11 @@ const MapView = ({
     if (coordinates) {
       setMapCenter({lat: coordinates[0], lng: coordinates[1]});
       setMapZoom(14);
+      
+      // Activate radius search if not already active
+      if (!radiusActive) {
+        setRadiusActive(true);
+      }
     }
   };
   
@@ -149,13 +191,35 @@ const MapView = ({
           const { latitude, longitude } = position.coords;
           setMapCenter({lat: latitude, lng: longitude});
           setMapZoom(15);
+          
+          // Activate radius search if not already active
+          if (!radiusActive) {
+            setRadiusActive(true);
+          }
+          
+          // Show toast notification
+          toast({
+            title: "Location Set",
+            description: "Using your current location",
+            variant: "default",
+          });
         },
-        () => {
-          alert("Could not get your location");
-        }
+        (error) => {
+          console.error("Geolocation error:", error);
+          toast({
+            title: "Location Error",
+            description: "Could not get your location. Please check your browser permissions.",
+            variant: "destructive",
+          });
+        },
+        { maximumAge: 60000, timeout: 10000, enableHighAccuracy: true }
       );
     } else {
-      alert("Geolocation is not supported by this browser");
+      toast({
+        title: "Geolocation Unavailable",
+        description: "Geolocation is not supported by this browser",
+        variant: "destructive",
+      });
     }
   };
   
@@ -166,23 +230,40 @@ const MapView = ({
   
   // Fit bounds to markers
   const fitBoundsToMarkers = () => {
-    if (!mapRef.current || venues.length === 0) return;
+    if (!mapRef.current || filteredVenues.length === 0) return;
     
     const bounds = new google.maps.LatLngBounds();
     
-    venues.forEach(venue => {
+    filteredVenues.forEach(venue => {
       if (venue.latitude && venue.longitude) {
         bounds.extend({lat: venue.latitude, lng: venue.longitude});
       }
     });
     
     mapRef.current.fitBounds(bounds);
+    
+    // Adjust zoom if too high
+    setTimeout(() => {
+      if (mapRef.current && mapRef.current.getZoom() && mapRef.current.getZoom()! > 16) {
+        mapRef.current.setZoom(16);
+      }
+    }, 100);
   };
   
   // Reset to default location
   const resetToDefaultLocation = () => {
     setMapCenter({lat: 24.7136, lng: 46.6753}); // Default to Riyadh
     setMapZoom(12);
+  };
+
+  // Handle clear filter
+  const handleClearFilter = (filter: string) => {
+    setAppliedFilters(prev => prev.filter(f => f !== filter));
+  };
+  
+  // Callback for EnhancedMapSearch component
+  const handleRadiusChange = (size: number) => {
+    setRadiusSize(size);
   };
 
   if (isLoading) {
@@ -196,14 +277,33 @@ const MapView = ({
   
   return (
     <div className="relative w-full h-full">
-      <div className="absolute top-4 left-4 right-4 z-[1000] bg-findvenue-surface/95 backdrop-blur-md shadow-lg rounded-md border border-white/10 overflow-hidden">
-        <LocationSearchInput
-          onSearch={handleSearch}
-          onLocationSelect={handleLocationSelect}
-          searchText={searchText}
-          setSearchText={setSearchText}
-          isLoading={isLoading}
-        />
+      <div className="absolute top-4 left-4 right-4 z-[1000]">
+        {radiusActive ? (
+          <EnhancedMapSearch
+            onSearch={handleSearch}
+            onLocationSelect={handleLocationSelect}
+            onRadiusChange={handleRadiusSizeChange}
+            onManualLocation={() => {}}
+            onCurrentLocation={getCurrentLocation}
+            venueCount={filteredVenues.length}
+            radiusInKm={radiusSize}
+            isRadiusActive={radiusActive}
+            searchText={searchText}
+            setSearchText={setSearchText}
+            appliedFilters={appliedFilters}
+            onClearFilter={handleClearFilter}
+          />
+        ) : (
+          <div className="bg-findvenue-surface/95 backdrop-blur-md shadow-lg rounded-md border border-white/10 overflow-hidden">
+            <LocationSearchInput
+              onSearch={handleSearch}
+              onLocationSelect={handleLocationSelect}
+              searchText={searchText}
+              setSearchText={setSearchText}
+              isLoading={isLoading}
+            />
+          </div>
+        )}
       </div>
       
       {isLoaded ? (
@@ -244,6 +344,21 @@ const MapView = ({
               />
             );
           })}
+          
+          {/* Display radius circle when radius search is active */}
+          {radiusActive && (
+            <CircleF
+              center={mapCenter}
+              radius={radiusSize * 1000} // Convert km to meters
+              options={{
+                fillColor: '#5046E4',
+                fillOpacity: 0.1,
+                strokeColor: '#5046E4',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+              }}
+            />
+          )}
           
           {selectedVenue && selectedVenue.latitude && selectedVenue.longitude && (
             <InfoWindowF
@@ -298,10 +413,6 @@ const MapView = ({
                 </div>
               </Card>
             </InfoWindowF>
-          )}
-          
-          {radiusActive && mapRef.current && (
-            <div className="radius-circle" /> // This would be implemented using a Circle component if using the actual library
           )}
         </GoogleMap>
       ) : (

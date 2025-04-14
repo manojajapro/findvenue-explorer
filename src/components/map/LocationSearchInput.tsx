@@ -4,6 +4,7 @@ import { Search, X, MapPin, History, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/hooks/useDebounce';
+import { toast } from 'sonner';
 
 interface SearchSuggestion {
   id: string;
@@ -35,17 +36,58 @@ const MOCK_SUGGESTIONS: SearchSuggestion[] = [
   { id: '8', text: 'Tabuk City Center', type: 'location', coordinates: { lat: 28.3835, lng: 36.5662 } },
   { id: '9', text: 'Abha City', type: 'location', coordinates: { lat: 18.2164, lng: 42.5053 } },
   { id: '10', text: 'Al Jubail Industrial City', type: 'location', coordinates: { lat: 27.0174, lng: 49.6622 } },
+  // Add postal code examples
+  { id: '11', text: 'Riyadh 12271', type: 'location', coordinates: { lat: 24.7133, lng: 46.6752 } },
+  { id: '12', text: 'Jeddah 21577', type: 'location', coordinates: { lat: 21.5430, lng: 39.1725 } },
+  { id: '13', text: 'Dammam 32241', type: 'location', coordinates: { lat: 26.4341, lng: 50.1030 } },
 ];
 
-// In a real implementation, this would be replaced with a geocoding service like Google Places API
-const getSearchSuggestions = async (query: string): Promise<SearchSuggestion[]> => {
-  // This is just a mock implementation
+// Function to search for locations using Google Maps Geocoding API
+const searchLocations = async (query: string): Promise<SearchSuggestion[]> => {
   if (!query.trim()) return [];
   
-  // Filter mock suggestions based on query
-  return MOCK_SUGGESTIONS.filter(sugg => 
-    sugg.text.toLowerCase().includes(query.toLowerCase())
-  ).slice(0, 5);
+  try {
+    // First try with mock suggestions
+    const mockResults = MOCK_SUGGESTIONS.filter(sugg => 
+      sugg.text.toLowerCase().includes(query.toLowerCase())
+    );
+    
+    if (mockResults.length > 0) {
+      return mockResults;
+    }
+    
+    // If no mock results, try with Google Maps Geocoding API
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      console.error("No Google Maps API key found");
+      return [];
+    }
+    
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        query
+      )}&key=${apiKey}`
+    );
+    
+    const data = await response.json();
+    
+    if (data.status === 'OK' && data.results && data.results.length > 0) {
+      return data.results.map((result: any, index: number) => ({
+        id: `google-${index}`,
+        text: result.formatted_address,
+        type: 'location',
+        coordinates: {
+          lat: result.geometry.location.lat,
+          lng: result.geometry.location.lng
+        }
+      }));
+    }
+    
+    return [];
+  } catch (error) {
+    console.error("Error searching locations:", error);
+    return [];
+  }
 };
 
 const LocationSearchInput = ({ 
@@ -58,6 +100,7 @@ const LocationSearchInput = ({
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [recentSearches, setRecentSearches] = useState<SearchSuggestion[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const debouncedSearchTerm = useDebounce(searchText, 800); // Increased debounce time
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -97,8 +140,15 @@ const LocationSearchInput = ({
     
     const fetchSuggestions = async () => {
       if (debouncedSearchTerm.trim()) {
-        const results = await getSearchSuggestions(debouncedSearchTerm);
-        setSuggestions(results);
+        setIsSearching(true);
+        try {
+          const results = await searchLocations(debouncedSearchTerm);
+          setSuggestions(results);
+        } catch (error) {
+          console.error("Error fetching suggestions:", error);
+        } finally {
+          setIsSearching(false);
+        }
       } else {
         setSuggestions([]);
       }
@@ -138,6 +188,7 @@ const LocationSearchInput = ({
         suggestion.coordinates.lng, 
         suggestion.text
       );
+      toast.success(`Location set to: ${suggestion.text}`);
     }
     
     saveToRecentSearches(suggestion);
@@ -146,6 +197,61 @@ const LocationSearchInput = ({
     setTimeout(() => {
       onSearch(suggestion.text);
     }, 100);
+  };
+
+  // Handle direct postal code search
+  const handlePostalCodeSearch = async () => {
+    if (!searchText.trim()) {
+      toast.error("Please enter a location or postal code");
+      return;
+    }
+    
+    setIsSearching(true);
+    
+    try {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        toast.error("Google Maps API key is missing");
+        return;
+      }
+      
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+          searchText
+        )}&key=${apiKey}`
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        const result = data.results[0];
+        onLocationSelect(
+          result.geometry.location.lat,
+          result.geometry.location.lng,
+          result.formatted_address
+        );
+        
+        // Save to recent searches
+        saveToRecentSearches({
+          id: `search-${Date.now()}`,
+          text: result.formatted_address,
+          type: 'location',
+          coordinates: {
+            lat: result.geometry.location.lat,
+            lng: result.geometry.location.lng
+          }
+        });
+        
+        toast.success(`Location set to: ${result.formatted_address}`);
+      } else {
+        toast.error("Location not found. Please try another search term.");
+      }
+    } catch (error) {
+      console.error("Error searching location:", error);
+      toast.error("Error searching location. Please try again.");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   // Handle form submission
@@ -157,22 +263,15 @@ const LocationSearchInput = ({
       return;
     }
     
+    // Try direct postal code search
+    handlePostalCodeSearch();
+    
     // Add a small delay to allow UI to stabilize
     setTimeout(() => {
       onSearch(searchText);
     }, 10);
     
     setShowSuggestions(false);
-    
-    // Save current search to history if not empty
-    if (searchText.trim()) {
-      const newSuggestion: SearchSuggestion = {
-        id: Date.now().toString(),
-        text: searchText,
-        type: 'history'
-      };
-      saveToRecentSearches(newSuggestion);
-    }
   };
 
   // Handle input change with minimal re-renders
@@ -185,6 +284,11 @@ const LocationSearchInput = ({
     }
     
     setSearchText(value);
+    
+    // Show suggestions when typing
+    if (value.trim() && !showSuggestions) {
+      setShowSuggestions(true);
+    }
   };
 
   return (
@@ -194,12 +298,12 @@ const LocationSearchInput = ({
         <Input
           ref={inputRef}
           type="text"
-          placeholder="Search locations or venues..."
+          placeholder="Search by city, postal code, or venue name..."
           className="pl-10 pr-8 py-2 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           value={searchText}
           onChange={handleInputChange}
           onFocus={() => setShowSuggestions(true)}
-          disabled={isLoading}
+          disabled={isLoading || isSearching}
         />
         {searchText && (
           <button
@@ -219,6 +323,11 @@ const LocationSearchInput = ({
           >
             <X className="h-4 w-4 text-findvenue-text-muted hover:text-white" />
           </button>
+        )}
+        {isSearching && (
+          <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+            <div className="h-4 w-4 border-2 border-findvenue border-t-transparent rounded-full animate-spin"></div>
+          </div>
         )}
       </form>
       
@@ -244,6 +353,17 @@ const LocationSearchInput = ({
                   </button>
                 ))}
               </div>
+              {searchText && (
+                <div className="px-3 py-2 border-t border-white/10 hover:bg-white/5">
+                  <button 
+                    className="w-full text-left flex items-center text-findvenue"
+                    onClick={handlePostalCodeSearch}
+                  >
+                    <Search className="h-3.5 w-3.5 mr-1.5" />
+                    Search directly for "{searchText}"
+                  </button>
+                </div>
+              )}
             </>
           )}
           
@@ -276,13 +396,30 @@ const LocationSearchInput = ({
                   Clear recent searches
                 </button>
               </div>
+              {searchText && (
+                <div className="px-3 py-2 border-t border-white/10 hover:bg-white/5">
+                  <button 
+                    className="w-full text-left flex items-center text-findvenue"
+                    onClick={handlePostalCodeSearch}
+                  >
+                    <Search className="h-3.5 w-3.5 mr-1.5" />
+                    Search directly for "{searchText}"
+                  </button>
+                </div>
+              )}
             </>
           )}
           
           {suggestions.length === 0 && recentSearches.length === 0 && searchText.trim() !== '' && (
-            <div className="px-3 py-4 text-center">
-              <p className="text-sm text-findvenue-text-muted">No suggestions found</p>
-              <p className="text-xs text-findvenue-text-muted mt-1">Try a different search term or click on the map to set location</p>
+            <div className="px-3 py-4">
+              <p className="text-sm text-findvenue-text-muted text-center mb-2">No suggestions found</p>
+              <Button 
+                className="w-full bg-findvenue hover:bg-findvenue-dark"
+                onClick={handlePostalCodeSearch}
+              >
+                <Search className="h-3.5 w-3.5 mr-1.5" />
+                Search for "{searchText}"
+              </Button>
             </div>
           )}
           
