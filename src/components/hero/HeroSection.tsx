@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Users, Calendar, MapPin, ChevronDown, X, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +13,7 @@ import MapSearchSection from '@/components/map/MapSearchSection';
 
 const HeroSection = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [eventType, setEventType] = useState('');
   const [venueType, setVenueType] = useState('');
   const [guests, setGuests] = useState('');
@@ -189,7 +189,17 @@ const HeroSection = () => {
     
     if (date) params.append('date', format(date, 'yyyy-MM-dd'));
     
-    navigate(`/venues?view=map&${params.toString()}`);
+    params.append('showMap', 'true');
+    navigate(`/?${params.toString()}`);
+  };
+  
+  const handleMapSearch = async (location: string) => {
+    const params = new URLSearchParams();
+    if (location) {
+      params.append('search', location);
+    }
+    params.append('showMap', 'true');
+    navigate(`/?${params.toString()}`);
   };
   
   const clearForm = () => {
@@ -200,7 +210,6 @@ const HeroSection = () => {
     setDate(undefined);
   };
   
-  // Case-insensitive search helper for categories
   const matchesSearchTerm = (name: string, term: string): boolean => {
     return name.toLowerCase().includes(term.toLowerCase());
   };
@@ -228,9 +237,8 @@ const HeroSection = () => {
             Discover the perfect space for your next event in Saudi Arabia with our curated selection of premium venues
           </p>
           
-          {/* Add Map Search Section */}
           <div className="mb-10">
-            <MapSearchSection />
+            <MapSearchSection onLocationSelected={handleMapSearch} />
           </div>
         </div>
         

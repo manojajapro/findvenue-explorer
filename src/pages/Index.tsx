@@ -9,12 +9,15 @@ import TopVenues from '@/components/venues/TopVenues';
 import GlobalVenues from '@/components/global/GlobalVenues';
 import AdviceSection from '@/components/advice/AdviceSection';
 import { useSearch } from '@/hooks/useSearch';
+import MapView from '@/components/map/MapView';
+import { Card } from '@/components/ui/card';
 
 const Index = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { venues, isLoading, filters } = useSearch();
   const [activeView, setActiveView] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState<boolean>(false);
   
   const hasFilters = Object.keys(filters).length > 0;
   
@@ -54,6 +57,12 @@ const Index = () => {
       navigate(`/venues?${currentParams.toString()}`);
     }
   }, [hasFilters, searchParams, navigate]);
+
+  // Show map when search is performed in hero section
+  useEffect(() => {
+    const showMapParam = searchParams.get('showMap');
+    setShowMap(showMapParam === 'true');
+  }, [searchParams]);
   
   if (activeView === 'categories') {
     return (
@@ -96,6 +105,21 @@ const Index = () => {
   return (
     <>
       <HeroSection />
+      
+      {showMap && (
+        <div className="container mx-auto px-4 py-8">
+          <Card className="rounded-lg overflow-hidden shadow-xl border border-white/10">
+            <div className="h-[500px] w-full">
+              <MapView 
+                venues={venues} 
+                isLoading={isLoading} 
+                onFilteredVenuesChange={() => {}}
+              />
+            </div>
+          </Card>
+        </div>
+      )}
+      
       <CitiesSection />
       <CategoriesSection />
       <PopularVenues />

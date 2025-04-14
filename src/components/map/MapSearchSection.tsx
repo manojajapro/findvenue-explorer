@@ -8,7 +8,11 @@ import { Card } from '@/components/ui/card';
 import { useGeocode } from '@/hooks/useGeocode';
 import { toast } from 'sonner';
 
-const MapSearchSection = () => {
+interface MapSearchSectionProps {
+  onLocationSelected?: (location: string) => void;
+}
+
+const MapSearchSection = ({ onLocationSelected }: MapSearchSectionProps = {}) => {
   const [location, setLocation] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const navigate = useNavigate();
@@ -25,6 +29,13 @@ const MapSearchSection = () => {
     setIsSearching(true);
     
     try {
+      if (onLocationSelected) {
+        // If we're on the home page, use the callback to update the UI there
+        onLocationSelected(location.trim());
+        setIsSearching(false);
+        return;
+      }
+      
       const params = new URLSearchParams();
       params.set('search', location.trim());
       params.set('view', 'map');
