@@ -206,62 +206,6 @@ const VenueDetails = () => {
         ownerName={venue.ownerInfo?.name || ''}
       />
       
-      {venue.ownerInfo && (
-        <>
-          <Separator className="my-4" />
-          <div className="mb-4 bg-findvenue-surface/10 p-4 rounded-lg">
-            <div className="flex items-center mb-3">
-              <div className="relative">
-                <div className="w-12 h-12 bg-findvenue rounded-full flex items-center justify-center text-white text-lg font-bold mr-3">
-                  {venue.ownerInfo.name.charAt(0)}
-                </div>
-              </div>
-              <div>
-                <h4 className="text-lg font-semibold">{venue.ownerInfo.name}</h4>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-findvenue-text-muted mb-1">Contact</p>
-                <p className="text-gray-700">{venue.ownerInfo.contact}</p>
-              </div>
-              <div>
-                <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
-                <p className="text-gray-700">{venue.ownerInfo.responseTime}</p>
-              </div>
-              <div className="md:col-span-2">
-                <p className="text-sm text-findvenue-text-muted mb-1">Response Rate</p>
-                <p className="text-gray-700">100%</p>
-              </div>
-            </div>
-            {venue.ownerInfo.socialLinks && (
-              <div className="mt-4 flex space-x-3">
-                {venue.ownerInfo.socialLinks.facebook && (
-                  <a href={venue.ownerInfo.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                    <Facebook className="h-5 w-5" />
-                  </a>
-                )}
-                {venue.ownerInfo.socialLinks.twitter && (
-                  <a href={venue.ownerInfo.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                    <Twitter className="h-5 w-5" />
-                  </a>
-                )}
-                {venue.ownerInfo.socialLinks.instagram && (
-                  <a href={venue.ownerInfo.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:text-pink-300">
-                    <Instagram className="h-5 w-5" />
-                  </a>
-                )}
-                {venue.ownerInfo.socialLinks.linkedin && (
-                  <a href={venue.ownerInfo.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500">
-                    <Linkedin className="h-5 w-5" />
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
       <VenueAIAssistants venue={venue} />
     </div>
   );

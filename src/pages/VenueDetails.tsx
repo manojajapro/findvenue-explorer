@@ -333,34 +333,6 @@ const VenueDetails = () => {
     );
   };
   
-  const renderOwnerInfo = () => {
-    if (!venue?.ownerInfo) return null;
-    
-    return (
-      <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10 mb-6">
-        <div className="p-4 border-b border-white/10">
-          <h3 className="font-semibold">Venue Host Information</h3>
-        </div>
-        <div className="p-4">
-          <div className="space-y-3">
-            <div>
-              <p className="text-sm text-findvenue-text-muted mb-1">Host Name</p>
-              <p className="font-medium">{venue.ownerInfo.name}</p>
-            </div>
-            <div>
-              <p className="text-sm text-findvenue-text-muted mb-1">Contact</p>
-              <p className="font-medium">{venue.ownerInfo.contact}</p>
-            </div>
-            <div>
-              <p className="text-sm text-findvenue-text-muted mb-1">Response Time</p>
-              <p className="font-medium">{venue.ownerInfo.responseTime}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
   const renderVenueType = () => {
     if (!venue?.type) return null;
     
@@ -618,7 +590,6 @@ const VenueDetails = () => {
             <VenueAIAssistants venue={venue} />
             
             {venue?.additionalServices && venue.additionalServices.length > 0 && renderAdditionalServices()}
-            {venue?.ownerInfo && renderOwnerInfo()}
           </div>
           
           <div>
