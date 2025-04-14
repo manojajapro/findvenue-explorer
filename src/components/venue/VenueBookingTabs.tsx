@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Clock, Calendar as CalendarIcon, LogIn, Users } from 'lucide-react';
@@ -376,7 +375,7 @@ export default function VenueBookingTabs({
         title: "Booking requested!",
         description: `You've successfully requested ${venueName} on ${format(selectedDate, 'PPP')}${
           bookingType === 'hourly' ? ` from ${fromTime} to ${toTime}` : ' for the entire day'
-        }. Total: ${totalPrice} ${venue.currency || 'SAR'}`,
+        }. Total: ${totalPrice} ${pricePerHour > 0 ? 'SAR' : ''}`,
       });
       
       // Redirect to bookings page
