@@ -1,126 +1,85 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.2";
+// Follow this setup guide to integrate the Deno language server with your editor:
+// https://deno.land/manual/getting_started/setup_your_environment
+// This enables autocomplete, go to definition, etc.
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
+    const { query, venueId, type } = await req.json();
 
-    const requestData = await req.json();
-    const { query, venueId, type = 'chat' } = requestData;
-
-    console.log(`Processing query: "${query}" for venue ID: ${venueId}`);
-
-    // Fetch data for the specific venue
-    if (!venueId) {
-      throw new Error('Venue ID is required');
-    }
-
-    console.log(`Fetching data for specific venue ID: ${venueId}`);
-
-    // Get venue details from the database
-    const { data: venue, error } = await supabaseClient
-      .from('venues')
-      .select('*')
-      .eq('id', venueId)
-      .single();
-
-    if (error) {
-      throw new Error(`Error fetching venue data: ${error.message}`);
-    }
-
-    console.log("Venue data retrieved: success");
-
-    // Format the venue details for the AI to use
-    const venueDetails = {
-      name: venue.name,
-      description: venue.description,
-      location: venue.address,
-      city: venue.city_name,
-      categoryType: venue.category_name,
-      capacity: {
-        min: venue.min_capacity,
-        max: venue.max_capacity
-      },
-      pricing: {
-        currency: venue.currency,
-        startingPrice: venue.starting_price,
-        pricePerPerson: venue.price_per_person
-      },
-      amenities: venue.amenities,
-      availability: venue.availability,
-      type: venue.type,
-      rules: venue.rules_and_regulations,
-      openingHours: venue.opening_hours
-    };
-
-    // Generate a system prompt that includes venue details
-    const systemPrompt = `You are an AI assistant named "Venue Assistant" for the venue "${venueDetails.name}". 
-    Your role is to help potential customers by answering their questions about this specific venue.
-    Here are the venue details:
-    - Name: ${venueDetails.name}
-    - Description: ${venueDetails.description}
-    - Location: ${venueDetails.location}, ${venueDetails.city}
-    - Category: ${Array.isArray(venueDetails.categoryType) ? venueDetails.categoryType.join(', ') : venueDetails.categoryType}
-    - Capacity: ${venueDetails.capacity.min} to ${venueDetails.capacity.max} people
-    - Pricing: Starts at ${venueDetails.pricing.currency} ${venueDetails.pricing.startingPrice}
-    - Price per Person: ${venueDetails.pricing.pricePerPerson ? `${venueDetails.pricing.currency} ${venueDetails.pricing.pricePerPerson}` : 'Not applicable'}
-    - Amenities: ${venueDetails.amenities ? venueDetails.amenities.join(', ') : 'Not specified'}
-    - Availability: ${venueDetails.availability ? venueDetails.availability.join(', ') : 'Contact venue for availability'}
-    - Venue Type: ${venueDetails.type || 'Standard venue'}
-
-    Be friendly, concise, and helpful. If you don't know something specific, suggest they contact the venue directly for the most accurate information. Always stay on topic about this venue.`;
+    // Log the incoming request for debugging
+    console.log(`Received ${type} request for venue ${venueId}: ${query}`);
     
+    // Basic validation
+    if (!query || typeof query !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid query parameter' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // Simulate venue information lookup
+    // In a real implementation, you would fetch this from your database
+    const venueInfo = {
+      name: "Sample Venue",
+      location: "Riyadh",
+      capacity: "200 guests",
+      amenities: ["WiFi", "Parking", "Catering"],
+      priceRange: "15,000 - 25,000 SAR"
+    }
+    
+    // Generate a response based on the query
+    // This is a simple rule-based approach; in production you might use a real AI service
     let answer = "";
     
-    if (type === 'welcome') {
-      answer = `Hello! I'm the virtual assistant for ${venueDetails.name}. I can help answer any questions you might have about our venue, from pricing and capacity to amenities and booking options. What would you like to know?`;
-      return new Response(JSON.stringify({ welcome: answer }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    console.log("System prompt prepared, calling OpenAI...");
+    const queryLower = query.toLowerCase();
     
-    // For demo purposes, create a simple response without OpenAI
-    if (query.toLowerCase().includes('price') || query.toLowerCase().includes('cost')) {
-      answer = `${venueDetails.name} pricing starts at ${venueDetails.pricing.currency} ${venueDetails.pricing.startingPrice}. ${venueDetails.pricing.pricePerPerson ? `There's also a price per person of ${venueDetails.pricing.currency} ${venueDetails.pricing.pricePerPerson}.` : ''}`;
-    } else if (query.toLowerCase().includes('capacity') || query.toLowerCase().includes('people')) {
-      answer = `${venueDetails.name} can accommodate between ${venueDetails.capacity.min} and ${venueDetails.capacity.max} guests.`;
-    } else if (query.toLowerCase().includes('location') || query.toLowerCase().includes('address')) {
-      answer = `${venueDetails.name} is located at ${venueDetails.location} in ${venueDetails.city}.`;
-    } else if (query.toLowerCase().includes('amenities') || query.toLowerCase().includes('facilities')) {
-      const amenitiesList = Array.isArray(venueDetails.amenities) ? venueDetails.amenities.join(', ') : 'None specified';
-      answer = `${venueDetails.name} offers these amenities: ${amenitiesList}.`;
-    } else if (query.toLowerCase().includes('book') || query.toLowerCase().includes('reserve')) {
-      answer = `To book ${venueDetails.name}, you can use the booking form on this page or message the venue host directly.`;
-    } else if (query.toLowerCase().includes('hello') || query.toLowerCase().includes('hi')) {
-      answer = `Hello! I'm the virtual assistant for ${venueDetails.name}. How can I help you today?`;
-    } else {
-      answer = `Thank you for your interest in ${venueDetails.name}. ${venueDetails.name} is a ${venueDetails.type || "venue"} located in ${venueDetails.city} with capacity for ${venueDetails.capacity.min} to ${venueDetails.capacity.max} people. How else can I help you?`;
+    if (queryLower.includes("price") || queryLower.includes("cost")) {
+      answer = `The price range for this venue is ${venueInfo.priceRange}.`;
+    } 
+    else if (queryLower.includes("capacity") || queryLower.includes("guests") || queryLower.includes("people")) {
+      answer = `This venue can accommodate up to ${venueInfo.capacity}.`;
+    } 
+    else if (queryLower.includes("amenities") || queryLower.includes("facilities") || queryLower.includes("services")) {
+      answer = `This venue offers the following amenities: ${venueInfo.amenities.join(", ")}.`;
+    } 
+    else if (queryLower.includes("location") || queryLower.includes("where")) {
+      answer = `This venue is located in ${venueInfo.location}.`;
+    } 
+    else if (queryLower.includes("book") || queryLower.includes("reservation") || queryLower.includes("reserve")) {
+      answer = `To book this venue, please fill out the booking form on this page or contact the venue owner directly.`;
+    } 
+    else if (queryLower.includes("hello") || queryLower.includes("hi") || queryLower.includes("greetings")) {
+      answer = `Hello! I'm the venue assistant for ${venueInfo.name}. How can I help you today?`;
+    } 
+    else {
+      answer = `I'm the venue assistant for ${venueInfo.name}. You can ask me about pricing, capacity, amenities, location, or how to book this venue.`;
     }
 
-    return new Response(JSON.stringify({ answer }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Return the response
+    return new Response(
+      JSON.stringify({ answer }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+    
   } catch (error) {
-    console.error("Error in venue-assistant function:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("Error processing venue assistant request:", error);
+    
+    return new Response(
+      JSON.stringify({ error: "Failed to process your request" }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    );
   }
-});
+})

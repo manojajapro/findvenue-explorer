@@ -123,7 +123,7 @@ export const useSupabaseVenues = () => {
       let query = supabase.from('venues').select('*', { count: 'exact' });
       
       if (filters.cityId) {
-        query = query.eq('city_id', filters.cityId);
+        query = query.ilike('city_id', `%${filters.cityId}%`);
       }
       
       if (filters.categoryId) {
