@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
@@ -79,7 +78,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
             rating: venue.rating || 0,
             latitude: venue.latitude,
             longitude: venue.longitude,
-            type: venue.type
+            type: venue.type || '' // Ensure type is always defined
           }));
           
           setRealVenues(formattedVenues);
@@ -295,7 +294,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
               {
                 "featureType": "road",
                 "elementType": "geometry.stroke",
-                "stylers": [{"color": "#212a37"}]
+                "stylers": [{"color": "#212835"}]
               },
               {
                 "featureType": "road",
