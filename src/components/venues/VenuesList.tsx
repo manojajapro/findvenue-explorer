@@ -1,3 +1,4 @@
+
 import { useNavigate } from 'react-router-dom';
 import { VenueCard } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,6 +53,7 @@ const VenuesList = ({
         id: venue.id,
         name: venue.name,
         description: venue.description || '',
+        type: venue.type || 'Standard', // Ensure type property exists
         capacity: venue.capacity || { min: 0, max: 0 },
         pricing: venue.pricing || { 
           currency: 'SAR', 

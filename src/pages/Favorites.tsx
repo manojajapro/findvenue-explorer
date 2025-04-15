@@ -44,7 +44,7 @@ const Favorites = () => {
       // Transform the data with proper fallbacks
       const transformedVenues = (data || []).map(venue => ({
         id: venue.id,
-        name: venue.name,
+        name: venue.name || 'Unnamed Venue',
         description: venue.description || '',
         imageUrl: venue.image_url || '',
         galleryImages: venue.gallery_images || [],
@@ -53,6 +53,7 @@ const Favorites = () => {
         cityId: venue.city_id || '',
         category: venue.category_name || [],
         categoryId: venue.category_id || [],
+        type: venue.type || 'Standard',
         capacity: {
           min: venue.min_capacity || 0,
           max: venue.max_capacity || 0

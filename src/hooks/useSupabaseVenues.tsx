@@ -43,7 +43,7 @@ export interface Venue {
     user_id: string;
   };
   additionalServices?: string[];
-  type?: string; // This property is used in HomePageMap.tsx
+  type?: string; // Added this property
   rulesAndRegulations?: Array<{
     category: string;
     title: string;
