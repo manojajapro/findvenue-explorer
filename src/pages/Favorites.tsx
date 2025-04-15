@@ -4,11 +4,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { VenueCard } from '@/components/ui';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import { Venue } from '@/hooks/useSupabaseVenues';
 
 const Favorites = () => {
   const { getUserFavorites, user } = useAuth();
   const { toast } = useToast();
-  const [favoriteVenues, setFavoriteVenues] = useState<any[]>([]);
+  const [favoriteVenues, setFavoriteVenues] = useState<Venue[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
@@ -40,7 +41,36 @@ const Favorites = () => {
         
       if (error) throw error;
       
-      setFavoriteVenues(data || []);
+      // Transform the data with proper fallbacks
+      const transformedVenues = (data || []).map(venue => ({
+        id: venue.id,
+        name: venue.name,
+        description: venue.description || '',
+        imageUrl: venue.image_url || '',
+        galleryImages: venue.gallery_images || [],
+        address: venue.address || '',
+        city: venue.city_name || '',
+        cityId: venue.city_id || '',
+        category: venue.category_name || [],
+        categoryId: venue.category_id || [],
+        capacity: {
+          min: venue.min_capacity || 0,
+          max: venue.max_capacity || 0
+        },
+        pricing: {
+          currency: venue.currency || 'SAR',
+          startingPrice: venue.starting_price || 0,
+          pricePerPerson: venue.price_per_person
+        },
+        amenities: venue.amenities || [],
+        rating: venue.rating || 0,
+        reviews: venue.reviews_count || 0,
+        featured: venue.featured || false,
+        popular: venue.popular || false,
+        availability: venue.availability || []
+      }));
+      
+      setFavoriteVenues(transformedVenues);
     } catch (error: any) {
       console.error('Error fetching favorite venues:', error);
       toast({
@@ -90,33 +120,7 @@ const Favorites = () => {
               {favoriteVenues.map((venue) => (
                 <VenueCard
                   key={venue.id}
-                  venue={{
-                    id: venue.id,
-                    name: venue.name,
-                    description: venue.description || '',
-                    imageUrl: venue.image_url || '',
-                    galleryImages: venue.gallery_images || [],
-                    address: venue.address || '',
-                    city: venue.city_name || '',
-                    cityId: venue.city_id || '',
-                    category: venue.category_name || '',
-                    categoryId: venue.category_id || '',
-                    capacity: {
-                      min: venue.min_capacity || 0,
-                      max: venue.max_capacity || 0
-                    },
-                    pricing: {
-                      currency: venue.currency || 'SAR',
-                      startingPrice: venue.starting_price || 0,
-                      pricePerPerson: venue.price_per_person
-                    },
-                    amenities: venue.amenities || [],
-                    rating: venue.rating || 0,
-                    reviews: venue.reviews_count || 0,
-                    featured: venue.featured || false,
-                    popular: venue.popular || false,
-                    availability: venue.availability || []
-                  }}
+                  venue={venue}
                   onFavoriteRemoved={handleFavoriteRemoved}
                 />
               ))}

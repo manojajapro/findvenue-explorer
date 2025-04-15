@@ -1,4 +1,3 @@
-
 import { useNavigate } from 'react-router-dom';
 import { VenueCard } from '@/components/ui';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,20 +43,32 @@ const VenuesList = ({
   };
 
   // Make sure venue images use the first image from gallery_images if available
-  const processVenueImages = (venues: Venue[]) => {
+  // And ensure all required properties exist with fallback values
+  const processVenueData = (venues: Venue[]): Venue[] => {
     return venues.map(venue => {
-      // If the venue has gallery_images, use the first one
+      // Create a processed venue with all required properties and fallbacks
+      const processedVenue: Venue = {
+        ...venue,
+        id: venue.id,
+        name: venue.name,
+        description: venue.description || '',
+        capacity: venue.capacity || { min: 0, max: 0 },
+        pricing: venue.pricing || { 
+          currency: 'SAR', 
+          startingPrice: 0,
+        }
+      };
+      
+      // If the venue has gallery_images, use the first one as imageUrl
       if (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0) {
-        return {
-          ...venue,
-          imageUrl: venue.galleryImages[0]
-        };
+        processedVenue.imageUrl = venue.galleryImages[0];
       }
-      return venue;
+      
+      return processedVenue;
     });
   };
 
-  const processedVenues = processVenueImages(venues);
+  const processedVenues = processVenueData(venues);
   
   if (isLoading) {
     return (

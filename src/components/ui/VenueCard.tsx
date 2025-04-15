@@ -111,6 +111,18 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
   };
 
   const primaryCategory = getPrimaryCategory();
+  
+  // Ensure capacity exists with fallback values
+  const capacity = venue.capacity || { min: 0, max: 0 };
+  const maxCapacity = capacity.max || 0;
+  
+  // Ensure pricing exists with fallback values
+  const pricing = venue.pricing || { currency: 'SAR', startingPrice: 0 };
+  const currency = pricing.currency || 'SAR';
+  const startingPrice = pricing.startingPrice || 0;
+  
+  // Ensure availability exists with fallback
+  const availabilityCount = venue.availability?.length || 0;
 
   return (
     <Link to={`/venue/${venue.id}`} className="block h-full">
@@ -188,30 +200,30 @@ const VenueCard = ({ venue, featured = false, onFavoriteRemoved }: VenueCardProp
             <h3 className="font-semibold text-lg leading-tight line-clamp-1">{venue.name}</h3>
             <div className="flex items-center text-findvenue-gold">
               <Star className="w-4 h-4 fill-findvenue-gold text-findvenue-gold mr-1" />
-              <span className="text-sm font-medium">{venue.rating}</span>
+              <span className="text-sm font-medium">{venue.rating || 0}</span>
             </div>
           </div>
           
           <div className="text-findvenue-text-muted text-sm mb-1 flex items-center">
             <MapPin className="w-3 h-3 mr-1" />
-            <span>{venue.city}</span>
+            <span>{venue.city || 'Location not specified'}</span>
           </div>
           
           <p className="text-sm text-findvenue-text-muted mb-4 line-clamp-2">
-            {venue.description}
+            {venue.description || 'No description available'}
           </p>
           
           <div className="flex flex-wrap gap-3 text-xs text-findvenue-text-muted mt-auto">
             <div className="flex items-center">
               <Users className="w-3 h-3 mr-1" />
-              <span>Up to {venue.capacity.max}</span>
+              <span>Up to {maxCapacity}</span>
             </div>
             <div className="flex items-center">
               <CalendarDays className="w-3 h-3 mr-1" />
-              <span>{venue.availability?.length} days/week</span>
+              <span>{availabilityCount} days/week</span>
             </div>
             <div className="ml-auto font-semibold text-white">
-              {venue.pricing.currency} {venue.pricing.startingPrice.toLocaleString()}
+              {currency} {startingPrice.toLocaleString()}
             </div>
           </div>
         </div>

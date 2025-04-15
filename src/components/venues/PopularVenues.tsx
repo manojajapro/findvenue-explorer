@@ -6,34 +6,7 @@ import { Button } from '@/components/ui/button';
 import VenueCard from '@/components/ui/VenueCard';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
-
-interface Venue {
-  id: string;
-  name: string;
-  description: string;
-  imageUrl: string;
-  galleryImages: string[];
-  address: string;
-  city: string;
-  cityId: string;
-  category: string;
-  categoryId: string;
-  capacity: {
-    min: number;
-    max: number;
-  };
-  pricing: {
-    currency: string;
-    startingPrice: number;
-    pricePerPerson: number;
-  };
-  amenities: string[];
-  rating: number;
-  reviews: number;
-  featured: boolean;
-  popular: boolean;
-  availability: string[];
-}
+import { Venue } from '@/hooks/useSupabaseVenues';
 
 const PopularVenues = () => {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -63,28 +36,28 @@ const PopularVenues = () => {
           return {
             id: venue.id,
             name: venue.name,
-            description: venue.description,
+            description: venue.description || '',
             imageUrl: defaultImage, // Use first gallery image
             galleryImages: venue.gallery_images || [],
-            address: venue.address,
+            address: venue.address || '',
             city: venue.city_name || '',
-            cityId: venue.city_id,
-            category: venue.category_name || '',
-            categoryId: venue.category_id,
+            cityId: venue.city_id || '',
+            category: venue.category_name || [],
+            categoryId: venue.category_id || [],
             capacity: {
-              min: venue.min_capacity,
-              max: venue.max_capacity
+              min: venue.min_capacity || 0,
+              max: venue.max_capacity || 0
             },
             pricing: {
-              currency: venue.currency,
-              startingPrice: venue.starting_price,
-              pricePerPerson: venue.price_per_person
+              currency: venue.currency || 'SAR',
+              startingPrice: venue.starting_price || 0,
+              pricePerPerson: venue.price_per_person || 0
             },
             amenities: venue.amenities || [],
-            rating: venue.rating,
-            reviews: venue.reviews_count,
-            featured: venue.featured,
-            popular: venue.popular,
+            rating: venue.rating || 0,
+            reviews: venue.reviews_count || 0,
+            featured: venue.featured || false,
+            popular: venue.popular || false,
             availability: venue.availability || []
           }
         });
