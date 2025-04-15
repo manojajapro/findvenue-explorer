@@ -20,6 +20,7 @@ const Index = () => {
   
   const hasFilters = Object.keys(filters).length > 0;
   
+  // Update active view when searchParams changes
   useEffect(() => {
     if (searchParams.has('view')) {
       setActiveView(searchParams.get('view'));
@@ -31,6 +32,7 @@ const Index = () => {
   // Redirect to venues page with map view when search filters are applied
   useEffect(() => {
     if (hasFilters) {
+      console.log('Filters detected, redirecting to venues page:', filters);
       const currentParams = new URLSearchParams(searchParams);
       
       // Handle event type search - map it to either category or search parameter
@@ -43,7 +45,7 @@ const Index = () => {
         }
       }
       
-      // If there's a location parameter, map it to cityId if it matches a city name
+      // If there's a location parameter, map it to search
       if (currentParams.has('location')) {
         const location = currentParams.get('location') || '';
         currentParams.set('search', location);

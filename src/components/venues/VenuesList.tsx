@@ -50,7 +50,7 @@ const VenuesList = ({
       // Create a processed venue with all required properties and fallbacks
       const processedVenue: Venue = {
         ...venue,
-        id: venue.id,
+        id: venue.id || 'unknown-id',
         name: venue.name || 'Unnamed Venue',
         description: venue.description || '',
         type: venue.type || 'Standard', // Ensure type property exists

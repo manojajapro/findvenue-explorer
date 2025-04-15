@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useGeocode } from '@/hooks/useGeocode';
-import { toast } from 'react-toastify';
+import { toast } from "@/components/ui/use-toast";
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -181,7 +181,11 @@ const HeroSection = () => {
     e.preventDefault();
     
     if (!eventType && !venueType && !guests && !location && !date) {
-      toast?.error("Please fill in at least one search field");
+      toast({
+        title: "Search Error",
+        description: "Please fill in at least one search field",
+        variant: "destructive",
+      });
       return;
     }
     

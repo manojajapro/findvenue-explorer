@@ -101,7 +101,7 @@ export const useRealTimeVenues = (): UseRealTimeVenuesReturn => {
           categoryId: v.category_id || [],
           imageUrl: v.image_url || (v.gallery_images && v.gallery_images.length > 0 ? v.gallery_images[0] : undefined),
           galleryImages: v.gallery_images,
-          type: v.type,
+          type: v.type || 'Standard', // Ensure type is always defined
           capacity: {
             min: typeof v.min_capacity === 'number' ? v.min_capacity : 0,
             max: typeof v.max_capacity === 'number' ? v.max_capacity : 0
@@ -127,6 +127,7 @@ export const useRealTimeVenues = (): UseRealTimeVenuesReturn => {
           zipcode: v.zipcode
         }));
 
+        console.log('Processed venues:', processedVenues);
         setVenues(processedVenues);
         setTotalCount(count || processedVenues.length);
       }
@@ -209,6 +210,7 @@ export const useRealTimeVenues = (): UseRealTimeVenuesReturn => {
 
   // Initial data load and subscription setup
   useEffect(() => {
+    console.log("Running useRealTimeVenues effect to fetch data");
     fetchVenues();
     fetchCategories();
     fetchCities();
@@ -228,7 +230,7 @@ export const useRealTimeVenues = (): UseRealTimeVenuesReturn => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchVenues, fetchCategories, fetchCities]);
+  }, [fetchVenues, fetchCategories, fetchCities, searchParams]); // Add searchParams to dependencies
 
   return {
     venues,

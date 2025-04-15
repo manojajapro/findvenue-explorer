@@ -19,7 +19,7 @@ const Venues = () => {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [viewMode, setViewMode] = useState<'list' | 'map'>(searchParams.get('view') as 'list' | 'map' || 'map');
   const [hoveredVenueId, setHoveredVenueId] = useState<string | null>(null);
-  const [filteredVenues, setFilteredVenues] = useState<Venue[]>(venues);
+  const [filteredVenues, setFilteredVenues] = useState<Venue[]>([]);
   const debouncedSearchTerm = useDebounce(searchTerm, 800);
   const isSearchUpdatingRef = useRef(false);
   const lastSearchTermRef = useRef<string>(searchTerm);
@@ -35,10 +35,13 @@ const Venues = () => {
   const cityName = useMemo(() => cityId ? cities.find(c => c.id === cityId)?.name : '', [cityId, cities]);
 
   useEffect(() => {
-    setFilteredVenues(venues);
+    console.log("Venues data received in Venues page:", venues);
+    if (venues && venues.length > 0) {
+      setFilteredVenues(venues);
     
-    const types = Array.from(new Set(venues.map(venue => venue.type).filter(Boolean))) as string[];
-    setVenueTypes(types);
+      const types = Array.from(new Set(venues.map(venue => venue.type).filter(Boolean))) as string[];
+      setVenueTypes(types);
+    }
   }, [venues]);
 
   useEffect(() => {
@@ -87,21 +90,12 @@ const Venues = () => {
   }, [debouncedSearchTerm, searchParams, setSearchParams]);
 
   useEffect(() => {
-    const currentViewInUrl = searchParams.get('view');
-    if (viewMode !== currentViewInUrl && (viewMode === 'list' || viewMode === 'map')) {
-      const newParams = new URLSearchParams(searchParams);
-      newParams.set('view', viewMode);
-      setSearchParams(newParams, { replace: true });
-    }
-  }, [viewMode, searchParams, setSearchParams]);
-
-  useEffect(() => {
     const viewFromUrl = searchParams.get('view') as 'list' | 'map' | null;
     const searchFromUrl = searchParams.get('search');
     
     if (viewFromUrl && (viewFromUrl === 'list' || viewFromUrl === 'map') && viewMode !== viewFromUrl) {
       setViewMode(viewFromUrl);
-    } else if (viewMode !== 'map') {
+    } else if (!viewFromUrl) {
       setViewMode('map');
       const newParams = new URLSearchParams(searchParams);
       newParams.set('view', 'map');
@@ -111,7 +105,7 @@ const Venues = () => {
     if (searchFromUrl && searchFromUrl !== searchTerm) {
       setSearchTerm(searchFromUrl);
     }
-  }, []);
+  }, [searchParams]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

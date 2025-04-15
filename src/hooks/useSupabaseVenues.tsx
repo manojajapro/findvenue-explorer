@@ -43,7 +43,7 @@ export interface Venue {
     user_id: string;
   };
   additionalServices?: string[];
-  type?: string; // Added this property
+  type?: string;
   rulesAndRegulations?: Array<{
     category: string;
     title: string;
