@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Search, Users, Calendar, MapPin, ChevronDown, X, Building } from 'lucide-react';
@@ -10,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useGeocode } from '@/hooks/useGeocode';
+import { toast } from 'react-toastify';
 
 const HeroSection = () => {
   const navigate = useNavigate();
@@ -179,18 +179,37 @@ const HeroSection = () => {
   
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!eventType && !venueType && !guests && !location && !date) {
+      toast?.error("Please fill in at least one search field");
+      return;
+    }
+    
     const params = new URLSearchParams();
     
-    if (eventType) params.append('categoryId', eventType);
-    if (venueType) params.append('type', venueType);
-    if (guests) params.append('guests', guests);
+    if (eventType) {
+      params.append('categoryId', eventType);
+    }
     
-    if (location) params.append('search', location);
+    if (venueType) {
+      params.append('type', venueType);
+    }
     
-    if (date) params.append('date', format(date, 'yyyy-MM-dd'));
+    if (guests) {
+      params.append('guests', guests);
+    }
     
-    params.append('showMap', 'true');
-    navigate(`/?${params.toString()}`);
+    if (location) {
+      params.append('search', location);
+    }
+    
+    if (date) {
+      params.append('date', format(date, 'yyyy-MM-dd'));
+    }
+    
+    params.append('view', 'map');
+    
+    navigate(`/venues?${params.toString()}`);
   };
   
   const clearForm = () => {

@@ -51,7 +51,7 @@ const VenuesList = ({
       const processedVenue: Venue = {
         ...venue,
         id: venue.id,
-        name: venue.name,
+        name: venue.name || 'Unnamed Venue',
         description: venue.description || '',
         type: venue.type || 'Standard', // Ensure type property exists
         capacity: venue.capacity || { min: 0, max: 0 },
@@ -60,6 +60,19 @@ const VenuesList = ({
           startingPrice: 0,
         }
       };
+      
+      // If venue.capacity is somehow undefined, ensure it exists
+      if (!processedVenue.capacity) {
+        processedVenue.capacity = { min: 0, max: 0 };
+      }
+      
+      // If venue.pricing is somehow undefined, ensure it exists
+      if (!processedVenue.pricing) {
+        processedVenue.pricing = {
+          currency: 'SAR',
+          startingPrice: 0
+        };
+      }
       
       // If the venue has gallery_images, use the first one as imageUrl
       if (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0) {
@@ -106,7 +119,7 @@ const VenuesList = ({
   }
   
   return (
-    <div className={`grid grid-cols-2 ${compact ? '' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-4`}>
+    <div className={`grid grid-cols-1 ${compact ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'} gap-4`}>
       {processedVenues.map((venue) => (
         <div 
           key={venue.id} 

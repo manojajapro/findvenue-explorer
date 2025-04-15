@@ -1,201 +1,240 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Venue, VenueFilter } from '@/hooks/useSupabaseVenues';
 import { useSearchParams } from 'react-router-dom';
+import { Venue } from '@/hooks/useSupabaseVenues';
+import { supabase } from '@/integrations/supabase/client';
 
-const initialVenues: Venue[] = [];
+interface Category {
+  id: string;
+  name: string;
+}
 
-export const useRealTimeVenues = (filter: VenueFilter = {}) => {
-  const [venues, setVenues] = useState<Venue[]>(initialVenues);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Array<{id: string, name: string}>>([]);
-  const [cities, setCities] = useState<Array<{id: string, name: string}>>([]);
+interface City {
+  id: string;
+  name: string;
+}
+
+interface UseRealTimeVenuesReturn {
+  venues: Venue[];
+  categories: Category[];
+  cities: City[];
+  isLoading: boolean;
+  totalCount: number;
+}
+
+export const useRealTimeVenues = (): UseRealTimeVenuesReturn => {
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [searchParams] = useSearchParams();
 
+  // Process filter params from URL
+  const getFilters = useCallback(() => {
+    const categoryId = searchParams.get('categoryId');
+    const cityId = searchParams.get('cityId');
+    const searchTerm = searchParams.get('search');
+    const venueType = searchParams.get('type');
+    const guests = searchParams.get('guests') ? parseInt(searchParams.get('guests') || '0', 10) : null;
+
+    return {
+      categoryId,
+      cityId,
+      searchTerm,
+      venueType,
+      guests
+    };
+  }, [searchParams]);
+
+  // Fetch venues with filters
   const fetchVenues = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
+    setIsLoading(true);
+    
+    const filters = getFilters();
+    console.info('Fetching venues with filters:', filters);
+    
     try {
-      // Get filters from URL params
-      const categoryId = searchParams.get('categoryId');
-      const cityId = searchParams.get('cityId');
-      const searchTerm = searchParams.get('search');
-      const venueType = searchParams.get('type');
-
-      console.log('Fetching venues with filters:', { categoryId, cityId, searchTerm, venueType });
-
+      // Start with base query
       let query = supabase
         .from('venues')
         .select('*');
-
-      // Apply URL parameter filters if they exist
-      if (cityId) {
-        query = query.eq('city_id', cityId);
+      
+      // Apply filters
+      if (filters.categoryId) {
+        // For array values, use contains operator
+        query = query.contains('category_id', [filters.categoryId]);
+      }
+      
+      if (filters.cityId) {
+        query = query.eq('city_id', filters.cityId);
+      }
+      
+      if (filters.venueType) {
+        query = query.eq('type', filters.venueType);
       }
 
-      if (categoryId) {
-        // For categoryId we need to check if it's contained in the array
-        query = query.contains('category_id', [categoryId]);
+      if (filters.searchTerm) {
+        query = query.or(`name.ilike.%${filters.searchTerm}%,description.ilike.%${filters.searchTerm}%,address.ilike.%${filters.searchTerm}%,city_name.ilike.%${filters.searchTerm}%`);
       }
 
-      if (searchTerm) {
-        query = query.ilike('name', `%${searchTerm}%`);
+      if (filters.guests) {
+        query = query.and(`min_capacity.lte.${filters.guests},max_capacity.gte.${filters.guests}`);
       }
 
-      if (venueType) {
-        query = query.eq('type', venueType);
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
       }
 
-      // Apply other filters from props
-      if (filter.city) {
-        query = query.eq('city_name', filter.city);
-      }
-
-      if (filter.category) {
-        query = query.contains('category_name', [filter.category]);
-      }
-
-      if (filter.minCapacity) {
-        query = query.gte('max_capacity', filter.minCapacity);
-      }
-
-      if (filter.maxPrice) {
-        query = query.lte('starting_price', filter.maxPrice);
-      }
-
-      if (filter.amenities && filter.amenities.length > 0) {
-        filter.amenities.forEach(amenity => {
-          query = query.contains('amenities', [amenity]);
-        });
-      }
-
-      if (filter.priceRange) {
-        query = query.gte('starting_price', filter.priceRange[0]).lte('starting_price', filter.priceRange[1]);
-      }
-
-      if (filter.capacityRange) {
-        query = query.gte('min_capacity', filter.capacityRange[0]).lte('max_capacity', filter.capacityRange[1]);
-      }
-
-      if (filter.searchTerm) {
-        query = query.ilike('name', `%${filter.searchTerm}%`);
-      }
-
-      const { data, error: venuesError } = await query;
-      console.log('Venues data fetched:', data?.length, 'venues');
-
-      if (venuesError) {
-        throw venuesError;
-      }
-
-      // Process venue data to ensure all required properties exist with fallbacks
-      const processedVenues = data?.map(venue => {
-        return {
-          id: venue.id,
-          name: venue.name || 'Unnamed Venue',
-          description: venue.description || '',
-          address: venue.address || '',
-          city: venue.city_name || '',
-          cityId: venue.city_id || '',
-          category: venue.category_name || [],
-          categoryId: venue.category_id || [],
-          imageUrl: venue.image_url || '',
-          galleryImages: venue.gallery_images || [],
+      if (data) {
+        const processedVenues: Venue[] = data.map(v => ({
+          id: v.id,
+          name: v.name,
+          description: v.description || '',
+          address: v.address,
+          city: v.city_name,
+          cityId: v.city_id,
+          category: v.category_name || [],
+          categoryId: v.category_id || [],
+          imageUrl: v.image_url || (v.gallery_images && v.gallery_images.length > 0 ? v.gallery_images[0] : undefined),
+          galleryImages: v.gallery_images,
+          type: v.type,
           capacity: {
-            min: venue.min_capacity || 0,
-            max: venue.max_capacity || 0
+            min: typeof v.min_capacity === 'number' ? v.min_capacity : 0,
+            max: typeof v.max_capacity === 'number' ? v.max_capacity : 0
           },
           pricing: {
-            currency: venue.currency || 'SAR',
-            startingPrice: venue.starting_price || 0,
-            pricePerPerson: venue.price_per_person
+            startingPrice: typeof v.starting_price === 'number' ? v.starting_price : 0,
+            pricePerPerson: v.price_per_person,
+            currency: v.currency || 'SAR'
           },
-          amenities: venue.amenities || [],
-          rating: venue.rating || 0,
-          reviews: venue.reviews_count || 0,
-          featured: venue.featured || false,
-          popular: venue.popular || false,
-          latitude: venue.latitude,
-          longitude: venue.longitude,
-          type: venue.type || 'Standard', // Ensure type is always present
-        };
-      }) || [];
+          amenities: v.amenities || [],
+          rating: v.rating || 0,
+          reviews: v.reviews_count || 0,
+          featured: v.featured || false,
+          popular: v.popular || false,
+          latitude: v.latitude,
+          longitude: v.longitude,
+          availability: v.availability || [],
+          parking: v.parking || false,
+          wifi: v.wifi || true,
+          accessibilityFeatures: v.accessibility_features || [],
+          acceptedPaymentMethods: v.accepted_payment_methods || [],
+          additionalServices: v.additional_services || [],
+          zipcode: v.zipcode
+        }));
 
-      setVenues(processedVenues);
-      setTotalCount(processedVenues.length);
+        setVenues(processedVenues);
+        setTotalCount(count || processedVenues.length);
+      }
+    } catch (error) {
+      console.error('Error fetching venues:', error);
+      // Use empty array as fallback
+      setVenues([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getFilters]);
 
-      // Fetch categories
-      const { data: categoriesData } = await supabase
+  // Fetch categories
+  const fetchCategories = useCallback(async () => {
+    try {
+      const { data: categoriesData, error } = await supabase
         .from('venues')
         .select('category_id, category_name')
         .not('category_id', 'is', null);
 
+      if (error) throw error;
+
       if (categoriesData) {
-        const uniqueCategories = new Map();
+        const processedCategories: Category[] = [];
+        const uniqueCategories = new Map<string, boolean>();
+
         categoriesData.forEach(item => {
-          if (item.category_id && item.category_name) {
-            // Handle both array and string cases for categories
-            const categoryIds = Array.isArray(item.category_id) ? item.category_id : [item.category_id];
-            const categoryNames = Array.isArray(item.category_name) ? item.category_name : [item.category_name];
-            
-            categoryIds.forEach((id, index) => {
-              if (id && categoryNames[index]) {
-                uniqueCategories.set(id, { id, name: categoryNames[index] });
+          if (Array.isArray(item.category_id) && Array.isArray(item.category_name)) {
+            item.category_id.forEach((catId, index) => {
+              if (catId && !uniqueCategories.has(catId)) {
+                uniqueCategories.set(catId, true);
+                processedCategories.push({
+                  id: catId,
+                  name: item.category_name[index] || 'Unnamed Category'
+                });
               }
             });
           }
         });
-        
-        setCategories(Array.from(uniqueCategories.values()));
-      }
 
-      // Fetch cities
-      const { data: citiesData } = await supabase
+        setCategories(processedCategories);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      setCategories([]);
+    }
+  }, []);
+
+  // Fetch cities
+  const fetchCities = useCallback(async () => {
+    try {
+      const { data: citiesData, error } = await supabase
         .from('venues')
         .select('city_id, city_name')
         .not('city_id', 'is', null);
 
+      if (error) throw error;
+
       if (citiesData) {
-        const uniqueCities = new Map();
+        const processedCities: City[] = [];
+        const uniqueCities = new Map<string, boolean>();
+
         citiesData.forEach(item => {
-          if (item.city_id && item.city_name) {
-            uniqueCities.set(item.city_id, { id: item.city_id, name: item.city_name });
+          if (item.city_id && item.city_name && !uniqueCities.has(item.city_id)) {
+            uniqueCities.set(item.city_id, true);
+            processedCities.push({
+              id: item.city_id,
+              name: item.city_name
+            });
           }
         });
-        
-        setCities(Array.from(uniqueCities.values()));
-      }
-    } catch (error: any) {
-      console.error('Error fetching venues:', error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, searchParams]);
 
+        setCities(processedCities);
+      }
+    } catch (error) {
+      console.error('Error fetching cities:', error);
+      setCities([]);
+    }
+  }, []);
+
+  // Initial data load and subscription setup
   useEffect(() => {
     fetchVenues();
+    fetchCategories();
+    fetchCities();
 
-    const venuesSubscription = supabase
-      .channel('venues')
-      .on(
-        'postgres_changes',
+    // Set up real-time subscription for venues table
+    const channel = supabase
+      .channel('venue-changes')
+      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'venues' },
         (payload) => {
-          console.log('Change received!', payload)
+          console.log('Real-time update received:', payload);
           fetchVenues();
         }
       )
-      .subscribe()
+      .subscribe();
 
     return () => {
-      supabase.removeChannel(venuesSubscription)
-    }
-  }, [fetchVenues]);
+      supabase.removeChannel(channel);
+    };
+  }, [fetchVenues, fetchCategories, fetchCities]);
 
-  return { venues, loading, error, categories, cities, isLoading: loading, totalCount };
+  return {
+    venues,
+    categories,
+    cities,
+    isLoading,
+    totalCount
+  };
 };
