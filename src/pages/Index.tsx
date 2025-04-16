@@ -23,11 +23,11 @@ const IndexPage: React.FC = () => {
   return (
     <div className="min-h-screen">
       <HeroSection onExploreMap={scrollToMapSection} />
-      <TopVenues title="Top Venues" />
+      <TopVenues />
       <div ref={mapSectionRef} id="map-section">
         <MapSearchSection />
       </div>
-      <PopularVenues title="Popular Venues" />
+      <PopularVenues />
       <CategoriesSection />
       <CitiesSection />
       <AdviceSection />

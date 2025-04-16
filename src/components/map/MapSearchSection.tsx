@@ -190,7 +190,7 @@ const MapSearchSection = () => {
         </div>
         
         <div className="rounded-lg overflow-hidden h-[500px] shadow-lg">
-          <MapView />
+          <MapView venues={venues} />
         </div>
       </div>
     </section>
