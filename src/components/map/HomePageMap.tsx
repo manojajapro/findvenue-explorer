@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGoogleMap } from '@/hooks/useGoogleMap';
 import { useRealTimeVenues } from '@/hooks/useRealTimeVenues';
@@ -144,7 +145,7 @@ const HomePageMap: React.FC<HomePageMapProps> = ({ height = '400px' }) => {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 {venueTypeOptions.map((type, index) => (
                   <SelectItem key={index} value={type.toLowerCase()}>
                     {type}
