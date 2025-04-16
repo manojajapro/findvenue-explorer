@@ -245,7 +245,7 @@ const HeroSection = () => {
             Find and Book Amazing Venues
           </h5>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white leading-tight">
-            Find and book venues for any event imaginable
+            Find and book a venue for your event
           </h1>
           <p className="text-xl text-findvenue-text mb-6 max-w-3xl mx-auto">
             Discover the perfect space for your next event in Saudi Arabia with our curated selection of premium venues

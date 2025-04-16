@@ -83,7 +83,7 @@ const Navbar = () => {
             className="text-xl md:text-2xl font-bold text-white cursor-pointer flex items-center" 
             onClick={handleLogoClick}
           >
-            <span className="bg-findvenue px-2 py-1 rounded text-white mr-1">Find</span>Venue
+            <span className="bg-findvenue px-2 py-0 rounded text-white mr-0.5 ml-1"> A </span>vnu
           </div>
           
           {/* Desktop Navigation */}

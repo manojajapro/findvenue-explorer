@@ -383,7 +383,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
               }}
             >
               <Target className="w-4 h-4 mr-2" />
-              {isRadiusActive ? 'Disable Radius' : 'Enable Radius'}
+              {isRadiusActive ? 'Disable Radius' : 'My Location'}
             </Button>
           </div>
           
