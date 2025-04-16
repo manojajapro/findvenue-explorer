@@ -24,7 +24,7 @@ serve(async (req) => {
 
     // Parse the request body
     const body = await req.json();
-    const { query, type } = body;
+    const { query, venueId, type } = body;
     
     // Log the incoming request for debugging
     console.log(`Received ${type} request: ${query}`);
@@ -39,47 +39,74 @@ serve(async (req) => {
     
     // Extract keywords for venue search
     const queryLower = query.toLowerCase();
-    let extractedKeywords: Record<string, string> = {};
+    let extractedKeywords: Record<string, string | number | boolean> = {};
     
     // Extract city
-    const cities = ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina'];
+    const cities = ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina', 'khobar', 'taif', 'abha'];
     cities.forEach(city => {
       if (queryLower.includes(city)) {
         extractedKeywords.city = city;
       }
     });
     
-    // Extract venue types/categories
-    const venueTypes = ['wedding', 'birthday', 'meeting', 'conference', 'hotel', 'hall', 'workshop', 'party', 'marriage'];
-    venueTypes.forEach(type => {
-      if (queryLower.includes(type)) {
-        extractedKeywords.venueType = type;
+    // Extract venue types/categories with more comprehensive matching
+    const venueTypes = {
+      'wedding': ['wedding', 'marriage', 'bride', 'groom', 'ceremony', 'reception', 'bridal'],
+      'conference': ['conference', 'meeting', 'seminar', 'workshop', 'corporate', 'business'],
+      'party': ['party', 'celebration', 'birthday', 'anniversary', 'festivity'],
+      'exhibition': ['exhibition', 'showcase', 'display', 'expo', 'fair'],
+      'concert': ['concert', 'performance', 'show', 'music', 'live'],
+      'hall': ['hall', 'ballroom', 'venue', 'space', 'auditorium']
+    };
+    
+    Object.entries(venueTypes).forEach(([type, keywords]) => {
+      for (const keyword of keywords) {
+        if (queryLower.includes(keyword)) {
+          extractedKeywords.venueType = type;
+          break;
+        }
       }
     });
     
-    // Extract amenities
-    const amenities = ['wifi', 'parking', 'catering', 'dining'];
-    amenities.forEach(amenity => {
-      if (queryLower.includes(amenity)) {
-        extractedKeywords.amenity = amenity;
+    // Extract amenities with more extensive matching
+    const amenityMap = {
+      'wifi': ['wifi', 'internet', 'connection', 'wireless'],
+      'parking': ['parking', 'car', 'vehicle', 'valet'],
+      'catering': ['catering', 'food', 'meal', 'cuisine', 'dining'],
+      'av': ['av', 'audio', 'visual', 'sound', 'projector', 'screen', 'microphone'],
+      'stage': ['stage', 'platform', 'podium'],
+      'seating': ['seating', 'chairs', 'tables', 'arrangement']
+    };
+    
+    Object.entries(amenityMap).forEach(([amenity, keywords]) => {
+      for (const keyword of keywords) {
+        if (queryLower.includes(keyword)) {
+          extractedKeywords.amenity = amenity;
+          break;
+        }
       }
     });
     
-    // Extract capacity
-    const capacityMatch = queryLower.match(/(\d+)(?:\s*(?:people|guests|persons|capacity))/);
+    // Extract capacity with improved regex
+    const capacityMatch = queryLower.match(/(\d+)(?:\s*(?:people|guests|persons?|capacity|attendees|visitors|seats))/);
     if (capacityMatch) {
-      extractedKeywords.capacity = capacityMatch[1];
+      extractedKeywords.capacity = parseInt(capacityMatch[1]);
     }
     
-    // Extract price range
-    const priceMatch = queryLower.match(/(\d+)(?:\s*(?:sar|price|cost))/);
+    // Extract price range with improved regex
+    const priceMatch = queryLower.match(/(\d+)(?:\s*(?:sar|price|cost|budget|\$|dollar|money))/);
     if (priceMatch) {
-      extractedKeywords.price = priceMatch[1];
+      extractedKeywords.price = parseInt(priceMatch[1]);
     }
 
-    // Extract top/best venues
-    if (queryLower.includes('top') || queryLower.includes('best') || queryLower.includes('popular')) {
-      extractedKeywords.popular = 'true';
+    // Extract top/best/popular venues
+    if (queryLower.match(/\b(top|best|popular|highest rated|recommended|featured|premium)\b/)) {
+      extractedKeywords.premium = true;
+    }
+    
+    // Check for specific venue request by ID
+    if (venueId) {
+      extractedKeywords.venueId = venueId;
     }
     
     // If it's a welcome message, generate a welcome
@@ -92,55 +119,158 @@ serve(async (req) => {
       );
     }
     
-    // For chat messages, query the database and use OpenAI to generate responses
+    // For venue-specific chat when we have a venueId
+    if (type === 'chat' && venueId) {
+      try {
+        // Fetch specific venue details
+        const { data: venueData, error: venueError } = await supabaseClient
+          .from('venues')
+          .select('*')
+          .eq('id', venueId)
+          .single();
+        
+        if (venueError) {
+          console.error('Error fetching venue details:', venueError);
+          throw venueError;
+        }
+        
+        if (!venueData) {
+          throw new Error('Venue not found');
+        }
+        
+        // Format venue info for the AI prompt
+        const venueInfo = `
+          Venue Name: ${venueData.name}
+          Location: ${venueData.address || ''}, ${venueData.city_name || ''}
+          Category: ${Array.isArray(venueData.category_name) ? venueData.category_name.join(', ') : venueData.category_name || 'Venue'}
+          Capacity: ${venueData.min_capacity || 'N/A'}-${venueData.max_capacity || 'N/A'} people
+          Starting Price: ${venueData.currency || 'SAR'} ${venueData.starting_price || 'N/A'}
+          Price Per Person: ${venueData.price_per_person ? `${venueData.currency || 'SAR'} ${venueData.price_per_person}` : 'N/A'}
+          Amenities: ${Array.isArray(venueData.amenities) ? venueData.amenities.join(', ') : 'None listed'}
+          Availability: ${Array.isArray(venueData.availability) ? venueData.availability.join(', ') : 'Contact for availability'}
+          Rating: ${venueData.rating || 'Not yet rated'} (${venueData.reviews_count || 0} reviews)
+          Features: ${venueData.wifi ? 'WiFi Available, ' : ''}${venueData.parking ? 'Parking Available' : ''}
+          Description: ${venueData.description || 'No detailed description available.'}
+        `;
+        
+        // Use OpenAI for venue-specific responses
+        const OPENAI_API_KEY = "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";
+        
+        console.log("Querying OpenAI for venue-specific chat");
+        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: `You are a helpful venue booking assistant for FindVenue. You provide detailed information about a specific venue.
+                         Be friendly, conversational, and informative. Focus on answering the user's questions about the specific venue
+                         using the venue information provided. If the user asks about something not mentioned in the venue data,
+                         politely explain that you don't have that specific information and suggest they contact the venue directly.
+                         Format your responses in a friendly, conversational style. Use emojis occasionally to make your responses friendly.`
+              },
+              {
+                role: "user",
+                content: `The user asked: "${query}"\n\nHere is the detailed information about the venue:\n${venueInfo}`
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 500,
+          }),
+        });
+
+        const openaiData = await openaiResponse.json();
+        
+        if (openaiData.choices && openaiData.choices[0]?.message?.content) {
+          const answer = openaiData.choices[0].message.content.trim();
+          console.log("OpenAI venue-specific response:", answer);
+          return new Response(
+            JSON.stringify({ answer }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          console.error("Invalid OpenAI response for venue-specific query:", openaiData);
+          throw new Error("Invalid response from OpenAI API");
+        }
+      } catch (error) {
+        console.error("Error in venue-specific chat:", error);
+        return new Response(
+          JSON.stringify({ 
+            answer: "I'm sorry, I encountered an issue retrieving information about this venue. Please try again or contact customer support for assistance."
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    
+    // For general venue search and chat
     if (type === 'chat') {
       try {
         // 1. First, try to get relevant venues based on the query
         let venueQuery = supabaseClient.from('venues').select('*');
         let keywordsFound = false;
+        let queryFilters = [];
         
         // Apply filters based on extracted keywords
         if (extractedKeywords.city) {
           venueQuery = venueQuery.ilike('city_name', `%${extractedKeywords.city}%`);
           keywordsFound = true;
+          queryFilters.push(`in ${extractedKeywords.city}`);
         }
         
         if (extractedKeywords.venueType) {
           // Handle both arrays and string fields for category_name
-          venueQuery = venueQuery.or(`category_name.cs.{${extractedKeywords.venueType}},category_name.ilike.%${extractedKeywords.venueType}%`);
+          const venueTypeStr = String(extractedKeywords.venueType);
+          venueQuery = venueQuery.or(`category_name.cs.{${venueTypeStr}},category_name.ilike.%${venueTypeStr}%`);
           keywordsFound = true;
+          queryFilters.push(`for ${venueTypeStr} events`);
         }
         
         if (extractedKeywords.amenity) {
-          venueQuery = venueQuery.contains('amenities', [extractedKeywords.amenity]);
+          venueQuery = venueQuery.contains('amenities', [String(extractedKeywords.amenity)]);
           keywordsFound = true;
+          queryFilters.push(`with ${extractedKeywords.amenity}`);
         }
         
         if (extractedKeywords.capacity) {
-          const capacity = parseInt(extractedKeywords.capacity);
+          const capacity = Number(extractedKeywords.capacity);
           venueQuery = venueQuery.gte('max_capacity', capacity);
           keywordsFound = true;
+          queryFilters.push(`with capacity for at least ${capacity} people`);
         }
         
         if (extractedKeywords.price) {
-          const price = parseInt(extractedKeywords.price);
+          const price = Number(extractedKeywords.price);
           venueQuery = venueQuery.lte('starting_price', price);
           keywordsFound = true;
+          queryFilters.push(`with starting price under ${price} SAR`);
         }
         
-        if (extractedKeywords.popular) {
-          venueQuery = venueQuery.eq('popular', true).order('rating', { ascending: false });
-          keywordsFound = true;
-        }
-        
-        // If no specific filters were set and user is asking for halls or venues generally
-        if (!keywordsFound && (queryLower.includes('hall') || queryLower.includes('venue'))) {
-          // Just get some popular venues as a fallback
+        if (extractedKeywords.premium) {
           venueQuery = venueQuery.order('rating', { ascending: false });
+          keywordsFound = true;
+          queryFilters.push('highest rated first');
+        }
+        
+        // If no specific filters were set but query contains venue-related terms
+        if (!keywordsFound && 
+            (queryLower.includes('venue') || 
+             queryLower.includes('hall') || 
+             queryLower.includes('place') ||
+             queryLower.includes('location') ||
+             queryLower.includes('space') ||
+             queryLower.includes('room'))) {
+          venueQuery = venueQuery.order('rating', { ascending: false });
+          queryFilters.push('best rated venues');
         }
         
         // Execute the query with a reasonable limit
-        venueQuery = venueQuery.limit(5);
+        venueQuery = venueQuery.limit(7);
         
         const { data: venueData, error: venueError } = await venueQuery;
         
@@ -149,26 +279,42 @@ serve(async (req) => {
           throw venueError;
         }
         
+        // Get a count of all venues for informational purposes
+        const { count: totalVenueCount, error: countError } = await supabaseClient
+          .from('venues')
+          .select('*', { count: 'exact', head: true });
+        
+        if (countError) {
+          console.error('Error counting venues:', countError);
+          // Non-fatal, continue with the query
+        }
+        
         // 2. Use OpenAI to generate a response
         const OPENAI_API_KEY = "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";
-        if (!OPENAI_API_KEY) {
-          throw new Error("OPENAI_API_KEY not found");
-        }
         
         // Prepare venue information for the OpenAI prompt
         let venueContext = "";
+        let searchContext = "";
+        
+        if (queryFilters.length > 0) {
+          searchContext = `I searched for venues ${queryFilters.join(', ')}.`;
+        }
+        
         if (venueData && venueData.length > 0) {
-          venueContext = `I found ${venueData.length} venues that might be relevant:\n`;
+          venueContext = `I found ${venueData.length} venues that match the search criteria:\n\n`;
           
           venueData.forEach((venue, index) => {
-            const venueType = Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.type || 'Venue';
+            const venueType = Array.isArray(venue.category_name) ? venue.category_name.join(', ') : (venue.category_name || venue.type || 'Venue');
             const amenities = Array.isArray(venue.amenities) ? venue.amenities.join(', ') : 'No specific amenities listed';
             
             venueContext += `Venue ${index + 1}: "${venue.name}" in ${venue.city_name || 'Unknown location'}, ` +
-                        `${venueType}, ` +
-                        `capacity: ${venue.min_capacity || 'N/A'}-${venue.max_capacity || 'N/A'} people, ` +
-                        `starting price: ${venue.currency || 'SAR'} ${venue.starting_price || 'N/A'}, ` +
-                        `amenities: ${amenities}.\n`;
+                        `Type: ${venueType}, ` +
+                        `Capacity: ${venue.min_capacity || 'N/A'}-${venue.max_capacity || 'N/A'} people, ` +
+                        `Starting Price: ${venue.currency || 'SAR'} ${venue.starting_price || 'N/A'}, ` +
+                        `Rating: ${venue.rating || 'Not rated'}/5 (${venue.reviews_count || 0} reviews), ` +
+                        `Amenities: ${amenities}` +
+                        (venue.description ? `, Description: ${venue.description.substring(0, 100)}...` : '') + 
+                        `.\n\n`;
           });
         } else {
           // Be more specific about why we couldn't find venues
@@ -185,7 +331,10 @@ serve(async (req) => {
           }
         }
         
-        console.log("Prepared venue context:", venueContext);
+        // Add general database information
+        venueContext += `\nInformation about our venue database: We have approximately ${totalVenueCount || 'many'} venues across Saudi Arabia, primarily in major cities like Riyadh, Jeddah, and Dammam.`;
+        
+        console.log("Querying OpenAI with context:", venueContext.substring(0, 200) + "...");
         
         const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -194,28 +343,31 @@ serve(async (req) => {
             "Authorization": `Bearer ${OPENAI_API_KEY}`,
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: "gpt-4o",
             messages: [
               {
                 role: "system",
-                content: `You are a helpful venue booking assistant for FindVenue, a platform that helps users find and book venues in Saudi Arabia. 
+                content: `You are a helpful venue booking assistant for FindVenue, a platform that helps users find and book venues in Saudi Arabia.
                          Your job is to provide helpful, conversational answers based on the venue data provided.
-                         If you have venue data, mention the specific venues by name and highlight key features.
-                         Be conversational and friendly, making the user feel understood.
+                         Be detailed and thorough in your responses, highlighting key features of venues that match the query.
+                         If you have venue data, mention the specific venues by name and highlight their key features.
+                         If the user is asking for recommendations, suggest specific venues from the data provided.
+                         Be conversational, friendly, and helpful, making the user feel understood.
                          When mentioning prices, always include the currency (SAR).
-                         If a user is looking for something specific (wedding halls, conference rooms, etc.) and we don't have exact matches,
-                         suggest alternatives or recommend they try with broader criteria.
+                         If the user is looking for something specific that we don't have exact matches for,
+                         suggest the closest alternatives available or recommend they try with broader criteria.
                          Never make up information about specific venues that isn't in the data provided.
-                         If the user query is a simple greeting or small talk, respond in a friendly way without forcing venue information.
-                         Keep answers focused and relevant to the user's query.`
+                         If the user query is a simple greeting or small talk, respond in a friendly way.
+                         Keep answers focused and relevant to the user's query about venues.
+                         Use emoji occasionally to make your responses friendly 😊.`
               },
               {
                 role: "user",
-                content: `The user asked: "${query}"\n\nHere is the venue data I have:\n${venueContext}`
+                content: `The user asked: "${query}"\n\n${searchContext}\n\nHere is the venue data I have:\n${venueContext}`
               }
             ],
             temperature: 0.7,
-            max_tokens: 400,
+            max_tokens: 800,
           }),
         });
 
@@ -223,7 +375,7 @@ serve(async (req) => {
         
         if (openaiData.choices && openaiData.choices[0]?.message?.content) {
           const answer = openaiData.choices[0].message.content.trim();
-          console.log("OpenAI response:", answer);
+          console.log("OpenAI response:", answer.substring(0, 100) + "...");
           return new Response(
             JSON.stringify({ answer }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -235,8 +387,8 @@ serve(async (req) => {
       } catch (error) {
         console.error("OpenAI API error or database error:", error);
         
-        // Fallback to a generic response based on the query
-        let answer = "I'm sorry, I couldn't find specific information about that in our venue database. You can try asking in a different way or browse our venues page to see all available options.";
+        // Fallback to a generic response
+        let answer = "I'm sorry, I encountered an issue while searching our venue database. You can try asking in a different way or browse all venues on our website. Is there something specific you're looking for?";
         
         return new Response(
           JSON.stringify({ answer }),
@@ -247,7 +399,7 @@ serve(async (req) => {
 
     // Return a generic response for other request types
     return new Response(
-      JSON.stringify({ answer: "I'm here to help you find venues. How can I assist you today?" }),
+      JSON.stringify({ answer: "I'm here to help you find the perfect venue for your event. How can I assist you today?" }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
     
