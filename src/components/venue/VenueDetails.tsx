@@ -272,7 +272,10 @@ const VenueDetails = () => {
             <h4 className="text-sm font-medium mb-2">Categories</h4>
             <div className="flex flex-wrap gap-2">
               {categoryNames.map((category, index) => (
-                <Badge key={index} className="bg-findvenue/20 text-findvenue hover:bg-findvenue/30">
+                <Badge 
+                  key={index} 
+                  className="bg-findvenue/20 text-findvenue hover:bg-findvenue/30 text-xs px-3 py-1 rounded-full"
+                >
                   {category}
                 </Badge>
               ))}
