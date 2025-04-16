@@ -2,11 +2,28 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue, VenueFilter } from '@/types/global';
+import { data as categoriesData } from '@/data/categories';
+import { data as citiesData } from '@/data/cities';
 
-export const useRealTimeVenues = (filters?: VenueFilter) => {
+// Type definition for what the hook returns
+interface UseRealTimeVenuesReturn {
+  venues: Venue[];
+  isLoading: boolean;
+  error: string | null;
+  categories: { id: string; name: string }[];
+  cities: { id: string; name: string }[];
+  totalCount: number;
+}
+
+export const useRealTimeVenues = (filters?: VenueFilter): UseRealTimeVenuesReturn => {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState<number>(0);
+
+  // Use static data for categories and cities
+  const categories = categoriesData;
+  const cities = citiesData;
 
   useEffect(() => {
     const fetchVenues = async () => {
@@ -37,11 +54,15 @@ export const useRealTimeVenues = (filters?: VenueFilter) => {
           if (filters.search) {
             query = query.ilike('name', `%${filters.search}%`);
           }
+
+          if (filters.type && typeof filters.type === 'string') {
+            query = query.eq('type', filters.type);
+          }
         }
 
-        const { data, error } = await query;
+        const { data, error: fetchError, count } = await query.select('count', { count: 'exact' });
 
-        if (error) throw error;
+        if (fetchError) throw fetchError;
 
         if (data) {
           // Map the database data to the Venue type, ensuring all required fields are present
@@ -72,6 +93,7 @@ export const useRealTimeVenues = (filters?: VenueFilter) => {
           }));
           
           setVenues(mappedVenues);
+          setTotalCount(count || 0);
         }
       } catch (err) {
         console.error("Error fetching venues:", err);
@@ -94,5 +116,5 @@ export const useRealTimeVenues = (filters?: VenueFilter) => {
     };
   }, [filters]);
 
-  return { venues, isLoading, error };
+  return { venues, isLoading, error, categories, cities, totalCount };
 };

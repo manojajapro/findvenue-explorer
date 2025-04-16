@@ -53,13 +53,13 @@ const HomePageMap: React.FC<HomePageMapProps> = ({ height = '400px' }) => {
         
         if (data) {
           // Extract unique venue types, filter out null/empty values, and capitalize
-          const types = [...new Set(data
+          const typesArray = data
             .map(venue => venue.type)
-            .filter(type => typeof type === 'string' && type.trim() !== '')
-            .map(type => typeof type === 'string' ? type.charAt(0).toUpperCase() + type.slice(1) : '')
-          )].sort();
-          
-          setVenueTypeOptions(types);
+            .filter((type): type is string => typeof type === 'string' && type.trim() !== '')
+            .map(type => type.charAt(0).toUpperCase() + type.slice(1));
+            
+          const uniqueTypes = [...new Set(typesArray)].sort();
+          setVenueTypeOptions(uniqueTypes);
         }
       } catch (err) {
         console.error('Error fetching venue types:', err);

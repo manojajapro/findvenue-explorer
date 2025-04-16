@@ -10,7 +10,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Venue } from '@/hooks/useSupabaseVenues';
+import { Venue } from '@/types/global';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Venues = () => {
@@ -31,13 +31,13 @@ const Venues = () => {
   const venueType = searchParams.get('type');
   const hasFilters = searchParams.toString().length > 0;
 
-  const categoryName = useMemo(() => categoryId ? categories.find(c => c.id === categoryId)?.name : '', [categoryId, categories]);
-  const cityName = useMemo(() => cityId ? cities.find(c => c.id === cityId)?.name : '', [cityId, cities]);
+  const categoryName = useMemo(() => categoryId ? categories?.find(c => c.id === categoryId)?.name : '', [categoryId, categories]);
+  const cityName = useMemo(() => cityId ? cities?.find(c => c.id === cityId)?.name : '', [cityId, cities]);
 
   useEffect(() => {
     console.log("Venues data received in Venues page:", venues);
     if (venues && venues.length > 0) {
-      setFilteredVenues(venues);
+      setFilteredVenues([...venues]);
     
       const types = Array.from(new Set(venues.map(venue => venue.type).filter(Boolean))) as string[];
       setVenueTypes(types);
@@ -133,13 +133,13 @@ const Venues = () => {
     setHoveredVenueId(null);
   }, []);
 
-  const handleMapFilteredVenues = useCallback((mapFilteredVenues: Venue[]) => {
-    setFilteredVenues(mapFilteredVenues);
+  const handleMapFilteredVenues = useCallback((mapFilteredVenues: any[]) => {
+    setFilteredVenues([...mapFilteredVenues] as Venue[]);
   }, []);
 
   const handleTypeChange = (value: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (value) {
+    if (value && value !== 'all-types') {
       newParams.set('type', value);
     } else {
       newParams.delete('type');
@@ -325,7 +325,7 @@ const Venues = () => {
             </div>
             <div className="w-full lg:w-2/3 h-[400px] md:h-[500px] lg:h-[650px] rounded-lg overflow-hidden border border-white/10 shadow-lg">
               <MapView 
-                venues={venues} 
+                venues={venues as any[]} 
                 isLoading={isLoading} 
                 highlightedVenueId={hoveredVenueId || undefined}
                 onFilteredVenuesChange={handleMapFilteredVenues}

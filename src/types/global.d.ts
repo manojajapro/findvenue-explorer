@@ -22,8 +22,35 @@ export interface Venue {
   images?: string[];
   lat?: number | null;
   lng?: number | null;
-  type?: string; // Add this property
+  type?: string;
   categories?: string[];
+  pricing?: {
+    startingPrice: number;
+    pricePerPerson?: number;
+    hourlyRate?: number;
+    currency: string;
+  };
+  // Add additional optional fields to make both venue types compatible
+  availability?: string[];
+  parking?: boolean;
+  wifi?: boolean;
+  accessibilityFeatures?: string[];
+  acceptedPaymentMethods?: string[];
+  openingHours?: Record<string, {open: string, close: string}>;
+  ownerInfo?: {
+    name: string;
+    contact: string;
+    responseTime: string;
+    user_id: string;
+  };
+  additionalServices?: string[];
+  rulesAndRegulations?: Array<{
+    category: string;
+    title: string;
+    description: string;
+  }>;
+  zipcode?: string;
+  categoryNames?: string[];
 }
 
 export interface VenueFilter {
@@ -32,5 +59,5 @@ export interface VenueFilter {
   minCapacity?: number;
   maxPrice?: number;
   search?: string;
-  type?: string; // Add this property to filters
+  type?: string;
 }
