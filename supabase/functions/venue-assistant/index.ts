@@ -1,16 +1,11 @@
-
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 // Helper function to create a standard response
 const createResponse = (data: any, status = 200) => {
@@ -18,7 +13,7 @@ const createResponse = (data: any, status = 200) => {
     JSON.stringify(data),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status }
   );
-}
+};
 
 // Handler for error responses
 const handleError = (error: Error, status = 500) => {
@@ -26,7 +21,7 @@ const handleError = (error: Error, status = 500) => {
   return createResponse({ 
     error: error.message || "An unexpected error occurred" 
   }, status);
-}
+};
 
 // Fetch venue data from Supabase
 async function fetchVenueData(supabaseClient: any, venueId?: string) {
@@ -229,6 +224,28 @@ async function callOpenAI(query: string, venueInfo: any, openAIApiKey: string) {
   }
 }
 
+// Process a welcome message for voice assistant
+async function handleWelcomeRequest(supabaseClient: any, venueId: string | undefined, openAIApiKey: string) {
+  try {
+    let welcomeMessage = "Hello! I'm your venue assistant. How can I help you today?";
+    
+    // If venue ID is provided, customize welcome message
+    if (venueId) {
+      const venueData = await fetchVenueData(supabaseClient, venueId);
+      if (venueData) {
+        welcomeMessage = `Welcome to ${venueData.name}! I'm your virtual assistant and can answer questions about this venue's pricing, capacity, amenities, and booking information. How can I help you?`;
+      }
+    }
+    
+    return {
+      welcome: welcomeMessage
+    };
+  } catch (error) {
+    console.error("Error in welcome request:", error);
+    throw error;
+  }
+}
+
 // Process a chat request
 async function handleChatRequest(supabaseClient: any, query: string, openAIApiKey: string) {
   try {
@@ -278,6 +295,24 @@ async function handleVenueRequest(supabaseClient: any, query: string, venueId: s
   }
 }
 
+// Process a voice request
+async function handleVoiceRequest(supabaseClient: any, query: string, venueId: string | undefined, openAIApiKey: string) {
+  try {
+    // If venue ID is provided, handle venue-specific request
+    if (venueId) {
+      const result = await handleVenueRequest(supabaseClient, query, venueId, openAIApiKey);
+      return result;
+    } else {
+      // Otherwise, handle general chat request
+      const result = await handleChatRequest(supabaseClient, query, openAIApiKey);
+      return result;
+    }
+  } catch (error) {
+    console.error("Error in voice request:", error);
+    throw error;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
@@ -306,18 +341,29 @@ serve(async (req) => {
     console.log(`Received ${type} request ${venueId ? `for venue ${venueId}` : ''}: ${query}`);
     
     // Basic validation
-    if (!query || typeof query !== 'string') {
+    if (!query && type !== 'welcome') {
       return handleError(new Error('Invalid query parameter'), 400);
     }
 
     // Route to appropriate handler based on request type
     let result;
-    if (type === 'venue' && venueId) {
-      // Handle venue-specific request
-      result = await handleVenueRequest(supabaseClient, query, venueId, openAIApiKey);
-    } else {
-      // Handle general chat request (default)
-      result = await handleChatRequest(supabaseClient, query, openAIApiKey);
+    switch(type) {
+      case 'welcome':
+        result = await handleWelcomeRequest(supabaseClient, venueId, openAIApiKey);
+        break;
+      case 'venue':
+        if (!venueId) {
+          return handleError(new Error('Venue ID is required for venue-specific queries'), 400);
+        }
+        result = await handleVenueRequest(supabaseClient, query, venueId, openAIApiKey);
+        break;
+      case 'voice':
+        result = await handleVoiceRequest(supabaseClient, query, venueId, openAIApiKey);
+        break;
+      case 'chat':
+      default:
+        result = await handleChatRequest(supabaseClient, query, openAIApiKey);
+        break;
     }
 
     return createResponse(result);
