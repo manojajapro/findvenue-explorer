@@ -50,7 +50,11 @@ serve(async (req) => {
     });
     
     // Extract venue types/categories
-    const venueTypes = ['wedding', 'birthday', 'meeting', 'conference', 'hotel', 'hall', 'workshop', 'party', 'exhibition', 'training'];
+    const venueTypes = [
+      'wedding', 'birthday', 'meeting', 'conference', 'hotel', 'hall', 'workshop', 
+      'party', 'exhibition', 'training', 'graduation', 'family', 'business',
+      'marriage', 'wedding hall', 'wedding venue', 'ballroom', 'banquet'
+    ];
     const foundTypes: string[] = [];
     venueTypes.forEach(type => {
       if (queryLower.includes(type)) {
@@ -91,7 +95,7 @@ serve(async (req) => {
     if (type === 'welcome') {
       return new Response(
         JSON.stringify({ 
-          welcome: "Welcome to the FindVenue assistant! I can help you discover the perfect venue for your event. Ask me about venues in specific cities, with certain amenities, or for particular occasions."
+          welcome: "Welcome! I'm your venue assistant. I can help you discover the perfect venue for your event. Ask me about venues in specific cities, with certain amenities, or for particular occasions."
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -100,20 +104,51 @@ serve(async (req) => {
     // For chat messages, query the database and use OpenAI to generate responses
     if (type === 'chat') {
       try {
-        // Build a query based on the extracted keywords
+        // Handle specific query patterns
         let venueQuery = supabaseClient.from('venues').select('*');
+        let isGeneralSearch = true;
         
+        // Special case for "top", "best", "popular" queries
+        if (queryLower.includes('top') || queryLower.includes('best') || queryLower.includes('popular')) {
+          console.log("Processing top/popular venues request");
+          venueQuery = venueQuery.eq('popular', true).order('rating', { ascending: false });
+          isGeneralSearch = false;
+        }
+        
+        // Search for hall/halls specifically
+        if (queryLower.includes('hall') || queryLower.includes('halls')) {
+          console.log("Searching for halls");
+          // Search for halls in name or description
+          venueQuery = venueQuery.or(`name.ilike.%hall%,description.ilike.%hall%`);
+          isGeneralSearch = false;
+        }
+        
+        // Search for wedding/marriage venues
+        if (queryLower.includes('wedding') || queryLower.includes('marriage')) {
+          console.log("Searching for wedding venues");
+          venueQuery = venueQuery.or(`category_name.cs.{"Wedding"}, category_name.cs.{"wedding"}, name.ilike.%wedding%, description.ilike.%wedding%, name.ilike.%marriage%, description.ilike.%marriage%`);
+          isGeneralSearch = false;
+        }
+
         // Apply filters based on extracted keywords
         if (extractedKeywords.city) {
           venueQuery = venueQuery.ilike('city_name', `%${extractedKeywords.city}%`);
+          isGeneralSearch = false;
         }
         
         if (extractedKeywords.venueTypes && Array.isArray(extractedKeywords.venueTypes)) {
           const types = extractedKeywords.venueTypes;
-          // Create an OR condition for each venue type in the category_name array
-          const typeFilters = types.map(type => `category_name.cs.{"${type}"}`);
-          if (typeFilters.length > 0) {
-            venueQuery = venueQuery.or(typeFilters.join(','));
+          
+          // Create filter conditions
+          let orCondition = '';
+          types.forEach((type, index) => {
+            if (index > 0) orCondition += ',';
+            orCondition += `category_name.cs.{"${type}"}, name.ilike.%${type}%, description.ilike.%${type}%`;
+          });
+          
+          if (orCondition) {
+            venueQuery = venueQuery.or(orCondition);
+            isGeneralSearch = false;
           }
         }
         
@@ -123,21 +158,24 @@ serve(async (req) => {
           const amenityFilters = amenitiesList.map(amenity => `amenities.cs.{"${amenity}"}`);
           if (amenityFilters.length > 0) {
             venueQuery = venueQuery.or(amenityFilters.join(','));
+            isGeneralSearch = false;
           }
         }
         
         if (extractedKeywords.capacity && typeof extractedKeywords.capacity === 'number') {
           const capacity = extractedKeywords.capacity;
           venueQuery = venueQuery.gte('max_capacity', capacity);
+          isGeneralSearch = false;
         }
         
         if (extractedKeywords.price && typeof extractedKeywords.price === 'number') {
           const price = extractedKeywords.price;
           venueQuery = venueQuery.lte('starting_price', price);
+          isGeneralSearch = false;
         }
         
         // If no specific filters were applied but we have text, do a general search
-        if (Object.keys(extractedKeywords).length === 0) {
+        if (isGeneralSearch) {
           if (queryLower.includes('list') || 
               queryLower.includes('show') || 
               queryLower.includes('find') ||
@@ -150,14 +188,31 @@ serve(async (req) => {
                 break;
               }
             }
+          } else if (queryLower.includes('hi') || queryLower.includes('hello')) {
+            // Just return a greeting for simple hello/hi without searching
+            return new Response(
+              JSON.stringify({ 
+                answer: "Hello! I'm your venue assistant. How can I help you find the perfect venue today? You can ask about venues by city, venue type, or special features.",
+                venues: [] 
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
           } else {
             // Search venue name, description, and city
-            venueQuery = venueQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%,city_name.ilike.%${query}%`);
+            const searchTerms = query.split(/\s+/).filter(term => term.length > 2);
+            if (searchTerms.length > 0) {
+              let orCondition = '';
+              searchTerms.forEach((term, index) => {
+                if (index > 0) orCondition += ',';
+                orCondition += `name.ilike.%${term}%,description.ilike.%${term}%,city_name.ilike.%${term}%`;
+              });
+              venueQuery = venueQuery.or(orCondition);
+            }
           }
         }
         
-        // Limit results
-        venueQuery = venueQuery.limit(5);
+        // Limit results and ensure they're ordered by something useful
+        venueQuery = venueQuery.order('popular', { ascending: false }).order('rating', { ascending: false }).limit(5);
         
         // Execute the query
         const { data: venueData, error: venueError } = await venueQuery;
@@ -186,7 +241,7 @@ serve(async (req) => {
           // Add some details about each venue
           if (venueData.length === 1) {
             const venue = venueData[0];
-            answer += ` ${venue.name} is located in ${venue.city_name}`;
+            answer += ` ${venue.name} is located in ${venue.city_name || 'N/A'}`;
             if (venue.starting_price) {
               answer += ` with prices starting at ${venue.currency || 'SAR'} ${venue.starting_price}`;
             }
@@ -217,7 +272,7 @@ serve(async (req) => {
           try {
             const venueContext = venueData && venueData.length > 0 ? 
               venueData.map((venue, i) => {
-                return `Venue ${i+1}: ${venue.name} in ${venue.city_name}, ` +
+                return `Venue ${i+1}: ${venue.name} in ${venue.city_name || 'N/A'}, ` +
                       `capacity: ${venue.min_capacity || 'N/A'}-${venue.max_capacity || 'N/A'}, ` +
                       `price: ${venue.currency || 'SAR'} ${venue.starting_price || 'N/A'}, ` +
                       `amenities: ${Array.isArray(venue.amenities) ? venue.amenities.join(', ') : 'N/A'}, ` +
@@ -235,15 +290,15 @@ serve(async (req) => {
                 messages: [
                   {
                     role: "system",
-                    content: `You are a helpful venue booking assistant. You help users find venues for their events based on their requirements.
+                    content: `You are a helpful venue booking assistant for a venue search system in Saudi Arabia. You help users find venues for their events based on their requirements.
                              Your job is to provide helpful, concise answers based on the venue data provided.
                              If you have venue data, mention the specific venues by name and highlight key features.
-                             If the user is asking a question that doesn't seem to be about finding venues, still try to be helpful.
                              Keep responses friendly, concise (under 150 words), and focused on directly answering the user's query.
                              When mentioning prices, always include the currency (SAR).
                              Don't apologize for limitations in data - just work with what you have.
                              Never make up information about specific venues that isn't in the data provided.
-                             If you don't have enough venues, suggest the user try with broader criteria.`
+                             If you don't have enough venues, suggest the user try with broader criteria.
+                             For basic greetings like "hi" or "hello", respond warmly and offer help with venue searches.`
                   },
                   {
                     role: "user",

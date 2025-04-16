@@ -44,17 +44,32 @@ export interface Venue {
   parking?: boolean;
   wifi?: boolean;
   accessibility_features?: string[];
+  accessibilityFeatures?: string[];
   accepted_payment_methods?: string[];
+  acceptedPaymentMethods?: string[];
   opening_hours?: Record<string, {open: string, close: string}>;
+  openingHours?: Record<string, {open: string, close: string}>;
   owner_info?: {
     name: string;
     contact: string;
     responseTime: string;
     user_id: string;
   };
+  ownerInfo?: {
+    name: string;
+    contact: string;
+    responseTime: string;
+    user_id: string;
+  };
   additional_services?: string[];
+  additionalServices?: string[];
   type?: string;
   rules_and_regulations?: Array<{
+    category: string;
+    title: string;
+    description: string;
+  }>;
+  rulesAndRegulations?: Array<{
     category: string;
     title: string;
     description: string;
