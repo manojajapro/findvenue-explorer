@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
@@ -47,7 +46,6 @@ const HomePageMap = ({ height = '600px', smallView = false }: HomePageMapProps) 
     id: 'google-map-script'
   });
   
-  // Function to fetch venue types from the database
   const fetchVenueTypes = async () => {
     try {
       const { data, error } = await supabase
@@ -60,15 +58,17 @@ const HomePageMap = ({ height = '600px', smallView = false }: HomePageMapProps) 
         return;
       }
       
-      // Extract unique types
-      const uniqueTypes = [...new Set(data.map(item => item.type).filter(Boolean))];
+      const uniqueTypes = [...new Set(data
+        .map(item => item.type)
+        .filter(Boolean)
+      )];
+      
       setVenueTypes(uniqueTypes as string[]);
     } catch (error) {
       console.error('Error in fetchVenueTypes:', error);
     }
   };
   
-  // Function to fetch venues, with optional type filter
   const fetchVenues = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -79,7 +79,8 @@ const HomePageMap = ({ height = '600px', smallView = false }: HomePageMapProps) 
         .order('rating', { ascending: false })
         .limit(20);
       
-      if (selectedVenueType) {
+      if (selectedVenueType && selectedVenueType !== '_all' && 
+          selectedVenueType !== '_unknown' && selectedVenueType !== '_none') {
         query = query.eq('type', selectedVenueType);
       }
       
@@ -92,15 +93,12 @@ const HomePageMap = ({ height = '600px', smallView = false }: HomePageMapProps) 
       
       if (data) {
         const mappedVenues: Venue[] = data.map(venue => {
-          // Process gallery images
           const galleryImages = venue.gallery_images ? 
             (Array.isArray(venue.gallery_images) ? venue.gallery_images : [venue.gallery_images]) 
             : [];
           
-          // Get the first image as default
           const imageUrl = galleryImages.length > 0 ? galleryImages[0] : '';
           
-          // Process capacity
           const minCapacity = venue.min_capacity ? Number(venue.min_capacity) : 0;
           const maxCapacity = venue.max_capacity ? Number(venue.max_capacity) : 0;
           
@@ -149,10 +147,19 @@ const HomePageMap = ({ height = '600px', smallView = false }: HomePageMapProps) 
   }, [isLoaded, fetchVenues]);
   
   const handleVenueTypeChange = (value: string) => {
+    setSelectedVenue(null);
+    
+    if (value === '_all') {
+      setSelectedVenueType('');
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('venueType');
+      setSearchParams(newSearchParams);
+      return;
+    }
+    
     setSelectedVenueType(value);
-    // Update URL search params
     const newSearchParams = new URLSearchParams(searchParams);
-    if (value) {
+    if (value && value !== '_unknown' && value !== '_none') {
       newSearchParams.set('venueType', value);
     } else {
       newSearchParams.delete('venueType');
@@ -163,7 +170,6 @@ const HomePageMap = ({ height = '600px', smallView = false }: HomePageMapProps) 
   const onMarkerClick = (venue: Venue) => {
     setSelectedVenue(venue);
     
-    // Center map on selected venue
     if (map && venue.latitude && venue.longitude) {
       map.panTo({ lat: venue.latitude, lng: venue.longitude });
     }
@@ -239,12 +245,16 @@ const HomePageMap = ({ height = '600px', smallView = false }: HomePageMapProps) 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="">All Venue Types</SelectItem>
-                    {venueTypes.map(type => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="_all">All Venue Types</SelectItem>
+                    {venueTypes && venueTypes.length > 0 ? (
+                      venueTypes.map((type, index) => (
+                        <SelectItem key={index} value={type || '_unknown'}>
+                          {type || 'Uncategorized'}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="_none">No venue types available</SelectItem>
+                    )}
                   </SelectGroup>
                 </SelectContent>
               </Select>
