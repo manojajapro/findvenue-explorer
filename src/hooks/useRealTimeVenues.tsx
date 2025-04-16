@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue, VenueFilter } from '@/types/global';
-import { data as categoriesData } from '@/data/categories';
-import { data as citiesData } from '@/data/cities';
+import { categories as categoriesData } from '@/data/categories';
+import { cities as citiesData } from '@/data/cities';
 
 // Type definition for what the hook returns
 interface UseRealTimeVenuesReturn {

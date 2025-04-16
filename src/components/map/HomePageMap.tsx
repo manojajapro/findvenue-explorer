@@ -1,11 +1,9 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useGoogleMap } from '@/hooks/useGoogleMap';
 import { useRealTimeVenues } from '@/hooks/useRealTimeVenues';
 import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { CircleIcon, MapPin, Search } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -15,7 +13,6 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
