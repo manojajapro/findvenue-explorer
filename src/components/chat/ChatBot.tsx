@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { MessageSquare, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -24,7 +24,34 @@ const ChatBot: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const { id } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
   const [venueInfo, setVenueInfo] = useState<any | null>(null);
+  const [venues, setVenues] = useState<any[]>([]);
+
+  // Fetch venues for recommendations
+  useEffect(() => {
+    const fetchVenues = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('venues')
+          .select('id, name, city_name, category_name, image_url')
+          .limit(10);
+
+        if (error) {
+          console.error("Error fetching venues:", error);
+          return;
+        }
+
+        if (data) {
+          setVenues(data);
+        }
+      } catch (err) {
+        console.error("Error in venues fetch:", err);
+      }
+    };
+
+    fetchVenues();
+  }, []);
 
   // Fetch venue details if we're on a venue details page
   useEffect(() => {
@@ -80,63 +107,84 @@ const ChatBot: React.FC = () => {
     // Add user message to chat
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     
-    // Simulate AI response
     setIsLoading(true);
     
     try {
-      // Here we would normally call an AI API
-      // For this demo, we'll generate responses based on user input and venue context
-      
-      setTimeout(() => {
-        let response = '';
-        const lowerCaseMessage = userMessage.toLowerCase();
-        
-        if (venueInfo) {
-          // Venue-specific responses
-          if (lowerCaseMessage.includes('price') || lowerCaseMessage.includes('cost') || lowerCaseMessage.includes('fee')) {
-            response = `${venueInfo.name} pricing starts at ${venueInfo.currency} ${venueInfo.starting_price.toLocaleString()} per booking.`;
-            if (venueInfo.price_per_person > 0) {
-              response += ` There's also a price per person of ${venueInfo.currency} ${venueInfo.price_per_person}.`;
-            }
-          } else if (lowerCaseMessage.includes('capacity') || lowerCaseMessage.includes('people') || lowerCaseMessage.includes('guests')) {
-            response = `${venueInfo.name} can accommodate between ${venueInfo.min_capacity} and ${venueInfo.max_capacity} guests.`;
-          } else if (lowerCaseMessage.includes('amenities') || lowerCaseMessage.includes('facilities') || lowerCaseMessage.includes('features')) {
-            const amenitiesList = venueInfo.amenities.join(', ');
-            response = `${venueInfo.name} offers these amenities: ${amenitiesList}.`;
-            if (venueInfo.wifi) response += " WiFi is available.";
-            if (venueInfo.parking) response += " Parking facilities are available.";
-          } else if (lowerCaseMessage.includes('location') || lowerCaseMessage.includes('address') || lowerCaseMessage.includes('where')) {
-            response = `${venueInfo.name} is located at ${venueInfo.address} in ${venueInfo.city_name}.`;
-          } else if (lowerCaseMessage.includes('book') || lowerCaseMessage.includes('reserve') || lowerCaseMessage.includes('availability')) {
-            response = `To book ${venueInfo.name}, you can use the booking form on this page. Available days include: ${venueInfo.availability.join(', ')}. You can also message the venue host directly.`;
-          } else if (lowerCaseMessage.includes('contact') || lowerCaseMessage.includes('owner') || lowerCaseMessage.includes('host')) {
-            response = `You can contact the venue host directly by clicking the "Message Venue Host" button on this page. They'll respond to your inquiries about ${venueInfo.name}.`;
-          } else {
-            response = `${venueInfo.name} is a ${venueInfo.category_name} venue located in ${venueInfo.city_name}. Is there something specific you'd like to know about this venue?`;
-          }
-        } else {
-          // General responses
-          if (lowerCaseMessage.includes('venue')) {
-            response = 'FindVenue helps you discover and book the perfect venue for your events. You can browse venues by city or category, and filter by capacity and price.';
-          } else if (lowerCaseMessage.includes('book') || lowerCaseMessage.includes('reservation')) {
-            response = 'To book a venue, navigate to the venue details page and use the booking form. You can select your preferred date and time, and provide details about your event.';
-          } else if (lowerCaseMessage.includes('hello') || lowerCaseMessage.includes('hi') || lowerCaseMessage.includes('hey')) {
-            response = 'Hello! How can I assist you with FindVenue today?';
-          } else if (lowerCaseMessage.includes('thank')) {
-            response = "You're welcome! Let me know if you need anything else.";
-          } else {
-            response = "I'm here to help you find and book venues. You can ask about specific venues, booking process, or browse available options by city or category.";
-          }
+      // Call the OpenAI-powered edge function
+      const { data, error } = await supabase.functions.invoke('venue-assistant', {
+        body: {
+          query: userMessage,
+          venueId: venueInfo?.id || null,
+          type: 'chat'
         }
-        
-        setMessages(prev => [...prev, { role: 'assistant', content: response }]);
-        setIsLoading(false);
-      }, 1000);
+      });
       
+      if (error) {
+        throw error;
+      }
+      
+      let response = data?.answer;
+      
+      // If we've got venue recommendations, format them as clickable links
+      if (data?.venues) {
+        response += "\n\nHere are some venues you might be interested in:\n";
+        data.venues.forEach((venue: any, index: number) => {
+          response += `\n${index + 1}. ${venue.name} in ${venue.city_name}`;
+        });
+      }
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
     } catch (error) {
       console.error('Error generating response:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again later.' }]);
+      
+      // Fall back to the rule-based responses
+      let response = '';
+      const lowerCaseMessage = userMessage.toLowerCase();
+      
+      if (lowerCaseMessage.includes('venue')) {
+        response = 'I can help you find the perfect venue for your event. Would you like to browse by location or event type?';
+        // Add recommendations of actual venues
+        if (venues.length > 0) {
+          response += "\n\nHere are some popular venues you might like:";
+          venues.slice(0, 3).forEach(venue => {
+            response += `\n• <a href="/venue/${venue.id}" class="text-blue-400 hover:underline">${venue.name}</a> in ${venue.city_name}`;
+          });
+        }
+      } else if (lowerCaseMessage.includes('find') || lowerCaseMessage.includes('search')) {
+        response = 'You can search for venues using the search bar at the top of the page, or browse venues by city or category.';
+      } else if (lowerCaseMessage.includes('book') || lowerCaseMessage.includes('reservation')) {
+        response = 'To book a venue, navigate to the venue details page and use the booking form. You can select your preferred date and time, and provide details about your event.';
+      } else if (lowerCaseMessage.includes('hello') || lowerCaseMessage.includes('hi') || lowerCaseMessage.includes('hey')) {
+        response = 'Hello! How can I assist you with FindVenue today?';
+      } else if (lowerCaseMessage.includes('thank')) {
+        response = "You're welcome! Let me know if you need anything else.";
+      } else {
+        response = "I'm here to help you find and book venues. You can ask about specific venues, the booking process, or browse available options by city or category.";
+        // Add links to popular venues
+        if (venues.length > 0) {
+          response += "\n\nHere are some trending venues right now:";
+          venues.slice(0, 3).forEach(venue => {
+            response += `\n• <a href="/venue/${venue.id}" class="text-blue-400 hover:underline">${venue.name}</a>`;
+          });
+        }
+      }
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+    } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // Function to handle clicking on venue links in messages
+  const handleMessageClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'A') {
+      const href = target.getAttribute('href');
+      if (href) {
+        e.preventDefault();
+        navigate(href);
+        setIsOpen(false);
+      }
     }
   };
 
@@ -164,7 +212,7 @@ const ChatBot: React.FC = () => {
             </Button>
           </div>
           
-          <CardContent className="flex-1 overflow-y-auto p-3">
+          <CardContent className="flex-1 overflow-y-auto p-3" onClick={handleMessageClick}>
             <div className="space-y-4">
               {messages.map((msg, i) => (
                 <div
@@ -177,9 +225,8 @@ const ChatBot: React.FC = () => {
                         ? 'bg-findvenue text-white'
                         : 'bg-findvenue-surface/30 border border-white/10'
                     }`}
-                  >
-                    {msg.content}
-                  </div>
+                    dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br/>') }}
+                  />
                 </div>
               ))}
               {isLoading && (
