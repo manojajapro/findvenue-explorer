@@ -41,6 +41,12 @@ export interface Venue {
     contact: string;
     responseTime: string;
     user_id: string;
+    socialLinks?: {
+      facebook?: string;
+      twitter?: string;
+      instagram?: string;
+      linkedin?: string;
+    }
   };
   additionalServices?: string[];
   type?: string;
