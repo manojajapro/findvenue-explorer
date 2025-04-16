@@ -25,10 +25,11 @@ serve(async (req) => {
 
     // Parse the request body
     const body = await req.json();
-    const { query, venueId, type } = body;
+    const { query, venueId, type, enhancedSearch } = body;
 
     // Log the incoming request for debugging
     console.log(`Received ${type} request: ${query}`);
+    console.log('Enhanced search parameters:', enhancedSearch || 'none');
     
     // Basic validation
     if (!query || typeof query !== 'string') {
@@ -41,7 +42,7 @@ serve(async (req) => {
     // Process the query based on type
     switch (type) {
       case 'home':
-        return await handleHomeQuery(query, supabaseClient);
+        return await handleHomeQuery(query, supabaseClient, enhancedSearch);
       case 'venue':
         return await handleVenueQuery(query, venueId, supabaseClient);
       case 'voice':
@@ -70,10 +71,15 @@ serve(async (req) => {
 });
 
 // Handle home page queries
-async function handleHomeQuery(query: string, supabaseClient: any) {
+async function handleHomeQuery(query: string, supabaseClient: any, enhancedSearch?: any) {
   try {
     // Extract query intent with OpenAI
-    const queryIntent = await analyzeQueryIntent(query);
+    const queryIntent = await analyzeQueryIntent(query, enhancedSearch);
+    
+    // Generate suggested follow-up queries based on the user's question
+    const suggestedQueries = await generateSuggestedQueries(query, queryIntent);
+    
+    console.log('Query intent analysis:', JSON.stringify(queryIntent, null, 2));
     
     // Fetch relevant venues based on query intent
     let relevantVenues: any[] = [];
@@ -85,13 +91,24 @@ async function handleHomeQuery(query: string, supabaseClient: any) {
       // Construct query
       let venuesQuery = supabaseClient.from('venues').select('*');
       
-      // Add filters based on searchParams
+      // Add filters based on searchParams with improved matching
       if (searchParams.city) {
         venuesQuery = venuesQuery.ilike('city_name', `%${searchParams.city}%`);
       }
       
       if (searchParams.category) {
-        venuesQuery = venuesQuery.contains('category_name', [searchParams.category]);
+        // For category, check if it's in the array of category names
+        if (Array.isArray(searchParams.category)) {
+          // Multiple categories, ANY match
+          const categoryFilter = searchParams.category.map(cat => `%${cat}%`);
+          venuesQuery = venuesQuery.or(categoryFilter.map(cat => `category_name.ilike.${cat}`).join(','));
+        } else {
+          venuesQuery = venuesQuery.ilike('category_name::text', `%${searchParams.category}%`);
+        }
+      }
+      
+      if (searchParams.type) {
+        venuesQuery = venuesQuery.ilike('type', `%${searchParams.type}%`);
       }
       
       if (searchParams.minCapacity) {
@@ -107,24 +124,44 @@ async function handleHomeQuery(query: string, supabaseClient: any) {
       }
       
       if (searchParams.amenities && searchParams.amenities.length) {
-        const amenity = searchParams.amenities[0];
-        venuesQuery = venuesQuery.contains('amenities', [amenity]);
+        if (Array.isArray(searchParams.amenities)) {
+          // Filter venues that contain ANY of the specified amenities
+          const amenityConditions = searchParams.amenities.map(amenity => 
+            `amenities::text ILIKE '%${amenity}%'`
+          );
+          venuesQuery = venuesQuery.or(amenityConditions.join(','));
+        } else {
+          venuesQuery = venuesQuery.contains('amenities', [searchParams.amenities]);
+        }
+      }
+
+      if (searchParams.features) {
+        if (searchParams.features.includes('wifi')) {
+          venuesQuery = venuesQuery.eq('wifi', true);
+        }
+        if (searchParams.features.includes('parking')) {
+          venuesQuery = venuesQuery.eq('parking', true);
+        }
       }
       
       // Execute query with limit
       const { data, error } = await venuesQuery.limit(5);
       
       if (error) {
+        console.error('Venue query error:', error);
         throw error;
       }
       
       if (data) {
+        console.log(`Found ${data.length} venues matching the query`);
+        
         relevantVenues = data.map(venue => ({
           id: venue.id,
           name: venue.name,
           description: venue.description || '',
           address: venue.address || '',
           city: venue.city_name || '',
+          type: venue.type || 'Venue',
           imageUrl: venue.gallery_images && venue.gallery_images.length > 0 ? venue.gallery_images[0] : null,
           capacity: {
             min: venue.min_capacity || 0,
@@ -133,6 +170,11 @@ async function handleHomeQuery(query: string, supabaseClient: any) {
           pricing: {
             startingPrice: venue.starting_price || 0,
             currency: venue.currency || 'SAR'
+          },
+          amenities: venue.amenities || [],
+          features: {
+            wifi: venue.wifi,
+            parking: venue.parking
           }
         }));
       }
@@ -144,7 +186,8 @@ async function handleHomeQuery(query: string, supabaseClient: any) {
     return new Response(
       JSON.stringify({
         answer: response,
-        venues: relevantVenues.length > 0 ? relevantVenues : undefined
+        venues: relevantVenues.length > 0 ? relevantVenues : undefined,
+        suggestedQueries: suggestedQueries
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -162,7 +205,7 @@ async function handleVenueQuery(query: string, venueId: string, supabaseClient: 
       .from('venues')
       .select('*')
       .eq('id', venueId)
-      .single();
+      .maybeSingle();
       
     if (error) throw error;
     
@@ -207,7 +250,7 @@ async function handleVenueQuery(query: string, venueId: string, supabaseClient: 
   }
 }
 
-// Handle voice queries (similar to venue queries but optimized for speech)
+// Handle voice queries (optimized for speech)
 async function handleVoiceQuery(query: string, venueId: string, supabaseClient: any) {
   try {
     const response = await handleVenueQuery(query, venueId, supabaseClient);
@@ -232,7 +275,7 @@ async function handleWelcomeMessage(venueId: string, supabaseClient: any) {
       .from('venues')
       .select('name, type')
       .eq('id', venueId)
-      .single();
+      .maybeSingle();
       
     if (error) throw error;
     
@@ -252,9 +295,18 @@ async function handleWelcomeMessage(venueId: string, supabaseClient: any) {
   }
 }
 
-// Analyze query intent using OpenAI
-async function analyzeQueryIntent(query: string) {
+// Analyze query intent using OpenAI with enhanced parameters
+async function analyzeQueryIntent(query: string, enhancedSearch?: any) {
   try {
+    // Use the enhanced search info if available
+    const searchContext = enhancedSearch ? 
+      `Enhanced search info indicates this is likely: 
+      - Location query: ${enhancedSearch.isLocationQuery ? 'Yes' : 'No'}
+      - Capacity query: ${enhancedSearch.isCapacityQuery ? 'Yes' : 'No'}
+      - Pricing query: ${enhancedSearch.isPricingQuery ? 'Yes' : 'No'}
+      - Category query: ${enhancedSearch.isCategoryQuery ? 'Yes' : 'No'}` 
+      : '';
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -269,16 +321,19 @@ async function analyzeQueryIntent(query: string) {
             content: 
             `You are an AI assistant that analyzes user queries about venues. 
             Extract the search intent and parameters from the query.
+            ${searchContext}
             Return ONLY a JSON object with the following structure:
             {
               "searchVenues": boolean, // true if the user is searching for venues
               "searchParams": {
                 "city": string or null, // city name if mentioned
-                "category": string or null, // category name if mentioned (e.g., wedding, conference, etc.)
+                "category": string or array or null, // category name(s) if mentioned (e.g., wedding, conference, etc.)
+                "type": string or null, // venue type if mentioned (e.g., hotel, restaurant, hall, etc.)
                 "minCapacity": number or null, // minimum capacity if mentioned
                 "maxCapacity": number or null, // maximum capacity if mentioned
                 "maxPrice": number or null, // maximum price if mentioned
                 "amenities": string[] // array of amenities mentioned (e.g., wifi, parking, etc.)
+                "features": string[] // specific features like wifi, parking, etc.
               },
               "generalInfo": boolean, // true if asking for general information about the platform/service
               "locationInfo": boolean, // true if asking about specific locations
@@ -314,10 +369,64 @@ async function analyzeQueryIntent(query: string) {
   }
 }
 
+// Generate suggested follow-up queries
+async function generateSuggestedQueries(query: string, intent: any): Promise<string[]> {
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: 
+            `You are an AI assistant for FindVenue, a venue booking platform.
+             Based on the user's query and their intent, suggest 5 follow-up questions they might want to ask.
+             Make the suggestions specific, relevant, and natural.
+             Return your response as a JSON array of strings.
+             Examples: ["Show me wedding venues in Riyadh", "What venues offer catering services?"]`
+          },
+          {
+            role: "user",
+            content: `User query: "${query}"\nIntent analysis: ${JSON.stringify(intent)}`
+          }
+        ],
+        temperature: 0.7,
+        response_format: { "type": "json_object" }
+      }),
+    });
+
+    const result = await response.json();
+    
+    if (!result.choices || !result.choices[0]?.message?.content) {
+      throw new Error("Invalid response from OpenAI API");
+    }
+    
+    const content = JSON.parse(result.choices[0].message.content);
+    return Array.isArray(content.suggestions) ? content.suggestions : [];
+  } catch (error) {
+    console.error('Error generating suggested queries:', error);
+    return [
+      "Find venues with WiFi",
+      "Show me wedding venues",
+      "What are the top-rated venues?",
+      "Find venues for 50 guests",
+      "Show me venues with parking"
+    ];
+  }
+}
+
 // Generate response based on query and intent
 async function generateResponse(query: string, intent: any, venues: any[]) {
   try {
     const hasVenues = venues.length > 0;
+    const venueDetails = hasVenues 
+      ? venues.map(v => `- ${v.name}: ${v.type} in ${v.city}, capacity ${v.capacity.min}-${v.capacity.max}, from ${v.pricing.currency} ${v.pricing.startingPrice}`).join("\n")
+      : "";
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -333,8 +442,9 @@ async function generateResponse(query: string, intent: any, venues: any[]) {
             content: 
             `You are an AI assistant for FindVenue, a venue booking platform.
              Answer the user's question about venues, locations, features, and services.
-             ${hasVenues ? `I've found ${venues.length} venues that match the query. I'll show them alongside your response.` : "I didn't find any venues matching the query."}
-             Keep your response conversational, helpful, and concise (under 100 words).
+             ${hasVenues ? `I've found ${venues.length} venues that match the query. Details:\n${venueDetails}\nI'll show them alongside your response.` : "I didn't find any venues matching the query."}
+             Be specific about the venues found if any. Mention venue names, types, and key features that matched their search.
+             Keep your response conversational, helpful, and concise (under 150 words).
              If you're suggesting venues, mention that the user can see them below your message.
              Don't include URLs or complex formatting.`
           },
@@ -344,7 +454,7 @@ async function generateResponse(query: string, intent: any, venues: any[]) {
           }
         ],
         temperature: 0.7,
-        max_tokens: 150
+        max_tokens: 250
       }),
     });
 
@@ -358,9 +468,10 @@ async function generateResponse(query: string, intent: any, venues: any[]) {
   } catch (error) {
     console.error('Error generating response:', error);
     
-    // Fallback response
+    // Fallback response with more details
     if (venues.length > 0) {
-      return `I found ${venues.length} venues that might match what you're looking for. You can check them out below.`;
+      const venueNames = venues.map(v => v.name).join(', ');
+      return `I found ${venues.length} venues that might match what you're looking for: ${venueNames}. You can check them out below.`;
     } else {
       return "I can help you find venues for your events. Just let me know what you're looking for - like location, capacity, or venue type.";
     }
@@ -385,7 +496,11 @@ async function generateVenueResponse(query: string, venueDetails: any) {
             `You are an AI assistant for ${venueDetails.name}, a venue on the FindVenue platform.
              Answer the user's question about this specific venue based on the following details:
              ${JSON.stringify(venueDetails, null, 2)}
-             Keep your response conversational, helpful, and concise (under 100 words).
+             Be specific in your answers. If asked about features or amenities, list the exact ones available.
+             If asked about pricing, give the exact figures.
+             If asked about capacity, provide the minimum and maximum guest counts.
+             If information is not available, politely state so instead of inventing details.
+             Keep your response conversational, helpful, and concise (under 150 words).
              Don't include URLs or complex formatting.`
           },
           {
@@ -394,7 +509,7 @@ async function generateVenueResponse(query: string, venueDetails: any) {
           }
         ],
         temperature: 0.7,
-        max_tokens: 150
+        max_tokens: 250
       }),
     });
 
@@ -408,7 +523,7 @@ async function generateVenueResponse(query: string, venueDetails: any) {
   } catch (error) {
     console.error('Error generating venue response:', error);
     
-    // Fallback response
+    // Fallback response with basic venue info
     return `${venueDetails.name} is a ${venueDetails.type} that can accommodate ${venueDetails.capacity}. It's located at ${venueDetails.location} in ${venueDetails.city}. How else can I help you with this venue?`;
   }
 }

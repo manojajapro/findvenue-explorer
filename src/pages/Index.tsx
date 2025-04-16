@@ -81,6 +81,7 @@ const Index = () => {
             {/* We would render all categories here */}
           </div>
         </div>
+        <SmartVenueAssistant />
       </div>
     );
   }
@@ -100,6 +101,7 @@ const Index = () => {
             {/* We would render all cities here */}
           </div>
         </div>
+        <SmartVenueAssistant />
       </div>
     );
   }
@@ -125,7 +127,7 @@ const Index = () => {
       <GlobalVenues />
       <AdviceSection />
       
-      {/* Add the Smart Venue Assistant */}
+      {/* Add the improved Smart Venue Assistant */}
       <SmartVenueAssistant />
     </>
   );
