@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useGeocode } from '@/hooks/useGeocode';
-import { venues as mockVenues } from '@/data/venues';
+import { venues as mockVenues, Venue as MockVenue } from '@/data/venues';
 import { supabase } from '@/integrations/supabase/client';
 import EnhancedMapSearch from './EnhancedMapSearch';
 import LocationSearchInput from './LocationSearchInput';
@@ -281,9 +281,12 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     let filtered = [...(realVenues.length > 0 ? realVenues : mockVenues)];
     
     if (venueType && venueType !== 'all') {
-      filtered = filtered.filter(venue => 
-        venue.type !== undefined && venue.type === venueType
-      );
+      filtered = filtered.filter(venue => {
+        if ('type' in venue) {
+          return venue.type === venueType;
+        }
+        return true;
+      });
       
       const filterName = `Type: ${venueType}`;
       if (!appliedFilters.includes(filterName)) {
