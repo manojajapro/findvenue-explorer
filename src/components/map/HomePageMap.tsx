@@ -35,6 +35,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
   const [guestCount, setGuestCount] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [realVenues, setRealVenues] = useState<Venue[]>([]);
+  const [venueTypes, setVenueTypes] = useState<{value: string, label: string}[]>([]);
   
   const [radiusInKm, setRadiusInKm] = useState(5);
   const [isRadiusActive, setIsRadiusActive] = useState(false);
@@ -49,6 +50,43 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     id: 'google-map-script',
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
   });
+
+  useEffect(() => {
+    const fetchVenueTypes = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('venues')
+          .select('type')
+          .not('type', 'is', null);
+        
+        if (error) throw error;
+        
+        if (data) {
+          const uniqueTypes = Array.from(new Set(data.map(venue => venue.type)))
+            .filter(type => type && type.trim() !== '')
+            .map(type => ({
+              value: String(type),
+              label: String(type).charAt(0).toUpperCase() + String(type).slice(1)
+            }));
+          
+          setVenueTypes(uniqueTypes);
+          console.log('Fetched venue types:', uniqueTypes);
+        }
+      } catch (error) {
+        console.error("Error fetching venue types:", error);
+        setVenueTypes([
+          { value: "hall", label: "Hall" },
+          { value: "restaurant", label: "Restaurant" },
+          { value: "hotel", label: "Hotel" },
+          { value: "outdoor", label: "Outdoor" },
+          { value: "lounge", label: "Lounge" },
+          { value: "rooftop", label: "Rooftop" }
+        ]);
+      }
+    };
+    
+    fetchVenueTypes();
+  }, []);
 
   useEffect(() => {
     const fetchVenues = async () => {
@@ -103,10 +141,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
     fetchVenues();
   }, []);
   
-  useEffect(() => {
-    setVenues(realVenues.length > 0 ? realVenues : mockVenues);
-  }, [realVenues]);
-
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371;
     const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -300,15 +334,6 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
       handleSearch();
     }
   };
-
-  const venueTypes = [
-    { value: "hall", label: "Hall" },
-    { value: "restaurant", label: "Restaurant" },
-    { value: "hotel", label: "Hotel" },
-    { value: "outdoor", label: "Outdoor" },
-    { value: "lounge", label: "Lounge" },
-    { value: "rooftop", label: "Rooftop" }
-  ];
 
   const displayVenues = isRadiusActive && userLocation ? filteredByRadius : venues;
 
