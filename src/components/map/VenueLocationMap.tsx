@@ -91,11 +91,10 @@ const VenueLocationMap = ({
   }) : [];
 
   useEffect(() => {
-    if (latitude !== undefined && longitude !== undefined && 
-        latitude !== null && longitude !== null) {
+    if (latitude && longitude) {
       setPosition({
-        lat: Number(latitude),
-        lng: Number(longitude)
+        lat: latitude,
+        lng: longitude
       });
     }
   }, [latitude, longitude]);

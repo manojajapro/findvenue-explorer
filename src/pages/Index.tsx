@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import HeroSection from '@/components/hero/HeroSection';
 import CitiesSection from '@/components/cities/CitiesSection';
@@ -17,7 +17,6 @@ const Index = () => {
   const { venues, isLoading, filters } = useSearch();
   const [activeView, setActiveView] = useState<string | null>(null);
   const [showMap, setShowMap] = useState<boolean>(false);
-  const mapSectionRef = useRef<HTMLDivElement>(null);
   
   const hasFilters = Object.keys(filters).length > 0;
   
@@ -64,25 +63,7 @@ const Index = () => {
   useEffect(() => {
     const showMapParam = searchParams.get('showMap');
     setShowMap(showMapParam === 'true');
-    
-    // Check if we should scroll to map section
-    if (showMapParam === 'true' && mapSectionRef.current) {
-      mapSectionRef.current.scrollIntoView({ 
-        behavior: 'smooth',
-        block: 'start'
-      });
-    }
   }, [searchParams]);
-  
-  // Function for smooth scrolling to map section
-  const scrollToMapSection = () => {
-    if (mapSectionRef.current) {
-      mapSectionRef.current.scrollIntoView({ 
-        behavior: 'smooth',
-        block: 'start'
-      });
-    }
-  };
   
   if (activeView === 'categories') {
     return (
@@ -124,9 +105,9 @@ const Index = () => {
   
   return (
     <>
-      <HeroSection scrollToMapSection={scrollToMapSection} />
+      <HeroSection />
       
-      <div ref={mapSectionRef} className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h2 className="text-2xl md:text-3xl font-bold mb-2">Find Venues on Map</h2>
           <p className="text-findvenue-text-muted">
