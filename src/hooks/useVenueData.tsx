@@ -1,10 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { useToast } from '@/components/ui/use-toast';
-import { processCategoryNames } from '@/utils/venueHelpers';
 
 export const useVenueData = () => {
   const { id } = useParams<{ id: string }>();
@@ -121,6 +119,54 @@ export const useVenueData = () => {
             return [String(field)];
           };
           
+          const processCategoryNames = (categories: any): string[] => {
+            if (!categories) return [];
+            
+            if (Array.isArray(categories)) {
+              return categories.map(cat => {
+                if (typeof cat === 'string') {
+                  return cat.replace(/[[\]']/g, '').trim();
+                }
+                return String(cat).trim();
+              });
+            }
+            
+            if (typeof categories === 'string') {
+              if (categories.startsWith('[') && categories.endsWith(']')) {
+                try {
+                  const parsed = JSON.parse(categories.replace(/'/g, '"'));
+                  if (Array.isArray(parsed)) {
+                    return parsed.map(item => String(item).trim());
+                  }
+                } catch (e) {
+                  console.error("Error parsing category names array", categories, e);
+                }
+              }
+              
+              if (categories.includes(',')) {
+                return categories.split(',').map(cat => cat.trim());
+              }
+              
+              try {
+                const parsed = JSON.parse(categories);
+                if (Array.isArray(parsed)) {
+                  return parsed.map(item => String(item).trim());
+                }
+              } catch (e) {
+                console.error("Error parsing category names JSON", categories, e);
+              }
+              
+              if (/[a-z][A-Z]/.test(categories)) {
+                return categories.replace(/([a-z])([A-Z])/g, '$1,$2').split(',')
+                  .map(cat => cat.trim());
+              }
+              
+              return [categories.trim()];
+            }
+            
+            return [];
+          };
+          
           const galleryImages = processArrayField(data.gallery_images);
           const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
           
@@ -136,7 +182,6 @@ export const useVenueData = () => {
           const pricePerPerson = data.price_per_person ? Number(data.price_per_person) : undefined;
           const hourlyRate = data.hourly_rate ? Number(data.hourly_rate) : undefined;
           
-          // Use the processCategoryNames utility to properly parse the category names
           const categoryNames = processCategoryNames(data.category_name);
           
           const transformedVenue: Venue = {

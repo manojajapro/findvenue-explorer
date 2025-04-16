@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -12,7 +13,6 @@ import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import VenueLocationMap from '@/components/map/VenueLocationMap';
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -59,16 +59,15 @@ const VenueDetails = () => {
     return <div className="container mx-auto p-4">Venue not found.</div>;
   }
 
+  // Get owner info from venue data
   const ownerInfo = venue.ownerInfo || null;
   const ownerId = ownerInfo?.user_id || '';
   const ownerName = ownerInfo?.name || '';
   
+  // Check if current user is the owner
   const isOwner = user?.id === ownerId;
   
-  const categoryNames = Array.isArray(venue.categoryNames) ? venue.categoryNames : 
-                       (venue.category && typeof venue.category === 'string' ? 
-                         venue.category.split(',').map(c => c.trim()) : 
-                         []);
+  const categoryNames = venue.categoryNames || [];
   
   const mainImage = venue.galleryImages && venue.galleryImages.length > 0 
     ? venue.galleryImages[0] 
@@ -94,6 +93,7 @@ const VenueDetails = () => {
         console.error('Error sharing:', error);
       }
     } else {
+      // Fallback for browsers that don't support the Web Share API
       navigator.clipboard.writeText(window.location.href);
       toast({
         title: "Link copied",
@@ -102,16 +102,14 @@ const VenueDetails = () => {
     }
   };
   
+  // Helper function to determine if we have enough images for gallery layout
   const hasEnoughImages = venue.galleryImages && venue.galleryImages.length >= 4;
-
-  const venueLatitude = typeof venue.latitude === 'number' ? venue.latitude : 
-                       (venue.latitude ? parseFloat(String(venue.latitude)) : undefined);
-  const venueLongitude = typeof venue.longitude === 'number' ? venue.longitude : 
-                       (venue.longitude ? parseFloat(String(venue.longitude)) : undefined);
 
   return (
     <div className="container mx-auto p-4">
+      {/* Modern Gallery Layout - Expanded and more prominent */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-2 h-[650px] mb-8 rounded-xl overflow-hidden shadow-xl">
+        {/* Main large image - takes up more space */}
         <div 
           className="md:col-span-8 h-full relative overflow-hidden group cursor-pointer" 
           onClick={() => venue.galleryImages?.[0] && handleImageClick(venue.galleryImages[0])}
@@ -158,6 +156,7 @@ const VenueDetails = () => {
           </div>
         </div>
         
+        {/* Right column with additional images stacked vertically */}
         <div className="md:col-span-4 grid grid-rows-4 gap-2 h-full">
           {venue.galleryImages?.slice(1, 5).map((img, index) => (
             <div 
@@ -182,6 +181,7 @@ const VenueDetails = () => {
         </div>
       </div>
       
+      {/* Image Gallery Dialog */}
       <Dialog>
         <DialogTrigger asChild>
           <Button className="mb-6 bg-findvenue hover:bg-findvenue/90 text-white">
@@ -203,6 +203,7 @@ const VenueDetails = () => {
         </DialogContent>
       </Dialog>
       
+      {/* Selected Image Dialog */}
       {selectedImage && (
         <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
           <DialogContent className="max-w-4xl p-0">
@@ -228,8 +229,10 @@ const VenueDetails = () => {
         </Dialog>
       )}
 
+      {/* Main content and sidebar layout */}
       <div className="md:flex md:gap-8">
         <div className="md:w-2/3 space-y-4">
+          {/* Quick overview with key information */}
           <div className="flex flex-wrap gap-x-8 gap-y-2 items-center mb-6 bg-findvenue-surface/5 p-4 rounded-lg border border-white/10">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-findvenue" />
@@ -268,18 +271,11 @@ const VenueDetails = () => {
           <div className="mb-4">
             <h4 className="text-sm font-medium mb-2">Categories</h4>
             <div className="flex flex-wrap gap-2">
-              {categoryNames.length > 0 ? (
-                categoryNames.map((category, index) => (
-                  <Badge 
-                    key={index} 
-                    className="py-1.5 px-3 bg-indigo-100/10 hover:bg-indigo-100/20 text-indigo-500 border border-indigo-500/30 rounded-full"
-                  >
-                    {category}
-                  </Badge>
-                ))
-              ) : (
-                <span className="text-gray-400">No categories specified</span>
-              )}
+              {categoryNames.map((category, index) => (
+                <Badge key={index} className="bg-findvenue/20 text-findvenue hover:bg-findvenue/30">
+                  {category}
+                </Badge>
+              ))}
             </div>
           </div>
           
@@ -321,19 +317,7 @@ const VenueDetails = () => {
           <Separator className="my-4" />
           
           <div className="mb-4">
-            <h4 className="text-lg font-semibold mb-3">Location</h4>
-            <VenueLocationMap 
-              name={venue.name}
-              address={venue.address || ''}
-              latitude={venueLatitude}
-              longitude={venueLongitude}
-            />
-          </div>
-          
-          <Separator className="my-4" />
-          
-          <div className="mb-4">
-            <h4 className="text-lg font-semibold mb-3">Rules and Regulations</h4>
+            <h4 className="text-lg font-semibold">Rules and Regulations</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
               <div className="glass-card p-4 rounded-lg bg-findvenue-surface/10 backdrop-blur-sm border border-white/10">
                 <h5 className="font-medium mb-2">General Rules</h5>
@@ -362,6 +346,7 @@ const VenueDetails = () => {
         </div>
         
         <div className="md:w-1/3 mt-6 md:mt-0">
+          {/* Use the VenueBookingTabs component but with simpler initial view */}
           <VenueBookingTabs 
             venueId={venue.id}
             venueName={venue.name}

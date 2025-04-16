@@ -65,15 +65,6 @@ const VenueLocationMap = ({
     id: 'google-map-script'
   });
 
-  useEffect(() => {
-    if (latitude !== undefined && longitude !== undefined && latitude !== null && longitude !== null) {
-      setPosition({
-        lat: Number(latitude),
-        lng: Number(longitude)
-      });
-    }
-  }, [latitude, longitude]);
-
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Radius of the earth in km
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -99,14 +90,25 @@ const VenueLocationMap = ({
     return distance <= radiusInKm;
   }) : [];
 
+  useEffect(() => {
+    if (latitude && longitude) {
+      setPosition({
+        lat: latitude,
+        lng: longitude
+      });
+    }
+  }, [latitude, longitude]);
+
+  useEffect(() => {
+    if (editable && onLocationChange && mapLoaded) {
+      onLocationChange(position.lat, position.lng);
+    }
+  }, [position, editable, onLocationChange, mapLoaded]);
+
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     setMapLoaded(true);
-    if (latitude && longitude) {
-      map.setCenter({ lat: Number(latitude), lng: Number(longitude) });
-      map.setZoom(14);
-    }
-  }, [latitude, longitude]);
+  }, []);
 
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (editable && e.latLng) {
