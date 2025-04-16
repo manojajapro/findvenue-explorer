@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Send, X, MessageSquare, Volume2, VolumeX, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -42,7 +43,7 @@ const suggestedQueries = [
   "Find venues suitable for birthday parties",
   "I need a venue with good accessibility features",
   "Show popular venues with high ratings",
-  "Show me venues in Jeddah for meetings"
+  "Which venues accept online payment?"
 ];
 
 const SmartVenueAssistant = () => {
@@ -66,11 +67,6 @@ const SmartVenueAssistant = () => {
       try {
         const parsedMessages = JSON.parse(storedMessages);
         setMessages(parsedMessages);
-        
-        // Don't show suggestions if there are already messages
-        if (parsedMessages.length > 1) { // More than just the welcome message
-          setShowSuggestions(false);
-        }
       } catch (err) {
         console.error('Error parsing stored messages:', err);
       }
@@ -219,13 +215,74 @@ const SmartVenueAssistant = () => {
       
       if (error) throw new Error(error.message);
       
+      let venues: VenueResult[] = [];
+      
+      // Get venue recommendations based on the query
+      if (userMessage.toLowerCase().includes('venue') || 
+          userMessage.toLowerCase().includes('place') || 
+          userMessage.toLowerCase().includes('hall') ||
+          userMessage.toLowerCase().includes('find') ||
+          userMessage.toLowerCase().includes('looking for') ||
+          userMessage.toLowerCase().includes('show me')) {
+        
+        // Basic search criteria extraction
+        let searchQuery = userMessage.toLowerCase();
+        let cityFilter = '';
+        let categoryFilter = '';
+        let maxPriceFilter = 10000; // Default high price
+        
+        // Extract city
+        ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina'].forEach(city => {
+          if (searchQuery.includes(city)) {
+            cityFilter = city;
+          }
+        });
+        
+        // Extract category
+        const commonCategories = ['wedding', 'birthday', 'meeting', 'conference', 'party', 'workshop'];
+        commonCategories.forEach(category => {
+          if (searchQuery.includes(category)) {
+            categoryFilter = category;
+          }
+        });
+        
+        // Extract price ranges
+        if (searchQuery.includes('cheap') || searchQuery.includes('affordable')) {
+          maxPriceFilter = 100;
+        } else if (searchQuery.includes('expensive') || searchQuery.includes('luxury')) {
+          maxPriceFilter = 1000;
+        }
+        
+        // Query Supabase for venues
+        let query = supabase.from('venues').select('id, name, city_name, gallery_images, description, starting_price, currency, category_name')
+          .limit(5);
+          
+        if (cityFilter) {
+          query = query.ilike('city_name', `%${cityFilter}%`);
+        }
+        
+        if (categoryFilter) {
+          query = query.contains('category_name', [categoryFilter]);
+        }
+        
+        if (maxPriceFilter < 10000) {
+          query = query.lte('starting_price', maxPriceFilter);
+        }
+        
+        const { data: venueData } = await query;
+        
+        if (venueData && venueData.length > 0) {
+          venues = venueData;
+        }
+      }
+      
       // Create assistant response
       const assistantMsg: Message = {
         id: generateId(),
         role: 'assistant',
         content: data?.answer || "I'm sorry, I couldn't find an answer to your query.",
         timestamp: Date.now(),
-        venues: data?.venues || []
+        venues: venues.length > 0 ? venues : undefined
       };
       
       setMessages(prev => [...prev, assistantMsg]);
@@ -288,16 +345,6 @@ const SmartVenueAssistant = () => {
     if (venue.gallery_images && venue.gallery_images.length > 0) return venue.gallery_images[0];
     return '/placeholder.svg';
   };
-
-  // Get a random set of suggested queries each time
-  const getRandomSuggestedQueries = () => {
-    // Shuffle the array
-    const shuffled = [...suggestedQueries].sort(() => 0.5 - Math.random());
-    // Get first 5
-    return shuffled.slice(0, 5);
-  };
-
-  const randomSuggestions = useRef(getRandomSuggestedQueries());
 
   return (
     <>
@@ -394,7 +441,7 @@ const SmartVenueAssistant = () => {
                   <div className="mb-6">
                     <p className="text-sm text-slate-400 mb-2">Try asking about:</p>
                     <div className="flex flex-wrap gap-2">
-                      {randomSuggestions.current.map((query, idx) => (
+                      {suggestedQueries.slice(0, 5).map((query, idx) => (
                         <Badge 
                           key={idx}
                           variant="outline" 
@@ -429,7 +476,7 @@ const SmartVenueAssistant = () => {
                           <div className="mt-3 pt-3 border-t border-slate-700/50">
                             <p className="font-medium text-sm mb-2">Recommended Venues</p>
                             <div className="space-y-2">
-                              {msg.venues.map(venue => (
+                              {msg.venues.slice(0, 3).map(venue => (
                                 <Link 
                                   key={venue.id}
                                   to={`/venue/${venue.id}`}
@@ -451,6 +498,15 @@ const SmartVenueAssistant = () => {
                                   </div>
                                 </Link>
                               ))}
+                              
+                              {msg.venues.length > 3 && (
+                                <Link 
+                                  to="/venues" 
+                                  className="block text-center text-xs text-blue-400 hover:text-blue-300 py-1"
+                                >
+                                  + {msg.venues.length - 3} more venues
+                                </Link>
+                              )}
                             </div>
                           </div>
                         )}
@@ -471,7 +527,7 @@ const SmartVenueAssistant = () => {
                   >
                     <div className="bg-slate-800/70 border border-slate-700/50 rounded-xl p-3 flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                      <span className="text-sm text-slate-300">Searching venues...</span>
+                      <span className="text-sm text-slate-300">Thinking...</span>
                     </div>
                   </motion.div>
                 )}

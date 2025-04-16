@@ -8,34 +8,24 @@ export interface Venue {
   description: string;
   address?: string;
   city?: string;
-  city_name?: string;
   cityId?: string;
   category?: string | string[];
-  category_name?: string[];
   categoryId?: string | string[];
   imageUrl?: string;
-  image_url?: string;
-  gallery_images?: string[];
   galleryImages?: string[];
-  capacity?: {
+  capacity: {
     min: number;
     max: number;
   };
-  min_capacity?: number;
-  max_capacity?: number;
-  pricing?: {
+  pricing: {
     startingPrice: number;
     pricePerPerson?: number;
     hourlyRate?: number;
     currency: string;
   };
-  starting_price?: number;
-  price_per_person?: number;
-  currency?: string;
   amenities?: string[];
   rating?: number;
   reviews?: number;
-  reviews_count?: number;
   featured?: boolean;
   popular?: boolean;
   latitude?: number;
@@ -43,32 +33,17 @@ export interface Venue {
   availability?: string[];
   parking?: boolean;
   wifi?: boolean;
-  accessibility_features?: string[];
   accessibilityFeatures?: string[];
-  accepted_payment_methods?: string[];
   acceptedPaymentMethods?: string[];
-  opening_hours?: Record<string, {open: string, close: string}>;
   openingHours?: Record<string, {open: string, close: string}>;
-  owner_info?: {
-    name: string;
-    contact: string;
-    responseTime: string;
-    user_id: string;
-  };
   ownerInfo?: {
     name: string;
     contact: string;
     responseTime: string;
     user_id: string;
   };
-  additional_services?: string[];
   additionalServices?: string[];
   type?: string;
-  rules_and_regulations?: Array<{
-    category: string;
-    title: string;
-    description: string;
-  }>;
   rulesAndRegulations?: Array<{
     category: string;
     title: string;
@@ -76,7 +51,6 @@ export interface Venue {
   }>;
   zipcode?: string;
   categoryNames?: string[];
-  status?: string;
 }
 
 export interface VenueFilter {
