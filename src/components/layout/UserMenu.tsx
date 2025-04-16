@@ -57,11 +57,13 @@ const UserMenu = () => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
+  const defaultAvatar = "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png";
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Avatar className="cursor-pointer h-8 w-8 border border-white/10">
-          <AvatarImage src={user?.profileImage} alt={`${user?.firstName} ${user?.lastName}`} />
+          <AvatarImage src={user?.profileImage || defaultAvatar} alt={`${user?.firstName} ${user?.lastName}`} />
           <AvatarFallback className="bg-findvenue text-white">{getInitials()}</AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>

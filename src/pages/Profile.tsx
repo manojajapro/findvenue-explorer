@@ -7,10 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import { PhoneInput } from '@/components/ui/phone-input';
+import { AvatarSelector } from '@/components/profile/AvatarSelector';
 
 const Profile = () => {
   const { user, profile, updateProfile, updatePassword } = useAuth();
@@ -59,6 +58,11 @@ const Profile = () => {
       });
     } catch (error) {
       console.error('Error updating profile:', error);
+      toast({
+        title: 'Error',
+        description: 'There was a problem updating your profile.',
+        variant: 'destructive',
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -146,26 +150,12 @@ const Profile = () => {
                   <form onSubmit={handleProfileUpdate} className="space-y-6">
                     <div className="flex flex-col md:flex-row items-start gap-6">
                       <div className="flex flex-col items-center space-y-3">
-                        <Avatar className="h-24 w-24 border-2 border-findvenue/20">
-                          <AvatarImage 
-                            src={profileImage || "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png"} 
-                            alt={`${firstName} ${lastName}`} 
-                          />
-                          <AvatarFallback className="text-2xl bg-findvenue/10 text-findvenue">
-                            {firstName.charAt(0)}{lastName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="text-center">
-                          <Label htmlFor="profileImage" className="block mb-2 text-sm">Profile Image URL</Label>
-                          <Input
-                            id="profileImage"
-                            type="text"
-                            value={profileImage}
-                            onChange={(e) => setProfileImage(e.target.value)}
-                            placeholder="Image URL"
-                            className="max-w-xs"
-                          />
-                        </div>
+                        <AvatarSelector 
+                          currentAvatar={profileImage || "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png"}
+                          firstName={firstName}
+                          lastName={lastName}
+                          onAvatarChange={(url) => setProfileImage(url)}
+                        />
                       </div>
                       
                       <div className="flex-1 space-y-4 w-full">

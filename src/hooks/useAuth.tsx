@@ -283,6 +283,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!user) throw new Error('User must be logged in to update profile');
     
     try {
+      // If the profile image is a base64 string, it's a new upload
+      if (profileData.profile_image && profileData.profile_image.startsWith('data:image')) {
+        // We'll save the base64 image directly
+        // In a production app, you might want to upload to a storage bucket instead
+      }
+      
       const { error } = await supabase
         .from('user_profiles')
         .update(profileData)
@@ -301,7 +307,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           ...prev,
           firstName: profileData.first_name || prev.firstName,
           lastName: profileData.last_name || prev.lastName,
-          profileImage: profileData.avatar_url || prev.profileImage,
+          profileImage: profileData.profile_image || prev.profileImage,
         };
       });
     } catch (error) {
