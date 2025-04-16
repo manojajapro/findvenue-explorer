@@ -10,7 +10,6 @@ import GlobalVenues from '@/components/global/GlobalVenues';
 import AdviceSection from '@/components/advice/AdviceSection';
 import { useSearch } from '@/hooks/useSearch';
 import HomePageMap from '@/components/map/HomePageMap';
-import SmartVenueAssistant from '@/components/chat/SmartVenueAssistant';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -124,9 +123,6 @@ const Index = () => {
       <TopVenues cityId="jeddah" cityName="Jeddah" />
       <GlobalVenues />
       <AdviceSection />
-      
-      {/* Smart Venue Assistant */}
-      <SmartVenueAssistant />
     </>
   );
 };

@@ -1,10 +1,33 @@
 
-# This file is used to configure the Supabase project
-
 project_id = "esdmelfzeszjtbnoajig"
 
-[functions.venue-assistant]
-verify_jwt = false
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
 
-[functions.text-to-speech]
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+
+[storage]
+enabled = true
+
+[realtime]
+enabled = true
+
+[functions]
+[functions.venue-assistant]
 verify_jwt = false

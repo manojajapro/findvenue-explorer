@@ -1,14 +1,13 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// OpenAI API key from environment variables
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+// Use the provided ElevenLabs API key directly
+const ELEVEN_LABS_API_KEY = "sk_fe796be98a194c7eb3bf5a3e5cc089835f08bb09a80cfeb1";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -17,37 +16,40 @@ serve(async (req) => {
   }
 
   try {
-    if (!OPENAI_API_KEY) {
-      throw new Error('OpenAI API key not found in environment variables');
-    }
-
-    const { text, voice = 'alloy' } = await req.json();
+    const { text, voiceId } = await req.json();
     
     if (!text) {
       throw new Error('Text is required');
     }
 
-    console.log(`Converting to speech: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+    // Use a default voice ID if none provided
+    const voice = voiceId || 'EXAVITQu4vr4xnSDxMaL'; // Sarah voice
     
-    // Using OpenAI's TTS API
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+    console.log(`Converting text to speech using voice ${voice}`);
+    
+    // Using Eleven Labs API for high-quality TTS
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'xi-api-key': ELEVEN_LABS_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'tts-1',
-        input: text,
-        voice,
-        response_format: 'mp3',
+        text: text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: 0.7,
+          similarity_boost: 0.8,
+          style: 0.1,
+          use_speaker_boost: true
+        }
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('OpenAI TTS API error:', errorData);
-      throw new Error(`OpenAI TTS API error: ${JSON.stringify(errorData)}`);
+      const error = await response.json();
+      console.error('ElevenLabs API error:', error);
+      throw new Error(`ElevenLabs API error: ${error.detail?.message || response.statusText}`);
     }
 
     // Get audio data
@@ -73,7 +75,7 @@ serve(async (req) => {
         }
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in text-to-speech function:', error);
     
     return new Response(
