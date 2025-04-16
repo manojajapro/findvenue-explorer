@@ -107,7 +107,7 @@ const Index = () => {
     <>
       <HeroSection />
       
-      <div className="container mx-auto px-4 py-8">
+      <div id="find-venues-map" className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h2 className="text-2xl md:text-3xl font-bold mb-2">Find Venues on Map</h2>
           <p className="text-findvenue-text-muted">

@@ -51,6 +51,15 @@ const VenueLocationMap = ({
     lng: longitude || DEFAULT_LOCATION.lng
   });
 
+  useEffect(() => {
+    if (latitude !== undefined && longitude !== undefined) {
+      setPosition({
+        lat: latitude,
+        lng: longitude
+      });
+    }
+  }, [latitude, longitude]);
+
   const [infoWindowOpen, setInfoWindowOpen] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -89,21 +98,6 @@ const VenueLocationMap = ({
     
     return distance <= radiusInKm;
   }) : [];
-
-  useEffect(() => {
-    if (latitude && longitude) {
-      setPosition({
-        lat: latitude,
-        lng: longitude
-      });
-    }
-  }, [latitude, longitude]);
-
-  useEffect(() => {
-    if (editable && onLocationChange && mapLoaded) {
-      onLocationChange(position.lat, position.lng);
-    }
-  }, [position, editable, onLocationChange, mapLoaded]);
 
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;

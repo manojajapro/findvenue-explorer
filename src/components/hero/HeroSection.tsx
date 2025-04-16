@@ -24,6 +24,13 @@ const HeroSection = () => {
   const [venueTypes, setVenueTypes] = useState<{value: string, label: string}[]>([]);
   const { geocodePinCode, isLoading } = useGeocode();
   
+  const scrollToMapSection = () => {
+    const mapSection = document.getElementById('find-venues-map');
+    if (mapSection) {
+      mapSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+  
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -253,11 +260,7 @@ const HeroSection = () => {
           
           <div className="mb-4">
             <Button 
-              onClick={() => {
-                const params = new URLSearchParams();
-                params.append('showMap', 'true');
-                navigate(`/?${params.toString()}`);
-              }}
+              onClick={scrollToMapSection}
               className="bg-findvenue hover:bg-findvenue-dark text-white px-6 py-3 rounded-md text-lg"
             >
               <Search className="w-5 h-5 mr-2" />
