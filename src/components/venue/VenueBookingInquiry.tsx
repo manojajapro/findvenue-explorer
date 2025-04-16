@@ -128,7 +128,7 @@ const VenueBookingInquiry = ({
         </Avatar>
         <div>
           <h3 className="font-semibold text-lg">{ownerFirstName}</h3>
-          <p className="text-sm text-gray-500">Your Personal Event Manager from {venueName}</p>
+          <p className="text-sm text-white-500">Event Manager from {venueName}</p>
           <div className="flex items-center gap-4 mt-1">
             <div className="flex items-center gap-1 text-sm">
               <Activity className="h-4 w-4" />

@@ -681,14 +681,14 @@ export default function VenueBookingTabs({
       
       <div className="flex items-center pt-4 border-t border-gray-200">
         <div className="flex-shrink-0 mr-4">
-          <div className="bg-gray-200 rounded-full w-16 h-16 flex items-center justify-center">
+          <div className="bg-green-500 rounded-full w-16 h-16 flex items-center justify-center">
             {ownerName ? ownerName.charAt(0) : 'H'}
           </div>
         </div>
         <div className="flex-1">
-          <h4 className="font-medium">{ownerName}</h4>
-          <p className="text-sm text-gray-500">Your Personal Event Manager from {venueName}</p>
-          <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+          <h4 className="font-medium text-white">{ownerName}</h4>
+          <p className="text-sm text-white-500">Event Manager from {venueName}</p>
+          <div className="flex items-center gap-4 mt-1 text-xs text-white-500">
             <div>Response rate - 96%</div>
             <div>Response time - 1h</div>
           </div>

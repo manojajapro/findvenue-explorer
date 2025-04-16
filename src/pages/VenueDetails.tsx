@@ -612,14 +612,14 @@ const VenueDetails = () => {
                 </div>
               )}
               
-              {venue?.type && (
+              {/* {venue?.type && (
                 <div className="mb-4 pb-4 border-b border-white/10">
                   <div className="flex justify-between items-center">
                     <span>Venue Type</span>
                     <span className="font-medium">{venue.type}</span>
                   </div>
                 </div>
-              )}
+              )} */}
               
               {venue && (
                 <VenueBookingTabs
@@ -633,7 +633,7 @@ const VenueDetails = () => {
                 />
               )}
               
-              <div className="mt-4">
+              {/* <div className="mt-4">
                 {venue?.ownerInfo && (
                   <ContactVenueOwner 
                     venueId={venue.id}
@@ -642,7 +642,7 @@ const VenueDetails = () => {
                     ownerName={venue.ownerInfo.name || 'Venue Host'}
                   />
                 )}
-              </div>
+              </div> */}
               
               <div className="mt-6">
                 <VenueRating 
