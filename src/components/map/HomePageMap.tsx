@@ -63,7 +63,7 @@ const HomePageMap = ({ height = '500px' }: HomePageMapProps) => {
         
         if (data) {
           const uniqueTypes = Array.from(new Set(data.map(venue => venue.type)))
-            .filter(type => type && type.trim() !== '')
+            .filter(type => type && typeof type === 'string' && type.trim() !== '')
             .map(type => ({
               value: String(type),
               label: String(type).charAt(0).toUpperCase() + String(type).slice(1)
