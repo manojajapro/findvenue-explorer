@@ -47,9 +47,21 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('ElevenLabs API error:', error);
-      throw new Error(`ElevenLabs API error: ${error.detail?.message || response.statusText}`);
+      const errorBody = await response.text();
+      console.error('ElevenLabs API error status:', response.status);
+      console.error('ElevenLabs API error response:', errorBody);
+      
+      let errorMessage = `ElevenLabs API error: ${response.statusText}`;
+      try {
+        // Try to parse JSON error if available
+        const errorJson = JSON.parse(errorBody);
+        errorMessage = errorJson.detail?.message || errorJson.detail || errorMessage;
+      } catch (e) {
+        // If not valid JSON, use the text response
+        errorMessage = errorBody || errorMessage;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     // Get audio data

@@ -1,19 +1,16 @@
 
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
+
+// Use the provided OpenAI API key directly
+const OPENAI_API_KEY = "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";
 
 serve(async (req) => {
-  // Handle CORS preflight request
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -31,7 +28,7 @@ serve(async (req) => {
     const { query, venueId, type } = body;
 
     // Log the incoming request for debugging
-    console.log(`Received ${type} request for venue ${venueId}: ${query}`);
+    console.log(`Received ${type} request: ${query}`);
     
     // Basic validation
     if (!query || typeof query !== 'string') {
@@ -41,253 +38,381 @@ serve(async (req) => {
       );
     }
 
-    // Fetch venue data if venueId is provided
-    let venueInfo = null;
-    if (venueId) {
-      const { data, error } = await supabaseClient
-        .from('venues')
-        .select('*')
-        .eq('id', venueId)
-        .single();
-        
-      if (error) {
-        console.error('Error fetching venue data:', error);
-      } else {
-        venueInfo = data;
-        console.log('Fetched venue info:', venueInfo.name);
-      }
+    // Process the query based on type
+    switch (type) {
+      case 'home':
+        return await handleHomeQuery(query, supabaseClient);
+      case 'venue':
+        return await handleVenueQuery(query, venueId, supabaseClient);
+      case 'voice':
+        return await handleVoiceQuery(query, venueId, supabaseClient);
+      case 'welcome':
+        return await handleWelcomeMessage(venueId, supabaseClient);
+      default:
+        return new Response(
+          JSON.stringify({ error: 'Invalid query type' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
     }
-    
-    // If it's a welcome message, generate a welcome using OpenAI
-    if (type === 'welcome') {
-      if (!venueInfo) {
-        return new Response(
-          JSON.stringify({ welcome: "Welcome to the venue assistant. How can I help you?" }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      try {
-        const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-        if (!OPENAI_API_KEY) {
-          throw new Error("OPENAI_API_KEY not found in environment variables");
-        }
-        
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content: "You are a helpful venue assistant that helps users learn about venues they are interested in. Keep your responses friendly and concise."
-              },
-              {
-                role: "user",
-                content: `Generate a brief welcome message for a venue called ${venueInfo.name}. It's a ${venueInfo.type || 'venue'} that can accommodate ${venueInfo.min_capacity || 0} to ${venueInfo.max_capacity || 'many'} people. Keep it under 40 words.`
-              }
-            ],
-            temperature: 0.7,
-            max_tokens: 150,
-          }),
-        });
-
-        const openaiData = await openaiResponse.json();
-        console.log("OpenAI welcome response:", openaiData);
-        
-        if (openaiData.choices && openaiData.choices[0]?.message?.content) {
-          const welcomeMessage = openaiData.choices[0].message.content.trim();
-          return new Response(
-            JSON.stringify({ welcome: welcomeMessage }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        } else {
-          throw new Error("Invalid response from OpenAI API");
-        }
-      } catch (error) {
-        console.error("OpenAI API error:", error);
-        return new Response(
-          JSON.stringify({ welcome: `Welcome to ${venueInfo.name}! How can I assist you today?` }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-    
-    // For chat messages, use OpenAI to generate responses
-    if (type === 'chat') {
-      if (!venueInfo) {
-        return new Response(
-          JSON.stringify({ answer: "I'm sorry, I couldn't find information about this venue." }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      try {
-        const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-        if (!OPENAI_API_KEY) {
-          throw new Error("OPENAI_API_KEY not found in environment variables");
-        }
-        
-        // Format venue info for the prompt
-        const formatPrice = (price) => {
-          return price ? price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : 'Not specified';
-        };
-        
-        const venueDetails = {
-          name: venueInfo.name,
-          type: venueInfo.type || 'Not specified',
-          description: venueInfo.description || 'Not available',
-          address: venueInfo.address || 'Not specified',
-          city: venueInfo.city_name || 'Not specified',
-          capacity: `${venueInfo.min_capacity || 'Not specified'} to ${venueInfo.max_capacity || 'Not specified'} guests`,
-          pricing: {
-            startingPrice: `${venueInfo.currency || 'SAR'} ${formatPrice(venueInfo.starting_price)}`,
-            pricePerPerson: venueInfo.price_per_person ? `${venueInfo.currency || 'SAR'} ${formatPrice(venueInfo.price_per_person)}` : null,
-            hourlyRate: venueInfo.hourly_rate ? `${venueInfo.currency || 'SAR'} ${formatPrice(venueInfo.hourly_rate)}` : null,
-          },
-          amenities: venueInfo.amenities || [],
-          wifi: venueInfo.wifi ? "Available" : "Not available",
-          parking: venueInfo.parking ? "Available" : "Not available",
-          availability: venueInfo.availability || [],
-          contactInfo: venueInfo.owner_info ? `${venueInfo.owner_info.name || 'Venue host'} (Response time: ${venueInfo.owner_info.responseTime || 'Not specified'})` : "Contact the venue host through the booking form",
-          categories: venueInfo.category_name || []
-        };
-        
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content: `You are a helpful venue assistant for ${venueInfo.name}. 
-                You know all the details about this venue and provide accurate information.
-                Be concise and helpful. Keep responses under 100 words. 
-                Here are the venue details:
-                ${JSON.stringify(venueDetails, null, 2)}`
-              },
-              {
-                role: "user",
-                content: query
-              }
-            ],
-            temperature: 0.7,
-            max_tokens: 300,
-          }),
-        });
-
-        const openaiData = await openaiResponse.json();
-        console.log("OpenAI chat response:", openaiData);
-        
-        if (openaiData.choices && openaiData.choices[0]?.message?.content) {
-          const answer = openaiData.choices[0].message.content.trim();
-          return new Response(
-            JSON.stringify({ answer }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        } else {
-          throw new Error("Invalid response from OpenAI API");
-        }
-      } catch (error) {
-        console.error("OpenAI API error:", error);
-        
-        // Fallback to the original rule-based responses if OpenAI fails
-        let answer = "";
-        const queryLower = query.toLowerCase();
-        
-        // Format prices with commas for readability
-        const formatPrice = (price) => {
-          return price ? price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : 'Not specified';
-        };
-        
-        const startingPrice = formatPrice(venueInfo.starting_price);
-        const pricePerPerson = venueInfo.price_per_person ? formatPrice(venueInfo.price_per_person) : null;
-        const hourlyRate = venueInfo.hourly_rate ? formatPrice(venueInfo.hourly_rate) : null;
-        
-        if (queryLower.includes("price") || queryLower.includes("cost") || queryLower.includes("fee")) {
-          answer = `${venueInfo.name} pricing starts at ${venueInfo.currency || 'SAR'} ${startingPrice}.`;
-          if (pricePerPerson) {
-            answer += ` There's also a price per person of ${venueInfo.currency || 'SAR'} ${pricePerPerson}.`;
-          }
-          if (hourlyRate) {
-            answer += ` Hourly rate is ${venueInfo.currency || 'SAR'} ${hourlyRate}.`;
-          }
-        } 
-        else if (queryLower.includes("capacity") || queryLower.includes("guests") || queryLower.includes("people")) {
-          answer = `${venueInfo.name} can accommodate between ${venueInfo.min_capacity || 'Not specified'} and ${venueInfo.max_capacity || 'Not specified'} guests.`;
-        } 
-        else if (queryLower.includes("amenities") || queryLower.includes("facilities") || queryLower.includes("features")) {
-          const amenitiesList = venueInfo.amenities && venueInfo.amenities.length > 0 
-            ? venueInfo.amenities.join(', ') 
-            : 'No specific amenities listed';
-          answer = `${venueInfo.name} offers these amenities: ${amenitiesList}.`;
-          if (venueInfo.wifi) answer += " WiFi is available.";
-          if (venueInfo.parking) answer += " Parking facilities are available.";
-        } 
-        else if (queryLower.includes("location") || queryLower.includes("address") || queryLower.includes("where")) {
-          answer = `${venueInfo.name} is located at ${venueInfo.address || 'Address not specified'} in ${venueInfo.city_name || 'the city'}.`;
-          if (venueInfo.latitude && venueInfo.longitude) {
-            answer += " You can find it on the map on this page.";
-          }
-        } 
-        else if (queryLower.includes("book") || queryLower.includes("reserve") || queryLower.includes("availability")) {
-          const availabilityDays = venueInfo.availability && venueInfo.availability.length > 0 
-            ? venueInfo.availability.join(', ') 
-            : 'Contact venue for availability';
-          answer = `To book ${venueInfo.name}, you can use the booking form on this page. Available days include: ${availabilityDays}. You can also message the venue host directly.`;
-        } 
-        else if (queryLower.includes("contact") || queryLower.includes("owner") || queryLower.includes("host")) {
-          answer = `You can contact the venue host directly by clicking the "Message Venue Host" button on this page. They'll respond to your inquiries about ${venueInfo.name}.`;
-        } 
-        else if (queryLower.includes("type") || queryLower.includes("category") || queryLower.includes("kind")) {
-          const venueType = venueInfo.type || 'No specific type';
-          const categoryNames = venueInfo.category_name && venueInfo.category_name.length > 0 
-            ? venueInfo.category_name.join(', ') 
-            : 'No specific category';
-          answer = `${venueInfo.name} is a ${venueType} venue in the ${categoryNames} category.`;
-        }
-        else if (queryLower.includes("rules") || queryLower.includes("policy") || queryLower.includes("regulations")) {
-          if (venueInfo.rules_and_regulations && Object.keys(venueInfo.rules_and_regulations).length > 0) {
-            answer = `${venueInfo.name} has specific rules and regulations that you should be aware of. Please check the rules section on this page for details.`;
-          } else {
-            answer = `For rules and regulations regarding ${venueInfo.name}, please contact the venue host directly.`;
-          }
-        }
-        else {
-          // General information response
-          answer = `${venueInfo.name} is a ${venueInfo.type || ''} venue located in ${venueInfo.city_name || 'the city'}. `;
-          answer += `It can accommodate between ${venueInfo.min_capacity || 'Not specified'} and ${venueInfo.max_capacity || 'Not specified'} guests. `;
-          answer += `Pricing starts at ${venueInfo.currency || 'SAR'} ${startingPrice}. `;
-          answer += `You can ask me about specific details like amenities, location, booking information, and more!`;
-        }
-        
-        return new Response(
-          JSON.stringify({ answer }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Return a generic response for other request types
-    return new Response(
-      JSON.stringify({ answer: "I'm here to help you with venue information. How can I assist you today?" }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-    
   } catch (error) {
-    console.error("Error processing venue assistant request:", error);
+    console.error('Error in venue-assistant function:', error);
     
     return new Response(
-      JSON.stringify({ error: "Failed to process your request", message: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ 
+        error: error.message || 'Failed to process your request' 
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     );
   }
 });
+
+// Handle home page queries
+async function handleHomeQuery(query: string, supabaseClient: any) {
+  try {
+    // Extract query intent with OpenAI
+    const queryIntent = await analyzeQueryIntent(query);
+    
+    // Fetch relevant venues based on query intent
+    let relevantVenues: any[] = [];
+    
+    // If the intent includes searching for venues, fetch them
+    if (queryIntent.searchVenues) {
+      const searchParams = queryIntent.searchParams || {};
+      
+      // Construct query
+      let venuesQuery = supabaseClient.from('venues').select('*');
+      
+      // Add filters based on searchParams
+      if (searchParams.city) {
+        venuesQuery = venuesQuery.ilike('city_name', `%${searchParams.city}%`);
+      }
+      
+      if (searchParams.category) {
+        venuesQuery = venuesQuery.contains('category_name', [searchParams.category]);
+      }
+      
+      if (searchParams.minCapacity) {
+        venuesQuery = venuesQuery.gte('min_capacity', searchParams.minCapacity);
+      }
+      
+      if (searchParams.maxCapacity) {
+        venuesQuery = venuesQuery.lte('max_capacity', searchParams.maxCapacity);
+      }
+      
+      if (searchParams.maxPrice) {
+        venuesQuery = venuesQuery.lte('starting_price', searchParams.maxPrice);
+      }
+      
+      if (searchParams.amenities && searchParams.amenities.length) {
+        const amenity = searchParams.amenities[0];
+        venuesQuery = venuesQuery.contains('amenities', [amenity]);
+      }
+      
+      // Execute query with limit
+      const { data, error } = await venuesQuery.limit(5);
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        relevantVenues = data.map(venue => ({
+          id: venue.id,
+          name: venue.name,
+          description: venue.description || '',
+          address: venue.address || '',
+          city: venue.city_name || '',
+          imageUrl: venue.gallery_images && venue.gallery_images.length > 0 ? venue.gallery_images[0] : null,
+          capacity: {
+            min: venue.min_capacity || 0,
+            max: venue.max_capacity || 0
+          },
+          pricing: {
+            startingPrice: venue.starting_price || 0,
+            currency: venue.currency || 'SAR'
+          }
+        }));
+      }
+    }
+    
+    // Generate response using OpenAI
+    const response = await generateResponse(query, queryIntent, relevantVenues);
+    
+    return new Response(
+      JSON.stringify({
+        answer: response,
+        venues: relevantVenues.length > 0 ? relevantVenues : undefined
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Error in handleHomeQuery:', error);
+    throw error;
+  }
+}
+
+// Handle venue-specific queries
+async function handleVenueQuery(query: string, venueId: string, supabaseClient: any) {
+  try {
+    // Fetch venue data
+    const { data: venue, error } = await supabaseClient
+      .from('venues')
+      .select('*')
+      .eq('id', venueId)
+      .single();
+      
+    if (error) throw error;
+    
+    if (!venue) {
+      return new Response(
+        JSON.stringify({ answer: "I couldn't find information for this venue." }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Format venue data for prompt
+    const venueDetails = {
+      name: venue.name,
+      description: venue.description || 'No description available',
+      location: venue.address || 'Address not specified',
+      city: venue.city_name || 'City not specified',
+      capacity: `${venue.min_capacity || '0'} to ${venue.max_capacity || '0'} guests`,
+      pricing: {
+        startingPrice: `${venue.currency || 'SAR'} ${venue.starting_price || 0}`,
+        pricePerPerson: venue.price_per_person ? `${venue.currency || 'SAR'} ${venue.price_per_person}` : null,
+      },
+      amenities: venue.amenities || [],
+      features: {
+        wifi: venue.wifi ? "Available" : "Not available",
+        parking: venue.parking ? "Available" : "Not available",
+      },
+      availability: venue.availability || [],
+      type: venue.type || 'Venue',
+      categoryNames: venue.category_name || []
+    };
+    
+    // Generate response using OpenAI
+    const answer = await generateVenueResponse(query, venueDetails);
+    
+    return new Response(
+      JSON.stringify({ answer }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Error in handleVenueQuery:', error);
+    throw error;
+  }
+}
+
+// Handle voice queries (similar to venue queries but optimized for speech)
+async function handleVoiceQuery(query: string, venueId: string, supabaseClient: any) {
+  try {
+    const response = await handleVenueQuery(query, venueId, supabaseClient);
+    const data = await response.json();
+    
+    // Return the same response structure for consistency
+    return new Response(
+      JSON.stringify(data),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Error in handleVoiceQuery:', error);
+    throw error;
+  }
+}
+
+// Generate welcome message for venue assistant
+async function handleWelcomeMessage(venueId: string, supabaseClient: any) {
+  try {
+    // Fetch venue data
+    const { data: venue, error } = await supabaseClient
+      .from('venues')
+      .select('name, type')
+      .eq('id', venueId)
+      .single();
+      
+    if (error) throw error;
+    
+    let welcomeMessage = "Welcome to the venue assistant. How can I help you today?";
+    
+    if (venue) {
+      welcomeMessage = `Welcome! I'm the assistant for ${venue.name}. I can help you learn about this ${venue.type || 'venue'} and answer any questions you might have.`;
+    }
+    
+    return new Response(
+      JSON.stringify({ welcome: welcomeMessage }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('Error in handleWelcomeMessage:', error);
+    throw error;
+  }
+}
+
+// Analyze query intent using OpenAI
+async function analyzeQueryIntent(query: string) {
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: 
+            `You are an AI assistant that analyzes user queries about venues. 
+            Extract the search intent and parameters from the query.
+            Return ONLY a JSON object with the following structure:
+            {
+              "searchVenues": boolean, // true if the user is searching for venues
+              "searchParams": {
+                "city": string or null, // city name if mentioned
+                "category": string or null, // category name if mentioned (e.g., wedding, conference, etc.)
+                "minCapacity": number or null, // minimum capacity if mentioned
+                "maxCapacity": number or null, // maximum capacity if mentioned
+                "maxPrice": number or null, // maximum price if mentioned
+                "amenities": string[] // array of amenities mentioned (e.g., wifi, parking, etc.)
+              },
+              "generalInfo": boolean, // true if asking for general information about the platform/service
+              "locationInfo": boolean, // true if asking about specific locations
+            }`
+          },
+          {
+            role: "user",
+            content: query
+          }
+        ],
+        temperature: 0.3,
+        response_format: { "type": "json_object" }
+      }),
+    });
+
+    const result = await response.json();
+    
+    if (!result.choices || !result.choices[0]?.message?.content) {
+      throw new Error("Invalid response from OpenAI API");
+    }
+    
+    const content = result.choices[0].message.content;
+    return JSON.parse(content);
+  } catch (error) {
+    console.error('Error analyzing query intent:', error);
+    // Return default intent if OpenAI fails
+    return {
+      searchVenues: true,
+      searchParams: {},
+      generalInfo: false,
+      locationInfo: false
+    };
+  }
+}
+
+// Generate response based on query and intent
+async function generateResponse(query: string, intent: any, venues: any[]) {
+  try {
+    const hasVenues = venues.length > 0;
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: 
+            `You are an AI assistant for FindVenue, a venue booking platform.
+             Answer the user's question about venues, locations, features, and services.
+             ${hasVenues ? `I've found ${venues.length} venues that match the query. I'll show them alongside your response.` : "I didn't find any venues matching the query."}
+             Keep your response conversational, helpful, and concise (under 100 words).
+             If you're suggesting venues, mention that the user can see them below your message.
+             Don't include URLs or complex formatting.`
+          },
+          {
+            role: "user",
+            content: query
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 150
+      }),
+    });
+
+    const result = await response.json();
+    
+    if (!result.choices || !result.choices[0]?.message?.content) {
+      throw new Error("Invalid response from OpenAI API");
+    }
+    
+    return result.choices[0].message.content;
+  } catch (error) {
+    console.error('Error generating response:', error);
+    
+    // Fallback response
+    if (venues.length > 0) {
+      return `I found ${venues.length} venues that might match what you're looking for. You can check them out below.`;
+    } else {
+      return "I can help you find venues for your events. Just let me know what you're looking for - like location, capacity, or venue type.";
+    }
+  }
+}
+
+// Generate venue-specific response
+async function generateVenueResponse(query: string, venueDetails: any) {
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: 
+            `You are an AI assistant for ${venueDetails.name}, a venue on the FindVenue platform.
+             Answer the user's question about this specific venue based on the following details:
+             ${JSON.stringify(venueDetails, null, 2)}
+             Keep your response conversational, helpful, and concise (under 100 words).
+             Don't include URLs or complex formatting.`
+          },
+          {
+            role: "user",
+            content: query
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 150
+      }),
+    });
+
+    const result = await response.json();
+    
+    if (!result.choices || !result.choices[0]?.message?.content) {
+      throw new Error("Invalid response from OpenAI API");
+    }
+    
+    return result.choices[0].message.content;
+  } catch (error) {
+    console.error('Error generating venue response:', error);
+    
+    // Fallback response
+    return `${venueDetails.name} is a ${venueDetails.type} that can accommodate ${venueDetails.capacity}. It's located at ${venueDetails.location} in ${venueDetails.city}. How else can I help you with this venue?`;
+  }
+}
+
+// Import necessary Supabase client
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
