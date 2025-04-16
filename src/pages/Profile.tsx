@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import AvatarSelector from '@/components/profile/AvatarSelector';
+import { PhoneInput } from '@/components/ui/phone-input';
 
 const Profile = () => {
   const { user, profile, updateProfile, updatePassword } = useAuth();
@@ -20,7 +20,7 @@ const Profile = () => {
   const [firstName, setFirstName] = useState(profile?.first_name || '');
   const [lastName, setLastName] = useState(profile?.last_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
-  const [profileImage, setProfileImage] = useState(profile?.avatar_url || '');
+  const [profileImage, setProfileImage] = useState(profile?.profile_image || '');
   const [isUpdating, setIsUpdating] = useState(false);
   
   const [currentPassword, setCurrentPassword] = useState('');
@@ -50,7 +50,7 @@ const Profile = () => {
         first_name: firstName,
         last_name: lastName,
         phone,
-        avatar_url: profileImage,
+        profile_image: profileImage,
       });
       
       toast({
@@ -59,11 +59,6 @@ const Profile = () => {
       });
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast({
-        title: 'Update Failed',
-        description: 'Failed to update profile. Please try again.',
-        variant: 'destructive',
-      });
     } finally {
       setIsUpdating(false);
     }
@@ -124,10 +119,6 @@ const Profile = () => {
     }
   };
   
-  const getInitials = () => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-  };
-  
   if (!user || !profile) {
     navigate('/login');
     return null;
@@ -155,11 +146,26 @@ const Profile = () => {
                   <form onSubmit={handleProfileUpdate} className="space-y-6">
                     <div className="flex flex-col md:flex-row items-start gap-6">
                       <div className="flex flex-col items-center space-y-3">
-                        <AvatarSelector 
-                          currentAvatar={profileImage} 
-                          onAvatarChange={setProfileImage} 
-                          initials={getInitials()}
-                        />
+                        <Avatar className="h-24 w-24 border-2 border-findvenue/20">
+                          <AvatarImage 
+                            src={profileImage || "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png"} 
+                            alt={`${firstName} ${lastName}`} 
+                          />
+                          <AvatarFallback className="text-2xl bg-findvenue/10 text-findvenue">
+                            {firstName.charAt(0)}{lastName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="text-center">
+                          <Label htmlFor="profileImage" className="block mb-2 text-sm">Profile Image URL</Label>
+                          <Input
+                            id="profileImage"
+                            type="text"
+                            value={profileImage}
+                            onChange={(e) => setProfileImage(e.target.value)}
+                            placeholder="Image URL"
+                            className="max-w-xs"
+                          />
+                        </div>
                       </div>
                       
                       <div className="flex-1 space-y-4 w-full">
