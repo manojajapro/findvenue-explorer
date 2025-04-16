@@ -1,2 +1,3 @@
 
-project_id = "esdmelfzeszjtbnoajig"
+[functions.text-to-speech]
+verify_jwt = false

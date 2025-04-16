@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Use the provided ElevenLabs API key directly
+// Use the provided ElevenLabs API key
 const ELEVEN_LABS_API_KEY = "sk_fe796be98a194c7eb3bf5a3e5cc089835f08bb09a80cfeb1";
 
 serve(async (req) => {

@@ -31,3 +31,6 @@ enabled = true
 [functions]
 [functions.venue-assistant]
 verify_jwt = false
+
+[functions.text-to-speech]
+verify_jwt = false
