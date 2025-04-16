@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api';
 import { Link } from 'react-router-dom';
@@ -8,7 +9,7 @@ import { Star, MapPin } from 'lucide-react';
 import { useSearch } from '@/hooks/useSearch';
 import { supabase } from '@/integrations/supabase/client';
 import LocationSearchInput from './LocationSearchInput';
-import { MapControls } from './MapControls';
+import MapControls from './MapControls'; // Fixed import
 import { Venue } from '@/hooks/useSupabaseVenues';
 
 const defaultCenter = { lat: 24.7136, lng: 46.6753 }; // Default to Riyadh, Saudi Arabia
@@ -18,7 +19,16 @@ interface HomePageMapProps {
   defaultZoom?: number;
 }
 
-type VenueWithDistance = Venue & { distance?: number };
+// Extended the Venue type to include the distance property
+type VenueWithDistance = Venue & { 
+  distance?: number;
+  // Add missing properties from the database schema that aren't in the Venue interface
+  city_name?: string;
+  category_name?: string | string[];
+  reviews_count?: number;
+  starting_price?: number;
+  currency?: string;
+};
 
 // Function to calculate distance between two coordinates
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -88,13 +98,13 @@ const HomePageMap: React.FC<HomePageMapProps> = ({ height = '500px', defaultZoom
           }
 
           if (data) {
-            setMapVenues(data);
+            setMapVenues(data as VenueWithDistance[]);
           }
         } catch (err) {
           console.error('Error fetching venues:', err);
         }
       } else if (!isLoading && venues.length > 0) {
-        setMapVenues(venues);
+        setMapVenues(venues as VenueWithDistance[]);
       }
     };
 
@@ -158,6 +168,14 @@ const HomePageMap: React.FC<HomePageMapProps> = ({ height = '500px', defaultZoom
     borderRadius: '0.75rem',
   };
 
+  // Update LocationSearchInput to pass appropriate props
+  const handleLocationChange = (latLng: any) => {
+    if (latLng) {
+      setCenter(latLng);
+      setZoom(15);
+    }
+  };
+
   if (!isLoaded) {
     return <div style={{...containerStyle, background: '#f0f0f0'}} className="flex items-center justify-center">Loading Map...</div>;
   }
@@ -206,18 +224,19 @@ const HomePageMap: React.FC<HomePageMapProps> = ({ height = '500px', defaultZoom
       {/* Search and controls */}
       <div className="absolute top-4 left-4 w-64 z-10">
         <LocationSearchInput 
-          onChange={(latLng) => {
-            if (latLng) {
-              setCenter(latLng);
-              setZoom(15);
-            }
-          }}
+          onPlaceSelected={handleLocationChange}
         />
       </div>
 
       <MapControls
         onNearbyToggle={() => setShowNearby(!showNearby)}
         showNearby={showNearby}
+        isCompactControls={false}
+        isRadiusActive={false}
+        toggleRadiusSearch={() => {}}
+        handleManualLocationSetting={() => {}}
+        fitBoundsToMarkers={() => {}}
+        resetToDefaultLocation={() => {}}
       />
 
       {/* Selected venue info */}
