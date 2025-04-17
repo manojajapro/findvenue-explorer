@@ -1,13 +1,14 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Use the provided ElevenLabs API key
-const ELEVEN_LABS_API_KEY = "sk_fe796be98a194c7eb3bf5a3e5cc089835f08bb09a80cfeb1";
+// Google Cloud API key for Text-to-Speech
+const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -22,46 +23,41 @@ serve(async (req) => {
       throw new Error('Text is required');
     }
 
-    // Use a default voice ID if none provided
-    const voice = voiceId || 'EXAVITQu4vr4xnSDxMaL'; // Sarah voice
+    console.log(`Converting text to speech using Google TTS`);
     
-    console.log(`Converting text to speech using voice ${voice}`);
-    
-    // Using Eleven Labs API for high-quality TTS
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
+    // Set default Google TTS voice settings
+    const voice = {
+      languageCode: 'en-US',
+      name: voiceId || 'en-US-Neural2-F', // Default female voice
+      ssmlGender: 'FEMALE'
+    };
+
+    // Using Google Cloud Text-to-Speech API
+    const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_API_KEY}`, {
       method: 'POST',
       headers: {
-        'xi-api-key': ELEVEN_LABS_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        text: text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.7,
-          similarity_boost: 0.8,
-          style: 0.1,
-          use_speaker_boost: true
+        input: { text },
+        voice: voice,
+        audioConfig: { 
+          audioEncoding: 'MP3',
+          speakingRate: 1.0,
+          pitch: 0.0
         }
       }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      console.error('ElevenLabs API error:', error);
-      throw new Error(`ElevenLabs API error: ${error.detail?.message || response.statusText}`);
+      console.error('Google TTS API error:', error);
+      throw new Error(`Google TTS API error: ${JSON.stringify(error)}`);
     }
 
-    // Get audio data
-    const audioData = await response.arrayBuffer();
-    
-    // Convert audio data to base64
-    const uint8Array = new Uint8Array(audioData);
-    let binaryString = '';
-    for (let i = 0; i < uint8Array.length; i++) {
-      binaryString += String.fromCharCode(uint8Array[i]);
-    }
-    const base64Audio = btoa(binaryString);
+    // Get response with base64 encoded audio
+    const data = await response.json();
+    const base64Audio = data.audioContent; // Already base64 encoded
 
     return new Response(
       JSON.stringify({ 
@@ -69,10 +65,7 @@ serve(async (req) => {
         format: 'mp3'
       }),
       {
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   } catch (error) {
@@ -84,10 +77,7 @@ serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }

@@ -50,13 +50,24 @@ serve(async (req) => {
       );
     }
 
-    // Venue search intent detection
-    const isVenueSearchQuery = /find|show|list|suggest|recommend|get|display|search|venue|venues/i.test(queryLower);
+    // Advanced intent detection system
+    const searchIntents = {
+      venue: /\b(find|show|venues?|list|suggest|recommend|looking\s+for)\b/i,
+      wedding: /\b(wedding|bride|groom|ceremony|marriage|matrimony)\b/i,
+      conference: /\b(conference|meeting|business|corporate|seminar|workshop)\b/i,
+      party: /\b(party|birthday|celebration|festive|anniversary)\b/i,
+      capacity: /\b(\d+)\s+(people|guests|capacity|persons|attendees)\b/i,
+      price: /\b(\d+)\s*(sar|price|budget|cost)\b/i,
+      city: /\b(riyadh|jeddah|dammam|mecca|medina|khobar|taif|abha)\b/i,
+      amenities: /\b(wifi|parking|catering|stage|outdoor|indoor|av|equipment|sound)\b/i,
+      premium: /\b(luxury|premium|best|top|high-end|exclusive)\b/i,
+      rating: /\b(highest|best|top)\s+rated\b/i
+    };
     
     // Parse search criteria
     const searchCriteria: any = {};
-    
-    // City detection
+
+    // City detection (case insensitive)
     const cities = ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina', 'khobar', 'taif', 'abha'];
     for (const city of cities) {
       if (queryLower.includes(city)) {
@@ -82,20 +93,42 @@ serve(async (req) => {
       }
     }
 
-    // Capacity detection
-    const capacityMatch = queryLower.match(/(\d+)(?:\s*(?:people|guests|persons?|capacity))/);
+    // Capacity detection with better number extraction
+    const capacityMatch = queryLower.match(/(\d+)\s*(?:people|guests|persons?|capacity|attendees)/);
     if (capacityMatch) searchCriteria.capacity = parseInt(capacityMatch[1]);
 
     // Price range detection
-    const priceMatch = queryLower.match(/(\d+)(?:\s*(?:sar|price|budget|\$))/);
+    const priceMatch = queryLower.match(/(\d+)\s*(?:sar|price|\$|budget|cost)/);
     if (priceMatch) searchCriteria.maxPrice = parseInt(priceMatch[1]);
 
-    // Amenities detection
-    const amenities = ['wifi', 'parking', 'catering', 'av equipment', 'stage', 'outdoor space'];
-    const foundAmenities = amenities.filter(amenity => queryLower.includes(amenity));
+    // Parse amenities
+    const amenities = {
+      'wifi': ['wifi', 'internet', 'connection'],
+      'parking': ['parking', 'car park', 'valet'],
+      'catering': ['catering', 'food', 'cuisine', 'meal'],
+      'outdoor': ['outdoor', 'garden', 'terrace', 'open air'],
+      'audio visual': ['av', 'projector', 'screen', 'sound system', 'microphone']
+    };
+    
+    const foundAmenities: string[] = [];
+    for (const [amenity, keywords] of Object.entries(amenities)) {
+      if (keywords.some(keyword => queryLower.includes(keyword))) {
+        foundAmenities.push(amenity);
+      }
+    }
     if (foundAmenities.length) searchCriteria.amenities = foundAmenities;
     
-    // Month/Season detection for event planning
+    // Rating importance detection
+    if (queryLower.match(/\b(high(est)?|best|top|good)\s+rat(ed|ing)\b/)) {
+      searchCriteria.sortByRating = true;
+    }
+
+    // Premium venue detection
+    if (queryLower.match(/\b(premium|luxury|exclusive|high(-|\s)end)\b/)) {
+      searchCriteria.premium = true;
+    }
+    
+    // Season/month detection
     const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
     const seasons = ['winter', 'spring', 'summer', 'fall', 'autumn'];
     
@@ -113,8 +146,15 @@ serve(async (req) => {
       }
     }
 
-    // Handle venue search queries
-    if (isVenueSearchQuery || Object.keys(searchCriteria).length > 0) {
+    // Intelligent venue search based on criteria
+    const isVenueSearch = searchIntents.venue.test(queryLower) || 
+                          Object.keys(searchCriteria).length > 0 ||
+                          ['venue', 'where', 'place', 'location', 'recommend', 'suggest'].some(term => queryLower.includes(term));
+    
+    if (isVenueSearch) {
+      console.log("Processing venue search with criteria:", JSON.stringify(searchCriteria));
+      
+      // Build a dynamic query based on extracted criteria
       let venueQuery = supabaseClient.from('venues').select('*');
       
       if (searchCriteria.city) {
@@ -122,7 +162,12 @@ serve(async (req) => {
       }
       
       if (searchCriteria.venueType) {
-        venueQuery = venueQuery.contains('category_name', [searchCriteria.venueType]);
+        if (typeof venueQuery.contains === 'function') {
+          venueQuery = venueQuery.contains('category_name', [searchCriteria.venueType]);
+        } else {
+          // Fallback if contains is not available
+          venueQuery = venueQuery.filter('category_name', 'cs', `{${searchCriteria.venueType}}`);
+        }
       }
       
       if (searchCriteria.capacity) {
@@ -133,38 +178,57 @@ serve(async (req) => {
         venueQuery = venueQuery.lte('starting_price', searchCriteria.maxPrice);
       }
       
-      // Order by rating and limit results
+      if (searchCriteria.premium) {
+        venueQuery = venueQuery.eq('featured', true);
+      }
+      
+      // Order by rating by default for better results, unless specifically asked for different sorting
       venueQuery = venueQuery.order('rating', { ascending: false }).limit(5);
       
+      // Execute the query
       const { data: venues, error } = await venueQuery;
       
       if (error) {
         console.error('Venue search error:', error);
         return new Response(
-          JSON.stringify({ answer: "I'm sorry, I encountered an error searching for venues. Please try again." }),
+          JSON.stringify({ answer: "I'm sorry, I encountered an error searching for venues. Please try again with different criteria." }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
       if (!venues || venues.length === 0) {
+        // No venues found - suggest broader search
         return new Response(
           JSON.stringify({ 
-            answer: `I couldn't find any venues matching your criteria. Would you like to broaden your search?` 
+            answer: `I couldn't find any venues matching your criteria. Would you like to broaden your search or try different criteria?` 
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
       // Format venue information for OpenAI
-      const formattedVenues = venues.map(venue => `
-        - Name: ${venue.name}
-        - City: ${venue.city_name}
-        - Type: ${Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.category_name || 'Not specified'}
-        - Capacity: ${venue.min_capacity || 'N/A'}-${venue.max_capacity || 'N/A'} guests
-        - Starting Price: SAR ${venue.starting_price || 'Contact for pricing'}
-        - Rating: ${venue.rating || 'Unrated'}/5 (${venue.reviews_count || 0} reviews)
-        - Features: ${venue.wifi ? 'WiFi' : ''} ${venue.parking ? ', Parking' : ''}
-      `).join('\n');
+      const formattedVenues = venues.map(venue => {
+        // Handle possible array or string categories
+        let categoryDisplay = "Not specified";
+        if (venue.category_name) {
+          if (Array.isArray(venue.category_name)) {
+            categoryDisplay = venue.category_name.join(', ');
+          } else if (typeof venue.category_name === 'string') {
+            categoryDisplay = venue.category_name;
+          }
+        }
+        
+        return `
+          Name: ${venue.name}
+          Location: ${venue.city_name || 'Not specified'}
+          Type: ${categoryDisplay}
+          Capacity: ${venue.min_capacity || 'N/A'}-${venue.max_capacity || 'N/A'} guests
+          Starting Price: SAR ${venue.starting_price?.toLocaleString() || 'Contact for pricing'}
+          Rating: ${venue.rating || 'Unrated'}/5 (${venue.reviews_count || 0} reviews)
+          Features: ${venue.wifi ? 'WiFi' : ''} ${venue.parking ? ', Parking' : ''}
+          ${venue.amenities && venue.amenities.length > 0 ? `Amenities: ${venue.amenities.join(', ')}` : ''}
+        `;
+      }).join('\n');
 
       // Generate OpenAI response
       const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -178,9 +242,9 @@ serve(async (req) => {
           messages: [
             {
               role: "system", 
-              content: `You are a helpful FindVenue AI assistant. Provide concise, friendly advice about venues and event planning in Saudi Arabia. 
-                When presenting venue options, format them in an easy-to-read bulleted list with the most important details first.
-                Always be enthusiastic and helpful, showing your expertise in venue selection.`
+              content: `You are a helpful FindVenue AI assistant. Provide concise, friendly venue recommendations based on the user's query.
+                Format venues in a clear, readable way. Be enthusiastic and helpful, highlighting why each venue matches their needs.
+                Always provide a suggestion about what the user might ask next to refine their search.`
             },
             {
               role: "user",
@@ -189,7 +253,7 @@ serve(async (req) => {
                 Found ${venues.length} venues matching the criteria:
                 ${formattedVenues}
                 
-                Please provide a helpful response listing these venues with key details, suggesting which might be best based on the user's query, and offering a follow-up question to refine their search if needed.`
+                Please provide a helpful response listing these venues with key details, suggesting which might be best based on the user's query, and offering a follow-up question.`
             }
           ],
           temperature: 0.7,
@@ -220,7 +284,7 @@ serve(async (req) => {
     
     // Handle specific venue queries
     if (venueId) {
-      const { data: venue, error } = await supabaseClient.from('venues').select('*').eq('id', venueId).single();
+      const { data: venue, error } = await supabaseClient.from('venues').select('*').eq('id', venueId).maybeSingle();
       
       if (error || !venue) {
         return new Response(
@@ -229,16 +293,26 @@ serve(async (req) => {
         );
       }
       
+      // Format category name for display
+      let categoryDisplay = "Not specified";
+      if (venue.category_name) {
+        if (Array.isArray(venue.category_name)) {
+          categoryDisplay = venue.category_name.join(', ');
+        } else if (typeof venue.category_name === 'string') {
+          categoryDisplay = venue.category_name;
+        }
+      }
+      
       const venueInfo = `
         Venue Name: ${venue.name}
         City: ${venue.city_name || 'Not specified'}
         Address: ${venue.address || 'Not specified'}
-        Categories: ${Array.isArray(venue.category_name) ? venue.category_name.join(', ') : (venue.category_name || 'Not specified')}
+        Categories: ${categoryDisplay}
         Capacity: ${venue.min_capacity || 'N/A'}-${venue.max_capacity || 'N/A'} guests
-        Starting Price: SAR ${venue.starting_price || 'Contact for pricing'}
+        Starting Price: SAR ${venue.starting_price?.toLocaleString() || 'Contact for pricing'}
         Price per Person: ${venue.price_per_person ? `SAR ${venue.price_per_person}` : 'Not specified'}
-        Amenities: ${venue.amenities ? venue.amenities.join(', ') : 'Not specified'}
-        Additional Services: ${venue.additional_services ? venue.additional_services.join(', ') : 'Not specified'}
+        Amenities: ${Array.isArray(venue.amenities) ? venue.amenities.join(', ') : 'Not specified'}
+        Additional Services: ${Array.isArray(venue.additional_services) ? venue.additional_services.join(', ') : 'Not specified'}
         Rating: ${venue.rating || 'Unrated'}/5 (${venue.reviews_count || 0} reviews)
         Features: ${venue.wifi ? 'WiFi available' : ''} ${venue.parking ? ', Parking available' : ''}
         Description: ${venue.description || 'No detailed description available'}
@@ -256,9 +330,10 @@ serve(async (req) => {
           messages: [
             {
               role: "system", 
-              content: `You are a helpful FindVenue AI assistant specializing in venue information and event planning in Saudi Arabia. 
+              content: `You are a helpful FindVenue AI assistant specializing in venue information in Saudi Arabia. 
                 Provide concise, helpful information about the venue based on the user's query.
-                Be enthusiastic and friendly, highlighting key features that match what the user seems to be looking for.`
+                Be enthusiastic and friendly, highlighting key features that match what the user seems to be looking for.
+                If the user asks something not covered in the venue info, acknowledge that and suggest they contact the venue directly.`
             },
             {
               role: "user",
@@ -284,8 +359,8 @@ serve(async (req) => {
       );
     }
     
-    // General event planning queries
-    const isEventPlanningQuery = /plan|organize|theme|layout|decor|vendor|catering|budget|schedule|timeline/i.test(queryLower);
+    // Event planning queries
+    const isEventPlanningQuery = /plan|organize|theme|layout|decor|vendor|catering|budget|schedule|timeline|theme|idea/i.test(queryLower);
     
     if (isEventPlanningQuery) {
       const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -301,7 +376,8 @@ serve(async (req) => {
               role: "system", 
               content: `You are a helpful FindVenue AI assistant specializing in event planning in Saudi Arabia.
                 Provide helpful, culturally appropriate advice for planning events in Saudi Arabia.
-                Be concise but thorough, offering practical tips and suggestions.`
+                Be concise but thorough, offering practical tips and suggestions relevant to the Saudi Arabian context.
+                Include specific recommendations about venues, vendors, or planning approaches when possible.`
             },
             {
               role: "user",
@@ -340,7 +416,8 @@ serve(async (req) => {
             role: "system", 
             content: `You are a helpful FindVenue AI assistant specializing in venues and event planning in Saudi Arabia.
               Keep responses concise and helpful, focusing on Saudi Arabian venue context.
-              If you're not sure about a specific query, suggest how the user might rephrase or what details would be helpful to add.`
+              If the query is unclear, suggest how the user might rephrase it or what details would be helpful to add.
+              Always be friendly and helpful, maintaining a positive tone.`
           },
           {
             role: "user",
@@ -362,12 +439,11 @@ serve(async (req) => {
       JSON.stringify({ answer }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
     console.error("Venue Assistant Error:", error);
     return new Response(
       JSON.stringify({ 
-        answer: "I'm having trouble processing your request. Please try again later.",
+        answer: "I'm having trouble processing your request. Please try again with a different phrasing.",
         error: error.message 
       }),
       { 
