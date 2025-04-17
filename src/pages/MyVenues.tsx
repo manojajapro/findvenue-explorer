@@ -315,9 +315,9 @@ const MyVenues = () => {
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 mt-16">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-findvenue">Venue Owner Dashboard</h1>
+          <h1 className="text-3xl font-bold text-findvenue">My Venues</h1>
           <p className="text-findvenue-text-muted mt-1">
-            Welcome, {user?.firstName || user?.user_metadata?.first_name || 'Owner'}
+            Manage your venues and listings
           </p>
         </div>
         
@@ -330,241 +330,140 @@ const MyVenues = () => {
         </Button>
       </div>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="bookings">Bookings</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="dashboard" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-lg">Total Venues</CardTitle>
+      {isLoading ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Loading venues...</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-findvenue"></div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : error ? (
+        <Alert className="mb-6">
+          <AlertDescription>
+            Error loading venues: {error}
+          </AlertDescription>
+        </Alert>
+      ) : venues.length === 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>No venues found</CardTitle>
+            <CardDescription>You haven't listed any venues yet.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <Building className="h-16 w-16 mb-4 text-findvenue-text-muted opacity-40" />
+            <p className="text-center text-findvenue-text-muted mb-4">
+              Start by creating your first venue listing to begin receiving bookings.
+            </p>
+            <Button 
+              onClick={() => navigate('/list-venue')} 
+              className="bg-findvenue hover:bg-findvenue-dark"
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              List a Venue
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {venues.map((venue) => (
+            <Card key={venue.id} className="overflow-hidden">
+              <div className="relative h-48">
+                <img
+                  src={getFirstGalleryImage(venue)}
+                  alt={venue.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl">{venue.name}</CardTitle>
+                <div className="flex items-center text-findvenue-text-muted">
+                  <MapPin className="h-4 w-4 mr-1" />
+                  <span className="text-sm">{venue.city_name || 'Unknown location'}</span>
+                </div>
+                {venue.type && (
+                  <Badge variant="outline" className="mt-1">
+                    {venue.type}
+                  </Badge>
+                )}
               </CardHeader>
-              <CardContent className="py-0">
-                <p className="text-3xl font-bold">{venues.length}</p>
-              </CardContent>
-              <CardFooter className="py-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full text-xs" 
-                  onClick={() => navigate('/my-venues')}
-                >
-                  View All Venues
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-lg">Total Bookings</CardTitle>
-              </CardHeader>
-              <CardContent className="py-0">
-                <p className="text-3xl font-bold">{bookingStats.total}</p>
-              </CardContent>
-              <CardFooter className="py-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full text-xs" 
-                  onClick={() => setActiveTab('bookings')}
-                >
-                  View All Bookings
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-lg">Pending Bookings</CardTitle>
-              </CardHeader>
-              <CardContent className="py-0">
-                <p className="text-3xl font-bold">{bookingStats.pending}</p>
-              </CardContent>
-              <CardFooter className="py-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full text-xs" 
-                  onClick={() => navigate('/customer-bookings?status=pending')}
-                >
-                  View Pending Bookings
-                </Button>
-              </CardFooter>
-            </Card>
-            
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-lg">Completed Bookings</CardTitle>
-              </CardHeader>
-              <CardContent className="py-0">
-                <p className="text-3xl font-bold">{bookingStats.completed}</p>
-              </CardContent>
-              <CardFooter className="py-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full text-xs" 
-                  onClick={() => navigate('/customer-bookings?status=completed')}
-                >
-                  View Completed Bookings
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-          
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Bookings Calendar</CardTitle>
-              <CardDescription>View and manage your upcoming bookings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <OwnerBookingsCalendar />
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Venues</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <p>Loading venues...</p>
-                ) : venues.length > 0 ? (
-                  <div className="space-y-4">
-                    {venues.slice(0, 3).map((venue) => (
-                      <div key={venue.id} className="flex items-center gap-4 p-3 rounded-lg border">
-                        <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                          <img 
-                            src={getFirstGalleryImage(venue)} 
-                            alt={venue.name} 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium">{venue.name}</h4>
-                          <div className="flex items-center text-findvenue-text-muted text-sm">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            <span>{venue.city_name || 'Unknown location'}</span>
-                          </div>
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => navigate(`/edit-venue/${venue.id}`)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+              <CardContent className="pb-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center">
+                    <Users className="h-4 w-4 mr-1 text-findvenue-text-muted" />
+                    <span>
+                      {venue.min_capacity || 0}-{venue.max_capacity || 0} guests
+                    </span>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Building className="mx-auto h-12 w-12 text-findvenue-text-muted opacity-30" />
-                    <p className="mt-2 text-findvenue-text-muted">No venues yet</p>
+                  <div className="flex items-center">
+                    <Star className="h-4 w-4 mr-1 text-yellow-500" />
+                    <span>{venue.rating || 0}</span>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <span className="font-medium text-lg">
+                    {venue.starting_price} {venue.currency || 'SAR'}
+                  </span>
+                  <span className="text-findvenue-text-muted text-sm ml-1">
+                    starting price
+                  </span>
+                </div>
+              </CardContent>
+              <Separator />
+              <CardFooter className="pt-4 pb-4 flex justify-between">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="border-white/10"
+                  onClick={() => navigate(`/edit-venue/${venue.id}`)}
+                >
+                  <Edit className="h-4 w-4 mr-1" /> Edit
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
                     <Button 
                       variant="outline" 
-                      className="mt-4" 
-                      onClick={() => navigate('/list-venue')}
+                      size="sm"
+                      className="border-white/10 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500"
                     >
-                      Add Your First Venue
+                      <Trash className="h-4 w-4 mr-1" /> Delete
                     </Button>
-                  </div>
-                )}
-              </CardContent>
-              {venues.length > 0 && (
-                <CardFooter>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full flex items-center justify-center gap-1"
-                    onClick={() => navigate('/my-venues')}
-                  >
-                    View All Venues
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </CardFooter>
-              )}
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the venue
+                        and all associated data.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={() => handleDeleteVenue(venue.id)}
+                        className="bg-red-500 hover:bg-red-600"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  className="bg-findvenue hover:bg-findvenue-dark"
+                  onClick={() => navigate(`/venue/${venue.id}`)}
+                >
+                  View Venue
+                </Button>
+              </CardFooter>
             </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Bookings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <p>Loading bookings...</p>
-                ) : recentBookings.length > 0 ? (
-                  <div className="space-y-4">
-                    {recentBookings.map((booking) => (
-                      <div key={booking.id} className="flex items-center gap-4 p-3 rounded-lg border">
-                        <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                          <img 
-                            src={booking.venue_image || 'https://placehold.co/600x400?text=No+Image'} 
-                            alt={booking.venue_name} 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium">{booking.venue_name}</h4>
-                          <div className="flex items-center text-findvenue-text-muted text-sm mb-1">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            <span>{new Date(booking.booking_date).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex items-center text-findvenue-text-muted text-sm">
-                            <Users className="h-3 w-3 mr-1" />
-                            <span>{booking.user_name} • {booking.guests} guests</span>
-                          </div>
-                        </div>
-                        <Badge className={
-                          booking.status === 'confirmed' ? 'bg-green-500' : 
-                          booking.status === 'pending' ? 'bg-amber-500' : 
-                          booking.status === 'cancelled' ? 'bg-red-500' : 'bg-gray-500'
-                        }>
-                          {booking.status}
-                        </Badge>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleStartChat(booking.user_id, booking.user_name, booking.venue_id, booking.venue_name)}
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Calendar className="mx-auto h-12 w-12 text-findvenue-text-muted opacity-30" />
-                    <p className="mt-2 text-findvenue-text-muted">No recent bookings</p>
-                    <Button 
-                      variant="outline" 
-                      className="mt-4" 
-                      onClick={() => setActiveTab('bookings')}
-                    >
-                      Check Bookings
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-              {recentBookings.length > 0 && (
-                <CardFooter>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full flex items-center justify-center gap-1"
-                    onClick={() => navigate('/customer-bookings')}
-                  >
-                    View All Bookings
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </CardFooter>
-              )}
-            </Card>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="bookings" className="mt-6">
-          <OwnerBookingsCalendar />
-        </TabsContent>
-      </Tabs>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
