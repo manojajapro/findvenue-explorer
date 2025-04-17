@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,6 +65,7 @@ export const useVenueData = () => {
           } catch (e) {
             console.error("Error parsing owner_info for venue", data.id, e);
           }
+          
           
           const processArrayField = (field: any): string[] => {
             if (!field) return [];
@@ -141,6 +141,7 @@ export const useVenueData = () => {
             return [];
           };
           
+          
           const galleryImages = processArrayField(data.gallery_images);
           const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
           
@@ -199,6 +200,7 @@ export const useVenueData = () => {
             zipcode: data.zipcode || '',
             categoryNames: categoryNames
           };
+          
           
           try {
             if (data.opening_hours) {
