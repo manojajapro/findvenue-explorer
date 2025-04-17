@@ -48,7 +48,7 @@ serve(async (req) => {
     if (type === 'welcome' || isSimpleGreeting) {
       return new Response(
         JSON.stringify({ 
-          answer: "Hello there! 👋 I'm the FindVenue assistant. I can help you discover the perfect venue for your event in Saudi Arabia. Feel free to ask about venues in specific cities like Riyadh or Jeddah, venues with certain amenities like WiFi or parking, or venues suitable for particular occasions like weddings or conferences. How can I help you today?"
+          answer: "Hello there! 👋 I'm the FindVenue assistant. I can help you discover the perfect venue for your event in Saudi Arabia and assist with your event planning. Feel free to ask about venues, event themes, layouts, vendor recommendations, or budget planning. How can I help you today?"
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -121,6 +121,18 @@ serve(async (req) => {
     if (venueId) {
       extractedKeywords.venueId = venueId;
     }
+
+    // Detect event planning queries
+    const isEventPlanningQuery = queryLower.includes('plan') || 
+                               queryLower.includes('theme') || 
+                               queryLower.includes('layout') || 
+                               queryLower.includes('decor') || 
+                               queryLower.includes('vendor') || 
+                               queryLower.includes('catering') ||
+                               queryLower.includes('organize') ||
+                               queryLower.includes('budget') ||
+                               queryLower.includes('schedule') ||
+                               queryLower.match(/how (to|do I|should I) (plan|organize|set up|arrange)/);
     
     // For venue-specific chat when we have a venueId
     if (type === 'chat' && venueId) {
@@ -171,10 +183,18 @@ serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: `You are a helpful venue booking assistant for FindVenue. You provide detailed information about a specific venue.
+                content: `You are a helpful venue booking and event planning assistant for FindVenue. You provide detailed information about a specific venue and offer event planning advice.
                          Be friendly, conversational, and informative. Focus on answering the user's questions about the specific venue
                          using the venue information provided. If the user asks about something not mentioned in the venue data,
                          politely explain that you don't have that specific information and suggest they contact the venue directly.
+                         
+                         If the user is asking about event planning at this venue, offer creative and practical suggestions for:
+                         - Event themes that would work well in this space
+                         - Layout and seating arrangements based on the venue capacity and type
+                         - Decoration ideas suitable for the venue style
+                         - Vendor recommendations (like catering, photographers, music) appropriate for the venue
+                         - Budget planning advice taking into account the venue's starting price
+                         
                          Format your responses in a friendly, conversational style. Use emojis occasionally to make your responses friendly.`
               },
               {
@@ -183,7 +203,7 @@ serve(async (req) => {
               }
             ],
             temperature: 0.7,
-            max_tokens: 500,
+            max_tokens: 700,
           }),
         });
 
@@ -337,6 +357,20 @@ serve(async (req) => {
         // Add general database information
         venueContext += `\nInformation about our venue database: We have approximately ${totalVenueCount || 'many'} venues across Saudi Arabia, primarily in major cities like Riyadh, Jeddah, and Dammam.`;
         
+        // Determine if this is an event planning query
+        const eventPlanningPrompt = isEventPlanningQuery ? `
+          It seems the user is asking about event planning. Provide helpful advice on:
+          - Event themes and concepts appropriate for the event type and venues mentioned
+          - Layout suggestions and space utilization tips
+          - Decor ideas that match the venue style or event type
+          - Vendor recommendations (photographers, caterers, entertainers, etc.)
+          - Budget planning advice including venue costs, catering, decor and other elements
+          - Timeline suggestions for event planning
+          
+          If specific venues were found in the search, tailor your event planning advice to those venues.
+          If no specific venues were found, provide general event planning advice based on the user's query.
+        ` : "";
+        
         console.log("Querying OpenAI with context:", venueContext.substring(0, 200) + "...");
         
         const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -350,27 +384,37 @@ serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: `You are a helpful venue booking assistant for FindVenue, a platform that helps users find and book venues in Saudi Arabia.
-                         Your job is to provide helpful, conversational answers based on the venue data provided.
+                content: `You are a helpful venue booking and event planning assistant for FindVenue, a platform that helps users find and book venues in Saudi Arabia.
+                         Your job is to provide helpful, conversational answers based on the venue data provided and give expert event planning advice.
+                         
                          Be detailed and thorough in your responses, highlighting key features of venues that match the query.
                          If you have venue data, mention the specific venues by name and highlight their key features.
                          If the user is asking for recommendations, suggest specific venues from the data provided.
+                         
+                         For event planning questions, offer creative and practical suggestions on:
+                         - Event themes appropriate for the venue and occasion
+                         - Layout and seating arrangements
+                         - Decoration ideas
+                         - Vendor recommendations (catering, photographers, entertainers)
+                         - Budget planning advice
+                         - Timeline and checklist suggestions
+                         
                          Be conversational, friendly, and helpful, making the user feel understood.
                          When mentioning prices, always include the currency (SAR).
                          If the user is looking for something specific that we don't have exact matches for,
                          suggest the closest alternatives available or recommend they try with broader criteria.
                          Never make up information about specific venues that isn't in the data provided.
                          If the user query is a simple greeting or small talk, respond in a friendly way.
-                         Keep answers focused and relevant to the user's query about venues.
+                         Keep answers focused and relevant to the user's query about venues and event planning.
                          Use emoji occasionally to make your responses friendly 😊.`
               },
               {
                 role: "user",
-                content: `The user asked: "${query}"\n\n${searchContext}\n\nHere is the venue data I have:\n${venueContext}`
+                content: `The user asked: "${query}"\n\n${searchContext}\n\nHere is the venue data I have:\n${venueContext}\n\n${eventPlanningPrompt}`
               }
             ],
             temperature: 0.7,
-            max_tokens: 800,
+            max_tokens: 900,
           }),
         });
 
@@ -402,7 +446,7 @@ serve(async (req) => {
 
     // Return a generic response for other request types
     return new Response(
-      JSON.stringify({ answer: "I'm here to help you find the perfect venue for your event. How can I assist you today?" }),
+      JSON.stringify({ answer: "I'm here to help you find the perfect venue for your event and assist with event planning. How can I help you today?" }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
     
