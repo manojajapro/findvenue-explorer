@@ -49,7 +49,7 @@ const NavbarActions = () => {
             variant={isActive('/my-venues') ? 'secondary' : 'ghost'}
             size="sm"
             className={`hidden md:flex items-center gap-1.5 ${isActive('/my-venues') ? 'bg-findvenue-surface' : ''}`}
-            onClick={() => navigate('/my-venues')}
+            onClick={() => navigate('/my-venues?tab=venues')}
           >
             <Building className="h-4 w-4" />
             My Venues

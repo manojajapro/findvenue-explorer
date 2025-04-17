@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -130,9 +131,9 @@ const Navbar = () => {
               <>
                 <Link to="/my-venues?tab=dashboard">
                   <Button 
-                    variant={isActive('/my-venues') ? 'secondary' : 'ghost'}
+                    variant={isActive('/my-venues?tab=dashboard') ? 'secondary' : 'ghost'}
                     size="sm"
-                    className={isActive('/my-venues') ? 'bg-findvenue-surface' : ''}
+                    className={isActive('/my-venues?tab=dashboard') ? 'bg-findvenue-surface' : ''}
                   >
                     Dashboard
                   </Button>
