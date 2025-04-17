@@ -7,8 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Google Cloud API key for Text-to-Speech
-const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
+// FreeTTS API endpoint - free and open source TTS service
+const FREE_TTS_ENDPOINT = "https://api.freetts.com/speech";
+const FREE_TTS_API_KEY = Deno.env.get("FREE_TTS_API_KEY") || "";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -23,41 +24,44 @@ serve(async (req) => {
       throw new Error('Text is required');
     }
 
-    console.log(`Converting text to speech using Google TTS`);
+    console.log(`Converting text to speech using FreeTTS`);
     
-    // Set default Google TTS voice settings
-    const voice = {
-      languageCode: 'en-US',
-      name: voiceId || 'en-US-Neural2-F', // Default female voice
-      ssmlGender: 'FEMALE'
-    };
-
-    // Using Google Cloud Text-to-Speech API
-    const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_API_KEY}`, {
+    // Default voice settings - can be expanded with more options
+    const voice = voiceId || 'en-us-1'; // Default English US voice
+    
+    // Using the FreeTTS API to convert text to speech
+    const response = await fetch(FREE_TTS_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${FREE_TTS_API_KEY}`,
       },
       body: JSON.stringify({
-        input: { text },
+        text: text,
         voice: voice,
-        audioConfig: { 
-          audioEncoding: 'MP3',
-          speakingRate: 1.0,
-          pitch: 0.0
-        }
+        // Additional options like speed, pitch can be added here
       }),
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('Google TTS API error:', error);
-      throw new Error(`Google TTS API error: ${JSON.stringify(error)}`);
+      // Fallback to browser's Web Speech API method
+      // We'll return instructions to use the browser's SpeechSynthesis API
+      return new Response(
+        JSON.stringify({ 
+          useWebSpeech: true,
+          text: text,
+          voice: voice,
+          format: 'webspeech'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Get response with base64 encoded audio
     const data = await response.json();
-    const base64Audio = data.audioContent; // Already base64 encoded
+    const base64Audio = data.audio || ''; // Get the base64 audio string
 
     return new Response(
       JSON.stringify({ 
@@ -71,12 +75,15 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in text-to-speech function:', error);
     
+    // Return fallback to use browser's Web Speech API
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Failed to convert text to speech' 
+        useWebSpeech: true,
+        error: error.message || 'Failed to convert text to speech',
+        fallback: 'Using browser speech synthesis instead'
       }),
       {
-        status: 500,
+        status: 200, // Still return 200 as we provide a fallback
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );

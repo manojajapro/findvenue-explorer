@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +33,7 @@ export const useVenueVoiceAssistant = ({
   const welcomeTextRef = useRef<string>('');
   const processingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
+  const synth = useRef<SpeechSynthesis | null>(null);
   
   useEffect(() => {
     audioElementRef.current = new Audio();
@@ -46,11 +48,20 @@ export const useVenueVoiceAssistant = ({
       if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
     };
     
+    // Initialize speech synthesis
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      synth.current = window.speechSynthesis;
+    }
+    
     return () => {
       isMountedRef.current = false;
       if (audioElementRef.current) {
         audioElementRef.current.pause();
         audioElementRef.current = null;
+      }
+      
+      if (synth.current) {
+        synth.current.cancel();
       }
     };
   }, [onSpeechStart, onSpeechEnd]);
@@ -173,52 +184,138 @@ export const useVenueVoiceAssistant = ({
       const { data, error } = await supabase.functions.invoke('text-to-speech', {
         body: {
           text: text,
-          voiceId: 'EXAVITQu4vr4xnSDxMaL' // Sarah voice by default
+          voiceId: 'en-us-1' // Default voice
         }
       });
       
       if (error) throw new Error(error.message);
       
-      if (!data?.audio) throw new Error('No audio received from TTS service');
-      
-      if (audioElementRef.current) {
-        audioElementRef.current.pause();
-        audioElementRef.current.currentTime = 0;
+      // Check if we should use Web Speech API fallback
+      if (data?.useWebSpeech) {
+        console.log("Using Web Speech API fallback");
+        return new Promise((resolve, reject) => {
+          if (!synth.current) {
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+            reject(new Error('Speech synthesis not available'));
+            return;
+          }
+          
+          // Cancel any ongoing speech
+          synth.current.cancel();
+          
+          // Create utterance
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'en-US';
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          
+          utterance.onend = () => {
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+            resolve();
+          };
+          
+          utterance.onerror = (event) => {
+            console.error('Speech synthesis error:', event);
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+            reject(new Error('Speech synthesis failed'));
+          };
+          
+          // Speak
+          synth.current.speak(utterance);
+        });
       }
       
-      const audio = audioElementRef.current || new Audio();
-      audio.src = `data:audio/mp3;base64,${data.audio}`;
-      
-      return new Promise((resolve, reject) => {
-        const handleEnd = () => {
-          if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
-          audio.removeEventListener('ended', handleEnd);
-          audio.removeEventListener('error', handleError);
-          resolve();
-        };
+      // If we have audio data, play it
+      if (data?.audio) {
+        if (audioElementRef.current) {
+          audioElementRef.current.pause();
+          audioElementRef.current.currentTime = 0;
+        }
         
-        const handleError = (e: Event) => {
-          console.error('Audio playback error:', e);
-          if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
-          audio.removeEventListener('ended', handleEnd);
-          audio.removeEventListener('error', handleError);
-          reject(new Error('Audio playback failed'));
-        };
+        const audio = audioElementRef.current || new Audio();
+        audio.src = `data:audio/mp3;base64,${data.audio}`;
         
-        audio.addEventListener('ended', handleEnd);
-        audio.addEventListener('error', handleError);
-        
-        audio.play().catch(err => {
-          console.error('Error playing audio:', err);
-          if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
-          reject(err);
+        return new Promise((resolve, reject) => {
+          const handleEnd = () => {
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+            audio.removeEventListener('ended', handleEnd);
+            audio.removeEventListener('error', handleError);
+            resolve();
+          };
+          
+          const handleError = (e: Event) => {
+            console.error('Audio playback error:', e);
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+            audio.removeEventListener('ended', handleEnd);
+            audio.removeEventListener('error', handleError);
+            reject(new Error('Audio playback failed'));
+          };
+          
+          audio.addEventListener('ended', handleEnd);
+          audio.addEventListener('error', handleError);
+          
+          audio.play().catch(err => {
+            console.error('Error playing audio:', err);
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+            reject(err);
+          });
         });
-      });
+      } else {
+        // Fallback to Web Speech API if no audio was returned
+        return new Promise((resolve, reject) => {
+          if (!synth.current) {
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+            reject(new Error('Speech synthesis not available'));
+            return;
+          }
+          
+          // Cancel any ongoing speech
+          synth.current.cancel();
+          
+          // Create utterance
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'en-US';
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          
+          utterance.onend = () => {
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+            resolve();
+          };
+          
+          utterance.onerror = (event) => {
+            console.error('Speech synthesis error:', event);
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+            reject(new Error('Speech synthesis failed'));
+          };
+          
+          // Speak
+          synth.current.speak(utterance);
+        });
+      }
     } catch (err: any) {
       console.error('Text-to-speech error:', err);
-      if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
-      toast.error('Failed to play audio response');
-      throw err;
+      
+      // Fallback to Web Speech API
+      if (synth.current && isMountedRef.current) {
+        try {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'en-US';
+          
+          utterance.onend = () => {
+            if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+          };
+          
+          synth.current.speak(utterance);
+        } catch (synthError) {
+          console.error('Web Speech API error:', synthError);
+          if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+        }
+      } else {
+        if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
+      }
+      
+      toast.error('Audio playback issue, using fallback voice');
     }
   }, [audioEnabled, onSpeechStart, onSpeechEnd]);
   
@@ -329,8 +426,13 @@ export const useVenueVoiceAssistant = ({
     if (audioElementRef.current) {
       audioElementRef.current.pause();
       audioElementRef.current.currentTime = 0;
-      if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
     }
+    
+    if (synth.current) {
+      synth.current.cancel();
+    }
+    
+    if (onSpeechEnd && isMountedRef.current) onSpeechEnd();
   }, [onSpeechEnd]);
   
   const toggleAudio = useCallback(() => {
