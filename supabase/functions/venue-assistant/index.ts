@@ -54,6 +54,21 @@ serve(async (req) => {
       );
     }
     
+    // Check for a city listing request (e.g., "list riyadh venues" or "show venues in jeddah")
+    const cityListingMatch = queryLower.match(/(?:list|show|find|get|display|venues? in|venues? at|venues? from) (\w+)(?:\s+venues?)?/i);
+    let isCityListingQuery = false;
+    
+    if (cityListingMatch && cityListingMatch[1]) {
+      const potentialCity = cityListingMatch[1].toLowerCase();
+      const cities = ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina', 'khobar', 'taif', 'abha'];
+      
+      if (cities.includes(potentialCity)) {
+        extractedKeywords.city = potentialCity;
+        isCityListingQuery = true;
+        console.log(`Detected city listing query for: ${potentialCity}`);
+      }
+    }
+    
     // Extract city
     const cities = ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina', 'khobar', 'taif', 'abha'];
     cities.forEach(city => {
@@ -241,9 +256,10 @@ serve(async (req) => {
         
         // Apply filters based on extracted keywords
         if (extractedKeywords.city) {
-          venueQuery = venueQuery.ilike('city_name', `%${extractedKeywords.city}%`);
+          const cityStr = String(extractedKeywords.city);
+          venueQuery = venueQuery.ilike('city_name', `%${cityStr}%`);
           keywordsFound = true;
-          queryFilters.push(`in ${extractedKeywords.city}`);
+          queryFilters.push(`in ${cityStr}`);
         }
         
         if (extractedKeywords.venueType) {
@@ -278,6 +294,13 @@ serve(async (req) => {
           venueQuery = venueQuery.order('rating', { ascending: false });
           keywordsFound = true;
           queryFilters.push('highest rated first');
+        }
+        
+        // Special case for city listing queries
+        if (isCityListingQuery) {
+          // For "list X venues" type queries, we prioritize showing results
+          venueQuery = venueQuery.order('rating', { ascending: false });
+          keywordsFound = true;
         }
         
         // If no specific filters were set but query contains venue-related terms
@@ -324,7 +347,7 @@ serve(async (req) => {
         }
         
         if (venueData && venueData.length > 0) {
-          venueContext = `I found ${venueData.length} venues that match the search criteria:\n\n`;
+          venueContext = `I found ${venueData.length} venues that match your search criteria:\n\n`;
           
           venueData.forEach((venue, index) => {
             const venueType = Array.isArray(venue.category_name) ? venue.category_name.join(', ') : (venue.category_name || venue.type || 'Venue');
@@ -373,18 +396,8 @@ serve(async (req) => {
         
         console.log("Querying OpenAI with context:", venueContext.substring(0, 200) + "...");
         
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              {
-                role: "system",
-                content: `You are a helpful venue booking and event planning assistant for FindVenue, a platform that helps users find and book venues in Saudi Arabia.
+        // For simple city listing queries, create a more direct response format
+        let systemPrompt = `You are a helpful venue booking and event planning assistant for FindVenue, a platform that helps users find and book venues in Saudi Arabia.
                          Your job is to provide helpful, conversational answers based on the venue data provided and give expert event planning advice.
                          
                          Be detailed and thorough in your responses, highlighting key features of venues that match the query.
@@ -406,7 +419,28 @@ serve(async (req) => {
                          Never make up information about specific venues that isn't in the data provided.
                          If the user query is a simple greeting or small talk, respond in a friendly way.
                          Keep answers focused and relevant to the user's query about venues and event planning.
-                         Use emoji occasionally to make your responses friendly 😊.`
+                         Use emoji occasionally to make your responses friendly 😊.`;
+                         
+        // For city listing queries, use a more structured response format
+        if (isCityListingQuery) {
+          systemPrompt += `\n\nFor city listing queries (like "show venues in Riyadh"), structure your response like this:
+                            1. Brief introduction mentioning the city and how many venues you found
+                            2. Structured list of venues with their key details (name, type, capacity, price)
+                            3. Brief conclusion with suggestion on how to learn more about any specific venue`;
+        }
+        
+        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt
               },
               {
                 role: "user",
