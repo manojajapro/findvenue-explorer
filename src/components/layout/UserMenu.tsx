@@ -86,7 +86,7 @@ const UserMenu = () => {
           <>
             <DropdownMenuItem 
               className="cursor-pointer hover:bg-white/5" 
-              onClick={() => handleNavigate('/my-venues?tab=dashboard')}
+              onClick={() => handleNavigate('/my-venues')}
             >
               <Building className="mr-2 h-4 w-4" />
               <span>My Venues</span>

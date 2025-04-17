@@ -66,32 +66,6 @@ export const useVenueData = () => {
             console.error("Error parsing owner_info for venue", data.id, e);
           }
           
-          let openingHoursData = undefined;
-          try {
-            if (data.opening_hours) {
-              openingHoursData = typeof data.opening_hours === 'string'
-                ? JSON.parse(data.opening_hours)
-                : (data.opening_hours as Record<string, any>);
-            }
-          } catch (e) {
-            console.error("Error parsing opening_hours for venue", data.id, e);
-          }
-          
-          let rulesAndRegulationsData = undefined;
-          try {
-            if (data.rules_and_regulations) {
-              rulesAndRegulationsData = typeof data.rules_and_regulations === 'string'
-                ? JSON.parse(data.rules_and_regulations)
-                : (data.rules_and_regulations as Array<{
-                    category: string;
-                    title: string;
-                    description: string;
-                  }>);
-            }
-          } catch (e) {
-            console.error("Error parsing rules_and_regulations for venue", data.id, e);
-          }
-          
           const processArrayField = (field: any): string[] => {
             if (!field) return [];
             
@@ -111,7 +85,6 @@ export const useVenueData = () => {
                 }
                 return [field];
               } catch (e) {
-                console.error("Error parsing array field", field, e);
                 return [field];
               }
             }
@@ -217,14 +190,38 @@ export const useVenueData = () => {
             wifi: data.wifi,
             accessibilityFeatures: processArrayField(data.accessibility_features),
             acceptedPaymentMethods: processArrayField(data.accepted_payment_methods),
-            openingHours: openingHoursData,
+            openingHours: undefined,
             ownerInfo: ownerInfoData,
             additionalServices: processArrayField(data.additional_services),
-            rulesAndRegulations: rulesAndRegulationsData,
+            rulesAndRegulations: undefined,
             type: data.type || '',
             zipcode: data.zipcode || '',
             categoryNames: categoryNames
           };
+          
+          try {
+            if (data.opening_hours) {
+              transformedVenue.openingHours = typeof data.opening_hours === 'string'
+                ? JSON.parse(data.opening_hours)
+                : (data.opening_hours as Record<string, any>);
+            }
+          } catch (e) {
+            console.error("Error parsing opening_hours for venue", data.id, e);
+          }
+          
+          try {
+            if (data.rules_and_regulations) {
+              transformedVenue.rulesAndRegulations = typeof data.rules_and_regulations === 'string'
+                ? JSON.parse(data.rules_and_regulations)
+                : (data.rules_and_regulations as Array<{
+                    category: string;
+                    title: string;
+                    description: string;
+                  }>);
+            }
+          } catch (e) {
+            console.error("Error parsing rules_and_regulations for venue", data.id, e);
+          }
           
           console.log("Transformed venue data:", transformedVenue);
           setVenue(transformedVenue);

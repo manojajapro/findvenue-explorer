@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
@@ -56,7 +55,6 @@ export const OwnerBookingsCalendar = () => {
     
     setIsLoading(true);
     try {
-      // First get venues owned by the current user
       const { data: venuesData, error: venuesError } = await supabase
         .from('venues')
         .select('id, name, owner_info');
@@ -66,7 +64,6 @@ export const OwnerBookingsCalendar = () => {
         throw venuesError;
       }
       
-      // Filter to only include venues owned by this user
       const ownerVenues = venuesData?.filter(venue => {
         if (!venue.owner_info) return false;
         
@@ -90,7 +87,6 @@ export const OwnerBookingsCalendar = () => {
       
       const venueIds = ownerVenues.map(venue => venue.id);
       
-      // Then fetch all bookings for these venues
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select(`
@@ -116,7 +112,6 @@ export const OwnerBookingsCalendar = () => {
         throw bookingsError;
       }
       
-      // Fetch user profiles to get names
       const userIds = (bookingsData || []).map(booking => booking.user_id);
       const { data: userProfiles, error: profilesError } = await supabase
         .from('user_profiles')
@@ -127,7 +122,6 @@ export const OwnerBookingsCalendar = () => {
         console.error('Error fetching user profiles:', profilesError);
       }
       
-      // Format the bookings data
       const formattedBookings = (bookingsData || []).map(booking => {
         const userProfile = userProfiles?.find(profile => profile.id === booking.user_id);
         
@@ -152,14 +146,12 @@ export const OwnerBookingsCalendar = () => {
       
       setBookings(formattedBookings);
       
-      // Process dates for calendar
       const dates = formattedBookings
         .filter(booking => booking.status !== 'cancelled')
         .map(booking => parseISO(booking.booking_date));
       
       setBookedDates(dates);
       
-      // Set the selected booking if the current selected date matches a booking
       if (selectedDate) {
         const formattedSelectedDate = format(selectedDate, 'yyyy-MM-dd');
         const bookingsOnSelectedDate = formattedBookings.filter(
@@ -204,7 +196,6 @@ export const OwnerBookingsCalendar = () => {
     }
   }, [selectedDate, bookings]);
   
-  // Add a real-time listener for booking changes
   useEffect(() => {
     if (!user) return;
 
@@ -274,14 +265,12 @@ export const OwnerBookingsCalendar = () => {
     setCurrentMonth(prev => addMonths(prev, -1));
   };
   
-  // Custom day content for the calendar
   const isDayBooked = (date: Date) => {
     return bookedDates.some(bookedDate => 
       format(bookedDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
     );
   };
   
-  // Count bookings on a specific date
   const getBookingsCountForDate = (date: Date) => {
     const formattedDate = format(date, 'yyyy-MM-dd');
     return bookings.filter(booking => 
@@ -289,7 +278,6 @@ export const OwnerBookingsCalendar = () => {
     ).length;
   };
   
-  // Get bookings for a specific date
   const getBookingsForDate = (date: Date) => {
     const formattedDate = format(date, 'yyyy-MM-dd');
     return bookings.filter(booking => booking.booking_date === formattedDate);
@@ -453,8 +441,7 @@ export const OwnerBookingsCalendar = () => {
                           </div>
                         )}
                         
-                        {/* Add booking status update buttons */}
-                        {booking.status !== 'cancelled' && booking.status !== 'confirmed' && (
+                        {booking.status === 'pending' && (
                           <div className="flex space-x-2 mt-3">
                             <Button 
                               size="sm" 
@@ -494,7 +481,7 @@ export const OwnerBookingsCalendar = () => {
                           </div>
                         )}
                         
-                        {booking.status === 'cancelled' && booking.status !== 'confirmed' && (
+                        {booking.status === 'cancelled' && (
                           <div className="flex space-x-2 mt-3">
                             <Button 
                               size="sm" 

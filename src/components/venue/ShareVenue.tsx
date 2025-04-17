@@ -9,6 +9,8 @@ import { Facebook, Twitter, Linkedin, Instagram, Share2, Copy, Link2 } from 'luc
 interface ShareVenueProps {
   venueName: string;
   venueId: string;
+  venueImage?: string;
+  venueDescription?: string;
   facebookUrl?: string;
   twitterUrl?: string;
   instagramUrl?: string;
@@ -18,6 +20,8 @@ interface ShareVenueProps {
 export default function ShareVenue({ 
   venueName, 
   venueId, 
+  venueImage,
+  venueDescription,
   facebookUrl, 
   twitterUrl, 
   instagramUrl, 
@@ -48,7 +52,15 @@ export default function ShareVenue({
     if (facebookUrl) {
       window.open(facebookUrl, '_blank');
     } else {
-      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+      const url = new URL('https://www.facebook.com/sharer/sharer.php');
+      url.searchParams.append('u', shareUrl);
+      if (venueImage) {
+        url.searchParams.append('picture', venueImage);
+      }
+      if (venueDescription) {
+        url.searchParams.append('description', venueDescription);
+      }
+      window.open(url.toString(), '_blank');
     }
     setIsOpen(false);
   };
@@ -57,7 +69,11 @@ export default function ShareVenue({
     if (twitterUrl) {
       window.open(twitterUrl, '_blank');
     } else {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out ${venueName}`)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+      const url = new URL('https://twitter.com/intent/tweet');
+      const text = `Check out ${venueName}`;
+      url.searchParams.append('text', text);
+      url.searchParams.append('url', shareUrl);
+      window.open(url.toString(), '_blank');
     }
     setIsOpen(false);
   };
@@ -66,7 +82,15 @@ export default function ShareVenue({
     if (linkedinUrl) {
       window.open(linkedinUrl, '_blank');
     } else {
-      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank');
+      const url = new URL('https://www.linkedin.com/sharing/share-offsite/');
+      url.searchParams.append('url', shareUrl);
+      if (venueDescription) {
+        url.searchParams.append('summary', venueDescription);
+      }
+      if (venueName) {
+        url.searchParams.append('title', venueName);
+      }
+      window.open(url.toString(), '_blank');
     }
     setIsOpen(false);
   };
