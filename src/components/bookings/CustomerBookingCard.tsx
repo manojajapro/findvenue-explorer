@@ -38,7 +38,7 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
   };
 
   const handleViewDetails = () => {
-    navigate(`/venue/${booking.venue_id}`);
+    navigate(`/venue/${booking.venue_id}`, { replace: false });
   };
   
   return (
