@@ -61,7 +61,7 @@ const Navbar = () => {
   
   const handleLogoClick = () => {
     if (user && isVenueOwner) {
-      navigate('/my-venues?tab=dashboard');
+      navigate('/dashboard');
     } else {
       navigate('/');
     }
@@ -129,11 +129,11 @@ const Navbar = () => {
             
             {isVenueOwner && (
               <>
-                <Link to="/my-venues?tab=dashboard">
+                <Link to="/dashboard">
                   <Button 
-                    variant={isActive('/my-venues?tab=dashboard') ? 'secondary' : 'ghost'}
+                    variant={isActive('/dashboard') ? 'secondary' : 'ghost'}
                     size="sm"
-                    className={isActive('/my-venues?tab=dashboard') ? 'bg-findvenue-surface' : ''}
+                    className={isActive('/dashboard') ? 'bg-findvenue-surface' : ''}
                   >
                     Dashboard
                   </Button>
@@ -245,7 +245,7 @@ const Navbar = () => {
                   
                   {isVenueOwner && (
                     <>
-                      <DropdownMenuItem onClick={() => navigate('/my-venues?tab=dashboard')}>
+                      <DropdownMenuItem onClick={() => navigate('/dashboard')}>
                         <Home className="mr-2 h-4 w-4" />
                         <span>Dashboard</span>
                       </DropdownMenuItem>
