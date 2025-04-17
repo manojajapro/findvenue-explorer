@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
-import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Star, Clock, Wifi, Car, CreditCard } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import VenueBookingTabs from '@/components/venue/VenueBookingTabs';
 import VenueBookingInquiry from '@/components/venue/VenueBookingInquiry';
@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { VenueCard } from '@/components/ui';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
+import ShareVenue from '@/components/venue/ShareVenue';
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -165,30 +166,6 @@ const VenueDetails = () => {
     setSelectedImage(image);
   };
   
-  const shareVenue = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: venue.name,
-          text: `Check out this venue: ${venue.name}`,
-          url: window.location.href,
-        });
-        toast({
-          title: "Shared successfully",
-          description: "Venue link has been shared",
-        });
-      } catch (error) {
-        console.error('Error sharing:', error);
-      }
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      toast({
-        title: "Link copied",
-        description: "Venue link has been copied to clipboard",
-      });
-    }
-  };
-  
   const hasEnoughImages = venue.galleryImages && venue.galleryImages.length >= 4;
 
   return (
@@ -208,23 +185,20 @@ const VenueDetails = () => {
               Featured
             </Badge>
           )}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="absolute top-4 right-4 bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              shareVenue();
-            }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-share-2">
-              <circle cx="18" cy="5" r="3"/>
-              <circle cx="6" cy="12" r="3"/>
-              <circle cx="18" cy="19" r="3"/>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-            </svg>
-          </Button>
+          
+          <div className="absolute top-4 right-4">
+            <ShareVenue 
+              venueName={venue.name} 
+              venueId={venue.id} 
+              venueDescription={venue.description}
+              venueImage={venue.galleryImages?.[0]}
+              facebookUrl={venue.ownerInfo?.socialLinks?.facebook}
+              twitterUrl={venue.ownerInfo?.socialLinks?.twitter}
+              instagramUrl={venue.ownerInfo?.socialLinks?.instagram}
+              linkedinUrl={venue.ownerInfo?.socialLinks?.linkedin}
+            />
+          </div>
+          
           <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black/80 to-transparent">
             <h1 className="text-3xl font-bold text-white">{venue.name}</h1>
             <div className="flex items-center gap-3 mt-2">

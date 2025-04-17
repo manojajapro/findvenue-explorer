@@ -6,7 +6,6 @@ import { Bot, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import VenueUnifiedChatAssistant from '@/components/chat/VenueUnifiedChatAssistant';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 interface VenueAIAssistantsProps {
   venue: Venue | null;
