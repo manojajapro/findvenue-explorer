@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -26,7 +25,6 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // Track scroll position for navbar styling
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -36,12 +34,10 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
-  // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
   
-  // Check if a route is active
   const isActive = (path: string) => {
     if (path === '/') {
       return location.pathname === path;
@@ -78,7 +74,6 @@ const Navbar = () => {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
-          {/* Logo */}
           <div 
             className="text-xl md:text-2xl font-bold text-white cursor-pointer flex items-center" 
             onClick={handleLogoClick}
@@ -86,7 +81,6 @@ const Navbar = () => {
             <span className="bg-findvenue px-2 py-0 rounded text-white mr-0.5 ml-1"> A </span>vnu
           </div>
           
-          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
             {!isVenueOwner && (
               <>
@@ -144,6 +138,16 @@ const Navbar = () => {
                   </Button>
                 </Link>
                 
+                <Link to="/my-venues?tab=venues">
+                  <Button 
+                    variant={isActive('/my-venues?tab=venues') ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className={isActive('/my-venues?tab=venues') ? 'bg-findvenue-surface' : ''}
+                  >
+                    My Venues
+                  </Button>
+                </Link>
+                
                 <Link to="/list-venue">
                   <Button 
                     variant={isActive('/list-venue') ? 'secondary' : 'ghost'}
@@ -179,17 +183,13 @@ const Navbar = () => {
             )}
           </nav>
           
-          {/* User Menu & Auth Buttons */}
           <div className="flex items-center">
-            {/* Search Button */}
             <Button variant="ghost" size="icon" className="mr-1">
               <Search className="h-5 w-5" />
             </Button>
             
-            {/* Notifications center for logged in users */}
             {user && <NotificationCenter />}
             
-            {/* Messages link for logged in users */}
             {user && (
               <Link to="/messages">
                 <Button 
@@ -296,7 +296,6 @@ const Navbar = () => {
               </Button>
             )}
             
-            {/* Mobile Menu Button */}
             <Button 
               variant="ghost" 
               size="icon" 
@@ -310,122 +309,132 @@ const Navbar = () => {
               )}
             </Button>
           </div>
+          
+          {isMobileMenuOpen && (
+            <div className="md:hidden mt-4 pb-2 border-t border-findvenue-surface pt-3">
+              <nav className="flex flex-col space-y-2">
+                {!isVenueOwner && (
+                  <>
+                    <Link to="/">
+                      <Button 
+                        variant={isActive('/') ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={`w-full justify-start ${isActive('/') ? 'bg-findvenue-surface' : ''}`}
+                      >
+                        <Home className="mr-2 h-4 w-4" />
+                        Home
+                      </Button>
+                    </Link>
+                    
+                    <Link to="/venues">
+                      <Button 
+                        variant={isActive('/venues') ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={`w-full justify-start ${isActive('/venues') ? 'bg-findvenue-surface' : ''}`}
+                      >
+                        <Building className="mr-2 h-4 w-4" />
+                        Venues
+                      </Button>
+                    </Link>
+                    
+                    <Link to="/categories">
+                      <Button 
+                        variant={isActive('/categories') ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={`w-full justify-start ${isActive('/categories') ? 'bg-findvenue-surface' : ''}`}
+                      >
+                        Categories
+                      </Button>
+                    </Link>
+                    
+                    <Link to="/cities">
+                      <Button 
+                        variant={isActive('/cities') ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={`w-full justify-start ${isActive('/cities') ? 'bg-findvenue-surface' : ''}`}
+                      >
+                        Cities
+                      </Button>
+                    </Link>
+                  </>
+                )}
+                
+                {isVenueOwner && (
+                  <>
+                    <Link to="/my-venues?tab=dashboard">
+                      <Button 
+                        variant={isActive('/my-venues') ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={`w-full justify-start ${isActive('/my-venues') ? 'bg-findvenue-surface' : ''}`}
+                      >
+                        <Home className="mr-2 h-4 w-4" />
+                        Dashboard
+                      </Button>
+                    </Link>
+                    
+                    <Link to="/my-venues?tab=venues">
+                      <Button 
+                        variant={isActive('/my-venues?tab=venues') ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={`w-full justify-start ${isActive('/my-venues?tab=venues') ? 'bg-findvenue-surface' : ''}`}
+                      >
+                        <Building className="mr-2 h-4 w-4" />
+                        My Venues
+                      </Button>
+                    </Link>
+                    
+                    <Link to="/list-venue">
+                      <Button 
+                        variant={isActive('/list-venue') ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={`w-full justify-start ${isActive('/list-venue') ? 'bg-findvenue-surface' : ''}`}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        List Venue
+                      </Button>
+                    </Link>
+                    
+                    <Link to="/customer-bookings">
+                      <Button 
+                        variant={isActive('/customer-bookings') ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className={`w-full justify-start ${isActive('/customer-bookings') ? 'bg-findvenue-surface' : ''}`}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        Bookings
+                      </Button>
+                    </Link>
+                  </>
+                )}
+                
+                {user && (
+                  <Link to="/messages">
+                    <Button 
+                      variant={isActive('/messages') ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={`w-full justify-start ${isActive('/messages') ? 'bg-findvenue-surface' : ''}`}
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Messages
+                    </Button>
+                  </Link>
+                )}
+                
+                {!user && (
+                  <Link to="/venue-owner">
+                    <Button 
+                      variant={isActive('/venue-owner') ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={`w-full justify-start ${isActive('/venue-owner') ? 'bg-findvenue-surface' : ''}`}
+                    >
+                      For Venue Owners
+                    </Button>
+                  </Link>
+                )}
+              </nav>
+            </div>
+          )}
         </div>
-        
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-2 border-t border-findvenue-surface pt-3">
-            <nav className="flex flex-col space-y-2">
-              {!isVenueOwner && (
-                <>
-                  <Link to="/">
-                    <Button 
-                      variant={isActive('/') ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className={`w-full justify-start ${isActive('/') ? 'bg-findvenue-surface' : ''}`}
-                    >
-                      <Home className="mr-2 h-4 w-4" />
-                      Home
-                    </Button>
-                  </Link>
-                  
-                  <Link to="/venues">
-                    <Button 
-                      variant={isActive('/venues') ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className={`w-full justify-start ${isActive('/venues') ? 'bg-findvenue-surface' : ''}`}
-                    >
-                      <Building className="mr-2 h-4 w-4" />
-                      Venues
-                    </Button>
-                  </Link>
-                  
-                  <Link to="/categories">
-                    <Button 
-                      variant={isActive('/categories') ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className={`w-full justify-start ${isActive('/categories') ? 'bg-findvenue-surface' : ''}`}
-                    >
-                      Categories
-                    </Button>
-                  </Link>
-                  
-                  <Link to="/cities">
-                    <Button 
-                      variant={isActive('/cities') ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className={`w-full justify-start ${isActive('/cities') ? 'bg-findvenue-surface' : ''}`}
-                    >
-                      Cities
-                    </Button>
-                  </Link>
-                </>
-              )}
-              
-              {isVenueOwner && (
-                <>
-                  <Link to="/my-venues?tab=dashboard">
-                    <Button 
-                      variant={isActive('/my-venues') ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className={`w-full justify-start ${isActive('/my-venues') ? 'bg-findvenue-surface' : ''}`}
-                    >
-                      <Home className="mr-2 h-4 w-4" />
-                      Dashboard
-                    </Button>
-                  </Link>
-                  
-                  <Link to="/list-venue">
-                    <Button 
-                      variant={isActive('/list-venue') ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className={`w-full justify-start ${isActive('/list-venue') ? 'bg-findvenue-surface' : ''}`}
-                    >
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      List Venue
-                    </Button>
-                  </Link>
-                  
-                  <Link to="/customer-bookings">
-                    <Button 
-                      variant={isActive('/customer-bookings') ? 'secondary' : 'ghost'}
-                      size="sm"
-                      className={`w-full justify-start ${isActive('/customer-bookings') ? 'bg-findvenue-surface' : ''}`}
-                    >
-                      <Calendar className="mr-2 h-4 w-4" />
-                      Bookings
-                    </Button>
-                  </Link>
-                </>
-              )}
-              
-              {user && (
-                <Link to="/messages">
-                  <Button 
-                    variant={isActive('/messages') ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className={`w-full justify-start ${isActive('/messages') ? 'bg-findvenue-surface' : ''}`}
-                  >
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    Messages
-                  </Button>
-                </Link>
-              )}
-              
-              {!user && (
-                <Link to="/venue-owner">
-                  <Button 
-                    variant={isActive('/venue-owner') ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className={`w-full justify-start ${isActive('/venue-owner') ? 'bg-findvenue-surface' : ''}`}
-                  >
-                    For Venue Owners
-                  </Button>
-                </Link>
-              )}
-            </nav>
-          </div>
-        )}
       </div>
     </header>
   );

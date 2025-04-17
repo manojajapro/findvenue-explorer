@@ -21,7 +21,7 @@ const UserMenu = () => {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleNavigate = (path: string) => {
-    navigate(path);
+    navigate(path, { replace: false });
   };
 
   const handleSignOut = async (e: React.MouseEvent) => {
