@@ -396,7 +396,7 @@ const SmartVenueAssistant = () => {
               <div className="p-4 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-8 w-8 bg-blue-600">
-                    <AvatarImage src="/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png" alt="AI" />
+                    <AvatarImage src="https://static.vecteezy.com/system/resources/previews/011/490/381/original/happy-smiling-young-man-avatar-3d-portrait-of-a-man-cartoon-character-people-illustration-isolated-on-white-background-vector.jpg" alt="AI" />
                     <AvatarFallback>AI</AvatarFallback>
                   </Avatar>
                   <div>

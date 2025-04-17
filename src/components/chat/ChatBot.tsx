@@ -154,7 +154,7 @@ const ChatBot: React.FC = () => {
           <div className="bg-findvenue p-3 flex justify-between items-center rounded-t-lg">
             <div className="flex items-center">
               <Avatar className="h-8 w-8 mr-2">
-                <AvatarImage src="/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png" alt="FindVenue Assistant" />
+                <AvatarImage src="https://static.vecteezy.com/system/resources/previews/011/490/381/original/happy-smiling-young-man-avatar-3d-portrait-of-a-man-cartoon-character-people-illustration-isolated-on-white-background-vector.jpg" alt="FindVenue Assistant" />
                 <AvatarFallback>AI</AvatarFallback>
               </Avatar>
               <span className="font-medium text-white">FindVenue Assistant</span>

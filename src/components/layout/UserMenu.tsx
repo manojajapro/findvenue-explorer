@@ -56,7 +56,7 @@ const UserMenu = () => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
-  const defaultAvatar = "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png";
+  const defaultAvatar = "https://static.vecteezy.com/system/resources/previews/011/490/381/original/happy-smiling-young-man-avatar-3d-portrait-of-a-man-cartoon-character-people-illustration-isolated-on-white-background-vector.jpg";
 
   return (
     <DropdownMenu>

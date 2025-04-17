@@ -30,7 +30,7 @@ const VenueOwnerPromo = () => {
             </div>
           </div>
           <div className="md:w-1/2">
-            <img alt="Venue Owner" className="rounded-lg w-full max-w-lg mx-auto" src="/lovable-uploads/545c1cde-048c-4d24-a229-8931fc3147c8.png" />
+            <img alt="Venue Owner" className="rounded-lg w-full max-w-lg mx-auto" src="https://res.cloudinary.com/dbrzhkxtm/image/upload/v1744099920/venues/ta0n5k2q1lsrv1ea8p4u.jpg" />
           </div>
         </div>
         

@@ -10,7 +10,6 @@ import { useToast } from '@/components/ui/use-toast';
 
 // Default avatar options
 const defaultAvatars = [
-  '/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png', // Default avatar
   'https://api.dicebear.com/6.x/personas/svg?seed=John',
   'https://api.dicebear.com/6.x/personas/svg?seed=Jane',
   'https://api.dicebear.com/6.x/personas/svg?seed=Alex',

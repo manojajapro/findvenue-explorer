@@ -151,7 +151,7 @@ const Profile = () => {
                     <div className="flex flex-col md:flex-row items-start gap-6">
                       <div className="flex flex-col items-center space-y-3">
                         <AvatarSelector 
-                          currentAvatar={profileImage || "/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png"}
+                          currentAvatar={profileImage || "https://static.vecteezy.com/system/resources/previews/011/490/381/original/happy-smiling-young-man-avatar-3d-portrait-of-a-man-cartoon-character-people-illustration-isolated-on-white-background-vector.jpg"}
                           firstName={firstName}
                           lastName={lastName}
                           onAvatarChange={(url) => setProfileImage(url)}

@@ -60,7 +60,7 @@ const VenueSpecificChatBot: React.FC<VenueSpecificChatBotProps> = ({
         <CardHeader className="p-4 border-b border-white/10 flex flex-row justify-between items-center">
           <div className="flex items-center">
             <Avatar className="h-8 w-8 mr-2">
-              <AvatarImage src="/lovable-uploads/7fce1275-bc02-4586-a290-d55d1afa4a80.png" alt="Venue Assistant" />
+              <AvatarImage src="https://static.vecteezy.com/system/resources/previews/011/490/381/original/happy-smiling-young-man-avatar-3d-portrait-of-a-man-cartoon-character-people-illustration-isolated-on-white-background-vector.jpg" alt="Venue Assistant" />
               <AvatarFallback>AI</AvatarFallback>
             </Avatar>
             <div>
