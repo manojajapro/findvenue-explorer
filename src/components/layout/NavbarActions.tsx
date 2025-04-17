@@ -6,7 +6,7 @@ import NotificationCenter from '@/components/notifications/NotificationCenter';
 import UserMenu from './UserMenu';
 import NavbarSearchButton from './NavbarSearchButton';
 import LanguageToggle from '@/components/language/LanguageToggle';
-import { Building } from 'lucide-react';
+import { Building, Home } from 'lucide-react';
 
 const NavbarActions = () => {
   const { user, isVenueOwner } = useAuth();
@@ -46,10 +46,20 @@ const NavbarActions = () => {
       {isVenueOwner && (
         <>
           <Button 
+            variant={isActive('/dashboard') ? 'secondary' : 'ghost'}
+            size="sm"
+            className={`hidden md:flex items-center gap-1.5 ${isActive('/dashboard') ? 'bg-findvenue-surface' : ''}`}
+            onClick={() => navigate('/dashboard')}
+          >
+            <Home className="h-4 w-4" />
+            Dashboard
+          </Button>
+          
+          <Button 
             variant={isActive('/my-venues') ? 'secondary' : 'ghost'}
             size="sm"
             className={`hidden md:flex items-center gap-1.5 ${isActive('/my-venues') ? 'bg-findvenue-surface' : ''}`}
-            onClick={() => navigate('/my-venues?tab=venues')}
+            onClick={() => navigate('/my-venues')}
           >
             <Building className="h-4 w-4" />
             My Venues

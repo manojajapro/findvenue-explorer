@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Settings, LogOut, User, Building, Calendar } from 'lucide-react';
+import { Settings, LogOut, User, Building, Calendar, Home } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -86,6 +86,13 @@ const UserMenu = () => {
           <>
             <DropdownMenuItem 
               className="cursor-pointer hover:bg-white/5" 
+              onClick={() => handleNavigate('/dashboard')}
+            >
+              <Home className="mr-2 h-4 w-4" />
+              <span>Dashboard</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              className="cursor-pointer hover:bg-white/5" 
               onClick={() => handleNavigate('/my-venues')}
             >
               <Building className="mr-2 h-4 w-4" />
@@ -93,14 +100,7 @@ const UserMenu = () => {
             </DropdownMenuItem>
             <DropdownMenuItem 
               className="cursor-pointer hover:bg-white/5" 
-              onClick={() => handleNavigate('/my-venues?tab=dashboard')}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Dashboard</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              className="cursor-pointer hover:bg-white/5" 
-              onClick={() => handleNavigate('/my-venues?tab=bookings')}
+              onClick={() => handleNavigate('/customer-bookings')}
             >
               <Calendar className="mr-2 h-4 w-4" />
               <span>Bookings</span>

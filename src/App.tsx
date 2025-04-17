@@ -24,6 +24,7 @@ import CustomerBookings from "./pages/CustomerBookings";
 import Favorites from "./pages/Favorites";
 import Messages from "./pages/Messages";
 import MyVenues from "./pages/MyVenues";
+import Dashboard from "./pages/Dashboard";
 import EditVenue from "./pages/EditVenue";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
@@ -175,6 +176,7 @@ function AppContent() {
             
             {/* Venue owner-only routes */}
             <Route path="/list-venue" element={<ProtectedRoute allowedRoles={['venue-owner']}><ListVenue /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['venue-owner']}><Dashboard /></ProtectedRoute>} />
             <Route path="/my-venues" element={<ProtectedRoute allowedRoles={['venue-owner']}><MyVenues /></ProtectedRoute>} />
             <Route path="/edit-venue/:id" element={<ProtectedRoute allowedRoles={['venue-owner']}><EditVenue /></ProtectedRoute>} />
             <Route path="/customer-bookings" element={<ProtectedRoute allowedRoles={['venue-owner']}><CustomerBookings /></ProtectedRoute>} />
