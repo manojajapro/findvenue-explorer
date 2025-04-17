@@ -73,7 +73,7 @@ const MyVenues = () => {
   // Check URL params when component mounts or route changes
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
-    if (tabFromUrl && ['dashboard', 'my-venues', 'bookings'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['dashboard', 'bookings'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     }
   }, [searchParams]);
@@ -331,9 +331,8 @@ const MyVenues = () => {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="my-venues">My Venues</TabsTrigger>
           <TabsTrigger value="bookings">Bookings</TabsTrigger>
         </TabsList>
         
@@ -350,7 +349,7 @@ const MyVenues = () => {
                 <Button 
                   variant="outline" 
                   className="w-full text-xs" 
-                  onClick={() => setActiveTab('my-venues')}
+                  onClick={() => navigate('/my-venues')}
                 >
                   View All Venues
                 </Button>
@@ -477,7 +476,7 @@ const MyVenues = () => {
                   <Button 
                     variant="ghost" 
                     className="w-full flex items-center justify-center gap-1"
-                    onClick={() => setActiveTab('my-venues')}
+                    onClick={() => navigate('/my-venues')}
                   >
                     View All Venues
                     <ChevronRight className="h-4 w-4" />
@@ -560,141 +559,6 @@ const MyVenues = () => {
               )}
             </Card>
           </div>
-        </TabsContent>
-        
-        <TabsContent value="my-venues" className="mt-6">
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          {isLoading ? (
-            <div className="text-center py-12">Loading venues...</div>
-          ) : venues.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {venues.map((venue) => (
-                <Card key={venue.id} className="overflow-hidden h-full flex flex-col">
-                  <div className="relative h-48">
-                    <img 
-                      src={getFirstGalleryImage(venue)}
-                      alt={venue.name}
-                      className="w-full h-full object-cover"
-                    />
-                    {venue.popular && (
-                      <Badge className="absolute top-3 left-3 bg-findvenue">Popular</Badge>
-                    )}
-                    {venue.featured && (
-                      <Badge className="absolute top-3 right-3 bg-amber-500">Featured</Badge>
-                    )}
-                  </div>
-                  
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-xl">{venue.name}</CardTitle>
-                      <div className="flex items-center">
-                        <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                        <span className="text-sm ml-1">{venue.rating || '0.0'}</span>
-                      </div>
-                    </div>
-                    
-                    <CardDescription className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {venue.address}, {venue.city_name || 'Unknown location'}
-                    </CardDescription>
-                  </CardHeader>
-                  
-                  <CardContent className="pb-4 flex-grow">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users className="h-4 w-4 text-findvenue-text-muted" />
-                      <span className="text-sm text-findvenue-text-muted">
-                        {venue.min_capacity}-{venue.max_capacity} people
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="h-4 w-4 text-findvenue-text-muted" />
-                      <span className="text-sm text-findvenue-text-muted">
-                        {venue.type || 'Venue'}
-                      </span>
-                    </div>
-                    
-                    <p className="text-sm line-clamp-2 mt-2 text-findvenue-text-muted">
-                      {venue.description || 'No description available'}
-                    </p>
-                    
-                    <div className="mt-3">
-                      <div className="font-medium">
-                        {venue.starting_price > 0 ? (
-                          <span>Starting from {venue.currency || 'SAR'} {venue.starting_price}</span>
-                        ) : (
-                          <span>Price on request</span>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                  
-                  <CardFooter className="flex justify-between pt-0 border-t">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-1/2"
-                      onClick={() => navigate(`/edit-venue/${venue.id}`)}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                    
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="w-1/2 ml-2 text-destructive border-destructive hover:bg-destructive/10"
-                        >
-                          <Trash className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure you want to delete this venue?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the venue
-                            and all related data.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-red-600 hover:bg-red-700"
-                            onClick={() => handleDeleteVenue(venue.id)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Building className="mx-auto h-16 w-16 text-findvenue-text-muted opacity-30" />
-              <h3 className="mt-4 text-xl font-medium">No venues yet</h3>
-              <p className="mt-2 text-findvenue-text-muted">
-                You haven't listed any venues yet. Get started by adding your first venue.
-              </p>
-              <Button 
-                className="mt-6 bg-findvenue hover:bg-findvenue-dark"
-                onClick={() => navigate('/list-venue')}
-              >
-                <PlusCircle className="mr-2 h-5 w-5" />
-                List a Venue
-              </Button>
-            </div>
-          )}
         </TabsContent>
         
         <TabsContent value="bookings" className="mt-6">
