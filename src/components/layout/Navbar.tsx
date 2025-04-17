@@ -362,11 +362,11 @@ const Navbar = () => {
                 
                 {isVenueOwner && (
                   <>
-                    <Link to="/my-venues?tab=dashboard">
+                    <Link to="/dashboard">
                       <Button 
-                        variant={isActive('/my-venues') ? 'secondary' : 'ghost'}
+                        variant={isActive('/dashboard') ? 'secondary' : 'ghost'}
                         size="sm"
-                        className={`w-full justify-start ${isActive('/my-venues') ? 'bg-findvenue-surface' : ''}`}
+                        className={`w-full justify-start ${isActive('/dashboard') ? 'bg-findvenue-surface' : ''}`}
                       >
                         <Home className="mr-2 h-4 w-4" />
                         Dashboard
