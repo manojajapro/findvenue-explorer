@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,7 +10,7 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
-import { ChevronRight, Calendar, MessageCircle } from 'lucide-react';
+import { ChevronRight, Calendar, MessageCircle, Building, Users, PieChart, DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
@@ -21,6 +20,8 @@ const Dashboard = () => {
   const { user } = useAuth();
   
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
+  const [venuesCount, setVenuesCount] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
   
   // Booking stats
   const [bookingStats, setBookingStats] = useState({
@@ -35,12 +36,69 @@ const Dashboard = () => {
     if (user) {
       fetchBookingStats();
       fetchRecentBookings();
+      fetchVenueCount();
       
       // Enable realtime for bookings
       enableRealtimeForTable('bookings');
     }
   }, [user]);
 
+  const fetchVenueCount = async () => {
+    if (!user) return;
+    
+    try {
+      // Get all venues owned by the current user
+      const { data: venuesData, error: venuesError } = await supabase
+        .from('venues')
+        .select('id, owner_info');
+      
+      if (venuesError) {
+        console.error('Error fetching venues count:', venuesError);
+        return;
+      }
+      
+      // Filter venues to only include those owned by this user
+      const ownerVenues = venuesData?.filter(venue => {
+        if (!venue.owner_info) return false;
+        
+        try {
+          const ownerInfo = typeof venue.owner_info === 'string' 
+            ? JSON.parse(venue.owner_info) 
+            : venue.owner_info;
+            
+          return ownerInfo.user_id === user.id;
+        } catch (e) {
+          console.error("Error parsing owner_info for venue", venue.id, e);
+          return false;
+        }
+      });
+      
+      setVenuesCount(ownerVenues?.length || 0);
+      
+      // Calculate total revenue from confirmed bookings
+      if (ownerVenues && ownerVenues.length > 0) {
+        const venueIds = ownerVenues.map(venue => venue.id);
+        
+        const { data: bookingsData, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('total_price, status')
+          .in('venue_id', venueIds)
+          .in('status', ['confirmed', 'completed']);
+          
+        if (bookingsError) {
+          console.error('Error fetching revenue:', bookingsError);
+          return;
+        }
+        
+        const revenue = bookingsData?.reduce((total, booking) => total + Number(booking.total_price || 0), 0) || 0;
+        setTotalRevenue(revenue);
+      }
+      
+    } catch (err) {
+      console.error('Error fetching venue count:', err);
+    }
+  };
+  
   const fetchBookingStats = async () => {
     try {
       if (!user) return;
@@ -208,27 +266,25 @@ const Dashboard = () => {
           </p>
         </div>
         
-        <Button 
-          className="mt-4 md:mt-0 bg-findvenue hover:bg-findvenue-dark flex items-center gap-2"
-          onClick={() => navigate('/my-venues')}
-        >
-          View My Venues
-        </Button>
+        <div className="flex gap-2 mt-4 md:mt-0">
+          <Button 
+            className="bg-findvenue hover:bg-findvenue-dark flex items-center gap-2"
+            onClick={() => navigate('/list-venue')}
+          >
+            Add New Venue
+          </Button>
+          <Button 
+            variant="outline"
+            className="border-white/10 hover:bg-white/5"
+            onClick={() => navigate('/my-venues')}
+          >
+            Manage Venues
+          </Button>
+        </div>
       </div>
       
-      {/* Calendar Card at the top */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Booking Calendar</CardTitle>
-          <CardDescription>View your upcoming bookings</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-2">
-          <OwnerBookingsCalendar />
-        </CardContent>
-      </Card>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Stats Cards */}
+      {/* Dashboard Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Total Bookings</CardTitle>
@@ -251,6 +307,16 @@ const Dashboard = () => {
         
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Pending Bookings</CardTitle>
+            <CardDescription>Need confirmation</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{bookingStats.pending}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-lg">Cancelled Bookings</CardTitle>
             <CardDescription>No longer active</CardDescription>
           </CardHeader>
@@ -258,89 +324,135 @@ const Dashboard = () => {
             <div className="text-3xl font-bold">{bookingStats.cancelled}</div>
           </CardContent>
         </Card>
-        
-        {/* Recent Bookings */}
-        <Card className="col-span-1 md:col-span-3">
+      </div>
+      
+      {/* Additional Statistics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+        <Card>
           <CardHeader className="pb-2">
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>Recent Bookings</CardTitle>
-                <CardDescription>Your latest venue reservations</CardDescription>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1"
-                onClick={() => navigate('/customer-bookings')}
-              >
-                View All <ChevronRight className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center">
+              <Building className="h-5 w-5 text-findvenue mr-2" />
+              <CardTitle className="text-lg">Total Venues</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="flex justify-between items-center">
+            <div className="text-3xl font-bold">{venuesCount}</div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-findvenue"
+              onClick={() => navigate('/my-venues')}
+            >
+              Manage
+            </Button>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center">
+              <DollarSign className="h-5 w-5 text-green-500 mr-2" />
+              <CardTitle className="text-lg">Total Revenue</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-            {recentBookings.length === 0 ? (
-              <div className="text-center py-6 text-findvenue-text-muted">
-                No bookings to display
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentBookings.map((booking) => (
-                  <div 
-                    key={booking.id}
-                    className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0"
-                  >
-                    <div className="flex gap-3">
-                      <div className="h-12 w-12 rounded-md overflow-hidden">
-                        <img 
-                          src={booking.venue_image || 'https://placehold.co/100x100?text=No+Image'} 
-                          alt={booking.venue_name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <div>
-                        <h4 className="font-medium">{booking.venue_name}</h4>
-                        <div className="flex items-center gap-2 text-sm text-findvenue-text-muted">
-                          <Calendar className="h-3.5 w-3.5" />
-                          <span>{new Date(booking.booking_date).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <Badge 
-                          variant={
-                            booking.status === 'confirmed' ? 'default' :
-                            booking.status === 'pending' ? 'secondary' :
-                            booking.status === 'cancelled' ? 'destructive' :
-                            booking.status === 'completed' ? 'outline' : 'default'
-                          }
-                        >
-                          {booking.status?.charAt(0).toUpperCase() + booking.status?.slice(1)}
-                        </Badge>
-                        <div className="text-sm text-findvenue-text-muted mt-1">
-                          {booking.user_name}
-                        </div>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleStartChat(
-                          booking.user_id, 
-                          booking.user_name, 
-                          booking.venue_id, 
-                          booking.venue_name
-                        )}
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="text-3xl font-bold">SAR {totalRevenue.toLocaleString()}</div>
           </CardContent>
         </Card>
       </div>
+      
+      {/* Calendar Card */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Booking Calendar</CardTitle>
+          <CardDescription>View your upcoming bookings</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-2">
+          <OwnerBookingsCalendar />
+        </CardContent>
+      </Card>
+      
+      {/* Recent Bookings */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Recent Bookings</CardTitle>
+              <CardDescription>Your latest venue reservations</CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1"
+              onClick={() => navigate('/customer-bookings')}
+            >
+              View All <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {recentBookings.length === 0 ? (
+            <div className="text-center py-6 text-findvenue-text-muted">
+              No bookings to display
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {recentBookings.map((booking) => (
+                <div 
+                  key={booking.id}
+                  className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0"
+                >
+                  <div className="flex gap-3">
+                    <div className="h-12 w-12 rounded-md overflow-hidden">
+                      <img 
+                        src={booking.venue_image || 'https://placehold.co/100x100?text=No+Image'} 
+                        alt={booking.venue_name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">{booking.venue_name}</h4>
+                      <div className="flex items-center gap-2 text-sm text-findvenue-text-muted">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{new Date(booking.booking_date).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <Badge 
+                        variant={
+                          booking.status === 'confirmed' ? 'default' :
+                          booking.status === 'pending' ? 'secondary' :
+                          booking.status === 'cancelled' ? 'destructive' :
+                          booking.status === 'completed' ? 'outline' : 'default'
+                        }
+                      >
+                        {booking.status?.charAt(0).toUpperCase() + booking.status?.slice(1)}
+                      </Badge>
+                      <div className="text-sm text-findvenue-text-muted mt-1">
+                        {booking.user_name}
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => handleStartChat(
+                        booking.user_id, 
+                        booking.user_name, 
+                        booking.venue_id, 
+                        booking.venue_name
+                      )}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

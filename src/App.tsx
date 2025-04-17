@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -60,7 +59,7 @@ const HomeRoute = () => {
   const { user, isVenueOwner } = useAuth();
   
   if (user && isVenueOwner) {
-    return <Navigate to="/my-venues?tab=dashboard" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
   
   return <Index />;
@@ -80,7 +79,7 @@ const LoginRoute = () => {
     
     // Default redirects if no saved path exists
     if (isVenueOwner) {
-      return <Navigate to="/my-venues?tab=dashboard" replace />;
+      return <Navigate to="/dashboard" replace />;
     } else {
       return <Navigate to="/" replace />;
     }

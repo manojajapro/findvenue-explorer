@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -13,7 +12,7 @@ const NavbarActions = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const isActive = (path: string) => location.pathname.startsWith(path);
+  const isActive = (path: string) => location.pathname === path;
 
   if (!user) {
     return (
