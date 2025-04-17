@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -168,6 +169,12 @@ const VenueDetails = () => {
   
   const hasEnoughImages = venue.galleryImages && venue.galleryImages.length >= 4;
 
+  // Safely extract social links from owner info if they exist
+  const facebookUrl = venue.ownerInfo?.socialLinks?.facebook || '';
+  const twitterUrl = venue.ownerInfo?.socialLinks?.twitter || '';
+  const instagramUrl = venue.ownerInfo?.socialLinks?.instagram || '';
+  const linkedinUrl = venue.ownerInfo?.socialLinks?.linkedin || '';
+
   return (
     <div className="container mx-auto p-4">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-2 h-[650px] mb-8 rounded-xl overflow-hidden shadow-xl">
@@ -192,10 +199,10 @@ const VenueDetails = () => {
               venueId={venue.id} 
               venueDescription={venue.description}
               venueImage={venue.galleryImages?.[0]}
-              facebookUrl={venue.ownerInfo?.socialLinks?.facebook}
-              twitterUrl={venue.ownerInfo?.socialLinks?.twitter}
-              instagramUrl={venue.ownerInfo?.socialLinks?.instagram}
-              linkedinUrl={venue.ownerInfo?.socialLinks?.linkedin}
+              facebookUrl={facebookUrl}
+              twitterUrl={twitterUrl}
+              instagramUrl={instagramUrl}
+              linkedinUrl={linkedinUrl}
             />
           </div>
           
