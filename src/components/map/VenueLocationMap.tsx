@@ -1,6 +1,7 @@
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
-import { MapPin, Search, Ruler, Locate, Navigation, MapIcon } from 'lucide-react';
+import { MapPin, Search, Ruler, Locate, Navigation, MapIcon, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,23 @@ export interface VenueLocationMapProps {
   }>;
   highlightedVenueId?: string;
 }
+
+// Create custom venue marker icon using SVG
+const createVenueMarkerIcon = (featured: boolean = false) => {
+  const color = featured ? '#E6B325' : '#4F46E5'; // Gold for featured, indigo for regular
+  const svgMarker = {
+    path: 'M12 0C7.83 0 3 3.227 3 9c0 5.773 9 15 9 15s9-9.227 9-15c0-5.773-4.83-9-9-9zm0 13a4 4 0 100-8 4 4 0 000 8z',
+    fillColor: color,
+    fillOpacity: 1,
+    strokeWeight: 1,
+    strokeColor: '#FFFFFF',
+    rotation: 0,
+    scale: 1.5,
+    anchor: new google.maps.Point(12, 24),
+  };
+  
+  return svgMarker;
+};
 
 const containerStyle = {
   width: '100%',
@@ -226,7 +244,7 @@ const VenueLocationMap = ({
       <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
         <div className="p-4 border-b border-white/10">
           <h3 className="font-semibold flex items-center">
-            <MapPin className="w-4 h-4 mr-2 text-findvenue" />
+            <Building2 className="w-4 h-4 mr-2 text-findvenue" />
             Location
           </h3>
         </div>
@@ -242,7 +260,7 @@ const VenueLocationMap = ({
       <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
         <div className="p-4 border-b border-white/10">
           <h3 className="font-semibold flex items-center">
-            <MapPin className="w-4 h-4 mr-2 text-findvenue" />
+            <Building2 className="w-4 h-4 mr-2 text-findvenue" />
             Location
           </h3>
         </div>
@@ -258,7 +276,7 @@ const VenueLocationMap = ({
       <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
         <div className="p-4 border-b border-white/10">
           <h3 className="font-semibold flex items-center">
-            <MapPin className="w-4 h-4 mr-2 text-findvenue" />
+            <Building2 className="w-4 h-4 mr-2 text-findvenue" />
             Location
           </h3>
         </div>
@@ -273,7 +291,7 @@ const VenueLocationMap = ({
     <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
       <div className="p-4 border-b border-white/10">
         <h3 className="font-semibold flex items-center">
-          <MapPin className="w-4 h-4 mr-2 text-findvenue" />
+          <Building2 className="w-4 h-4 mr-2 text-findvenue" />
           Location {editable && <span className="text-xs text-findvenue-text-muted ml-2">(Click anywhere to set location)</span>}
         </h3>
       </div>
@@ -305,10 +323,7 @@ const VenueLocationMap = ({
             draggable={editable}
             onDragEnd={handleMarkerDragEnd}
             onClick={() => setInfoWindowOpen(true)}
-            icon={{
-              url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-              scaledSize: new google.maps.Size(36, 36)
-            }}
+            icon={createVenueMarkerIcon()}
           >
             {!editable && infoWindowOpen && (
               <InfoWindow
@@ -328,14 +343,7 @@ const VenueLocationMap = ({
               key={venue.id}
               position={{ lat: venue.latitude, lng: venue.longitude }}
               onClick={() => setSelectedVenue(venue.id)}
-              icon={{
-                url: venue.id === highlightedVenueId 
-                  ? 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
-                  : venue.featured
-                    ? 'https://maps.google.com/mapfiles/ms/icons/gold-dot.png'
-                    : 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                scaledSize: new google.maps.Size(30, 30)
-              }}
+              icon={createVenueMarkerIcon(venue.featured)}
               animation={
                 venue.id === highlightedVenueId
                   ? google.maps.Animation.BOUNCE
@@ -382,8 +390,12 @@ const VenueLocationMap = ({
               <Marker
                 position={userLocation}
                 icon={{
-                  url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                  scaledSize: new google.maps.Size(24, 24)
+                  path: google.maps.SymbolPath.CIRCLE,
+                  fillColor: '#FF4B4B',
+                  fillOpacity: 1,
+                  strokeWeight: 2,
+                  strokeColor: '#FFFFFF',
+                  scale: 10,
                 }}
               >
                 <InfoWindow>

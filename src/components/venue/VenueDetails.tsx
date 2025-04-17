@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -13,6 +12,9 @@ import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from '@/integrations/supabase/client';
+import { Venue } from '@/hooks/useSupabaseVenues';
+import { VenueCard } from '@/components/ui';
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -20,6 +22,8 @@ const VenueDetails = () => {
   const { venue, isLoading, error } = useVenueData();
   const { user } = useAuth();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [similarVenues, setSimilarVenues] = useState<Venue[]>([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -27,6 +31,70 @@ const VenueDetails = () => {
       navigate('/login', { replace: true });
     }
   }, [user, isLoading, navigate]);
+  
+  useEffect(() => {
+    const fetchSimilarVenues = async () => {
+      if (!venue || !venue.categoryId) return;
+      
+      try {
+        setLoadingSimilar(true);
+        
+        const { data, error } = await supabase
+          .from('venues')
+          .select('*')
+          .filter('category_id', 'cs', `{${venue.categoryId}}`)
+          .neq('id', venue.id)
+          .limit(4);
+        
+        if (error) {
+          console.error('Error fetching similar venues:', error);
+          return;
+        }
+        
+        if (data && data.length) {
+          const transformedVenues = data.map(venueData => {
+            const galleryImages = venueData.gallery_images || [];
+            const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
+            
+            return {
+              id: venueData.id,
+              name: venueData.name,
+              description: venueData.description || '',
+              imageUrl: defaultImage,
+              galleryImages: galleryImages,
+              address: venueData.address || '',
+              city: venueData.city_name || '',
+              cityId: venueData.city_id || '',
+              category: venueData.category_name?.join(', ') || '',
+              categoryId: venueData.category_id || '',
+              capacity: {
+                min: typeof venueData.min_capacity === 'string' ? parseInt(venueData.min_capacity) : (venueData.min_capacity || 0),
+                max: typeof venueData.max_capacity === 'string' ? parseInt(venueData.max_capacity) : (venueData.max_capacity || 0)
+              },
+              pricing: {
+                currency: venueData.currency || 'SAR',
+                startingPrice: venueData.starting_price || 0,
+                pricePerPerson: venueData.price_per_person
+              },
+              amenities: venueData.amenities || [],
+              rating: venueData.rating || 0,
+              reviews: venueData.reviews_count || 0,
+              featured: venueData.featured || false,
+              popular: venueData.popular || false
+            } as Venue;
+          });
+          
+          setSimilarVenues(transformedVenues);
+        }
+      } catch (err) {
+        console.error('Unexpected error fetching similar venues:', err);
+      } finally {
+        setLoadingSimilar(false);
+      }
+    };
+    
+    fetchSimilarVenues();
+  }, [venue]);
   
   if (isLoading) {
     return (
@@ -59,12 +127,10 @@ const VenueDetails = () => {
     return <div className="container mx-auto p-4">Venue not found.</div>;
   }
 
-  // Get owner info from venue data
   const ownerInfo = venue.ownerInfo || null;
   const ownerId = ownerInfo?.user_id || '';
   const ownerName = ownerInfo?.name || '';
   
-  // Check if current user is the owner
   const isOwner = user?.id === ownerId;
   
   const categoryNames = venue.categoryNames || [];
@@ -93,7 +159,6 @@ const VenueDetails = () => {
         console.error('Error sharing:', error);
       }
     } else {
-      // Fallback for browsers that don't support the Web Share API
       navigator.clipboard.writeText(window.location.href);
       toast({
         title: "Link copied",
@@ -102,14 +167,11 @@ const VenueDetails = () => {
     }
   };
   
-  // Helper function to determine if we have enough images for gallery layout
   const hasEnoughImages = venue.galleryImages && venue.galleryImages.length >= 4;
 
   return (
     <div className="container mx-auto p-4">
-      {/* Modern Gallery Layout - Expanded and more prominent */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-2 h-[650px] mb-8 rounded-xl overflow-hidden shadow-xl">
-        {/* Main large image - takes up more space */}
         <div 
           className="md:col-span-8 h-full relative overflow-hidden group cursor-pointer" 
           onClick={() => venue.galleryImages?.[0] && handleImageClick(venue.galleryImages[0])}
@@ -156,7 +218,6 @@ const VenueDetails = () => {
           </div>
         </div>
         
-        {/* Right column with additional images stacked vertically */}
         <div className="md:col-span-4 grid grid-rows-4 gap-2 h-full">
           {venue.galleryImages?.slice(1, 5).map((img, index) => (
             <div 
@@ -181,7 +242,6 @@ const VenueDetails = () => {
         </div>
       </div>
       
-      {/* Image Gallery Dialog */}
       <Dialog>
         <DialogTrigger asChild>
           <Button className="mb-6 bg-findvenue hover:bg-findvenue/90 text-white">
@@ -203,7 +263,6 @@ const VenueDetails = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Selected Image Dialog */}
       {selectedImage && (
         <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
           <DialogContent className="max-w-4xl p-0">
@@ -229,10 +288,8 @@ const VenueDetails = () => {
         </Dialog>
       )}
 
-      {/* Main content and sidebar layout */}
       <div className="md:flex md:gap-8">
         <div className="md:w-2/3 space-y-4">
-          {/* Quick overview with key information */}
           <div className="flex flex-wrap gap-x-8 gap-y-2 items-center mb-6 bg-findvenue-surface/5 p-4 rounded-lg border border-white/10">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-findvenue" />
@@ -346,7 +403,6 @@ const VenueDetails = () => {
         </div>
         
         <div className="md:w-1/3 mt-6 md:mt-0">
-          {/* Use the VenueBookingTabs component but with simpler initial view */}
           <VenueBookingTabs 
             venueId={venue.id}
             venueName={venue.name}
@@ -358,6 +414,31 @@ const VenueDetails = () => {
           />
         </div>
       </div>
+      
+      {similarVenues.length > 0 && (
+        <div className="mt-12 mb-4">
+          <h2 className="text-2xl font-bold mb-6">Similar Venues You Might Like</h2>
+          {loadingSimilar ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className="h-64 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {similarVenues.map((similarVenue) => (
+                <div 
+                  key={similarVenue.id} 
+                  className="cursor-pointer transition-transform hover:scale-105"
+                  onClick={() => navigate(`/venue/${similarVenue.id}`)}
+                >
+                  <VenueCard venue={similarVenue} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
