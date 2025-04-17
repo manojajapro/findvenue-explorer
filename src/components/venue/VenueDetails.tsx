@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/integrations/supabase/client';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { VenueCard } from '@/components/ui';
+import VenueLocationMap from '@/components/map/VenueLocationMap';
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -414,6 +415,19 @@ const VenueDetails = () => {
           />
         </div>
       </div>
+      
+      {venue.latitude && venue.longitude && (
+        <div className="mb-6">
+          <h4 className="text-lg font-semibold mb-3">Location</h4>
+          <VenueLocationMap
+            name={venue.name}
+            address={venue.address || ''}
+            latitude={venue.latitude}
+            longitude={venue.longitude}
+            editable={false}
+          />
+        </div>
+      )}
       
       {similarVenues.length > 0 && (
         <div className="mt-12 mb-4">
