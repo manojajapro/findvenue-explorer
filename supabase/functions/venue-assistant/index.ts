@@ -41,6 +41,19 @@ serve(async (req) => {
     const queryLower = query.toLowerCase();
     let extractedKeywords: Record<string, string | number | boolean> = {};
     
+    // Check if this is a simple greeting
+    const isSimpleGreeting = /^(hi|hello|hey|howdy|greetings|hola|what's up|yo|good (morning|afternoon|evening)|hiya)$/i.test(query.trim());
+    
+    // If it's a welcome message or simple greeting, generate a welcome
+    if (type === 'welcome' || isSimpleGreeting) {
+      return new Response(
+        JSON.stringify({ 
+          answer: "Hello there! 👋 I'm the FindVenue assistant. I can help you discover the perfect venue for your event in Saudi Arabia. Feel free to ask about venues in specific cities like Riyadh or Jeddah, venues with certain amenities like WiFi or parking, or venues suitable for particular occasions like weddings or conferences. How can I help you today?"
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     // Extract city
     const cities = ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina', 'khobar', 'taif', 'abha'];
     cities.forEach(city => {
@@ -107,16 +120,6 @@ serve(async (req) => {
     // Check for specific venue request by ID
     if (venueId) {
       extractedKeywords.venueId = venueId;
-    }
-    
-    // If it's a welcome message, generate a welcome
-    if (type === 'welcome') {
-      return new Response(
-        JSON.stringify({ 
-          welcome: "Welcome to the FindVenue assistant! I can help you discover the perfect venue for your event. Ask me about venues in specific cities, with certain amenities, or for particular occasions."
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
     
     // For venue-specific chat when we have a venueId
