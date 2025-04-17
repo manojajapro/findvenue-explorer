@@ -3,10 +3,22 @@ import { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarClock, ChevronLeft, ChevronRight, User, Users, Clock, DollarSign, MapPin, Calendar as CalendarIcon } from 'lucide-react';
+import { 
+  CalendarClock, 
+  ChevronLeft, 
+  ChevronRight, 
+  User, 
+  Users, 
+  Clock, 
+  DollarSign, 
+  CheckCircle,
+  XCircle 
+} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO, addMonths, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
+import { useToast } from '@/components/ui/use-toast';
 
 interface Booking {
   id: string;
@@ -28,14 +40,18 @@ interface Booking {
 
 export const OwnerBookingsCalendar = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [bookedDates, setBookedDates] = useState<Date[]>([]);
+  const [processingBookingIds, setProcessingBookingIds] = useState<Set<string>>(new Set());
+  
+  const { updateBookingStatus, isBusy } = useBookingStatusUpdate(fetchOwnerBookings);
 
-  const fetchOwnerBookings = async () => {
+  async function fetchOwnerBookings() {
     if (!user) return;
     
     setIsLoading(true);
@@ -159,6 +175,11 @@ export const OwnerBookingsCalendar = () => {
       
     } catch (error: any) {
       console.error('Error fetching bookings for calendar:', error);
+      toast({
+        variant: "destructive",
+        title: "Error loading bookings",
+        description: error.message || "Failed to load bookings calendar",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -182,6 +203,68 @@ export const OwnerBookingsCalendar = () => {
       }
     }
   }, [selectedDate, bookings]);
+  
+  // Add a real-time listener for booking changes
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('bookings_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'bookings' 
+      }, (payload) => {
+        console.log('Booking change detected:', payload);
+        fetchOwnerBookings();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+  
+  const handleStatusUpdate = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
+    if (processingBookingIds.has(bookingId) || isBusy) {
+      toast({
+        title: 'Please wait',
+        description: 'Another booking update is in progress...',
+      });
+      return;
+    }
+    
+    try {
+      setProcessingBookingIds(prev => new Set(prev).add(bookingId));
+      
+      const booking = bookings.find(b => b.id === bookingId);
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+      
+      await updateBookingStatus(bookingId, status, booking, setBookings);
+      
+      await fetchOwnerBookings();
+      
+      toast({
+        title: `Booking ${status === 'confirmed' ? 'Confirmed' : 'Cancelled'}`,
+        description: `The booking status has been updated to ${status}.`,
+      });
+    } catch (error: any) {
+      console.error(`Error handling status update for booking ${bookingId}:`, error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update booking status',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessingBookingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(bookingId);
+        return newSet;
+      });
+    }
+  };
   
   const nextMonth = () => {
     setCurrentMonth(prev => addMonths(prev, 1));
@@ -300,7 +383,7 @@ export const OwnerBookingsCalendar = () => {
           ) : selectedDate ? (
             <div>
               <div className="mb-4 flex items-center">
-                <CalendarIcon className="mr-2 h-5 w-5 text-findvenue" />
+                <CalendarClock className="mr-2 h-5 w-5 text-findvenue" />
                 <h3 className="text-lg font-medium">
                   {format(selectedDate, 'EEEE, MMMM d, yyyy')}
                 </h3>
@@ -369,6 +452,62 @@ export const OwnerBookingsCalendar = () => {
                             </p>
                           </div>
                         )}
+                        
+                        {/* Add booking status update buttons */}
+                        {booking.status !== 'cancelled' && booking.status !== 'confirmed' && (
+                          <div className="flex space-x-2 mt-3">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex items-center text-green-600 border-green-600/30 hover:bg-green-600/10"
+                              onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
+                              disabled={processingBookingIds.has(booking.id) || isBusy}
+                            >
+                              <CheckCircle className="mr-1 h-4 w-4" />
+                              Confirm
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex items-center text-red-600 border-red-600/30 hover:bg-red-600/10"
+                              onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
+                              disabled={processingBookingIds.has(booking.id) || isBusy}
+                            >
+                              <XCircle className="mr-1 h-4 w-4" />
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {booking.status === 'confirmed' && (
+                          <div className="flex space-x-2 mt-3">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex items-center text-red-600 border-red-600/30 hover:bg-red-600/10"
+                              onClick={() => handleStatusUpdate(booking.id, 'cancelled')}
+                              disabled={processingBookingIds.has(booking.id) || isBusy}
+                            >
+                              <XCircle className="mr-1 h-4 w-4" />
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {booking.status === 'cancelled' && booking.status !== 'confirmed' && (
+                          <div className="flex space-x-2 mt-3">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex items-center text-green-600 border-green-600/30 hover:bg-green-600/10"
+                              onClick={() => handleStatusUpdate(booking.id, 'confirmed')}
+                              disabled={processingBookingIds.has(booking.id) || isBusy}
+                            >
+                              <CheckCircle className="mr-1 h-4 w-4" />
+                              Reconfirm
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </Card>
                   ))}
@@ -385,7 +524,7 @@ export const OwnerBookingsCalendar = () => {
             </div>
           ) : (
             <div className="text-center py-8 border border-white/10 rounded-lg bg-findvenue-card-bg">
-              <CalendarIcon className="h-10 w-10 text-findvenue-text-muted mx-auto mb-2" />
+              <CalendarClock className="h-10 w-10 text-findvenue-text-muted mx-auto mb-2" />
               <h4 className="text-lg font-medium">Select a Date</h4>
               <p className="text-findvenue-text-muted">
                 Select a date on the calendar to view booking details.

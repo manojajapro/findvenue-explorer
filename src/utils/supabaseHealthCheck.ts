@@ -25,9 +25,21 @@ export const updateBookingStatusInDatabase = async (
   bookingId: string, 
   status: 'confirmed' | 'cancelled'
 ) => {
-  return await supabase
-    .from('bookings')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', bookingId)
-    .select();
+  try {
+    console.log(`Updating booking ${bookingId} to status ${status}`);
+    const result = await supabase
+      .from('bookings')
+      .update({ 
+        status, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', bookingId)
+      .select();
+      
+    console.log("Database update result:", result);
+    return result;
+  } catch (error) {
+    console.error("Error updating booking status in database:", error);
+    throw error;
+  }
 };
