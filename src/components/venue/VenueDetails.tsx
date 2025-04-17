@@ -57,6 +57,26 @@ const VenueDetails = () => {
             const galleryImages = venueData.gallery_images || [];
             const defaultImage = galleryImages.length > 0 ? galleryImages[0] : '';
             
+            let categoryNames = [];
+            
+            if (venueData.category_name) {
+              if (Array.isArray(venueData.category_name)) {
+                categoryNames = venueData.category_name;
+              } 
+              else if (typeof venueData.category_name === 'string' && 
+                       venueData.category_name.startsWith('[') && 
+                       venueData.category_name.endsWith(']')) {
+                try {
+                  categoryNames = JSON.parse(venueData.category_name.replace(/'/g, '"'));
+                } catch (e) {
+                  categoryNames = [venueData.category_name];
+                }
+              } 
+              else if (typeof venueData.category_name === 'string') {
+                categoryNames = [venueData.category_name];
+              }
+            }
+            
             return {
               id: venueData.id,
               name: venueData.name,
@@ -66,7 +86,7 @@ const VenueDetails = () => {
               address: venueData.address || '',
               city: venueData.city_name || '',
               cityId: venueData.city_id || '',
-              category: venueData.category_name?.join(', ') || '',
+              category: categoryNames.join(', ') || '',
               categoryId: venueData.category_id || '',
               capacity: {
                 min: typeof venueData.min_capacity === 'string' ? parseInt(venueData.min_capacity) : (venueData.min_capacity || 0),
@@ -81,7 +101,8 @@ const VenueDetails = () => {
               rating: venueData.rating || 0,
               reviews: venueData.reviews_count || 0,
               featured: venueData.featured || false,
-              popular: venueData.popular || false
+              popular: venueData.popular || false,
+              categoryNames: categoryNames
             } as Venue;
           });
           
