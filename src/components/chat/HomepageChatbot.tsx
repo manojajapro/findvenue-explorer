@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,11 +38,11 @@ const HomepageChatbot: React.FC = () => {
   const [suggestedVenues, setSuggestedVenues] = useState<Venue[]>([]);
   const [isVoiceAvailable, setIsVoiceAvailable] = useState(true);
   const [isListening, setIsListening] = useState(false);
+  const [lastBotShouldSpeak, setLastBotShouldSpeak] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Use custom speech hooks
   const { speak, stop, isSupported: speechSynthesisSupported } = useSpeechSynthesis();
   const [isSpeaking, setIsSpeaking] = useState(false);
   
@@ -66,7 +65,6 @@ const HomepageChatbot: React.FC = () => {
     }
   });
 
-  // Update voice availability when support status changes
   useEffect(() => {
     setIsVoiceAvailable(speechRecognitionSupported === true);
   }, [speechRecognitionSupported]);
@@ -83,7 +81,7 @@ const HomepageChatbot: React.FC = () => {
     return Math.random().toString(36).substring(2, 11);
   };
 
-  const handleSendMessage = async (customMessage?: string) => {
+  const handleSendMessage = async (customMessage?: string, options?: { viaMic?: boolean }) => {
     const messageText = customMessage || inputMessage;
     
     if (messageText.trim() === '' || chatbotState === 'thinking') return;
@@ -100,37 +98,18 @@ const HomepageChatbot: React.FC = () => {
     setChatbotState('thinking');
 
     try {
-      // Add a timeout to prevent UI from hanging if the request takes too long
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error("Request timed out")), 30000)
       );
-      
       const responsePromise = supabase.functions.invoke('venue-chatbot', {
-        body: { query: messageText }
+        body: { query: messageText, ...(options?.viaMic ? { viaMic: true } : {}) }
       });
-      
-      // Race between the actual request and the timeout
       const response = await Promise.race([responsePromise, timeoutPromise]);
+      if (response.error) throw new Error(response.error.message || 'Error from chatbot service');
+      if (!response.data) throw new Error('Invalid response format from chatbot service');
+      const { message, venues, error, speak } = response.data;
+      if (error) console.error('Error from chatbot API:', error);
 
-      // Check if there's a response error
-      if (response.error) {
-        console.error('Error from Supabase function:', response.error);
-        throw new Error(response.error.message || 'Error from chatbot service');
-      }
-
-      // Check for undefined or unexpected response format
-      if (!response.data) {
-        throw new Error('Invalid response format from chatbot service');
-      }
-
-      // Extract the message and venues from the response data
-      const { message, venues, error } = response.data;
-
-      if (error) {
-        console.error('Error from chatbot API:', error);
-      }
-
-      // Create bot message from response
       const botMessage = {
         id: generateId(),
         sender: 'bot' as const,
@@ -139,8 +118,8 @@ const HomepageChatbot: React.FC = () => {
       };
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
-      
-      // Update suggested venues if any
+      setLastBotShouldSpeak(!!speak);
+
       if (venues && Array.isArray(venues) && venues.length > 0) {
         setSuggestedVenues(venues);
       } else {
@@ -161,7 +140,6 @@ const HomepageChatbot: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, errorMessage]);
       setChatbotState('error');
       
-      // Show error toast
       toast({
         variant: "destructive",
         title: "Connection Error",
@@ -225,6 +203,26 @@ const HomepageChatbot: React.FC = () => {
     setIsListening(false);
     stopListening();
   };
+
+  const micSendHandler = (transcript: string) => {
+    setInputMessage(transcript);
+    setIsListening(false);
+    if (transcript) {
+      handleSendMessage(transcript, { viaMic: true });
+    }
+  };
+
+  useEffect(() => {
+    if (
+      lastBotShouldSpeak &&
+      speechSynthesisSupported &&
+      messages.length &&
+      messages[messages.length - 1]?.sender === 'bot'
+    ) {
+      handleSpeak(messages[messages.length - 1].content);
+      setLastBotShouldSpeak(false);
+    }
+  }, [messages, lastBotShouldSpeak, speechSynthesisSupported]);
 
   return (
     <>

@@ -1,9 +1,7 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { corsHeaders } from '../_shared/cors.ts'
 
-// Add a type for the relevant venue search result structure
 type VenueSearchResult = {
   id: string;
   name: string;
@@ -21,35 +19,43 @@ type VenueSearchResult = {
   type?: string | null;
 };
 
+function isGreeting(query: string): boolean {
+  const greetings = [
+    'hi', 'hello', 'hey', 'السلام عليكم', 'مرحبا', 'hola', 'bonjour', 'ciao', 'مرحبا'
+  ];
+  const normalized = query.trim().toLowerCase();
+  return greetings.some(greet => normalized === greet || normalized.startsWith(greet + " ") || normalized.endsWith(" " + greet));
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Get OpenAI API key from environment variables
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openaiApiKey) {
-      throw new Error('Missing OpenAI API key')
-    }
+    if (!openaiApiKey) throw new Error('Missing OpenAI API key')
 
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-    // Parse request body
     const requestData = await req.json();
-    const query = requestData.query;
+    const query: string = requestData.query;
+    const viaMic: boolean = !!requestData.viaMic;
 
-    if (!query) {
-      throw new Error('No query provided')
+    if (!query) throw new Error('No query provided')
+
+    if (isGreeting(query)) {
+      return new Response(JSON.stringify({
+        message: 'Hello! How can I help you find a venue today?',
+        venues: [],
+        speak: true,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    console.log('Received query:', query)
-
-    // First, create a query to search venues based on user request
     const searchQueryPrompt = `
       Create a SQL query to search venues in the database based on this user query: "${query}".
       The venues table has columns: id, name, description, address, city_id, city_name, category_id, category_name, 
@@ -60,7 +66,6 @@ serve(async (req) => {
     `
 
     try {
-      // Direct call to OpenAI API instead of using the client library
       const searchQueryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -85,7 +90,6 @@ serve(async (req) => {
       const sqlQuery = searchQueryData.choices[0].message?.content?.trim();
       console.log('Generated SQL query:', sqlQuery);
 
-      // Execute the SQL query (with safety checks)
       let venues: VenueSearchResult[] = [];
       let error: string | null = null;
 
@@ -106,7 +110,6 @@ serve(async (req) => {
 
           venues = (data || []) as VenueSearchResult[];
         } else {
-          // Fallback to simple search if SQL generation fails or contains unsafe operations
           const { data, error: queryError } = await supabase
             .from('venues')
             .select('*')
@@ -122,7 +125,6 @@ serve(async (req) => {
       } catch (e) {
         console.error('Error executing query:', e);
         error = e.message || String(e);
-        // Fallback to simple search if custom query fails
         const { data } = await supabase
           .from('venues')
           .select('*')
@@ -133,7 +135,6 @@ serve(async (req) => {
 
       console.log(`Found ${venues.length} venues`);
 
-      // Transform venues data to match frontend expected format
       const transformedVenues = venues.map((venue) => {
         return {
           id: venue.id,
@@ -146,7 +147,6 @@ serve(async (req) => {
             startingPrice: venue.starting_price || 0,
             currency: venue.currency || 'SAR',
           },
-          // For backward compatibility
           image_url: venue.image_url ?? '',
           gallery_images: venue.gallery_images ?? [],
           city_name: venue.city_name ?? '',
@@ -155,7 +155,6 @@ serve(async (req) => {
         };
       });
 
-      // Format venue data for OpenAI consumption
       const venueData = venues.map((venue) => ({
         id: venue.id,
         name: venue.name,
@@ -176,26 +175,41 @@ serve(async (req) => {
         type: venue.type || 'Venue',
       }));
 
-      // Generate chatbot response based on query and venue data
-      const promptContent = `
-        You are a helpful venue search assistant for a venue booking platform. 
-        The user is looking for venues with this query: "${query}"
-        
-        ${
-          venues.length > 0
-            ? `Here are some venues I found:
-        ${JSON.stringify(venueData, null, 2)}`
-            : 'I could not find any venues matching your query.'
+      const venueDetailLinks = venues.map((venue) => {
+        return {
+          name: venue.name,
+          city: venue.city_name || '',
+          price: (venue.starting_price ?? 0) + ' ' + (venue.currency || 'SAR') + (venue.price_per_person ? ' per person' : ''),
+          capacity: `${venue.min_capacity || 0} - ${venue.max_capacity || 0}`,
+          amenities: Array.isArray(venue.amenities) ? venue.amenities.join(', ') : venue.amenities ?? '',
+          url: `/venue/${venue.id}`,
+          id: venue.id,
+          description: (venue.description && venue.description.length > 150)
+            ? venue.description.slice(0, 150) + '...'
+            : (venue.description || ''),
         }
-        
-        Provide a helpful response that:
-        1. Acknowledges the user's query
-        2. Summarizes the search results in a natural way (if any)
-        3. Suggests some options or alternatives if appropriate
-        4. Provides a friendly next step (e.g., "Would you like more information about any of these venues?")
-        
-        Keep your response conversational and helpful. If no venues were found, suggest the user try different search terms.
-        The response should be in the tone of a helpful concierge.
+      }).slice(0, 3);
+
+      const venuesText = venueDetailLinks.length > 0
+        ? venueDetailLinks.map((v, i) =>
+          `${i + 1}. **${v.name} (${v.city})** - ${v.capacity} guests, ${v.price}${
+            v.amenities ? ` | Amenities: ${v.amenities}` : ''
+          }\n[View details](https://esdmelfzeszjtbnoajig.supabase.co/venue/${v.id})${v.description ? `\n${v.description}` : ''}`
+        ).join('\n\n')
+        : '';
+
+      const promptContent = `
+        You are a helpful venue search assistant for a venue booking platform.
+        The user is looking for venues with this query: "${query}"
+
+        ${venueDetailLinks.length > 0
+          ? `Here are some venues I found (show a short summary for each and include a "View details" link):
+
+${venuesText}`
+          : 'I could not find any venues matching your query.'}
+
+        Acknowledge the user's query briefly. If you found venues, summarize the top 3 options and suggest clicking 'View details' to learn more. If not, suggest alternative keywords.
+        Always keep your response friendly, helpful, and to the point. If the query seems like a greeting, reply with a short acknowledgment.
       `;
 
       const chatCompletion = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -213,7 +227,7 @@ serve(async (req) => {
             },
             { role: 'user', content: promptContent },
           ],
-          temperature: 0.7,
+          temperature: 0.5,
         }),
       });
 
@@ -224,52 +238,35 @@ serve(async (req) => {
       const completionData = await chatCompletion.json();
       const chatResponse =
         completionData.choices[0]?.message?.content ??
-        'Sorry, I could not process your request at this time.';
+        "Sorry, I could not process your request at this time.";
 
-      return new Response(
-        JSON.stringify({
-          message: chatResponse,
-          venues: transformedVenues.slice(0, 3), // Return top 3 venues
-          error,
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      return new Response(JSON.stringify({
+        message: chatResponse,
+        venues: venueDetailLinks,
+        speak: !!viaMic,
+        error: null,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+
     } catch (openAiError) {
       console.error('OpenAI API error:', openAiError);
-      return new Response(
-        JSON.stringify({
-          message: "I'm having trouble connecting to my assistant service right now. Please try again later.",
-          venues: [],
-          error: openAiError.message,
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      return new Response(JSON.stringify({
+        message: "I'm having trouble connecting to my assistant service right now. Please try again later.",
+        venues: [],
+        error: openAiError.message,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
   } catch (error) {
     console.error('Error processing request:', error);
-
-    return new Response(
-      JSON.stringify({
-        message: 'An error occurred while processing your request.',
-        error: error.message,
-      }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    return new Response(JSON.stringify({
+      message: 'An error occurred while processing your request.',
+      error: error.message,
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 });
