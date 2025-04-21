@@ -226,6 +226,9 @@ const HomepageChatbot: React.FC = () => {
   }, [messages, lastBotShouldSpeak, speechSynthesisSupported]);
 
   const getVenueMainImage = (venue: any) => {
+    if (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0) {
+      return venue.galleryImages[0];
+    }
     if (venue.gallery_images && Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) {
       return venue.gallery_images[0];
     }
@@ -343,44 +346,75 @@ const HomepageChatbot: React.FC = () => {
                             <span className="absolute top-0 right-0 bg-yellow-400 text-xs text-black px-1 rounded-tr rounded-bl">★</span>
                           )}
                         </div>
-                        <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex-1 min-w-0 space-y-1 text-white text-xs">
                           <h4 className="text-md font-semibold text-white truncate">{venue.name}</h4>
-                          <div className="text-xs text-findvenue-text-muted flex flex-wrap gap-2">
-                            <span>{venue.city_name || venue.city || 'No city'}</span>
+                          <div className="flex flex-wrap gap-2 text-findvenue-text-muted">
+                            <span>{venue.city_name || venue.city || '-'}</span>
                             <span>|</span>
-                            <span className="capitalize">{Array.isArray(venue.category_name) ? venue.category_name.join(', ') : (venue.category_name || venue.category)}</span>
+                            <span>
+                              Category: {Array.isArray(venue.categoryNames) ? venue.categoryNames.join(', ') : (venue.categoryNames || venue.category || '-')}
+                            </span>
                             <span>|</span>
-                            <span>Type: {venue.type ?? 'Venue'}</span>
+                            <span>Type: {venue.type ?? '-'}</span>
                           </div>
-                          <div className="text-xs mt-1 flex flex-wrap gap-3">
-                            <span>
-                              <b>Capacity:</b> {venue.min_capacity ?? venue.capacity?.min ?? '-'} - {venue.max_capacity ?? venue.capacity?.max ?? '-'}
-                            </span>
-                            <span>
-                              <b>Price:</b> {venue.starting_price ?? venue.pricing?.startingPrice ?? '-'} {venue.currency ?? venue.pricing?.currency ?? 'SAR'}
-                              {venue.price_per_person || venue.pricing?.pricePerPerson ? ' per person' : ''}
-                            </span>
+                          <div className="flex flex-wrap gap-3 mt-1">
+                            <span><b>Capacity:</b> {venue.capacity?.min ?? '-'} - {venue.capacity?.max ?? '-'}</span>
+                            <span><b>Price:</b> {venue.pricing?.startingPrice ?? '-'} {venue.pricing?.currency ?? venue.currency ?? 'SAR'}{venue.pricing?.pricePerPerson || venue.pricePerPerson ? ' per person' : ''}</span>
                           </div>
-                          <p className="text-xs text-white/80 mt-1 line-clamp-3">{venue.description ?? '-'}</p>
-                          {venue.amenities && (
-                            <p className="text-[11px] text-findvenue mb-0 mt-1 truncate">
-                              <b>Amenities:</b> {Array.isArray(venue.amenities) ? venue.amenities.join(', ') : venue.amenities}
-                            </p>
-                          )}
-                          <p className="text-[11px] text-findvenue-text-muted mt-1 line-clamp-1">
-                            <b>Address:</b> {venue.address}
-                          </p>
-                          {venue.rating && (
-                            <span className="inline-block bg-green-800 text-xs px-2 py-0.5 rounded mt-1">★ {venue.rating} / 5</span>
-                          )}
+                          <div className="mt-1">
+                            <div>
+                              <b>Description:</b> {venue.description ?? '-'}
+                            </div>
+                            {venue.amenities && (
+                              <div>
+                                <b>Amenities:</b> {Array.isArray(venue.amenities) ? venue.amenities.join(', ') : venue.amenities}
+                              </div>
+                            )}
+                            <div>
+                              <b>Address:</b> {venue.address ?? '-'}
+                            </div>
+                            {venue.rating && (
+                              <span className="inline-block bg-green-800 text-xs px-2 py-0.5 rounded mt-1">★ {venue.rating} / 5</span>
+                            )}
+                            {venue.reviews && (
+                              <span className="text-xs text-white/70 ml-2">
+                                {venue.reviews} reviews
+                              </span>
+                            )}
+                            {venue.availability && (
+                              <div>
+                                <b>Availability:</b> {Array.isArray(venue.availability) ? venue.availability.join(', ') : venue.availability}
+                              </div>
+                            )}
+                            {venue.ownerInfo && (
+                              <div>
+                                <b>Owner:</b> {venue.ownerInfo?.name ?? '-'} ({venue.ownerInfo?.contact ?? '-'})
+                              </div>
+                            )}
+                            {venue.rulesAndRegulations && Array.isArray(venue.rulesAndRegulations) && (
+                              <div>
+                                <b>Rules:</b>
+                                <ul className="list-disc list-inside pl-2">
+                                  {venue.rulesAndRegulations.map((rule: any, idx: number) => (
+                                    <li key={idx}>{rule.title}: {rule.description}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {venue.zipcode && (
+                              <div>
+                                <b>Zipcode:</b> {venue.zipcode}
+                              </div>
+                            )}
+                            {venue.additionalServices && Array.isArray(venue.additionalServices) && (
+                              <div>
+                                <b>Additional Services:</b> {venue.additionalServices.join(', ')}
+                              </div>
+                            )}
+                          </div>
                           <div className="flex gap-2 flex-wrap mt-2">
                             {venue.popular && <Badge variant="secondary" className="text-xs">Popular</Badge>}
                             {venue.featured && <Badge variant="secondary" className="text-xs">Featured</Badge>}
-                            {venue.reviews_count && (
-                              <span className="text-xs text-white/70">
-                                {venue.reviews_count} reviews
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>
