@@ -3,7 +3,24 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { corsHeaders } from '../_shared/cors.ts'
 
-// Use the OpenAI REST API directly instead of the JS client to avoid compatibility issues
+// Add a type for the relevant venue search result structure
+type VenueSearchResult = {
+  id: string;
+  name: string;
+  description?: string | null;
+  image_url?: string | null;
+  gallery_images?: string[] | null;
+  city_name?: string | null;
+  starting_price?: number | null;
+  currency?: string | null;
+  category_name?: string[] | string | null;
+  min_capacity?: number | null;
+  max_capacity?: number | null;
+  price_per_person?: number | null;
+  amenities?: string[] | string | null;
+  type?: string | null;
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -69,11 +86,16 @@ serve(async (req) => {
       console.log('Generated SQL query:', sqlQuery);
 
       // Execute the SQL query (with safety checks)
-      let venues = [];
-      let error = null;
+      let venues: VenueSearchResult[] = [];
+      let error: string | null = null;
 
       try {
-        if (sqlQuery && !sqlQuery.toLowerCase().includes('delete') && !sqlQuery.toLowerCase().includes('update') && !sqlQuery.toLowerCase().includes('insert')) {
+        if (
+          sqlQuery &&
+          !sqlQuery.toLowerCase().includes('delete') &&
+          !sqlQuery.toLowerCase().includes('update') &&
+          !sqlQuery.toLowerCase().includes('insert')
+        ) {
           const { data, error: queryError } = await supabase.rpc('search_venues_with_raw_query', {
             query_text: sqlQuery
           });
@@ -82,7 +104,7 @@ serve(async (req) => {
             throw queryError;
           }
 
-          venues = data || [];
+          venues = (data || []) as VenueSearchResult[];
         } else {
           // Fallback to simple search if SQL generation fails or contains unsafe operations
           const { data, error: queryError } = await supabase
@@ -95,55 +117,63 @@ serve(async (req) => {
             throw queryError;
           }
 
-          venues = data || [];
+          venues = (data || []) as VenueSearchResult[];
         }
       } catch (e) {
         console.error('Error executing query:', e);
-        error = e.message;
+        error = e.message || String(e);
         // Fallback to simple search if custom query fails
         const { data } = await supabase
           .from('venues')
           .select('*')
           .limit(5);
 
-        venues = data || [];
+        venues = (data || []) as VenueSearchResult[];
       }
 
       console.log(`Found ${venues.length} venues`);
 
       // Transform venues data to match frontend expected format
-      const transformedVenues = venues.map(venue => {
+      const transformedVenues = venues.map((venue) => {
         return {
           id: venue.id,
           name: venue.name,
-          description: venue.description,
-          imageUrl: venue.image_url,
-          galleryImages: venue.gallery_images,
-          city: venue.city_name,
+          description: venue.description ?? '',
+          imageUrl: venue.image_url ?? '',
+          galleryImages: venue.gallery_images ?? [],
+          city: venue.city_name ?? '',
           pricing: {
             startingPrice: venue.starting_price || 0,
-            currency: venue.currency || 'SAR'
+            currency: venue.currency || 'SAR',
           },
-          // Keep these original fields to maintain compatibility with existing database structure
-          image_url: venue.image_url,
-          gallery_images: venue.gallery_images,
-          city_name: venue.city_name,
-          starting_price: venue.starting_price,
-          currency: venue.currency
+          // For backward compatibility
+          image_url: venue.image_url ?? '',
+          gallery_images: venue.gallery_images ?? [],
+          city_name: venue.city_name ?? '',
+          starting_price: venue.starting_price ?? 0,
+          currency: venue.currency ?? 'SAR',
         };
       });
 
       // Format venue data for OpenAI consumption
-      const venueData = venues.map(venue => ({
+      const venueData = venues.map((venue) => ({
         id: venue.id,
         name: venue.name,
-        description: venue.description?.substring(0, 100) + (venue.description?.length > 100 ? '...' : '') || 'No description',
-        city: venue.city_name,
-        category: Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.category_name,
+        description: venue.description
+          ? venue.description.substring(0, 100) + (venue.description.length > 100 ? '...' : '')
+          : 'No description',
+        city: venue.city_name || '',
+        category: Array.isArray(venue.category_name)
+          ? venue.category_name.join(', ')
+          : venue.category_name || '',
         capacity: `${venue.min_capacity || 0} - ${venue.max_capacity || 0} guests`,
-        price: `${venue.starting_price || 0} ${venue.currency || 'SAR'}${venue.price_per_person ? ' per person' : ''}`,
-        amenities: Array.isArray(venue.amenities) ? venue.amenities.join(', ') : venue.amenities,
-        type: venue.type || 'Venue'
+        price: `${venue.starting_price || 0} ${venue.currency || 'SAR'}${
+          venue.price_per_person ? ' per person' : ''
+        }`,
+        amenities: Array.isArray(venue.amenities)
+          ? venue.amenities.join(', ')
+          : venue.amenities || '',
+        type: venue.type || 'Venue',
       }));
 
       // Generate chatbot response based on query and venue data
@@ -151,8 +181,12 @@ serve(async (req) => {
         You are a helpful venue search assistant for a venue booking platform. 
         The user is looking for venues with this query: "${query}"
         
-        ${venues.length > 0 ? `Here are some venues I found:
-        ${JSON.stringify(venueData, null, 2)}` : 'I could not find any venues matching your query.'}
+        ${
+          venues.length > 0
+            ? `Here are some venues I found:
+        ${JSON.stringify(venueData, null, 2)}`
+            : 'I could not find any venues matching your query.'
+        }
         
         Provide a helpful response that:
         1. Acknowledges the user's query
@@ -173,31 +207,36 @@ serve(async (req) => {
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'You are a helpful venue search assistant for a venue booking platform.' },
-            { role: 'user', content: promptContent }
+            {
+              role: 'system',
+              content: 'You are a helpful venue search assistant for a venue booking platform.',
+            },
+            { role: 'user', content: promptContent },
           ],
           temperature: 0.7,
         }),
       });
-      
+
       if (!chatCompletion.ok) {
         throw new Error(`OpenAI API error: ${chatCompletion.status} ${await chatCompletion.text()}`);
       }
 
       const completionData = await chatCompletion.json();
-      const chatResponse = completionData.choices[0].message?.content || 'Sorry, I could not process your request at this time.';
+      const chatResponse =
+        completionData.choices[0]?.message?.content ??
+        'Sorry, I could not process your request at this time.';
 
       return new Response(
         JSON.stringify({
           message: chatResponse,
           venues: transformedVenues.slice(0, 3), // Return top 3 venues
-          error
+          error,
         }),
         {
           headers: {
             ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
     } catch (openAiError) {
@@ -206,13 +245,13 @@ serve(async (req) => {
         JSON.stringify({
           message: "I'm having trouble connecting to my assistant service right now. Please try again later.",
           venues: [],
-          error: openAiError.message
+          error: openAiError.message,
         }),
         {
           headers: {
             ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         }
       );
     }
@@ -222,14 +261,14 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         message: 'An error occurred while processing your request.',
-        error: error.message
+        error: error.message,
       }),
       {
         status: 500,
         headers: {
           ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       }
     );
   }
