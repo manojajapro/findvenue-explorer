@@ -13,7 +13,7 @@ import { Venue } from '@/hooks/useSupabaseVenues';
 import { Volume2, Mic } from "lucide-react";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 
 type Message = {
   id: string;
@@ -57,8 +57,7 @@ const HomepageChatbot: React.FC = () => {
       setIsVoiceAvailable(false);
       toast({
         title: "Speech Recognition Error",
-        description: "Speech recognition not supported or not permitted in your browser.",
-        variant: "destructive"
+        description: "Speech recognition not supported or not permitted in your browser."
       });
     }
   });

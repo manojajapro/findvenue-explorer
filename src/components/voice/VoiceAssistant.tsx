@@ -1,5 +1,5 @@
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Mic, MicOff, X, Volume2 } from 'lucide-react';
@@ -17,6 +17,20 @@ const VoiceAssistant = () => {
   // Use our custom hooks for speech functionality
   const { speak, stop } = useSpeechSynthesis();
   const [isSpeaking, setIsSpeaking] = useState(false);
+  
+  // Speech recognition with our custom hook
+  const { startListening, stopListening } = useSpeechRecognition({
+    onResult: (text) => {
+      setTranscript(text);
+      handleVoiceCommand(text);
+      setMicActive(false);
+    },
+    onEnd: () => setMicActive(false),
+    onError: (err) => { 
+      setMicError(err); 
+      setMicActive(false); 
+    }
+  });
   
   // Handle voice commands
   const handleVoiceCommand = (command: string) => {
@@ -52,20 +66,6 @@ const VoiceAssistant = () => {
   const handleSpeakResponse = (text: string) => {
     speak(text, () => setIsSpeaking(true), () => setIsSpeaking(false));
   };
-  
-  // Speech recognition with our custom hook
-  const { startListening, stopListening } = useSpeechRecognition({
-    onResult: (text) => {
-      setTranscript(text);
-      handleVoiceCommand(text);
-      setMicActive(false);
-    },
-    onEnd: () => setMicActive(false),
-    onError: (err) => { 
-      setMicError(err); 
-      setMicActive(false); 
-    }
-  });
   
   const handleMicStart = () => {
     setMicActive(true);
