@@ -86,6 +86,26 @@ const HomepageChatbot: React.FC = () => {
     return Math.random().toString(36).substring(2, 11);
   };
 
+  // Enhanced query matching: decide if the query is "venue-related"
+  const isVenueQuery = (query: string) => {
+    const keywords = [
+      "show", "list", "find", "venues", "venue", "top", "best", "suggest", "recommend", "available", "search", "option", "hall", "ballroom", "space",
+      "location", "places"
+    ];
+    // Also match city names
+    const cityKeywords = [
+      "riyadh", "jeddah", "khobar", "dammam", "mecca", "medina", "abha", "taif", "khamis", "khamis mushait"
+    ];
+    const q = query.toLowerCase();
+    if (keywords.some(k => q.includes(k))) return true;
+    if (cityKeywords.some(c => q.includes(c))) return true;
+    // explicit numbers/top requests like "top 10"
+    if (/top ?\d+ venues?/.test(q)) return true;
+    // very basic patterns
+    if (/venues? in/.test(q)) return true;
+    return false;
+  };
+
   // Function to check if query is a greeting
   const isGreeting = (query: string): boolean => {
     const greetings = [
@@ -248,20 +268,13 @@ const HomepageChatbot: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, botMessage]);
       setLastBotShouldSpeak(!!speak);
 
-      // Only show venues when specifically asked for venue search
-      if (venues && Array.isArray(venues) && venues.length > 0 && 
-          (messageText.toLowerCase().includes('show me') ||
-           messageText.toLowerCase().includes('find') ||
-           messageText.toLowerCase().includes('search') ||
-           messageText.toLowerCase().includes('looking for') ||
-           messageText.toLowerCase().includes('need a venue') ||
-           messageText.toLowerCase().includes('in riyadh') ||
-           messageText.toLowerCase().includes('in jeddah'))) {
+      // Only show venues if the query is truly venue-related
+      if (venues && Array.isArray(venues) && venues.length > 0 && isVenueQuery(messageText)) {
         setSuggestedVenues(venues);
       } else {
+        // Clear suggested venues unless another venue-specific query is made
         setSuggestedVenues([]);
       }
-      
       setChatbotState('idle');
     } catch (error: any) {
       console.error('Error calling chatbot:', error);
@@ -370,57 +383,33 @@ const HomepageChatbot: React.FC = () => {
     return '/placeholder.svg';
   };
 
-  // Simplified venue card rendering with proper type checking
-  const renderVenueCard = (venue: Venue | ExtendedVenue) => {
-    const pricing = venue.pricing || { startingPrice: 0, currency: 'SAR', pricePerPerson: undefined };
-    const capacity = venue.capacity || { min: 0, max: 0 };
-    const amenities = venue.amenities || [];
-    
-    const startingPrice = pricing.startingPrice || venue.starting_price || 0;
-    const currency = pricing.currency || venue.currency || 'SAR';
-    const isPricePerPerson = !!pricing.pricePerPerson || !!(venue as ExtendedVenue).price_per_person;
-    
+  // SIMPLIFIED venue card - just title, city, type, and image (for suggestions)
+  const renderVenueCard = (venue: Venue) => {
+    const imageUrl =
+      (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0 && venue.galleryImages[0]) ||
+      (venue.gallery_images && Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0 && venue.gallery_images[0]) ||
+      venue.imageUrl ||
+      venue.image_url ||
+      '/placeholder.svg';
+
+    const city = venue.city || (venue as any).city_name || "-";
+    const type = venue.type || "-";
+
     return (
-      <Card 
+      <Card
         key={venue.id}
-        className="bg-findvenue-card-bg border border-findvenue-border p-3 cursor-pointer hover:bg-findvenue-surface/50 transition"
+        className="bg-findvenue-card-bg border border-gray-800 p-3 cursor-pointer hover:bg-findvenue-surface/60 transition"
         onClick={() => viewVenueDetails(venue.id)}
       >
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-shrink-0 relative w-full sm:w-24 h-24">
-            <img
-              src={getVenueMainImage(venue)}
-              alt={venue.name}
-              className="rounded object-cover w-full h-full"
-            />
-            {venue.featured && (
-              <span className="absolute top-0 right-0 bg-yellow-400 text-xs text-black px-1 rounded-tr rounded-bl">★</span>
-            )}
-          </div>
-          <div className="flex-1 min-w-0 space-y-1 text-white text-xs">
-            <h4 className="text-md font-semibold text-white truncate">{venue.name}</h4>
-            <div className="flex flex-wrap gap-2 text-findvenue-text-muted">
-              <span>{venue.city || (venue as any).city_name || '-'}</span>
-              <span>|</span>
-              <span>
-                {venue.type || '-'}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-1">
-              <span><b>Capacity:</b> {capacity.min || '-'} - {capacity.max || '-'}</span>
-              <span><b>Price:</b> {startingPrice} {currency}{isPricePerPerson ? ' per person' : ''}</span>
-            </div>
-            <div className="mt-1 line-clamp-2">
-              <div>
-                <b>Description:</b> {venue.description || '-'}
-              </div>
-            </div>
-            <div>
-              <b>Amenities:</b> {Array.isArray(amenities) ? amenities.join(', ') : String(amenities || '-')}
-            </div>
-            <div>
-              <b>Address:</b> {venue.address || '-'}
-            </div>
+        <div className="flex gap-3 items-center">
+          <img
+            src={imageUrl}
+            alt={venue.name}
+            className="rounded object-cover w-16 h-16 flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="font-medium text-white truncate">{venue.name}</div>
+            <div className="text-xs text-gray-400 truncate">{city} {type && <>| {type}</>}</div>
           </div>
         </div>
       </Card>
@@ -525,7 +514,7 @@ const HomepageChatbot: React.FC = () => {
                 <Badge variant="outline" className="bg-findvenue/10 text-findvenue mb-2">
                   Matching Venues
                 </Badge>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {suggestedVenues.map(venue => renderVenueCard(venue))}
                 </div>
               </div>
