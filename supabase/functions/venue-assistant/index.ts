@@ -43,57 +43,36 @@ serve(async (req) => {
     }
 
     const keywords = query.trim().toLowerCase().split(/\s+/);
-    // Build complex "or" filter to match any keyword in any attribute
-    let orFilters: string[] = [];
+    // Build filters for matching keywords in text columns
+    let textFilters = [];
+    
     for (const keyword of keywords) {
-      // Numeric: try to match on min/max capacity, price, rating, zipcode etc
-      for (const column of allVenueColumns) {
-        // Choose string or array search
-        if (column === 'min_capacity' || column === 'max_capacity' ||
-            column === 'starting_price' || column === 'price_per_person' ||
-            column === 'rating' || column === 'reviews_count' ||
-            column === 'latitude' || column === 'longitude' ||
-            column === 'zipcode') {
-          // Numeric: try exact or ilike
-          if (!isNaN(Number(keyword))) {
-            orFilters.push(`${column}.eq.${keyword}`);
-          }
-        } else if (
-          column === 'amenities' || column === 'gallery_images' ||
-          column === 'category_name' || column === 'accepted_payment_methods' ||
-          column === 'accessibility_features' || column === 'additional_services'
-        ) {
-          // Array columns: cs (contains) for strings
-          orFilters.push(`${column}.cs.{${keyword}}`);
-        } else if (
-          column === 'featured' || column === 'popular' ||
-          column === 'wifi' || column === 'parking'
-        ) {
-          // Boolean: catch true if keywords match
-          if (
-            (column === "featured" && ["featured", "premium"].includes(keyword)) ||
-            (column === "popular" && ["popular", "famous"].includes(keyword)) ||
-            (column === "wifi" && ["wifi", "internet"].includes(keyword)) ||
-            (column === "parking" && ["parking"].includes(keyword))
-          ) {
-            orFilters.push(`${column}.eq.true`);
-          }
-        } else {
-          // Default string, ilike
-          const safeKeyword = keyword.replace(/"/g, "");
-          orFilters.push(`${column}.ilike.%${safeKeyword}%`);
-        }
+      // Skip very short keywords to prevent too many false positives
+      if (keyword.length < 2) continue;
+      
+      // Use ilike for text columns
+      textFilters.push(`name.ilike.%${keyword}%`);
+      textFilters.push(`description.ilike.%${keyword}%`);
+      textFilters.push(`address.ilike.%${keyword}%`);
+      textFilters.push(`city_name.ilike.%${keyword}%`);
+      textFilters.push(`category_name.ilike.%${keyword}%`);
+      
+      // For numeric columns, only add if keyword is a number
+      if (!isNaN(Number(keyword))) {
+        textFilters.push(`min_capacity.eq.${keyword}`);
+        textFilters.push(`max_capacity.eq.${keyword}`);
+        textFilters.push(`starting_price.eq.${keyword}`);
+        textFilters.push(`zipcode.eq.${keyword}`);
       }
     }
-
-    let venueQuery = supabaseClient.from('venues').select('*');
-
-    if (orFilters.length > 0) {
-      venueQuery = venueQuery.or(orFilters.join(','));
-    }
-
-    // Sort by rating and popularity
-    venueQuery = venueQuery.order('rating', { ascending: false }).order('popular', { ascending: false }).limit(10);
+    
+    // Now execute the query with the text filters
+    let venueQuery = supabaseClient
+      .from('venues')
+      .select('*')
+      .or(textFilters.join(','))
+      .order('rating', { ascending: false })
+      .limit(10);
 
     const { data: venues, error } = await venueQuery;
 
@@ -117,38 +96,37 @@ serve(async (req) => {
 
     // Assemble a "pro" answer referencing all matching attributes
     let proAnswer = `I found ${venues.length} venue${venues.length > 1 ? "s" : ""} based on your keywords. Here are the top results:\n\n`;
+    
     // For each venue, display all attributes that match the keywords
     venues.forEach((venue, idx) => {
       proAnswer += `${idx + 1}. ${venue.name || "No name"}\n`;
-      for (const key of allVenueColumns) {
-        const val = venue[key];
-        // For each keyword, if it occurs in this value (case-insensitive, stringified for arrays/objects), show that line:
-        if (val !== null && val !== undefined) {
-          const valueString = Array.isArray(val) ? val.join(", ") : String(val);
-          for (const keyword of keywords) {
-            if (valueString.toLowerCase().includes(keyword)) {
-              proAnswer += `   • ${key.replace(/_/g, " ")}: ${valueString}\n`;
-              break;
-            }
-          }
-        }
+      proAnswer += `   • City: ${venue.city_name || "Unknown location"}\n`;
+      proAnswer += `   • Category: ${venue.category_name || "General venue"}\n`;
+      if (venue.description) {
+        proAnswer += `   • Description: ${venue.description.substring(0, 100)}${venue.description.length > 100 ? '...' : ''}\n`;
       }
-      proAnswer += `   • Venue Status: ${venue.status || "Unknown"}\n`;
+      if (venue.min_capacity && venue.max_capacity) {
+        proAnswer += `   • Capacity: ${venue.min_capacity} - ${venue.max_capacity} guests\n`;
+      }
+      if (venue.starting_price) {
+        proAnswer += `   • Starting price: ${venue.currency || 'SAR'} ${venue.starting_price}\n`;
+      }
+      if (venue.rating) {
+        proAnswer += `   • Rating: ${venue.rating}/5 (${venue.reviews_count || 0} reviews)\n`;
+      }
+      proAnswer += `   • Status: ${venue.status || "Unknown"}\n`;
       if (venue.image_url) {
         proAnswer += `   • [View Image](${venue.image_url})\n`;
       }
       proAnswer += "\n";
     });
+    
     proAnswer += "Would you like more details about any venue? You can ask for that venue by name or id.\n";
-
-    const formattedVenues = venues.map(v =>
-      Object.fromEntries(allVenueColumns.map(col => [col, v[col]]))
-    );
 
     return new Response(
       JSON.stringify({
         answer: proAnswer,
-        venues: formattedVenues
+        venues: venues
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

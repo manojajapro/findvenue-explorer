@@ -1,12 +1,11 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { Bot, Send, Volume2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-const apiUrl =
-  "https://esdmelfzeszjtbnoajig.functions.supabase.co/smart-venue-assistant";
+import { supabase } from "@/integrations/supabase/client";
 
 type Message = {
   role: "user" | "assistant";
@@ -52,39 +51,20 @@ export default function HomeVenueAssistantChat() {
     setError(null);
 
     try {
-      const resp = await fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+      const { data, error } = await supabase.functions.invoke('venue-assistant', {
+        body: { 
           query: userMsg,
           type: 'search'
-        }),
+        },
       });
       
-      if (!resp.ok) {
-        throw new Error("Unable to get answer from assistant");
+      if (error) {
+        throw new Error(error.message || "Unable to get answer from assistant");
       }
       
-      const data = await resp.json();
-      
-      // Format the answer with venue details if available
-      let formattedAnswer = data.answer;
-      if (data.venues && data.venues.length > 0) {
-        formattedAnswer += "\n\nHere are the matching venues:\n\n";
-        data.venues.forEach((venue: any) => {
-          formattedAnswer += `📍 ${venue.name} (${venue.city})\n`;
-          formattedAnswer += `   • Capacity: ${venue.capacity}\n`;
-          formattedAnswer += `   • Price: ${venue.price}\n`;
-          formattedAnswer += `   • Rating: ${venue.rating}\n`;
-          if (venue.image) {
-            formattedAnswer += `   • [View Images](${venue.image})\n`;
-          }
-          formattedAnswer += "\n";
-        });
-      }
-      
-      setMessages((prev) => [...prev, { role: "assistant", content: formattedAnswer }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: data.answer }]);
     } catch (e: any) {
+      console.error("Error invoking function:", e);
       setError(e.message || "Answer unavailable");
       setMessages((prev) => [
         ...prev,
