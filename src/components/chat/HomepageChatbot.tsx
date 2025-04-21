@@ -86,6 +86,61 @@ const HomepageChatbot: React.FC = () => {
     return Math.random().toString(36).substring(2, 11);
   };
 
+  // Helper for finding if the query is looking for venues by type/city/etc
+  const getVenueSearchCriteria = (query: string) => {
+    const keywords = [
+      'venue', 'venues', 'wedding', 'conference', 'exhibition',
+      'party', 'corporate', 'hall', 'room', 'ballroom', 'beach',
+      'hotel', 'private', 'dining', 'training', 'graduation', 'meeting'
+    ];
+    // city names from your data
+    const cityKeywords = [
+      "riyadh", "jeddah", "khobar", "dammam", "mecca", "medina", "abha", "taif", "khamis", "khamis mushait"
+    ];
+    const q = query.toLowerCase();
+    let type = '';
+    let city = '';
+
+    keywords.forEach(k => { if (q.includes(k)) type = k; });
+    cityKeywords.forEach(c => { if (q.includes(c)) city = c; });
+
+    // if we find a city/type, use it as a criterion
+    if (type || city) {
+      return { type, city };
+    }
+    return null;
+  };
+
+  // Filter/search venues based on query and show in chat
+  const getMatchingVenues = (venues: Venue[], query: string) => {
+    const search = getVenueSearchCriteria(query);
+
+    // if city or type matched
+    if (search?.city || search?.type) {
+      return venues.filter(v =>
+        (search.city && v.city && v.city.toLowerCase().includes(search.city)) ||
+        (search.type && (
+          (typeof v.type === 'string' && v.type.toLowerCase().includes(search.type)) ||
+          (typeof v.category === 'string' && v.category.toLowerCase().includes(search.type))
+        ))
+      );
+    }
+
+    // fallback: keyword matches
+    return venues.filter(v =>
+      v.name?.toLowerCase().includes(query.toLowerCase()) ||
+      v.city?.toLowerCase().includes(query.toLowerCase()) ||
+      v.category?.toString().toLowerCase().includes(query.toLowerCase()) ||
+      v.type?.toString().toLowerCase().includes(query.toLowerCase())
+    );
+  };
+
+  // Enhanced: Only show venues for direct venue queries
+  const isVenueListQuery = (query: string) => {
+    const venueListRegex = /(list|show|top|suggest|recommend|venues?|halls?)/i;
+    return venueListRegex.test(query);
+  };
+
   // Enhanced query matching: decide if the query is "venue-related"
   const isVenueQuery = (query: string) => {
     const keywords = [
@@ -269,8 +324,10 @@ const HomepageChatbot: React.FC = () => {
       setLastBotShouldSpeak(!!speak);
 
       // Only show venues if the query is truly venue-related
-      if (venues && Array.isArray(venues) && venues.length > 0 && isVenueQuery(messageText)) {
-        setSuggestedVenues(venues);
+      if (venues && Array.isArray(venues) && venues.length > 0 && isVenueListQuery(messageText)) {
+        // filter results by query if possible
+        const filteredVenues = getMatchingVenues(venues, messageText);
+        setSuggestedVenues(filteredVenues.slice(0, 10));
       } else {
         // Clear suggested venues unless another venue-specific query is made
         setSuggestedVenues([]);
@@ -383,7 +440,7 @@ const HomepageChatbot: React.FC = () => {
     return '/placeholder.svg';
   };
 
-  // SIMPLIFIED venue card - just title, city, type, and image (for suggestions)
+  // Venue card for chat - simplified and safe checks
   const renderVenueCard = (venue: Venue) => {
     const imageUrl =
       (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0 && venue.galleryImages[0]) ||
@@ -394,22 +451,31 @@ const HomepageChatbot: React.FC = () => {
 
     const city = venue.city || (venue as any).city_name || "-";
     const type = venue.type || "-";
+    const category = venue.category || "-";
+    const capacity = venue.capacity ? `${venue.capacity.min ?? '-'} - ${venue.capacity.max ?? '-'}` : "-";
+    let price = "-";
+    let currency = "SAR";
+    if (venue.pricing && (venue.pricing as any).startingPrice !== undefined) {
+      price = (venue.pricing as any).startingPrice.toLocaleString();
+      currency = (venue.pricing as any).currency || "SAR";
+    } else if ((venue as any).starting_price) {
+      price = (venue as any).starting_price.toLocaleString();
+      currency = (venue as any).currency || "SAR";
+    }
 
     return (
-      <Card
-        key={venue.id}
-        className="bg-findvenue-card-bg border border-gray-800 p-3 cursor-pointer hover:bg-findvenue-surface/60 transition"
-        onClick={() => viewVenueDetails(venue.id)}
-      >
+      <Card key={venue.id} className="bg-white/90 border p-3 cursor-pointer hover:bg-blue-100 transition" onClick={() => viewVenueDetails(venue.id)}>
         <div className="flex gap-3 items-center">
-          <img
-            src={imageUrl}
-            alt={venue.name}
-            className="rounded object-cover w-16 h-16 flex-shrink-0"
-          />
-          <div className="flex-1 min-w-0 space-y-1">
-            <div className="font-medium text-white truncate">{venue.name}</div>
-            <div className="text-xs text-gray-400 truncate">{city} {type && <>| {type}</>}</div>
+          <img src={imageUrl} alt={venue.name} className="rounded object-cover w-14 h-14 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-gray-900 truncate">{venue.name}</div>
+            <div className="text-xs text-gray-600 truncate">{city} {type ? <span>| {type}</span> : null}</div>
+            <div className="text-xs text-gray-500 mt-1">Category: <b>{category}</b></div>
+            <div className="text-xs text-gray-500 mt-1">Capacity: {capacity}</div>
+            <div className="text-xs text-findvenue mt-1">Price: {price} {currency}</div>
+            <Button variant="outline" size="sm" className="mt-1" onClick={e => { e.stopPropagation(); viewVenueDetails(venue.id); }}>
+              View Details
+            </Button>
           </div>
         </div>
       </Card>
