@@ -1,10 +1,11 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -14,71 +15,73 @@ serve(async (req) => {
   }
 
   try {
-    const { query, type } = await req.json();
+    const { prompt } = await req.json();
 
-    if (!query) {
-      throw new Error('Query is required');
+    if (!prompt) {
+      throw new Error('Prompt is required');
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
+    // Supabase client (anon for public function)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get all venues to form the context
-    const { data: venues, error } = await supabase
-      .from('venues')
-      .select('*');
-
+    // Fetch all venues
+    const { data: venues, error } = await supabase.from('venues').select('*');
     if (error) {
       throw error;
     }
 
-    // Process venues data for better context
-    const processedVenues = venues.map(venue => {
-      return {
-        id: venue.id,
-        name: venue.name,
-        description: venue.description || '',
-        address: venue.address || '',
-        city: venue.city_name || '',
-        categories: Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.category_name || '',
-        pricing: {
-          startingPrice: venue.starting_price || 0,
-          pricePerPerson: venue.price_per_person,
-          currency: venue.currency || 'SAR'
-        },
-        capacity: {
-          min: venue.min_capacity || 0,
-          max: venue.max_capacity || 0
-        },
-        amenities: Array.isArray(venue.amenities) ? venue.amenities.join(', ') : '',
-        features: {
-          parking: venue.parking ? 'Yes' : 'No',
-          wifi: venue.wifi ? 'Yes' : 'No'
-        },
-        accessibility: Array.isArray(venue.accessibility_features) ? venue.accessibility_features.join(', ') : '',
-        rating: venue.rating || 0,
-        reviews: venue.reviews_count || 0,
-        availability: Array.isArray(venue.availability) ? venue.availability.join(', ') : '',
-      };
+    // Search: Lowercase prompt, and check if any field (string, number, array, jsonb) contains keyword
+    const keywords = prompt.toLowerCase().split(/\s+/).filter(Boolean);
+
+    const filterVenues = (venue) => {
+      // Flatten venue object for search
+      const row = Object.entries(venue)
+        .map(([k, v]) =>
+          Array.isArray(v)
+            ? v.join(' ')
+            : typeof v === 'object' && v !== null
+            ? JSON.stringify(v)
+            : String(v ?? '')
+        )
+        .join(' ')
+        .toLowerCase();
+      return keywords.every((kw) => row.includes(kw));
+    };
+
+    const matchedVenues = venues.filter(filterVenues);
+
+    // Format matched venue rows for context
+    const venueInfoStrings = matchedVenues.slice(0, 5).map((venue) => {
+      // Show all major fields (as string)
+      return Object.entries(venue)
+        .map(([k, v]) =>
+          `${k}: ${
+            Array.isArray(v)
+              ? v.join(', ')
+              : typeof v === 'object' && v !== null
+              ? JSON.stringify(v)
+              : v
+          }`
+        )
+        .join('\n');
     });
 
-    // Format the query content for the OpenAI request
-    const contextString = JSON.stringify(processedVenues);
-    
-    const systemPrompt = `You are a helpful assistant specialized in answering questions about venues. Use ONLY the venue information provided in the context to answer queries. If a query cannot be answered with the information provided, acknowledge that you don't have that information rather than making up details. When mentioning price, always include the currency.
+    const contextString = venueInfoStrings.join("\n\n");
 
-    Here's the venue data:
-    ${contextString}`;
+    // Compose final system prompt for AI
+    const systemPrompt = `You are the FindVenue Pro Assistant. Answer the user using ONLY the data in the provided venues. 
+Format your answer with pro-level clarity, and if relevant to the question, show matching venue details or features.
+Venue attribute context:
 
-    // Call OpenAI API for chat completion
+${contextString || "No venues matched."}
+`;
+
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    
-    if (!OPENAI_API_KEY) {
-      throw new Error('OpenAI API key not found');
-    }
+    if (!OPENAI_API_KEY) throw new Error("Missing OpenAI API Key");
 
+    // GPT-4o-mini for best creative/comprehension
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -86,86 +89,35 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Using a more capable model
+        model: 'gpt-4o-mini',
         messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: query
-          }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
         ],
-        temperature: 0.7,
-        max_tokens: 500
+        temperature: 0.5,
+        max_tokens: 512
       }),
     });
 
     if (!openAIResponse.ok) {
-      const error = await openAIResponse.json();
-      throw new Error(error.error?.message || 'Failed to get a response');
+      throw new Error((await openAIResponse.json()).error?.message || "OpenAI API error");
     }
 
-    const jsonResponse = await openAIResponse.json();
-    const answer = jsonResponse.choices[0].message.content;
-
-    // Also search for relevant venues based on the query
-    let relevantVenues = [];
-    
-    // Create a simple keyword-based search
-    const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 3);
-    
-    if (searchTerms.length > 0) {
-      relevantVenues = venues.filter(venue => {
-        const venueText = [
-          venue.name,
-          venue.description,
-          venue.city_name,
-          Array.isArray(venue.category_name) ? venue.category_name.join(' ') : venue.category_name,
-          Array.isArray(venue.amenities) ? venue.amenities.join(' ') : '',
-          venue.address,
-          Array.isArray(venue.accessibility_features) ? venue.accessibility_features.join(' ') : '',
-        ].join(' ').toLowerCase();
-        
-        return searchTerms.some(term => venueText.includes(term));
-      }).slice(0, 5).map(venue => ({
-        id: venue.id,
-        name: venue.name,
-        city_name: venue.city_name,
-        image_url: venue.image_url,
-        gallery_images: venue.gallery_images,
-        starting_price: venue.starting_price,
-        currency: venue.currency,
-        category_name: venue.category_name,
-      }));
-    }
+    const completion = await openAIResponse.json();
+    const answer = completion.choices?.[0]?.message?.content ?? "I could not find any venues matching your query.";
 
     return new Response(
       JSON.stringify({
         answer,
-        relevantVenues: relevantVenues.length > 0 ? relevantVenues : undefined
+        venues: matchedVenues.slice(0, 5)
       }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
-  } catch (error) {
-    console.error('Error:', error);
-    
+  } catch (e) {
+    console.error('SmartVenueAssistant error:', e);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
+      JSON.stringify({ error: e.message || "Unknown error" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
 });
