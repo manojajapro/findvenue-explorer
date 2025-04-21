@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -10,11 +9,13 @@ import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { AvatarSelector } from '@/components/profile/AvatarSelector';
+import { useUnreadChatsCount } from '@/hooks/useUnreadChatsCount';
 
 const Profile = () => {
   const { user, profile, updateProfile, updatePassword } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const unreadChats = useUnreadChatsCount(user?.id);
   
   const [firstName, setFirstName] = useState(profile?.first_name || '');
   const [lastName, setLastName] = useState(profile?.last_name || '');
@@ -103,7 +104,6 @@ const Profile = () => {
     try {
       await updatePassword(currentPassword, newPassword);
       
-      // Clear password fields
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -132,7 +132,25 @@ const Profile = () => {
     <div className="min-h-screen pt-28 pb-16">
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-8">Profile Settings</h1>
+          <h1 className="text-3xl font-bold mb-8 flex items-center gap-3">
+            Profile Settings
+            {unreadChats > 0 && (
+              <span className="ml-2 bg-green-500/90 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                {unreadChats > 99 ? "99+" : unreadChats} Unread Chat{unreadChats > 1 ? "s" : ""}
+              </span>
+            )}
+          </h1>
+          
+          {unreadChats > 0 && (
+            <div className="flex mb-4">
+              <Button className="bg-findvenue/80 hover:bg-findvenue-dark mr-2" onClick={() => navigate('/messages')}>
+                Go to Messages
+                <span className="ml-2 bg-white/20 rounded px-2 py-0 text-xs">
+                  {unreadChats}
+                </span>
+              </Button>
+            </div>
+          )}
           
           <Tabs defaultValue="profile" className="w-full">
             <TabsList className="grid grid-cols-2 mb-8 bg-findvenue-surface/50">

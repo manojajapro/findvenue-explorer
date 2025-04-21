@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -117,18 +116,14 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
     return Math.random().toString(36).substring(2, 11);
   };
 
-  // Function to detect if text is Arabic
   const isArabicText = (text: string): boolean => {
     return /[\u0600-\u06FF]/.test(text);
   };
 
-  // Function to generate a detailed response using all venue attributes
   const generateDetailedResponse = (venue: Venue): string => {
-    // Determine if we should respond in Arabic based on whether venue name contains Arabic characters
     const useArabic = isArabicText(venue.name);
     
     if (useArabic) {
-      // Arabic detailed response
       let response = `${venue.name} هي قاعة مناسبات `;
       
       if (venue.city) {
@@ -185,7 +180,6 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       
       return response;
     } else {
-      // English detailed response
       let response = `${venue.name} is a venue `;
       
       if (venue.city) {
@@ -247,12 +241,10 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
   const getResponseForVenueQuery = (query: string): string => {
     query = query.toLowerCase();
     
-    // Check for conversational phrases that should trigger detailed responses
     if (/more details|tell me more|explain|elaborate|details|all info|full details|everything|more information|كل التفاصيل|شرح|تفاصيل/i.test(query)) {
       return generateDetailedResponse(venue);
     }
 
-    // Check for short greetings that should get a summary response
     if (/^(hi|hello|hey|مرحبا|اهلا|السلام عليكم)$/i.test(query.trim())) {
       const isArabic = isArabicText(query);
       
@@ -263,17 +255,14 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       }
     }
 
-    // If venue has a description and user asks about the venue in general
     if ((/about|describe|what is|tell me about|overview|وصف/i.test(query)) && venue.description) {
       return venue.description;
     }
     
-    // Handle capacity queries
     if (/max(imum)? capacity|max guests|most people|how many people|max attendees/i.test(query)) {
       return `${venue.name} can accommodate up to ${venue.capacity?.max || '?'} guests.`;
     }
 
-    // Handle price queries
     if (/price|cost|fee|how much|rate|pricing/i.test(query)) {
       const currency = venue.pricing?.currency || 'SAR';
       const startingPrice = venue.pricing?.startingPrice || 0;
@@ -286,12 +275,10 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       return priceResponse;
     }
 
-    // Handle location queries
     if (/location|address|where|place|situated|city|area/i.test(query)) {
       return `${venue.name} is located at ${venue.address || '(address not specified)'}, ${venue.city || ''}.`;
     }
 
-    // Handle amenities queries
     if (/amenities|facilities|features|offer|provide|service/i.test(query)) {
       if (!venue.amenities || venue.amenities.length === 0) {
         return `${venue.name} does not have any listed amenities.`;
@@ -299,21 +286,18 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       return `${venue.name} offers the following amenities: ${venue.amenities.join(', ')}.`;
     }
 
-    // Handle wifi query
     if (/wifi|internet|connection/i.test(query)) {
       return venue.wifi 
         ? `Yes, ${venue.name} provides WiFi connectivity.` 
         : `No, ${venue.name} does not offer WiFi.`;
     }
 
-    // Handle parking query
     if (/parking|car|vehicle/i.test(query)) {
       return venue.parking 
         ? `Yes, ${venue.name} has parking facilities available.` 
         : `No, ${venue.name} does not have dedicated parking.`;
     }
 
-    // Handle accessibility query
     if (/accessibility|accessible|wheelchair|disabled/i.test(query)) {
       if (!venue.accessibilityFeatures || venue.accessibilityFeatures.length === 0) {
         return `I don't have specific information about accessibility features for ${venue.name}.`;
@@ -321,7 +305,6 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       return `${venue.name} offers these accessibility features: ${venue.accessibilityFeatures.join(', ')}.`;
     }
 
-    // Handle payment methods query
     if (/payment|pay|credit card|cash/i.test(query)) {
       if (!venue.acceptedPaymentMethods || venue.acceptedPaymentMethods.length === 0) {
         return `I don't have specific information about accepted payment methods for ${venue.name}.`;
@@ -329,20 +312,17 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       return `${venue.name} accepts the following payment methods: ${venue.acceptedPaymentMethods.join(', ')}.`;
     }
 
-    // Handle categories query
     if (/category|type|kind|event type/i.test(query)) {
       const categories = Array.isArray(venue.categoryNames) ? venue.categoryNames.join(', ') : venue.category;
       return `${venue.name} is categorized as: ${categories || 'No category information available'}.`;
     }
 
-    // Handle rating query
     if (/rating|review|score|stars/i.test(query)) {
       return venue.rating
         ? `${venue.name} has a rating of ${venue.rating} out of 5 based on ${venue.reviews || 0} reviews.`
         : `${venue.name} does not have any ratings yet.`;
     }
 
-    // Handle operating hours query
     if (/hours|time|open|close|opening|closing/i.test(query)) {
       if (!venue.openingHours) {
         return `I don't have specific information about operating hours for ${venue.name}.`;
@@ -363,7 +343,6 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       return hoursText;
     }
 
-    // Default response with general venue information
     const isArabic = isArabicText(query);
     
     if (isArabic) {
@@ -396,7 +375,6 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
     }
 
     try {
-      // Generate response based on venue data
       const botResponse = getResponseForVenueQuery(messageText);
       
       const botMessage = {
@@ -540,24 +518,34 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
           <DialogDescription id="chatbot-description" className="sr-only">
             Chat with our venue assistant to learn more about {venue.name}
           </DialogDescription>
-          
+
           <div className="absolute top-2 right-2 z-10">
             <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="rounded-full h-8 w-8 hover:bg-white/10">
               <X className="h-4 w-4 text-gray-400" />
             </Button>
           </div>
-          
-          {/* Enhanced header with more prominence */}
-          <div className="w-full flex flex-col items-center p-5 border-b border-white/10 bg-blue-950/80 gap-1">
-            <div className="flex gap-2 items-center">
-              <Bot className="h-6 w-6 text-blue-300 animate-bounce-slow" />
-              <span className="text-2xl font-bold text-white">{venue.name} Assistant</span>
+
+          <div className="w-full flex flex-col items-center p-6 border-b border-white/10 bg-findvenue/90 gap-1">
+            <div className="flex flex-col items-center">
+              <div className="rounded-full border-4 border-blue-300 bg-white/50 shadow-lg p-1 mb-2">
+                <img
+                  src={"/favicon.ico"}
+                  alt="Venue Assistant"
+                  className="w-16 h-16 rounded-full"
+                />
+              </div>
+              <span className="text-xl font-bold text-blue-100 tracking-wide mb-0.5">
+                {venue.name} Assistant
+              </span>
+              <span className="text-xs text-blue-100/80">
+                Smart Q&A for all details about this venue.
+              </span>
             </div>
-            <span className="text-xs text-blue-200 italic whitespace-pre-line text-center">
+            <span className="mt-3 text-[13px] text-blue-200 italic whitespace-pre-line text-center max-w-xs">
               {"Ask about capacity, prices, amenities...\nيمكنك السؤال عن القاعة بالعربية أيضاً!"}
             </span>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message) => (
               <div 
@@ -697,4 +685,3 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
 };
 
 export default VenueDetailsChatbot;
-
