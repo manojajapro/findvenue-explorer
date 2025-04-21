@@ -57,6 +57,14 @@ export interface Venue {
   }>;
   zipcode?: string;
   categoryNames?: string[];
+  
+  // Add these fields to bridge the gap between database fields and frontend expected fields
+  // These are mapped from the database fields
+  image_url?: string;
+  gallery_images?: string[];
+  city_name?: string;
+  starting_price?: number;
+  currency?: string;
 }
 
 export interface VenueFilter {

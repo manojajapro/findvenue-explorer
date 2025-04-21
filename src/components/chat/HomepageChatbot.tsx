@@ -217,9 +217,9 @@ const HomepageChatbot: React.FC = () => {
                       onClick={() => viewVenueDetails(venue.id)}
                     >
                       <div className="flex">
-                        {venue.image_url || (venue.gallery_images && venue.gallery_images[0]) ? (
+                        {venue.imageUrl || (venue.galleryImages && venue.galleryImages[0]) ? (
                           <img 
-                            src={venue.image_url || venue.gallery_images[0]} 
+                            src={venue.imageUrl || venue.galleryImages[0]} 
                             alt={venue.name}
                             className="h-16 w-16 object-cover rounded mr-2"
                           />
@@ -231,11 +231,11 @@ const HomepageChatbot: React.FC = () => {
                         <div className="flex-1 overflow-hidden">
                           <h4 className="text-sm font-medium text-white truncate">{venue.name}</h4>
                           <p className="text-xs text-findvenue-text-muted truncate">
-                            {venue.city_name || 'Location not specified'}
+                            {venue.city || 'Location not specified'}
                           </p>
-                          {venue.starting_price && (
+                          {venue.pricing && venue.pricing.startingPrice && (
                             <Badge variant="secondary" className="mt-1 text-xs">
-                              {venue.starting_price} {venue.currency || 'SAR'}
+                              {venue.pricing.startingPrice} {venue.pricing.currency || 'SAR'}
                             </Badge>
                           )}
                         </div>

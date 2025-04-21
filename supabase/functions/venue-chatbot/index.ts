@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.2.1'
@@ -107,6 +106,28 @@ serve(async (req) => {
 
     console.log(`Found ${venues.length} venues`)
 
+    // Transform venues data to match frontend expected format
+    const transformedVenues = venues.map(venue => {
+      return {
+        id: venue.id,
+        name: venue.name,
+        description: venue.description,
+        imageUrl: venue.image_url,
+        galleryImages: venue.gallery_images,
+        city: venue.city_name,
+        pricing: {
+          startingPrice: venue.starting_price || 0,
+          currency: venue.currency || 'SAR'
+        },
+        // Keep these original fields to maintain compatibility with existing database structure
+        image_url: venue.image_url,
+        gallery_images: venue.gallery_images,
+        city_name: venue.city_name,
+        starting_price: venue.starting_price,
+        currency: venue.currency
+      };
+    });
+
     // Format venue data for OpenAI consumption
     const venueData = venues.map(venue => ({
       id: venue.id,
@@ -152,7 +173,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         message: chatResponse,
-        venues: venues.slice(0, 3), // Return top 3 venues
+        venues: transformedVenues.slice(0, 3), // Return top 3 venues
         error
       }),
       {
