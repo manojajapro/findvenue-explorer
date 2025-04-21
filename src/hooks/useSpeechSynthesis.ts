@@ -1,11 +1,25 @@
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 
 export function useSpeechSynthesis() {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [isSupported, setIsSupported] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Check if speech synthesis is supported
+    const supported = 'speechSynthesis' in window;
+    setIsSupported(supported);
+    
+    // Return cleanup function
+    return () => {
+      if (supported && window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   const speak = (text: string, onStart?: () => void, onEnd?: () => void) => {
-    if (!("speechSynthesis" in window)) {
+    if (!isSupported) {
       console.error("Sorry, your browser does not support speech synthesis.");
       return;
     }
@@ -39,14 +53,19 @@ export function useSpeechSynthesis() {
     }
     
     utteranceRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
+    
+    try {
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.error("Error during speech synthesis:", err);
+    }
   };
 
   const stop = () => {
-    if ("speechSynthesis" in window) {
+    if (isSupported) {
       window.speechSynthesis.cancel();
     }
   };
 
-  return { speak, stop };
+  return { speak, stop, isSupported };
 }

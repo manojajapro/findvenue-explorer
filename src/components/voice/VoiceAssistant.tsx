@@ -6,6 +6,7 @@ import { Mic, MicOff, X, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useToast } from '@/hooks/use-toast';
 
 const VoiceAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,13 +14,14 @@ const VoiceAssistant = () => {
   const [response, setResponse] = useState('');
   const [micActive, setMicActive] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
+  const { toast } = useToast();
   
   // Use our custom hooks for speech functionality
-  const { speak, stop } = useSpeechSynthesis();
+  const { speak, stop, isSupported: speechSynthesisSupported } = useSpeechSynthesis();
   const [isSpeaking, setIsSpeaking] = useState(false);
   
   // Speech recognition with our custom hook
-  const { startListening, stopListening } = useSpeechRecognition({
+  const { startListening, stopListening, isSupported: speechRecognitionSupported } = useSpeechRecognition({
     onResult: (text) => {
       setTranscript(text);
       handleVoiceCommand(text);
@@ -28,7 +30,12 @@ const VoiceAssistant = () => {
     onEnd: () => setMicActive(false),
     onError: (err) => { 
       setMicError(err); 
-      setMicActive(false); 
+      setMicActive(false);
+      
+      toast({
+        title: "Speech Recognition Error",
+        description: err || "An error occurred with speech recognition"
+      });
     }
   });
   
@@ -64,12 +71,37 @@ const VoiceAssistant = () => {
   
   // Enhanced: allow direct browser speech synthesis for responses
   const handleSpeakResponse = (text: string) => {
+    if (!speechSynthesisSupported) {
+      toast({
+        title: "Speech Synthesis Not Available",
+        description: "Your browser does not support speech synthesis."
+      });
+      return;
+    }
+    
     speak(text, () => setIsSpeaking(true), () => setIsSpeaking(false));
   };
   
   const handleMicStart = () => {
+    if (!speechRecognitionSupported) {
+      toast({
+        title: "Speech Recognition Not Available",
+        description: "Your browser does not support speech recognition."
+      });
+      return;
+    }
+    
     setMicActive(true);
-    startListening();
+    startListening().catch((err) => {
+      setMicActive(false);
+      setMicError("Could not access microphone. Please ensure microphone permissions are granted.");
+      
+      toast({
+        title: "Microphone Access Error",
+        description: "Could not access microphone. Please ensure microphone permissions are granted.",
+        variant: "destructive"
+      });
+    });
   };
   
   const handleMicStop = () => {
@@ -122,7 +154,7 @@ const VoiceAssistant = () => {
           </div>
           {/* --- Main Content --- */}
           <div className="p-6 flex flex-col items-center">
-            {micActive ? (
+            {(micActive) ? (
               <>
                 <div className="w-20 h-20 rounded-full bg-findvenue-surface flex items-center justify-center mb-6 relative">
                   <div className="absolute w-full h-full rounded-full bg-findvenue/20 animate-ping"></div>
@@ -165,15 +197,17 @@ const VoiceAssistant = () => {
                         {response}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Hear response"
-                      className="ml-2 h-8 w-8"
-                      onClick={() => handleSpeakResponse(response)}
-                    >
-                      <Volume2 className="h-5 w-5 text-findvenue" />
-                    </Button>
+                    {speechSynthesisSupported && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Hear response"
+                        className="ml-2 h-8 w-8"
+                        onClick={() => handleSpeakResponse(response)}
+                      >
+                        <Volume2 className="h-5 w-5 text-findvenue" />
+                      </Button>
+                    )}
                   </div>
                 )}
                 {isSpeaking ? (
@@ -189,11 +223,18 @@ const VoiceAssistant = () => {
                     <Button 
                       className="bg-findvenue hover:bg-findvenue-dark mr-2"
                       onClick={handleMicStart}
+                      disabled={!speechRecognitionSupported}
                     >
                       <Mic className="h-4 w-4 mr-2" />
                       Start Speaking
                     </Button>
                   </>
+                )}
+                
+                {speechRecognitionSupported === false && (
+                  <div className="mt-3 py-2 px-3 bg-yellow-500/20 text-yellow-400 text-sm rounded border border-yellow-500/30">
+                    <p>Speech recognition is not supported in your browser. Please try using Chrome, Edge, or Safari.</p>
+                  </div>
                 )}
               </>
             )}

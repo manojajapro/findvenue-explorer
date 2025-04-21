@@ -1,5 +1,5 @@
 
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 
 interface UseSpeechRecognitionOptions {
   lang?: string;
@@ -8,13 +8,29 @@ interface UseSpeechRecognitionOptions {
   onError?: (error: string) => void;
 }
 
-export function useSpeechRecognition({ lang = "en-US", onResult, onEnd, onError }: UseSpeechRecognitionOptions) {
+export function useSpeechRecognition({ 
+  lang = "en-US", 
+  onResult, 
+  onEnd, 
+  onError 
+}: UseSpeechRecognitionOptions) {
   const recognitionRef = useRef<any>(null);
+  const [isSupported, setIsSupported] = useState<boolean | null>(null);
+  
+  // Check browser support on mount
+  useEffect(() => {
+    const supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    setIsSupported(supported);
+    
+    if (!supported && onError) {
+      onError("Speech recognition not supported in this browser");
+    }
+  }, [onError]);
 
   const startListening = useCallback(() => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+    if (!isSupported) {
       onError?.("Speech recognition not supported");
-      return;
+      return Promise.reject(new Error("Speech recognition not supported"));
     }
     
     try {
@@ -40,6 +56,7 @@ export function useSpeechRecognition({ lang = "en-US", onResult, onEnd, onError 
       };
       
       recog.onerror = (e: Event & { error?: string }) => {
+        console.error("Speech recognition error:", e);
         onError?.(e?.error || "Speech recognition error");
       };
       
@@ -48,13 +65,24 @@ export function useSpeechRecognition({ lang = "en-US", onResult, onEnd, onError 
       };
       
       recognitionRef.current = recog;
-      recog.start();
-      console.log("Speech recognition started");
+      
+      return new Promise<void>((resolve, reject) => {
+        try {
+          recog.start();
+          console.log("Speech recognition started");
+          resolve();
+        } catch (err) {
+          console.error("Failed to start speech recognition:", err);
+          onError?.("Failed to start speech recognition");
+          reject(err);
+        }
+      });
     } catch (err) {
-      console.error("Failed to start speech recognition:", err);
-      onError?.("Failed to start speech recognition");
+      console.error("Failed to initialize speech recognition:", err);
+      onError?.("Failed to initialize speech recognition");
+      return Promise.reject(err);
     }
-  }, [lang, onResult, onEnd, onError]);
+  }, [lang, onResult, onEnd, onError, isSupported]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -67,5 +95,9 @@ export function useSpeechRecognition({ lang = "en-US", onResult, onEnd, onError 
     }
   }, []);
 
-  return { startListening, stopListening };
+  return { 
+    startListening, 
+    stopListening,
+    isSupported 
+  };
 }

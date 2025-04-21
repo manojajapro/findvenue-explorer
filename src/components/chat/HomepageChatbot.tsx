@@ -13,7 +13,7 @@ import { Venue } from '@/hooks/useSupabaseVenues';
 import { Volume2, Mic } from "lucide-react";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 type Message = {
   id: string;
@@ -41,11 +41,13 @@ const HomepageChatbot: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   // Use custom speech hooks
-  const { speak, stop } = useSpeechSynthesis();
+  const { speak, stop, isSupported: speechSynthesisSupported } = useSpeechSynthesis();
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const { startListening, stopListening } = useSpeechRecognition({
+  
+  const { startListening, stopListening, isSupported: speechRecognitionSupported } = useSpeechRecognition({
     onResult: (transcript) => {
       setInputMessage(transcript);
       setIsListening(false);
@@ -61,6 +63,11 @@ const HomepageChatbot: React.FC = () => {
       });
     }
   });
+
+  // Update voice availability when support status changes
+  useEffect(() => {
+    setIsVoiceAvailable(speechRecognitionSupported === true);
+  }, [speechRecognitionSupported]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -99,7 +106,7 @@ const HomepageChatbot: React.FC = () => {
         throw new Error(response.error.message);
       }
 
-      const { message, venues, error } = response.data;
+      const { message, venues, error } = response.data || {};
 
       if (error) {
         console.error('Error from chatbot API:', error);
@@ -108,7 +115,7 @@ const HomepageChatbot: React.FC = () => {
       const botMessage = {
         id: generateId(),
         sender: 'bot' as const,
-        content: message,
+        content: message || "I'm sorry, I couldn't process your request.",
         timestamp: new Date()
       };
 
@@ -149,6 +156,14 @@ const HomepageChatbot: React.FC = () => {
   };
 
   const handleSpeak = (text: string) => {
+    if (!speechSynthesisSupported) {
+      toast({
+        title: "Speech Synthesis Not Available",
+        description: "Your browser does not support speech synthesis."
+      });
+      return;
+    }
+    
     stop();
     speak(
       text, 
@@ -158,8 +173,19 @@ const HomepageChatbot: React.FC = () => {
   };
 
   const handleStartListening = () => {
+    if (!speechRecognitionSupported) {
+      toast({
+        title: "Speech Recognition Not Available",
+        description: "Your browser does not support speech recognition."
+      });
+      return;
+    }
+    
     setIsListening(true);
-    startListening();
+    startListening().catch(() => {
+      setIsListening(false);
+      setIsVoiceAvailable(false);
+    });
   };
 
   const handleStopListening = () => {
@@ -228,7 +254,7 @@ const HomepageChatbot: React.FC = () => {
                       : 'bg-findvenue-card-bg border border-findvenue-border flex items-center gap-2'
                   }`}>
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    {message.sender === "bot" && isVoiceAvailable && (
+                    {message.sender === "bot" && speechSynthesisSupported && (
                       <Button size="icon" variant="ghost" onClick={() => handleSpeak(message.content)} className="ml-1 h-7 w-7 flex-shrink-0">
                         <Volume2 className="h-4 w-4 text-findvenue cursor-pointer" />
                       </Button>
@@ -323,20 +349,22 @@ const HomepageChatbot: React.FC = () => {
                   <Send className="h-4 w-4" />
                 )}
               </Button>
-              <Button
-                onClick={isListening ? handleStopListening : handleStartListening}
-                className={`ml-1 ${isListening ? 'bg-findvenue' : 'bg-findvenue-surface/80'} border border-findvenue/30 hover:bg-findvenue/20 transition duration-150 ${isListening ? "animate-pulse" : ""}`}
-                disabled={chatbotState === 'thinking' || !isVoiceAvailable}
-                size="icon"
-                aria-label="Voice input"
-              >
-                <Mic className="h-4 w-4" />
-              </Button>
+              {speechRecognitionSupported !== false && (
+                <Button
+                  onClick={isListening ? handleStopListening : handleStartListening}
+                  className={`ml-1 ${isListening ? 'bg-findvenue' : 'bg-findvenue-surface/80'} border border-findvenue/30 hover:bg-findvenue/20 transition duration-150 ${isListening ? "animate-pulse" : ""}`}
+                  disabled={chatbotState === 'thinking'}
+                  size="icon"
+                  aria-label="Voice input"
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              )}
             </div>
             <p className="text-xs text-findvenue-text-muted mt-2">
               Ask me about venues, events, pricing, or locations!
-              { !isVoiceAvailable && (
-                <span className="text-warning ml-2">Voice features not supported in your browser.</span>
+              {speechRecognitionSupported === false && (
+                <span className="text-yellow-500 ml-2">Voice features not supported in your browser.</span>
               )}
             </p>
             {isListening && (
