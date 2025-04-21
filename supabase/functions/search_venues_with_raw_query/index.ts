@@ -23,8 +23,7 @@ serve(async (req) => {
       )
     }
     
-    // Use safer approach by creating a PostgreSQL function to execute
-    // this gives us better control over what's executed
+    // Use safer approach with simple search
     const { data, error } = await supabase
       .from('venues')
       .select('*')
@@ -38,6 +37,7 @@ serve(async (req) => {
     )
     
   } catch (error) {
+    console.error('Error in search_venues_with_raw_query:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

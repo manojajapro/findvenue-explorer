@@ -50,139 +50,156 @@ serve(async (req) => {
       Return just the SQL query, nothing else.
     `
 
-    // Get search query from OpenAI
-    const searchQueryResponse = await openai.createChatCompletion({
-      model: 'gpt-4',
-      messages: [
-        { role: 'system', content: 'You are a SQL expert who converts natural language to SQL queries.' },
-        { role: 'user', content: searchQueryPrompt }
-      ],
-      temperature: 0.2,
-    })
-
-    const sqlQuery = searchQueryResponse.data.choices[0].message?.content?.trim()
-    console.log('Generated SQL query:', sqlQuery)
-
-    // Execute the SQL query (with safety checks)
-    let venues = []
-    let error = null
-
     try {
-      if (sqlQuery && !sqlQuery.toLowerCase().includes('delete') && !sqlQuery.toLowerCase().includes('update') && !sqlQuery.toLowerCase().includes('insert')) {
-        const { data, error: queryError } = await supabase.rpc('search_venues_with_raw_query', {
-          query_text: sqlQuery
-        })
+      // Get search query from OpenAI
+      const searchQueryResponse = await openai.createChatCompletion({
+        model: 'gpt-4o-mini',  // Updated to a supported model
+        messages: [
+          { role: 'system', content: 'You are a SQL expert who converts natural language to SQL queries.' },
+          { role: 'user', content: searchQueryPrompt }
+        ],
+        temperature: 0.2,
+      })
 
-        if (queryError) {
-          throw queryError
+      const sqlQuery = searchQueryResponse.data.choices[0].message?.content?.trim()
+      console.log('Generated SQL query:', sqlQuery)
+
+      // Execute the SQL query (with safety checks)
+      let venues = []
+      let error = null
+
+      try {
+        if (sqlQuery && !sqlQuery.toLowerCase().includes('delete') && !sqlQuery.toLowerCase().includes('update') && !sqlQuery.toLowerCase().includes('insert')) {
+          const { data, error: queryError } = await supabase.rpc('search_venues_with_raw_query', {
+            query_text: sqlQuery
+          })
+
+          if (queryError) {
+            throw queryError
+          }
+
+          venues = data || []
+        } else {
+          // Fallback to simple search if SQL generation fails or contains unsafe operations
+          const { data, error: queryError } = await supabase
+            .from('venues')
+            .select('*')
+            .textSearch('name', query.split(' ').join(' & '))
+            .limit(5)
+
+          if (queryError) {
+            throw queryError
+          }
+
+          venues = data || []
         }
-
-        venues = data || []
-      } else {
-        // Fallback to simple search if SQL generation fails or contains unsafe operations
-        const { data, error: queryError } = await supabase
+      } catch (e) {
+        console.error('Error executing query:', e)
+        error = e.message
+        // Fallback to simple search if custom query fails
+        const { data } = await supabase
           .from('venues')
           .select('*')
-          .textSearch('name', query.split(' ').join(' & '))
           .limit(5)
-
-        if (queryError) {
-          throw queryError
-        }
 
         venues = data || []
       }
-    } catch (e) {
-      console.error('Error executing query:', e)
-      error = e.message
-      // Fallback to simple search if custom query fails
-      const { data } = await supabase
-        .from('venues')
-        .select('*')
-        .limit(5)
 
-      venues = data || []
-    }
+      console.log(`Found ${venues.length} venues`)
 
-    console.log(`Found ${venues.length} venues`)
+      // Transform venues data to match frontend expected format
+      const transformedVenues = venues.map(venue => {
+        return {
+          id: venue.id,
+          name: venue.name,
+          description: venue.description,
+          imageUrl: venue.image_url,
+          galleryImages: venue.gallery_images,
+          city: venue.city_name,
+          pricing: {
+            startingPrice: venue.starting_price || 0,
+            currency: venue.currency || 'SAR'
+          },
+          // Keep these original fields to maintain compatibility with existing database structure
+          image_url: venue.image_url,
+          gallery_images: venue.gallery_images,
+          city_name: venue.city_name,
+          starting_price: venue.starting_price,
+          currency: venue.currency
+        };
+      });
 
-    // Transform venues data to match frontend expected format
-    const transformedVenues = venues.map(venue => {
-      return {
+      // Format venue data for OpenAI consumption
+      const venueData = venues.map(venue => ({
         id: venue.id,
         name: venue.name,
-        description: venue.description,
-        imageUrl: venue.image_url,
-        galleryImages: venue.gallery_images,
+        description: venue.description?.substring(0, 100) + (venue.description?.length > 100 ? '...' : '') || 'No description',
         city: venue.city_name,
-        pricing: {
-          startingPrice: venue.starting_price || 0,
-          currency: venue.currency || 'SAR'
-        },
-        // Keep these original fields to maintain compatibility with existing database structure
-        image_url: venue.image_url,
-        gallery_images: venue.gallery_images,
-        city_name: venue.city_name,
-        starting_price: venue.starting_price,
-        currency: venue.currency
-      };
-    });
+        category: Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.category_name,
+        capacity: `${venue.min_capacity || 0} - ${venue.max_capacity || 0} guests`,
+        price: `${venue.starting_price || 0} ${venue.currency || 'SAR'}${venue.price_per_person ? ' per person' : ''}`,
+        amenities: Array.isArray(venue.amenities) ? venue.amenities.join(', ') : venue.amenities,
+        type: venue.type || 'Venue'
+      }))
 
-    // Format venue data for OpenAI consumption
-    const venueData = venues.map(venue => ({
-      id: venue.id,
-      name: venue.name,
-      description: venue.description?.substring(0, 100) + (venue.description?.length > 100 ? '...' : '') || 'No description',
-      city: venue.city_name,
-      category: Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.category_name,
-      capacity: `${venue.min_capacity || 0} - ${venue.max_capacity || 0} guests`,
-      price: `${venue.starting_price || 0} ${venue.currency || 'SAR'}${venue.price_per_person ? ' per person' : ''}`,
-      amenities: Array.isArray(venue.amenities) ? venue.amenities.join(', ') : venue.amenities,
-      type: venue.type || 'Venue'
-    }))
+      // Generate chatbot response based on query and venue data
+      const promptContent = `
+        You are a helpful venue search assistant for a venue booking platform. 
+        The user is looking for venues with this query: "${query}"
+        
+        ${venues.length > 0 ? `Here are some venues I found:
+        ${JSON.stringify(venueData, null, 2)}` : 'I could not find any venues matching your query.'}
+        
+        Provide a helpful response that:
+        1. Acknowledges the user's query
+        2. Summarizes the search results in a natural way (if any)
+        3. Suggests some options or alternatives if appropriate
+        4. Provides a friendly next step (e.g., "Would you like more information about any of these venues?")
+        
+        Keep your response conversational and helpful. If no venues were found, suggest the user try different search terms.
+        The response should be in the tone of a helpful concierge.
+      `
 
-    // Generate chatbot response based on query and venue data
-    const promptContent = `
-      You are a helpful venue search assistant for a venue booking platform. 
-      The user is looking for venues with this query: "${query}"
-      
-      ${venues.length > 0 ? `Here are some venues I found:
-      ${JSON.stringify(venueData, null, 2)}` : 'I could not find any venues matching your query.'}
-      
-      Provide a helpful response that:
-      1. Acknowledges the user's query
-      2. Summarizes the search results in a natural way (if any)
-      3. Suggests some options or alternatives if appropriate
-      4. Provides a friendly next step (e.g., "Would you like more information about any of these venues?")
-      
-      Keep your response conversational and helpful. If no venues were found, suggest the user try different search terms.
-      The response should be in the tone of a helpful concierge.
-    `
+      const completion = await openai.createChatCompletion({
+        model: 'gpt-4o-mini',  // Updated to a supported model
+        messages: [
+          { role: 'system', content: 'You are a helpful venue search assistant for a venue booking platform.' },
+          { role: 'user', content: promptContent }
+        ],
+        temperature: 0.7,
+      })
 
-    const completion = await openai.createChatCompletion({
-      model: 'gpt-4',
-      messages: [
-        { role: 'system', content: 'You are a helpful venue search assistant for a venue booking platform.' },
-        { role: 'user', content: promptContent }
-      ],
-      temperature: 0.7,
-    })
+      const chatResponse = completion.data.choices[0].message?.content || 'Sorry, I could not process your request at this time.'
 
-    const chatResponse = completion.data.choices[0].message?.content || 'Sorry, I could not process your request at this time.'
-
-    return new Response(
-      JSON.stringify({
-        message: chatResponse,
-        venues: transformedVenues.slice(0, 3), // Return top 3 venues
-        error
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
+      return new Response(
+        JSON.stringify({
+          message: chatResponse,
+          venues: transformedVenues.slice(0, 3), // Return top 3 venues
+          error
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
         }
-      }
-    )
+      )
+    } catch (openAiError) {
+      console.error('OpenAI API error:', openAiError)
+      return new Response(
+        JSON.stringify({
+          message: "I'm having trouble connecting to my assistant service right now. Please try again later.",
+          venues: [],
+          error: openAiError.message
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
   } catch (error) {
     console.error('Error processing request:', error)
 
