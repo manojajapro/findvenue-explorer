@@ -46,6 +46,7 @@ const HomepageChatbot: React.FC = () => {
   const [isVoiceAvailable, setIsVoiceAvailable] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [lastBotShouldSpeak, setLastBotShouldSpeak] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -101,6 +102,14 @@ const HomepageChatbot: React.FC = () => {
   useEffect(() => {
     setIsVoiceAvailable(speechRecognitionSupported === true);
   }, [speechRecognitionSupported]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("venue_attributes", JSON.stringify(venueAttributes));
+    } catch (e) {
+      console.warn('Could not save venue attributes to localStorage', e);
+    }
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -337,6 +346,11 @@ const HomepageChatbot: React.FC = () => {
     return null;
   };
 
+  const isMaxCapacityQuery = (query: string) => {
+    return /max(imum)? (capacity|guest|people|guests|persons)/i.test(query) ||
+           /largest venue|biggest venue|most guests/i.test(query);
+  };
+
   const handleSendMessage = async (customMessage?: string, options?: { viaMic?: boolean }) => {
     const messageText = customMessage || inputMessage;
     
@@ -352,6 +366,8 @@ const HomepageChatbot: React.FC = () => {
     setMessages(prevMessages => [...prevMessages, userMessage]);
     setInputMessage('');
     setChatbotState('thinking');
+
+    const isVoiceInput = !!options?.viaMic;
 
     try {
       if (isGreeting(messageText)) {
@@ -373,6 +389,7 @@ const HomepageChatbot: React.FC = () => {
         };
         
         setMessages(prevMessages => [...prevMessages, botMessage]);
+        setLastBotShouldSpeak(isVoiceInput);
         setChatbotState('idle');
         setSuggestedVenues([]);
         return;
@@ -389,6 +406,7 @@ const HomepageChatbot: React.FC = () => {
           };
           
           setMessages(prevMessages => [...prevMessages, botMessage]);
+          setLastBotShouldSpeak(isVoiceInput);
           setChatbotState('idle');
           setSuggestedVenues([]);
           return;
@@ -480,7 +498,7 @@ const HomepageChatbot: React.FC = () => {
       };
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
-      setLastBotShouldSpeak(!!speak);
+      setLastBotShouldSpeak(isVoiceInput || (isSpeakerOn && !isVoiceInput));
 
       if (venues && Array.isArray(venues) && venues.length > 0 && isVenueQuery(messageText)) {
         const filteredVenues = getMatchingVenues(venues, messageText);
@@ -707,14 +725,30 @@ const HomepageChatbot: React.FC = () => {
               <Bot className="h-5 w-5 text-findvenue" />
               <h2 className="text-white font-medium">Venue Assistant</h2>
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={clearChatHistory} 
-              className="text-xs text-gray-400 hover:text-white"
-            >
-              Clear Chat
-            </Button>
+            <div className="flex gap-2 items-center">
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-400">Speaker</span>
+                <Button
+                  size="icon"
+                  variant={isSpeakerOn ? "default" : "outline"}
+                  className={isSpeakerOn ? "bg-blue-700" : ""}
+                  title={isSpeakerOn ? "Speaker on" : "Speaker off"}
+                  aria-pressed={isSpeakerOn}
+                  onClick={() => setIsSpeakerOn(on => !on)}
+                  tabIndex={0}
+                >
+                  <Volume2 className={`h-4 w-4 ${isSpeakerOn ? "text-findvenue" : "text-gray-400"}`} />
+                </Button>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={clearChatHistory} 
+                className="text-xs text-gray-400 hover:text-white"
+              >
+                Clear Chat
+              </Button>
+            </div>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
