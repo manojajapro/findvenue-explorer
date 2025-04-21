@@ -1,10 +1,8 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { Bot, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import VenueUnifiedChatAssistant from '@/components/chat/VenueUnifiedChatAssistant';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface VenueAIAssistantsProps {
@@ -49,10 +47,6 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
               <X className="h-4 w-4 text-gray-400" />
             </Button>
           </div>
-          <VenueUnifiedChatAssistant 
-            venue={venue} 
-            onClose={() => setIsOpen(false)} 
-          />
         </DialogContent>
       </Dialog>
     </>
