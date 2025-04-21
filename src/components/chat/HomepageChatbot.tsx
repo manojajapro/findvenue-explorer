@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -35,7 +34,7 @@ const HomepageChatbot: React.FC = () => {
     {
       id: '0',
       sender: 'bot',
-      content: "Hello! I'm your venue assistant. I can help you find the perfect venue for your event. What type of venue are you looking for?",
+      content: "Hello! I'm your venue assistant. I can help you find the perfect venue. What type of venue are you looking for?",
       timestamp: new Date()
     }
   ]);
@@ -371,13 +370,14 @@ const HomepageChatbot: React.FC = () => {
     return '/placeholder.svg';
   };
 
-  // Simplified venue card rendering
+  // Simplified venue card rendering with proper type checking
   const renderVenueCard = (venue: Venue | ExtendedVenue) => {
-    const pricing = venue.pricing || {};
+    const pricing = venue.pricing || { startingPrice: 0, currency: 'SAR', pricePerPerson: undefined };
     const capacity = venue.capacity || { min: 0, max: 0 };
     const amenities = venue.amenities || [];
-    const startingPrice = pricing.startingPrice || (venue as any).starting_price || 0;
-    const currency = pricing.currency || (venue as any).currency || 'SAR';
+    
+    const startingPrice = pricing.startingPrice || venue.starting_price || 0;
+    const currency = pricing.currency || venue.currency || 'SAR';
     const isPricePerPerson = !!pricing.pricePerPerson || !!(venue as ExtendedVenue).price_per_person;
     
     return (

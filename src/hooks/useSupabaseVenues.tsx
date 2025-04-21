@@ -64,6 +64,7 @@ export interface Venue {
   gallery_images?: string[];
   city_name?: string;
   starting_price?: number;
+  price_per_person?: number;
   currency?: string;
 }
 
