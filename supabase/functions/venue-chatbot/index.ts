@@ -63,25 +63,49 @@ serve(async (req) => {
         // Try to extract city name from the query
         let cityFilter = '';
         
-        const commonCities = ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina', 'abha', 'taif'];
+        const commonCities = [
+          'riyadh', 'jeddah', 'dammam', 'mecca', 'medina', 'abha', 'taif', 
+          'khamis', 'khamis mushait', 'khamismushait', 'khamis mushyat', 'khamis-mushait'
+        ];
+        
         for (const city of commonCities) {
           if (query.toLowerCase().includes(city)) {
             cityFilter = city;
+            // Special case for Khamis variants
+            if (city === 'khamis' || city.includes('khamis')) {
+              cityFilter = 'khamis mushait';
+            }
             break;
           }
         }
         
         // Use a simple search to get some venues
-        const { data } = cityFilter ? 
-          await supabase
+        let data;
+        let queryError;
+        
+        if (cityFilter) {
+          console.log(`Searching for venues in city: ${cityFilter}`);
+          const result = await supabase
             .from('venues')
             .select('*')
             .ilike('city_name', `%${cityFilter}%`)
-            .limit(5) :
-          await supabase
+            .limit(5);
+          
+          data = result.data;
+          queryError = result.error;
+        } else {
+          const result = await supabase
             .from('venues')
             .select('*')
             .limit(5);
+          
+          data = result.data;
+          queryError = result.error;
+        }
+
+        if (queryError) {
+          throw queryError;
+        }
 
         const venues = (data || []) as VenueSearchResult[];
         
@@ -100,7 +124,10 @@ serve(async (req) => {
           }
         }).slice(0, 5);
 
-        const cityName = cityFilter ? cityFilter.charAt(0).toUpperCase() + cityFilter.slice(1) : '';
+        const cityName = cityFilter ? 
+          (cityFilter === 'khamis mushait' ? 'Khamis Mushait' : 
+          cityFilter.charAt(0).toUpperCase() + cityFilter.slice(1)) : '';
+          
         const message = venues.length > 0
           ? `Here are ${cityFilter ? `${cityName} venues` : 'some venues'} I found for you. Click any venue for details.`
           : `I couldn't find any venues ${cityFilter ? `in ${cityName}` : ''}. Try another search.`;
@@ -165,6 +192,11 @@ serve(async (req) => {
       min_capacity, max_capacity, starting_price, price_per_person, amenities, type, etc.
       Category names are stored as arrays and can include values like: "Graduation party", "Training Course", "Birthday", "Business Meeting", etc.
       Amenities are stored as arrays and can include values like: "WiFi", "Parking", "Catering", "Fine Dining", etc.
+      
+      If the query includes a city name, make sure to use ILIKE with wildcards to catch partial matches.
+      The query might contain city names like: Riyadh, Jeddah, Dammam, Mecca, Medina, Abha, Taif, Khamis, Khamis Mushait.
+      For Khamis or Khamis Mushait, use 'city_name ILIKE %khamis%'.
+      
       Return just the SQL query, nothing else.
       `
 
@@ -215,17 +247,32 @@ serve(async (req) => {
 
             venues = (data || []) as VenueSearchResult[];
           } else {
-            const { data, error: queryError } = await supabase
-              .from('venues')
-              .select('*')
-              .textSearch('name', query.split(' ').join(' & '))
-              .limit(5);
+            // Special handling for Khamis/Khamis Mushait
+            if (query.toLowerCase().includes('khamis')) {
+              const { data, error: queryError } = await supabase
+                .from('venues')
+                .select('*')
+                .ilike('city_name', '%khamis%')
+                .limit(5);
+              
+              if (queryError) {
+                throw queryError;
+              }
+              
+              venues = (data || []) as VenueSearchResult[];
+            } else {
+              const { data, error: queryError } = await supabase
+                .from('venues')
+                .select('*')
+                .textSearch('name', query.split(' ').join(' & '))
+                .limit(5);
 
-            if (queryError) {
-              throw queryError;
+              if (queryError) {
+                throw queryError;
+              }
+
+              venues = (data || []) as VenueSearchResult[];
             }
-
-            venues = (data || []) as VenueSearchResult[];
           }
         } catch (e) {
           console.error('Error executing query:', e);
@@ -310,13 +357,29 @@ serve(async (req) => {
       } catch (openAiError) {
         console.error('OpenAI API error:', openAiError);
         
-        // Fallback to basic venues when OpenAI fails
-        const { data } = await supabase
-          .from('venues')
-          .select('*')
-          .limit(5);
+        // Special handling for Khamis/Khamis Mushait search
+        let venues: VenueSearchResult[] = [];
+        if (query.toLowerCase().includes('khamis')) {
+          const { data, error: queryError } = await supabase
+            .from('venues')
+            .select('*')
+            .ilike('city_name', '%khamis%')
+            .limit(5);
+          
+          if (!queryError) {
+            venues = (data || []) as VenueSearchResult[];
+          }
+        }
+        
+        // If no Khamis venues or error, fallback to basic venues
+        if (venues.length === 0) {
+          const { data } = await supabase
+            .from('venues')
+            .select('*')
+            .limit(5);
 
-        const venues = (data || []) as VenueSearchResult[];
+          venues = (data || []) as VenueSearchResult[];
+        }
         
         const venueDetailLinks = venues.map((venue) => {
           return {
@@ -333,8 +396,12 @@ serve(async (req) => {
           }
         }).slice(0, 5);
         
+        const message = query.toLowerCase().includes('khamis') && venues.length > 0 
+          ? "Here are venues in Khamis Mushait. Click on any venue to view full details."
+          : "Here are some venues that might interest you. Click on any venue to view full details.";
+        
         return new Response(JSON.stringify({
-          message: "Here are some venues that might interest you. Click on any venue to view full details.",
+          message,
           venues: venueDetailLinks,
           error: openAiError.message || "Error processing with AI",
           speak: viaMic,
