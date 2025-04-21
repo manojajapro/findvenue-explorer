@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import HeroSection from '@/components/hero/HeroSection';
@@ -10,6 +9,7 @@ import GlobalVenues from '@/components/global/GlobalVenues';
 import AdviceSection from '@/components/advice/AdviceSection';
 import { useSearch } from '@/hooks/useSearch';
 import HomePageMap from '@/components/map/HomePageMap';
+import HomepageChatbot from '@/components/chat/HomepageChatbot';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -20,7 +20,6 @@ const Index = () => {
   
   const hasFilters = Object.keys(filters).length > 0;
   
-  // Update active view when searchParams changes
   useEffect(() => {
     if (searchParams.has('view')) {
       setActiveView(searchParams.get('view'));
@@ -29,37 +28,31 @@ const Index = () => {
     }
   }, [searchParams]);
   
-  // Redirect to venues page with map view when search filters are applied
   useEffect(() => {
     if (hasFilters) {
       console.log('Filters detected, redirecting to venues page:', filters);
       const currentParams = new URLSearchParams(searchParams);
       
-      // Handle event type search - map it to either category or search parameter
       if (currentParams.has('eventType')) {
         const eventType = currentParams.get('eventType') || '';
-        // If it's a search term rather than a specific category ID, set it as search
         if (!eventType.match(/^[a-z0-9-_]+$/)) {
           currentParams.set('search', eventType);
           currentParams.delete('eventType');
         }
       }
       
-      // If there's a location parameter, map it to search
       if (currentParams.has('location')) {
         const location = currentParams.get('location') || '';
         currentParams.set('search', location);
         currentParams.delete('location');
       }
       
-      // Set the view to map
       currentParams.set('view', 'map');
       
       navigate(`/venues?${currentParams.toString()}`);
     }
   }, [hasFilters, searchParams, navigate]);
 
-  // Show map when search is performed in hero section
   useEffect(() => {
     const showMapParam = searchParams.get('showMap');
     setShowMap(showMapParam === 'true');
@@ -105,6 +98,7 @@ const Index = () => {
   
   return (
     <>
+      <HomepageChatbot />
       <HeroSection />
       
       <div id="find-venues-map" className="container mx-auto px-4 py-8">
