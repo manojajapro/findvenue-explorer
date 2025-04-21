@@ -1,9 +1,10 @@
-
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Mic, MicOff, X, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 const VoiceAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -130,10 +131,30 @@ const VoiceAssistant = () => {
       setIsSpeaking(false);
     }
   };
+
+  const { speak, stop } = useSpeechSynthesis();
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Enhanced: allow direct browser speech synthesis for responses
+  const speakResponse = (text: string) => {
+    speak(text, () => setIsSpeaking(true), () => setIsSpeaking(false));
+  };
+
+  // mic for input
+  const [micError, setMicError] = useState<string | null>(null);
+  const [micActive, setMicActive] = useState(false);
+  const { startListening, stopListening } = useSpeechRecognition({
+    onResult: (t) => {
+      setTranscript(t);
+      handleVoiceCommand(t);
+      setMicActive(false);
+    },
+    onEnd: () => setMicActive(false),
+    onError: (err) => { setMicError(err); setMicActive(false); }
+  });
   
   return (
     <>
-      {/* Voice assistant button */}
       <div className="fixed bottom-6 left-6 z-50">
         <Button
           className={cn(
@@ -141,6 +162,7 @@ const VoiceAssistant = () => {
             isOpen ? "bg-findvenue-dark" : "bg-findvenue"
           )}
           onClick={() => setIsOpen(!isOpen)}
+          aria-label={isOpen ? "Close Voice Assistant" : "Open Voice Assistant"}
         >
           {isOpen ? (
             <X className="h-6 w-6" />
@@ -150,7 +172,7 @@ const VoiceAssistant = () => {
         </Button>
       </div>
       
-      {/* Voice assistant panel */}
+      {/* Panel */}
       <div
         className={cn(
           "fixed bottom-24 left-6 z-50 w-full max-w-md transition-all duration-500 transform",
@@ -169,14 +191,14 @@ const VoiceAssistant = () => {
               size="icon" 
               className="text-white hover:bg-findvenue-dark"
               onClick={() => setIsOpen(false)}
+              aria-label="Close"
             >
               <X className="h-5 w-5" />
             </Button>
           </div>
-          
-          {/* Voice assistant content */}
+          {/* --- Main Content --- */}
           <div className="p-6 flex flex-col items-center">
-            {isListening ? (
+            {(isListening || micActive) ? (
               <>
                 <div className="w-20 h-20 rounded-full bg-findvenue-surface flex items-center justify-center mb-6 relative">
                   <div className="absolute w-full h-full rounded-full bg-findvenue/20 animate-ping"></div>
@@ -189,18 +211,20 @@ const VoiceAssistant = () => {
                 <Button 
                   variant="outline" 
                   className="border-findvenue-gold text-findvenue-gold hover:bg-findvenue-gold/10"
-                  onClick={stopListening}
+                  onClick={() => { stopListening(); setMicActive(false); }}
                 >
                   <MicOff className="h-4 w-4 mr-2" />
                   Stop Listening
                 </Button>
+                {micError && (
+                  <div className="mt-2 text-sm text-red-400">{micError}</div>
+                )}
               </>
             ) : (
               <>
                 <div className="w-20 h-20 rounded-full bg-findvenue-surface flex items-center justify-center mb-6">
                   <Mic className="h-8 w-8 text-findvenue" />
                 </div>
-                
                 {transcript && (
                   <div className="w-full mb-4">
                     <p className="text-sm text-findvenue-text-muted mb-2">You said:</p>
@@ -209,37 +233,47 @@ const VoiceAssistant = () => {
                     </div>
                   </div>
                 )}
-                
                 {response && (
-                  <div className="w-full mb-6">
-                    <p className="text-sm text-findvenue-text-muted mb-2">Assistant:</p>
-                    <div className="p-3 bg-findvenue/10 rounded-lg text-findvenue-text">
-                      {response}
+                  <div className="w-full mb-3 flex flex-row">
+                    <div className="flex-1 mb-3">
+                      <p className="text-sm text-findvenue-text-muted mb-2">Assistant:</p>
+                      <div className="p-3 bg-findvenue/10 rounded-lg text-findvenue-text">
+                        {response}
+                      </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Hear response"
+                      className="ml-2 h-8 w-8"
+                      onClick={() => speakResponse(response)}
+                    >
+                      <Volume2 className="h-5 w-5 text-findvenue" />
+                    </Button>
                   </div>
                 )}
-                
                 {isSpeaking ? (
                   <Button 
                     className="bg-findvenue-dark hover:bg-findvenue-dark/80"
-                    onClick={stopSpeaking}
+                    onClick={stop}
                   >
                     <X className="h-4 w-4 mr-2" />
                     Stop Speaking
                   </Button>
                 ) : (
-                  <Button 
-                    className="bg-findvenue hover:bg-findvenue-dark"
-                    onClick={startListening}
-                  >
-                    <Mic className="h-4 w-4 mr-2" />
-                    Start Speaking
-                  </Button>
+                  <>
+                    <Button 
+                      className="bg-findvenue hover:bg-findvenue-dark mr-2"
+                      onClick={startListening}
+                    >
+                      <Mic className="h-4 w-4 mr-2" />
+                      Start Speaking
+                    </Button>
+                  </>
                 )}
               </>
             )}
           </div>
-          
           {/* Tips */}
           <div className="p-4 border-t border-white/10 bg-findvenue-dark-bg/75">
             <p className="text-xs text-findvenue-text-muted text-center">

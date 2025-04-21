@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,9 @@ import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Venue } from '@/hooks/useSupabaseVenues';
+import { Volume2, Mic } from "lucide-react";
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 type Message = {
   id: string;
@@ -33,6 +35,10 @@ const HomepageChatbot: React.FC = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [chatbotState, setChatbotState] = useState<ChatbotState>('idle');
   const [suggestedVenues, setSuggestedVenues] = useState<Venue[]>([]);
+  const [isVoiceAvailable, setIsVoiceAvailable] = useState(true);
+  const { speak, stop } = useSpeechSynthesis();
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -86,7 +92,6 @@ const HomepageChatbot: React.FC = () => {
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
       
-      // Set suggested venues if any
       if (venues && venues.length > 0) {
         setSuggestedVenues(venues);
       } else {
@@ -120,6 +125,28 @@ const HomepageChatbot: React.FC = () => {
     navigate(`/venue/${venueId}`);
     setIsOpen(false);
   };
+
+  const handleSpeak = (text: string) => {
+    stop();
+    setIsSpeaking(true);
+    speak(text, () => setIsSpeaking(true), () => setIsSpeaking(false));
+  };
+
+  const onMicResult = (transcript: string) => {
+    setInputMessage(transcript);
+    setIsListening(false);
+  };
+  const onMicEnd = () => setIsListening(false);
+  const onMicError = (err: string) => {
+    setIsListening(false);
+    setIsVoiceAvailable(false);
+    alert("Speech recognition not supported or not permitted in your browser.");
+  };
+  const { startListening, stopListening } = useSpeechRecognition({
+    onResult: onMicResult,
+    onEnd: onMicEnd,
+    onError: onMicError,
+  });
 
   return (
     <>
@@ -179,9 +206,14 @@ const HomepageChatbot: React.FC = () => {
                   <div className={`rounded-lg px-4 py-2 ${
                     message.sender === 'user'
                       ? 'bg-findvenue text-white'
-                      : 'bg-findvenue-card-bg border border-findvenue-border'
+                      : 'bg-findvenue-card-bg border border-findvenue-border flex items-center gap-2'
                   }`}>
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    {message.sender === "bot" && isVoiceAvailable && (
+                      <Button size="icon" variant="ghost" onClick={() => handleSpeak(message.content)} className="ml-1 h-7 w-7 flex-shrink-0">
+                        <Volume2 className="h-4 w-4 text-findvenue cursor-pointer" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -250,19 +282,21 @@ const HomepageChatbot: React.FC = () => {
           </div>
           
           <div className="p-4 border-t border-white/10">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Input
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Type your question..."
+                placeholder="Type your question or use the mic..."
                 className="bg-findvenue-surface/50 border-white/10"
                 onKeyDown={handleKeyDown}
-                disabled={chatbotState === 'thinking'}
+                disabled={chatbotState === 'thinking' || isListening}
+                aria-label="Chat message input"
               />
               <Button 
                 onClick={handleSendMessage}
                 disabled={inputMessage.trim() === '' || chatbotState === 'thinking'}
                 className="bg-findvenue hover:bg-findvenue-dark"
+                aria-label="Send"
               >
                 {chatbotState === 'thinking' ? (
                   <div className="h-4 w-4 border-2 border-r-transparent border-white rounded-full animate-spin" />
@@ -270,10 +304,39 @@ const HomepageChatbot: React.FC = () => {
                   <Send className="h-4 w-4" />
                 )}
               </Button>
+              <Button
+                onClick={() => {
+                  setIsListening(true); 
+                  startListening();
+                }}
+                className={`ml-1 bg-findvenue-surface/80 border border-findvenue/30 hover:bg-findvenue/20 transition duration-150 ${isListening ? "animate-pulse" : ""}`}
+                disabled={chatbotState === 'thinking' || isListening || !isVoiceAvailable}
+                size="icon"
+                aria-label="Voice input"
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
             </div>
             <p className="text-xs text-findvenue-text-muted mt-2">
               Ask me about venues, events, pricing, or locations!
+              { !isVoiceAvailable && (
+                <span className="text-warning ml-2">Voice features not supported in your browser.</span>
+              )}
             </p>
+            {isListening && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-blue-300">
+                <Mic className="w-4 h-4 animate-pulse" />
+                Listening... Speak now!
+                <Button variant="outline" size="sm" className="ml-2 py-0 px-2" onClick={stopListening}>Stop</Button>
+              </div>
+            )}
+            {isSpeaking && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-green-400">
+                <Volume2 className="w-4 h-4 animate-pulse" />
+                Speaking...
+                <Button variant="outline" size="sm" className="ml-2 py-0 px-2" onClick={stop}>Stop</Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
