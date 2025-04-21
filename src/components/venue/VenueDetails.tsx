@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -457,8 +456,6 @@ const VenueDetails = () => {
           )}
         </div>
       )}
-      
-      {venue && <VenueDetailsChatbot venue={venue} />}
     </div>
   );
 };

@@ -28,6 +28,7 @@ import EditVenue from "./pages/EditVenue";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AuthCallback from "./pages/AuthCallback";
+import HomePageVenueChatbot from "@/components/chat/HomePageVenueChatbot";
 
 const queryClient = new QueryClient();
 
@@ -171,6 +172,7 @@ function AppContent() {
         <Footer />
         <ScrollToTop />
         <RevealOnScroll />
+        <HomePageVenueChatbot />
       </TooltipProvider>
     </div>
   );
