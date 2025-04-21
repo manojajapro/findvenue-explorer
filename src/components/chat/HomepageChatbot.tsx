@@ -23,7 +23,6 @@ type Message = {
 
 type ChatbotState = 'idle' | 'thinking' | 'error';
 
-// Extend the Venue type to handle additional properties that might come from the API
 interface ExtendedVenue extends Venue {
   price_per_person?: number;
 }
@@ -86,14 +85,12 @@ const HomepageChatbot: React.FC = () => {
     return Math.random().toString(36).substring(2, 11);
   };
 
-  // Helper for finding if the query is looking for venues by type/city/etc
   const getVenueSearchCriteria = (query: string) => {
     const keywords = [
       'venue', 'venues', 'wedding', 'conference', 'exhibition',
       'party', 'corporate', 'hall', 'room', 'ballroom', 'beach',
       'hotel', 'private', 'dining', 'training', 'graduation', 'meeting'
     ];
-    // city names from your data
     const cityKeywords = [
       "riyadh", "jeddah", "khobar", "dammam", "mecca", "medina", "abha", "taif", "khamis", "khamis mushait"
     ];
@@ -104,18 +101,15 @@ const HomepageChatbot: React.FC = () => {
     keywords.forEach(k => { if (q.includes(k)) type = k; });
     cityKeywords.forEach(c => { if (q.includes(c)) city = c; });
 
-    // if we find a city/type, use it as a criterion
     if (type || city) {
       return { type, city };
     }
     return null;
   };
 
-  // Filter/search venues based on query and show in chat
   const getMatchingVenues = (venues: Venue[], query: string) => {
     const search = getVenueSearchCriteria(query);
 
-    // if city or type matched
     if (search?.city || search?.type) {
       return venues.filter(v =>
         (search.city && v.city && v.city.toLowerCase().includes(search.city)) ||
@@ -126,7 +120,6 @@ const HomepageChatbot: React.FC = () => {
       );
     }
 
-    // fallback: keyword matches
     return venues.filter(v =>
       v.name?.toLowerCase().includes(query.toLowerCase()) ||
       v.city?.toLowerCase().includes(query.toLowerCase()) ||
@@ -135,33 +128,27 @@ const HomepageChatbot: React.FC = () => {
     );
   };
 
-  // Enhanced: Only show venues for direct venue queries
   const isVenueListQuery = (query: string) => {
     const venueListRegex = /(list|show|top|suggest|recommend|venues?|halls?)/i;
     return venueListRegex.test(query);
   };
 
-  // Enhanced query matching: decide if the query is "venue-related"
   const isVenueQuery = (query: string) => {
     const keywords = [
       "show", "list", "find", "venues", "venue", "top", "best", "suggest", "recommend", "available", "search", "option", "hall", "ballroom", "space",
       "location", "places"
     ];
-    // Also match city names
     const cityKeywords = [
       "riyadh", "jeddah", "khobar", "dammam", "mecca", "medina", "abha", "taif", "khamis", "khamis mushait"
     ];
     const q = query.toLowerCase();
     if (keywords.some(k => q.includes(k))) return true;
     if (cityKeywords.some(c => q.includes(c))) return true;
-    // explicit numbers/top requests like "top 10"
     if (/top ?\d+ venues?/.test(q)) return true;
-    // very basic patterns
     if (/venues? in/.test(q)) return true;
     return false;
   };
 
-  // Function to check if query is a greeting
   const isGreeting = (query: string): boolean => {
     const greetings = [
       'hi', 'hello', 'hey', 'how are you', 'how r u', 'what\'s up', 'whats up',
@@ -176,7 +163,6 @@ const HomepageChatbot: React.FC = () => {
     );
   }
 
-  // Function to check if query is a direct question about attributes
   const isDirectAttributeQuestion = (query: string): boolean => {
     const attributeKeywords = [
       'city', 'cities', 'location', 'list', 'price', 'capacity', 
@@ -186,7 +172,6 @@ const HomepageChatbot: React.FC = () => {
     
     const normalizedQuery = query.toLowerCase();
     
-    // Check if the query appears to be asking about attributes
     return attributeKeywords.some(keyword => normalizedQuery.includes(keyword)) &&
            (normalizedQuery.includes('what') || 
             normalizedQuery.includes('which') || 
@@ -196,42 +181,34 @@ const HomepageChatbot: React.FC = () => {
             normalizedQuery.includes('show me'));
   }
 
-  // Function to get direct answer for attribute questions
   const getDirectAttributeAnswer = (query: string): string | null => {
     const normalizedQuery = query.toLowerCase();
     
-    // List of cities
     if (normalizedQuery.includes('city') || normalizedQuery.includes('cities') || normalizedQuery.includes('locations')) {
       return "The cities with available venues include: Riyadh, Jeddah, Khobar, Dammam, Mecca, Medina, Abha, Taif, and Khamis Mushait.";
     }
     
-    // List of venue types
     if ((normalizedQuery.includes('type') || normalizedQuery.includes('types')) && 
         (normalizedQuery.includes('list') || normalizedQuery.includes('what') || normalizedQuery.includes('show'))) {
       return "Available venue types include: Wedding Halls, Hotel, Hotel Suites, Conference Spaces, Exhibition Halls, Party Venues, and Corporate Events Venues.";
     }
     
-    // List of categories
     if (normalizedQuery.includes('category') || normalizedQuery.includes('categories')) {
       return "Venue categories include: Wedding Venues, Conference Spaces, Exhibition Halls, Party Venues, Corporate Events, Graduation Parties, Training Courses, Birthday Celebrations, and Business Meetings.";
     }
     
-    // About prices
     if (normalizedQuery.includes('price') || normalizedQuery.includes('cost') || normalizedQuery.includes('pricing')) {
       return "Venues are priced based on size, location, and amenities. Prices typically range from 12,000 SAR for small gatherings up to 40,000 SAR for luxury venues. Many venues offer per-person pricing options starting from 150 SAR per guest.";
     }
     
-    // About capacities
     if (normalizedQuery.includes('capacity') || normalizedQuery.includes('how many') || normalizedQuery.includes('people')) {
       return "Our venues can accommodate various group sizes. Small venues host 20-50 guests, medium venues 50-200 guests, and large venues can accommodate up to 800 guests. You can filter venues by your expected guest count.";
     }
     
-    // About amenities
     if (normalizedQuery.includes('amenities') || normalizedQuery.includes('facilities') || normalizedQuery.includes('features')) {
       return "Common venue amenities include WiFi, Parking, Catering, Sound Systems, Lighting, Bridal Suites, AV Equipment, Stage Setups, and Outdoor Spaces. Premium venues may offer Valet Parking, Fine Dining, and Decorative Services.";
     }
-
-    // About venues in general
+    
     if ((normalizedQuery.includes('venue') || normalizedQuery.includes('venues')) && 
         !normalizedQuery.includes('specific') && 
         !normalizedQuery.includes('show') &&
@@ -259,7 +236,6 @@ const HomepageChatbot: React.FC = () => {
     setChatbotState('thinking');
 
     try {
-      // Check if this is a greeting
       if (isGreeting(messageText)) {
         const greetingResponses = [
           "Hello! How can I help you find a venue today?",
@@ -284,31 +260,47 @@ const HomepageChatbot: React.FC = () => {
         return;
       }
       
-      // Check if this is a direct attribute question that we can answer immediately
-      const directAnswer = getDirectAttributeAnswer(messageText);
-      if (directAnswer && isDirectAttributeQuestion(messageText)) {
-        const botMessage = {
-          id: generateId(),
-          sender: 'bot' as const,
-          content: directAnswer,
-          timestamp: new Date()
-        };
-        
-        setMessages(prevMessages => [...prevMessages, botMessage]);
-        setChatbotState('idle');
-        setSuggestedVenues([]); // Clear venues when giving a direct answer
-        return;
+      if (isDirectAttributeQuestion(messageText)) {
+        const directAnswer = getDirectAttributeAnswer(messageText);
+        if (directAnswer) {
+          const botMessage = {
+            id: generateId(),
+            sender: 'bot' as const,
+            content: directAnswer,
+            timestamp: new Date()
+          };
+          
+          setMessages(prevMessages => [...prevMessages, botMessage]);
+          setChatbotState('idle');
+          setSuggestedVenues([]);
+          return;
+        }
       }
 
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error("Request timed out")), 30000)
       );
-      const responsePromise = supabase.functions.invoke('venue-chatbot', {
-        body: { query: messageText, ...(options?.viaMic ? { viaMic: true } : {}) }
-      });
-      const response = await Promise.race([responsePromise, timeoutPromise]);
-      if (response.error) throw new Error(response.error.message || 'Error from chatbot service');
-      if (!response.data) throw new Error('Invalid response format from chatbot service');
+      
+      let response;
+      try {
+        const responsePromise = supabase.functions.invoke('venue-chatbot', {
+          body: { query: messageText, ...(options?.viaMic ? { viaMic: true } : {}) }
+        });
+        response = await Promise.race([responsePromise, timeoutPromise]);
+      } catch (error) {
+        console.error('Error calling venue-chatbot function:', error);
+        throw new Error('Failed to connect to the chatbot service');
+      }
+      
+      if (response.error) {
+        console.error('Error from chatbot API:', response.error);
+        throw new Error(response.error.message || 'Error from chatbot service');
+      }
+      
+      if (!response.data) {
+        console.error('Invalid response format from chatbot service');
+        throw new Error('Invalid response format from chatbot service');
+      }
       
       const { message, venues, error, speak } = response.data;
       if (error) console.error('Error from chatbot API:', error);
@@ -323,13 +315,10 @@ const HomepageChatbot: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, botMessage]);
       setLastBotShouldSpeak(!!speak);
 
-      // Only show venues if the query is truly venue-related
-      if (venues && Array.isArray(venues) && venues.length > 0 && isVenueListQuery(messageText)) {
-        // filter results by query if possible
+      if (venues && Array.isArray(venues) && venues.length > 0 && (isVenueListQuery(messageText) || messageText.toLowerCase().includes('marriage') || messageText.toLowerCase().includes('wedding'))) {
         const filteredVenues = getMatchingVenues(venues, messageText);
         setSuggestedVenues(filteredVenues.slice(0, 10));
       } else {
-        // Clear suggested venues unless another venue-specific query is made
         setSuggestedVenues([]);
       }
       setChatbotState('idle');
@@ -339,7 +328,7 @@ const HomepageChatbot: React.FC = () => {
       const errorMessage = {
         id: generateId(),
         sender: 'bot' as const,
-        content: "I'm sorry, I encountered an error while processing your request. Please try again later.",
+        content: "I'm sorry, I encountered an error while processing your request. The OpenAI API key might be invalid or there was a connection issue. Please try again later.",
         timestamp: new Date()
       };
 
@@ -349,7 +338,7 @@ const HomepageChatbot: React.FC = () => {
       toast({
         variant: "destructive",
         title: "Connection Error",
-        description: "Could not connect to the chatbot service. Please try again later."
+        description: error.message || "Could not connect to the chatbot service. Please try again later."
       });
       
       setTimeout(() => setChatbotState('idle'), 2000);
@@ -440,9 +429,7 @@ const HomepageChatbot: React.FC = () => {
     return '/placeholder.svg';
   };
 
-  // Venue card for chat - simplified and safe checks
   const renderVenueCard = (venue: Venue) => {
-    // Use the first gallery image or a placeholder
     const imageUrl = Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0
       ? venue.gallery_images[0]
       : (Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0
@@ -451,10 +438,6 @@ const HomepageChatbot: React.FC = () => {
 
     const venueName = venue.name || "-";
 
-    // Pick city (not shown but can be included if needed)
-    // const city = venue.city || (venue as any).city_name || "-";
-
-    // Price: prefer starting_price, then price_per_person, else '-'
     let price: string = "-";
     if (typeof (venue as any).starting_price === 'number') {
       price = (venue as any).starting_price?.toLocaleString?.() || String((venue as any).starting_price);
@@ -463,18 +446,15 @@ const HomepageChatbot: React.FC = () => {
     } else if (typeof (venue as any).price_per_person === 'number') {
       price = (venue as any).price_per_person?.toLocaleString?.() || String((venue as any).price_per_person);
     }
-    // Always SAR for this DB
+    
     const currency = (venue as any).currency || (venue.pricing && venue.pricing.currency) || "SAR";
 
-    // Capacity: use min_capacity/max_capacity or .capacity object
     let guests = "-";
     if (typeof (venue as any).min_capacity === 'number' && typeof (venue as any).max_capacity === 'number') {
       guests = `${(venue as any).min_capacity} - ${(venue as any).max_capacity}`;
     } else if (venue.capacity && typeof venue.capacity.min === 'number' && typeof venue.capacity.max === 'number') {
       guests = `${venue.capacity.min} - ${venue.capacity.max}`;
     }
-
-    const detailsUrl = `/venue/${venue.id}`;
 
     return (
       <Card key={venue.id} className="bg-white/90 border p-3 flex gap-3 items-center hover:bg-blue-50 transition cursor-pointer"
@@ -492,15 +472,15 @@ const HomepageChatbot: React.FC = () => {
             {guests}
           </div>
           <Button
-            asChild
             variant="outline"
             size="sm"
             className="mt-1"
-            onClick={e => { e.stopPropagation(); viewVenueDetails(venue.id); }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              viewVenueDetails(venue.id);
+            }}
           >
-            <a href={detailsUrl} tabIndex={-1}>
-              View Details
-            </a>
+            View Details
           </Button>
         </div>
       </Card>
@@ -603,7 +583,7 @@ const HomepageChatbot: React.FC = () => {
             {suggestedVenues.length > 0 && (
               <div className="space-y-2">
                 <Badge variant="outline" className="bg-findvenue/10 text-findvenue mb-2">
-                  Matching Venues
+                  {suggestedVenues.length} Matching Venues
                 </Badge>
                 <div className="space-y-2">
                   {suggestedVenues.map(venue => renderVenueCard(venue))}
