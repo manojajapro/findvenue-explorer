@@ -52,7 +52,7 @@ serve(async (req) => {
 
     // Get search query from OpenAI
     const searchQueryResponse = await openai.createChatCompletion({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4',
       messages: [
         { role: 'system', content: 'You are a SQL expert who converts natural language to SQL queries.' },
         { role: 'user', content: searchQueryPrompt }
@@ -160,7 +160,7 @@ serve(async (req) => {
     `
 
     const completion = await openai.createChatCompletion({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4',
       messages: [
         { role: 'system', content: 'You are a helpful venue search assistant for a venue booking platform.' },
         { role: 'user', content: promptContent }
