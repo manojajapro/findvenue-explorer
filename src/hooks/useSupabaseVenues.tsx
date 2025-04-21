@@ -66,6 +66,8 @@ export interface Venue {
   starting_price?: number;
   price_per_person?: number;
   currency?: string;
+  min_capacity?: number;
+  max_capacity?: number;
 }
 
 export interface VenueFilter {
@@ -78,3 +80,11 @@ export interface VenueFilter {
   capacityRange?: [number, number];
   searchTerm?: string;
 }
+
+// Common attributes for venue matching
+export const venueAttributes = {
+  cities: ["riyadh", "jeddah", "khobar", "dammam", "mecca", "medina", "abha", "taif", "khamis mushait"],
+  eventTypes: ["wedding", "conference", "exhibition", "party", "corporate", "graduation", "training", "birthday", "business meeting"],
+  amenities: ["wifi", "parking", "catering", "sound system", "lighting", "bridal suite", "av equipment", "stage", "outdoor space"],
+  venueTypes: ["hotel", "hall", "ballroom", "beach", "restaurant", "garden", "rooftop"]
+};

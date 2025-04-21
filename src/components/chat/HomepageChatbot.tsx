@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { Venue } from '@/hooks/useSupabaseVenues';
+import { Venue, venueAttributes } from '@/hooks/useSupabaseVenues';
 import { Volume2, Mic } from "lucide-react";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
@@ -26,6 +26,9 @@ type ChatbotState = 'idle' | 'thinking' | 'error';
 interface ExtendedVenue extends Venue {
   price_per_person?: number;
 }
+
+const CHAT_STORAGE_KEY = 'venueAssistant_chatHistory';
+const MAX_STORED_MESSAGES = 50; // Maximum number of messages to store in local storage
 
 const HomepageChatbot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,6 +73,32 @@ const HomepageChatbot: React.FC = () => {
   });
 
   useEffect(() => {
+    try {
+      const storedChat = localStorage.getItem(CHAT_STORAGE_KEY);
+      if (storedChat) {
+        const parsedChat = JSON.parse(storedChat).map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+        setMessages(parsedChat);
+      }
+    } catch (error) {
+      console.error('Failed to load chat history:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 1) { // Don't save if it's just the initial greeting
+      try {
+        const messagesToStore = messages.slice(-MAX_STORED_MESSAGES);
+        localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messagesToStore));
+      } catch (error) {
+        console.error('Failed to save chat history:', error);
+      }
+    }
+  }, [messages]);
+
+  useEffect(() => {
     setIsVoiceAvailable(speechRecognitionSupported === true);
   }, [speechRecognitionSupported]);
 
@@ -85,67 +114,156 @@ const HomepageChatbot: React.FC = () => {
     return Math.random().toString(36).substring(2, 11);
   };
 
-  const getVenueSearchCriteria = (query: string) => {
-    const keywords = [
-      'venue', 'venues', 'wedding', 'conference', 'exhibition',
-      'party', 'corporate', 'hall', 'room', 'ballroom', 'beach',
-      'hotel', 'private', 'dining', 'training', 'graduation', 'meeting'
-    ];
-    const cityKeywords = [
-      "riyadh", "jeddah", "khobar", "dammam", "mecca", "medina", "abha", "taif", "khamis", "khamis mushait"
-    ];
-    const q = query.toLowerCase();
-    let type = '';
-    let city = '';
-
-    keywords.forEach(k => { if (q.includes(k)) type = k; });
-    cityKeywords.forEach(c => { if (q.includes(c)) city = c; });
-
-    if (type || city) {
-      return { type, city };
+  const matchUserQueryToAttributes = (query: string) => {
+    query = query.toLowerCase();
+    
+    const matches = {
+      cities: [] as string[],
+      eventTypes: [] as string[],
+      venueTypes: [] as string[],
+      amenities: [] as string[],
+      capacity: null as number | null,
+      priceRange: null as [number, number] | null
+    };
+    
+    venueAttributes.cities.forEach(city => {
+      if (query.includes(city.toLowerCase())) {
+        matches.cities.push(city);
+      }
+    });
+    
+    venueAttributes.eventTypes.forEach(eventType => {
+      if (query.includes(eventType.toLowerCase())) {
+        matches.eventTypes.push(eventType);
+      }
+    });
+    
+    venueAttributes.venueTypes.forEach(venueType => {
+      if (query.includes(venueType.toLowerCase())) {
+        matches.venueTypes.push(venueType);
+      }
+    });
+    
+    venueAttributes.amenities.forEach(amenity => {
+      if (query.includes(amenity.toLowerCase())) {
+        matches.amenities.push(amenity);
+      }
+    });
+    
+    const capacityRegex = /(\d+)\s*(people|guests|persons)/i;
+    const capacityMatch = query.match(capacityRegex);
+    if (capacityMatch) {
+      matches.capacity = parseInt(capacityMatch[1]);
     }
-    return null;
+    
+    const priceUnderRegex = /(under|less than|at most|maximum)\s*(\d+)/i;
+    const priceUnderMatch = query.match(priceUnderRegex);
+    if (priceUnderMatch) {
+      matches.priceRange = [0, parseInt(priceUnderMatch[2])];
+    }
+    
+    const priceBetweenRegex = /between\s*(\d+)\s*and\s*(\d+)/i;
+    const priceBetweenMatch = query.match(priceBetweenRegex);
+    if (priceBetweenMatch) {
+      matches.priceRange = [parseInt(priceBetweenMatch[1]), parseInt(priceBetweenMatch[2])];
+    }
+    
+    return matches;
+  };
+
+  const getVenueSearchCriteria = (query: string) => {
+    const matches = matchUserQueryToAttributes(query);
+    
+    return {
+      type: matches.eventTypes[0] || matches.venueTypes[0] || '',
+      city: matches.cities[0] || '',
+      capacity: matches.capacity,
+      priceRange: matches.priceRange,
+      amenities: matches.amenities
+    };
   };
 
   const getMatchingVenues = (venues: Venue[], query: string) => {
     const search = getVenueSearchCriteria(query);
+    let filteredVenues = venues;
 
-    if (search?.city || search?.type) {
-      return venues.filter(v =>
-        (search.city && v.city && v.city.toLowerCase().includes(search.city)) ||
-        (search.type && (
-          (typeof v.type === 'string' && v.type.toLowerCase().includes(search.type)) ||
-          (typeof v.category === 'string' && v.category.toLowerCase().includes(search.type))
-        ))
+    if (search.city) {
+      filteredVenues = filteredVenues.filter(v => 
+        v.city?.toLowerCase().includes(search.city) || 
+        v.city_name?.toLowerCase().includes(search.city)
       );
     }
 
-    return venues.filter(v =>
-      v.name?.toLowerCase().includes(query.toLowerCase()) ||
-      v.city?.toLowerCase().includes(query.toLowerCase()) ||
-      v.category?.toString().toLowerCase().includes(query.toLowerCase()) ||
-      v.type?.toString().toLowerCase().includes(query.toLowerCase())
-    );
+    if (search.type) {
+      filteredVenues = filteredVenues.filter(v =>
+        (typeof v.type === 'string' && v.type.toLowerCase().includes(search.type)) ||
+        (typeof v.category === 'string' && v.category.toLowerCase().includes(search.type)) ||
+        (Array.isArray(v.category) && v.category.some(c => c.toLowerCase().includes(search.type))) ||
+        (Array.isArray(v.categoryNames) && v.categoryNames.some(c => c.toLowerCase().includes(search.type)))
+      );
+    }
+
+    if (search.capacity) {
+      filteredVenues = filteredVenues.filter(v => {
+        const min = v.capacity?.min || v.min_capacity;
+        const max = v.capacity?.max || v.max_capacity;
+        
+        return min !== undefined && max !== undefined && 
+               min <= search.capacity! && max >= search.capacity!;
+      });
+    }
+
+    if (search.priceRange) {
+      filteredVenues = filteredVenues.filter(v => {
+        const price = v.pricing?.startingPrice || v.starting_price;
+        const [min, max] = search.priceRange!;
+        
+        return price !== undefined && price >= min && price <= max;
+      });
+    }
+
+    if (search.amenities && search.amenities.length > 0) {
+      filteredVenues = filteredVenues.filter(v => {
+        if (!v.amenities) return false;
+        return search.amenities!.some(a => 
+          Array.isArray(v.amenities) && 
+          v.amenities.some(am => typeof am === 'string' && am.toLowerCase().includes(a))
+        );
+      });
+    }
+
+    if (!search.city && !search.type && !search.capacity && !search.priceRange && !search.amenities?.length) {
+      return venues.filter(v =>
+        v.name?.toLowerCase().includes(query.toLowerCase()) ||
+        v.description?.toLowerCase().includes(query.toLowerCase()) ||
+        v.city?.toLowerCase().includes(query.toLowerCase()) ||
+        (typeof v.category === 'string' && v.category.toLowerCase().includes(query.toLowerCase())) ||
+        (typeof v.type === 'string' && v.type.toLowerCase().includes(query.toLowerCase()))
+      );
+    }
+
+    return filteredVenues;
   };
 
   const isVenueListQuery = (query: string) => {
-    const venueListRegex = /(list|show|top|suggest|recommend|venues?|halls?)/i;
+    const venueListRegex = /(list|show|top|suggest|recommend|venues?|halls?|wedding|marriage)/i;
     return venueListRegex.test(query);
   };
 
   const isVenueQuery = (query: string) => {
     const keywords = [
       "show", "list", "find", "venues", "venue", "top", "best", "suggest", "recommend", "available", "search", "option", "hall", "ballroom", "space",
-      "location", "places"
-    ];
-    const cityKeywords = [
-      "riyadh", "jeddah", "khobar", "dammam", "mecca", "medina", "abha", "taif", "khamis", "khamis mushait"
+      "location", "places", "wedding", "marriage"
     ];
     const q = query.toLowerCase();
     if (keywords.some(k => q.includes(k))) return true;
-    if (cityKeywords.some(c => q.includes(c))) return true;
+    if (venueAttributes.cities.some(c => q.includes(c))) return true;
+    if (venueAttributes.eventTypes.some(e => q.includes(e))) return true;
+    if (venueAttributes.venueTypes.some(v => q.includes(v))) return true;
     if (/top ?\d+ venues?/.test(q)) return true;
     if (/venues? in/.test(q)) return true;
+    if (/(\d+)\s*(people|guests|persons)/i.test(q)) return true;
+    if (/(under|less than|at most|maximum)\s*(\d+)/i.test(q)) return true;
     return false;
   };
 
@@ -217,7 +335,7 @@ const HomepageChatbot: React.FC = () => {
     }
     
     return null;
-  }
+  };
 
   const handleSendMessage = async (customMessage?: string, options?: { viaMic?: boolean }) => {
     const messageText = customMessage || inputMessage;
@@ -289,7 +407,56 @@ const HomepageChatbot: React.FC = () => {
         response = await Promise.race([responsePromise, timeoutPromise]);
       } catch (error) {
         console.error('Error calling venue-chatbot function:', error);
-        throw new Error('Failed to connect to the chatbot service');
+        
+        const matches = matchUserQueryToAttributes(messageText);
+        
+        let { data: venues, error: fetchError } = await supabase
+          .from('venues')
+          .select('*')
+          .limit(10);
+          
+        if (fetchError) {
+          throw new Error('Failed to fetch venues data');
+        }
+        
+        let filteredVenues = venues || [];
+        
+        if (matches.cities.length > 0) {
+          const city = matches.cities[0];
+          filteredVenues = filteredVenues.filter(v => 
+            v.city_name && v.city_name.toLowerCase().includes(city)
+          );
+        }
+        
+        if (matches.eventTypes.length > 0 || matches.venueTypes.length > 0) {
+          const eventType = matches.eventTypes[0] || '';
+          const venueType = matches.venueTypes[0] || '';
+          const searchType = eventType || venueType;
+          
+          filteredVenues = filteredVenues.filter(v => 
+            (Array.isArray(v.category_name) && v.category_name.some(c => 
+              c && c.toLowerCase().includes(searchType))) ||
+            (v.type && v.type.toLowerCase().includes(searchType))
+          );
+        }
+        
+        if (matches.capacity) {
+          filteredVenues = filteredVenues.filter(v => 
+            v.min_capacity && v.max_capacity && 
+            v.min_capacity <= matches.capacity! && 
+            v.max_capacity >= matches.capacity!
+          );
+        }
+        
+        response = {
+          data: {
+            message: isVenueListQuery(messageText) 
+              ? `Here are some venues that match your query for ${messageText}.`
+              : "Here are some venues you might be interested in:",
+            venues: filteredVenues.slice(0, 5),
+            speak: options?.viaMic || false
+          }
+        };
       }
       
       if (response.error) {
@@ -315,7 +482,7 @@ const HomepageChatbot: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, botMessage]);
       setLastBotShouldSpeak(!!speak);
 
-      if (venues && Array.isArray(venues) && venues.length > 0 && (isVenueListQuery(messageText) || messageText.toLowerCase().includes('marriage') || messageText.toLowerCase().includes('wedding'))) {
+      if (venues && Array.isArray(venues) && venues.length > 0 && isVenueQuery(messageText)) {
         const filteredVenues = getMatchingVenues(venues, messageText);
         setSuggestedVenues(filteredVenues.slice(0, 10));
       } else {
@@ -399,12 +566,22 @@ const HomepageChatbot: React.FC = () => {
     stopListening();
   };
 
-  const micSendHandler = (transcript: string) => {
-    setInputMessage(transcript);
-    setIsListening(false);
-    if (transcript) {
-      handleSendMessage(transcript, { viaMic: true });
-    }
+  const clearChatHistory = () => {
+    setMessages([{
+      id: '0',
+      sender: 'bot',
+      content: "Hello! I'm your venue assistant. I can help you find the perfect venue. What type of venue are you looking for?",
+      timestamp: new Date()
+    }]);
+    
+    localStorage.removeItem(CHAT_STORAGE_KEY);
+    
+    setSuggestedVenues([]);
+    
+    toast({
+      title: "Chat History Cleared",
+      description: "Your conversation history has been cleared."
+    });
   };
 
   useEffect(() => {
@@ -525,9 +702,19 @@ const HomepageChatbot: React.FC = () => {
             </Button>
           </div>
           
-          <div className="flex items-center gap-2 p-4 border-b border-white/10">
-            <Bot className="h-5 w-5 text-findvenue" />
-            <h2 className="text-white font-medium">Venue Assistant</h2>
+          <div className="flex items-center justify-between p-4 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <Bot className="h-5 w-5 text-findvenue" />
+              <h2 className="text-white font-medium">Venue Assistant</h2>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={clearChatHistory} 
+              className="text-xs text-gray-400 hover:text-white"
+            >
+              Clear Chat
+            </Button>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
