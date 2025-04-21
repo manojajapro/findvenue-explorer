@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Bot, User, Mic, Send, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -131,12 +130,78 @@ const VenueDetailsChatbot: React.FC = () => {
     return arr.join(sep);
   }
 
-  // Answer logic using all attributes
+  // --- utility for better attribute wording (en/ar) ---
+  function humanizeKey(key: string): string {
+    // (basic mapping for more readable attribute names)
+    const dict: Record<string, string> = {
+      id: "Venue ID",
+      name: "Name",
+      description: "Description",
+      gallery_images: "Gallery Images",
+      address: "Address",
+      city_id: "City ID",
+      city_name: "City Name",
+      category_id: "Category ID",
+      category_name: "Category Name",
+      min_capacity: "Minimum Capacity",
+      max_capacity: "Maximum Capacity",
+      currency: "Currency",
+      starting_price: "Starting Price",
+      price_per_person: "Price Per Person",
+      amenities: "Amenities",
+      availability: "Availability",
+      rating: "Rating",
+      reviews_count: "Reviews Count",
+      featured: "Featured",
+      popular: "Popular",
+      created_at: "Created At",
+      updated_at: "Updated At",
+      latitude: "Latitude",
+      longitude: "Longitude",
+      parking: "Parking",
+      wifi: "WiFi",
+      accessibility_features: "Accessibility Features",
+      accepted_payment_methods: "Accepted Payment Methods",
+      opening_hours: "Opening Hours",
+      owner_info: "Owner Info",
+      additional_services: "Additional Services",
+      rules_and_regulations: "Rules & Regulations",
+      type: "Venue Type",
+      zipcode: "Zip Code",
+      image_url: "Image URL",
+      status: "Status",
+    };
+    return dict[key] || key.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase());
+  }
+
+  function allFieldsAnswer(venue: Venue): string {
+    let lines: string[] = [];
+    for (const key of Object.keys(venue)) {
+      const v = (venue as any)[key];
+      const prettyKey = humanizeKey(key);
+      let val = "";
+      if (Array.isArray(v)) val = v.length > 0 ? v.join(", ") : "Not available";
+      else if (typeof v === "object" && v !== null) val = JSON.stringify(v, null, 2);
+      else if (typeof v === "boolean") val = v ? "Yes" : "No";
+      else if (v === null || v === undefined || v === "") val = "Not available";
+      else val = String(v);
+      lines.push(`${prettyKey}: ${val}`);
+    }
+    return lines.join("\n");
+  }
+
+  // Answer logic adjusted for "explain"/"detail"/Arabic queries
   function getVenueAnswer(query: string): string {
     if (!venue) return "Sorry, I couldn't find information for this venue.";
     const v = venue;
-    const q = query.toLowerCase();
+    const q = query.trim().toLowerCase();
 
+    // Check for "explain in detail", "explain", "all attributes", "كل التفاصيل" (Arabic for all details), etc.
+    if (
+      /explain( in detail)?|details|شرح|تفاصيل|عرض الكل|all fields|all attributes|all info|full details|everything/i.test(q)
+    ) {
+      return allFieldsAnswer(v);
+    }
     // Basic queries
     if (/name/i.test(q)) return `The venue's name is ${v.name}.`; 
     if (/(address|where|location)/i.test(q)) return v.address ? `Address: ${v.address}` : "No address is listed.";
@@ -184,16 +249,16 @@ const VenueDetailsChatbot: React.FC = () => {
     if (/zip(code)?/.test(q)) return v.zipcode ? `Zipcode: ${v.zipcode}` : "No zipcode info.";
     if(/status/.test(q)) return v.status ? `Status: ${v.status}` : "No status info.";
     if (/description|about|detail/.test(q)) return v.description ? `Description: ${v.description}` : "No description available.";
-    // show all fields if asked
-    if (/all fields|all attributes|all info|full details|everything/i.test(q)) {
-      let result = [];
-      for (let key in v) {
-        result.push(`${key}: ${typeof (v as any)[key] === "object" ? JSON.stringify((v as any)[key]) : (v as any)[key] ?? "null"}`);
-      }
-      return result.join("\n");
-    }
-    // fallback
+    // move the fallback to the end
+    // ... keep fallback as last return ...
     return `Please ask about this venue's name, address, price, categories, amenities, availability, contacts, type, etc.`;
+  }
+
+  // ---- Enhanced speechSynthesis to autodetect and speak Arabic or English ----
+  function speakSmart(text: string, onStart?: () => void, onEnd?: () => void) {
+    // Figure out if the text has significant Arabic codepoints
+    const isArabic = /[\u0600-\u06FF]/.test(text);
+    speak(text, onStart, onEnd, isArabic ? "ar-SA" : "en-US");
   }
 
   const handleSendMessage = (customMessage?: string, options?: { viaMic?: boolean }) => {
@@ -227,6 +292,7 @@ const VenueDetailsChatbot: React.FC = () => {
     }, 600);
   };
 
+  // ... keep effect for messages/lastBotShouldSpeak ...
   useEffect(() => {
     if (
       lastBotShouldSpeak &&
@@ -234,12 +300,13 @@ const VenueDetailsChatbot: React.FC = () => {
       messages.length &&
       messages[messages.length - 1].sender === "bot"
     ) {
-      speak(messages[messages.length - 1].content, () => setIsSpeaking(true), () => setIsSpeaking(false));
+      speakSmart(messages[messages.length - 1].content, () => setIsSpeaking(true), () => setIsSpeaking(false));
       setLastBotShouldSpeak(false);
     }
     // eslint-disable-next-line
   }, [messages, lastBotShouldSpeak, speechSynthesisSupported]);
 
+  // UI
   return (
     <>
       <TooltipProvider>
@@ -267,9 +334,25 @@ const VenueDetailsChatbot: React.FC = () => {
       </TooltipProvider>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[540px] h-[620px] p-0 overflow-hidden right-[5%] bg-gradient-to-b from-slate-950 to-slate-900 flex flex-col rounded-xl border border-white/10">
+          {/* --- NEW Assistant Header Below --- */}
+          <div className="w-full flex items-center p-4 border-b border-white/10 bg-slate-950/60 gap-2">
+            <Bot className="h-6 w-6 text-findvenue animate-bounce-slow" />
+            <div className="flex flex-col">
+              <span className="text-lg font-semibold text-white">
+                {venue?.name
+                  ? `${venue.name} Assistant`
+                  : "Venue Assistant"}
+              </span>
+              <span className="text-xs text-findvenue-text-muted">
+                Ask about capacity, prices, amenities... in English or العربية!
+              </span>
+            </div>
+          </div>
+          {/* DialogTitle (for accessibility, keep visually hidden) */}
           <DialogTitle className="sr-only">
             {venue?.name ? venue.name + " Assistant" : "Venue Assistant"}
           </DialogTitle>
+          {/* ... Close button ... */}
           <div className="absolute top-2 right-2 z-10">
             <Button
               variant="ghost"
@@ -310,11 +393,12 @@ const VenueDetailsChatbot: React.FC = () => {
                         }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {/* Speaker button: use speakSmart to auto-detect language */}
                       {message.sender === "bot" && speechSynthesisSupported && (
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => speak(message.content)}
+                          onClick={() => speakSmart(message.content)}
                           className="ml-1 h-7 w-7 flex-shrink-0"
                         >
                           <Volume2 className="h-4 w-4 text-findvenue cursor-pointer" />
@@ -331,7 +415,7 @@ const VenueDetailsChatbot: React.FC = () => {
                   <div className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center bg-findvenue-card-bg border border-findvenue-border">
                     <Bot className="h-4 w-4" />
                   </div>
-                  <div className="bg-findvenue-card-bg border-findvenue-border rounded-lg px-4 py-3">
+                  <div className="bg-findvenue-card-bg border border-findvenue-border rounded-lg px-4 py-3">
                     <div className="flex gap-1">
                       <span className="w-2 h-2 rounded-full bg-findvenue animate-pulse"></span>
                       <span className="w-2 h-2 rounded-full bg-findvenue animate-pulse delay-100"></span>
@@ -343,6 +427,7 @@ const VenueDetailsChatbot: React.FC = () => {
             )}
           </div>
           {/* Input */}
+          {/* ... keep input, mic, speaker buttons etc as before ... */}
           <div className="p-4 border-t border-white/10">
             <div className="flex gap-2 items-center">
               <Input
@@ -419,4 +504,3 @@ const VenueDetailsChatbot: React.FC = () => {
 };
 
 export default VenueDetailsChatbot;
-
