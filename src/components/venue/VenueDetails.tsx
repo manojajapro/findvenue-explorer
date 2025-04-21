@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useVenueData } from '@/hooks/useVenueData';
@@ -17,6 +18,7 @@ import { Venue } from '@/hooks/useSupabaseVenues';
 import { VenueCard } from '@/components/ui';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
 import ShareVenue from '@/components/venue/ShareVenue';
+import VenueDetailsChatbot from '@/components/venue/VenueDetailsChatbot';
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -36,15 +38,16 @@ const VenueDetails = () => {
   
   useEffect(() => {
     const fetchSimilarVenues = async () => {
-      if (!venue || !venue.categoryId) return;
+      if (!venue) return;
       
       try {
         setLoadingSimilar(true);
         
+        // Fetch venues from the same city
         const { data, error } = await supabase
           .from('venues')
           .select('*')
-          .filter('category_id', 'cs', `{${venue.categoryId}}`)
+          .eq('city_name', venue.city)
           .neq('id', venue.id)
           .limit(4);
         
@@ -432,7 +435,7 @@ const VenueDetails = () => {
       
       {similarVenues.length > 0 && (
         <div className="mt-12 mb-4">
-          <h2 className="text-2xl font-bold mb-6">Similar Venues You Might Like</h2>
+          <h2 className="text-2xl font-bold mb-6">More Venues in {venue.city}</h2>
           {loadingSimilar ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map(i => (
@@ -454,6 +457,8 @@ const VenueDetails = () => {
           )}
         </div>
       )}
+      
+      {venue && <VenueDetailsChatbot venue={venue} />}
     </div>
   );
 };
