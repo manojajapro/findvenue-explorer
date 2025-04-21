@@ -1,13 +1,9 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.2.1'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
+// Use the OpenAI REST API directly instead of the JS client to avoid compatibility issues
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -36,12 +32,6 @@ serve(async (req) => {
 
     console.log('Received query:', query)
 
-    // Configure OpenAI
-    const configuration = new Configuration({
-      apiKey: openaiApiKey,
-    })
-    const openai = new OpenAIApi(configuration)
-
     // First, create a query to search venues based on user request
     const searchQueryPrompt = `
       Create a SQL query to search venues in the database based on this user query: "${query}".
@@ -53,61 +43,73 @@ serve(async (req) => {
     `
 
     try {
-      // Get search query from OpenAI
-      const searchQueryResponse = await openai.createChatCompletion({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are a SQL expert who converts natural language to SQL queries.' },
-          { role: 'user', content: searchQueryPrompt }
-        ],
-        temperature: 0.2,
-      })
+      // Direct call to OpenAI API instead of using the client library
+      const searchQueryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a SQL expert who converts natural language to SQL queries.' },
+            { role: 'user', content: searchQueryPrompt }
+          ],
+          temperature: 0.2,
+        }),
+      });
+      
+      if (!searchQueryResponse.ok) {
+        throw new Error(`OpenAI API error: ${searchQueryResponse.status} ${await searchQueryResponse.text()}`);
+      }
 
-      const sqlQuery = searchQueryResponse.data.choices[0].message?.content?.trim()
-      console.log('Generated SQL query:', sqlQuery)
+      const searchQueryData = await searchQueryResponse.json();
+      const sqlQuery = searchQueryData.choices[0].message?.content?.trim();
+      console.log('Generated SQL query:', sqlQuery);
 
       // Execute the SQL query (with safety checks)
-      let venues = []
-      let error = null
+      let venues = [];
+      let error = null;
 
       try {
         if (sqlQuery && !sqlQuery.toLowerCase().includes('delete') && !sqlQuery.toLowerCase().includes('update') && !sqlQuery.toLowerCase().includes('insert')) {
           const { data, error: queryError } = await supabase.rpc('search_venues_with_raw_query', {
             query_text: sqlQuery
-          })
+          });
 
           if (queryError) {
-            throw queryError
+            throw queryError;
           }
 
-          venues = data || []
+          venues = data || [];
         } else {
           // Fallback to simple search if SQL generation fails or contains unsafe operations
           const { data, error: queryError } = await supabase
             .from('venues')
             .select('*')
             .textSearch('name', query.split(' ').join(' & '))
-            .limit(5)
+            .limit(5);
 
           if (queryError) {
-            throw queryError
+            throw queryError;
           }
 
-          venues = data || []
+          venues = data || [];
         }
       } catch (e) {
-        console.error('Error executing query:', e)
-        error = e.message
+        console.error('Error executing query:', e);
+        error = e.message;
         // Fallback to simple search if custom query fails
         const { data } = await supabase
           .from('venues')
           .select('*')
-          .limit(5)
+          .limit(5);
 
-        venues = data || []
+        venues = data || [];
       }
 
-      console.log(`Found ${venues.length} venues`)
+      console.log(`Found ${venues.length} venues`);
 
       // Transform venues data to match frontend expected format
       const transformedVenues = venues.map(venue => {
@@ -142,7 +144,7 @@ serve(async (req) => {
         price: `${venue.starting_price || 0} ${venue.currency || 'SAR'}${venue.price_per_person ? ' per person' : ''}`,
         amenities: Array.isArray(venue.amenities) ? venue.amenities.join(', ') : venue.amenities,
         type: venue.type || 'Venue'
-      }))
+      }));
 
       // Generate chatbot response based on query and venue data
       const promptContent = `
@@ -160,18 +162,30 @@ serve(async (req) => {
         
         Keep your response conversational and helpful. If no venues were found, suggest the user try different search terms.
         The response should be in the tone of a helpful concierge.
-      `
+      `;
 
-      const completion = await openai.createChatCompletion({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are a helpful venue search assistant for a venue booking platform.' },
-          { role: 'user', content: promptContent }
-        ],
-        temperature: 0.7,
-      })
+      const chatCompletion = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a helpful venue search assistant for a venue booking platform.' },
+            { role: 'user', content: promptContent }
+          ],
+          temperature: 0.7,
+        }),
+      });
+      
+      if (!chatCompletion.ok) {
+        throw new Error(`OpenAI API error: ${chatCompletion.status} ${await chatCompletion.text()}`);
+      }
 
-      const chatResponse = completion.data.choices[0].message?.content || 'Sorry, I could not process your request at this time.'
+      const completionData = await chatCompletion.json();
+      const chatResponse = completionData.choices[0].message?.content || 'Sorry, I could not process your request at this time.';
 
       return new Response(
         JSON.stringify({
@@ -185,9 +199,9 @@ serve(async (req) => {
             'Content-Type': 'application/json'
           }
         }
-      )
+      );
     } catch (openAiError) {
-      console.error('OpenAI API error:', openAiError)
+      console.error('OpenAI API error:', openAiError);
       return new Response(
         JSON.stringify({
           message: "I'm having trouble connecting to my assistant service right now. Please try again later.",
@@ -200,10 +214,10 @@ serve(async (req) => {
             'Content-Type': 'application/json'
           }
         }
-      )
+      );
     }
   } catch (error) {
-    console.error('Error processing request:', error)
+    console.error('Error processing request:', error);
 
     return new Response(
       JSON.stringify({
@@ -217,6 +231,6 @@ serve(async (req) => {
           'Content-Type': 'application/json'
         }
       }
-    )
+    );
   }
-})
+});

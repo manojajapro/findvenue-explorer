@@ -25,19 +25,54 @@ serve(async (req) => {
 
     console.log('Received query text:', query_text);
     
-    // Use safer approach with simple search
-    const { data, error } = await supabase
+    // Using a safer approach for searching venues
+    // Instead of executing raw SQL, we're using Supabase's query builder
+    let { data, error } = await supabase
       .from('venues')
       .select('*')
-      .limit(5)
-      
+      .limit(10)
+
+    // If the query is simple enough we can try to parse some common terms
+    const queryLower = query_text.toLowerCase();
+    
+    // Check for city names in the query
+    if (queryLower.includes('city:')) {
+      const cityMatch = queryLower.match(/city:\s*([a-z\s]+)(?:,|$)/i);
+      if (cityMatch && cityMatch[1]) {
+        const cityName = cityMatch[1].trim();
+        data = data?.filter(venue => 
+          venue.city_name && venue.city_name.toLowerCase().includes(cityName)
+        );
+      }
+    }
+    
+    // Check for capacity in the query
+    if (queryLower.includes('capacity:')) {
+      const capacityMatch = queryLower.match(/capacity:\s*(\d+)/i);
+      if (capacityMatch && capacityMatch[1]) {
+        const minCapacity = parseInt(capacityMatch[1]);
+        data = data?.filter(venue => 
+          venue.max_capacity >= minCapacity
+        );
+      }
+    }
+    
+    // Filter by name as a fallback
+    if (queryLower.length > 3) {
+      // Simple text search on name and description
+      data = data?.filter(venue => 
+        (venue.name && venue.name.toLowerCase().includes(queryLower)) ||
+        (venue.description && venue.description.toLowerCase().includes(queryLower))
+      );
+    }
+    
     if (error) {
       console.error('Error in database query:', error);
       throw error;
     }
       
     return new Response(
-      JSON.stringify({ data }),
+      JSON.stringify({ data: data || [] }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
     

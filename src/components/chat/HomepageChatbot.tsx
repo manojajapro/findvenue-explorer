@@ -100,9 +100,17 @@ const HomepageChatbot: React.FC = () => {
     setChatbotState('thinking');
 
     try {
-      const response = await supabase.functions.invoke('venue-chatbot', {
+      // Add a timeout to prevent UI from hanging if the request takes too long
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Request timed out")), 30000)
+      );
+      
+      const responsePromise = supabase.functions.invoke('venue-chatbot', {
         body: { query: messageText }
       });
+      
+      // Race between the actual request and the timeout
+      const response = await Promise.race([responsePromise, timeoutPromise]);
 
       // Check if there's a response error
       if (response.error) {
@@ -110,8 +118,13 @@ const HomepageChatbot: React.FC = () => {
         throw new Error(response.error.message || 'Error from chatbot service');
       }
 
+      // Check for undefined or unexpected response format
+      if (!response.data) {
+        throw new Error('Invalid response format from chatbot service');
+      }
+
       // Extract the message and venues from the response data
-      const { message, venues, error } = response.data || {};
+      const { message, venues, error } = response.data;
 
       if (error) {
         console.error('Error from chatbot API:', error);
@@ -128,7 +141,7 @@ const HomepageChatbot: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, botMessage]);
       
       // Update suggested venues if any
-      if (venues && venues.length > 0) {
+      if (venues && Array.isArray(venues) && venues.length > 0) {
         setSuggestedVenues(venues);
       } else {
         setSuggestedVenues([]);
@@ -141,7 +154,7 @@ const HomepageChatbot: React.FC = () => {
       const errorMessage = {
         id: generateId(),
         sender: 'bot' as const,
-        content: "I'm sorry, I encountered an error while processing your request. Please try again.",
+        content: "I'm sorry, I encountered an error while processing your request. Please try again later.",
         timestamp: new Date()
       };
 
