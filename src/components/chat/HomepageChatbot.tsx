@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -107,6 +108,7 @@ const HomepageChatbot: React.FC = () => {
       const response = await Promise.race([responsePromise, timeoutPromise]);
       if (response.error) throw new Error(response.error.message || 'Error from chatbot service');
       if (!response.data) throw new Error('Invalid response format from chatbot service');
+      
       const { message, venues, error, speak } = response.data;
       if (error) console.error('Error from chatbot API:', error);
 

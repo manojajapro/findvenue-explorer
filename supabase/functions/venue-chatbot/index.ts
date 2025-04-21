@@ -50,7 +50,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         message: 'Hello! How can I help you find a venue today?',
         venues: [],
-        speak: true,
+        speak: viaMic,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -190,11 +190,12 @@ serve(async (req) => {
         }
       }).slice(0, 3);
 
+      const baseUrl = 'https://esdmelfzeszjtbnoajig.supabase.co';
       const venuesText = venueDetailLinks.length > 0
         ? venueDetailLinks.map((v, i) =>
           `${i + 1}. **${v.name} (${v.city})** - ${v.capacity} guests, ${v.price}${
             v.amenities ? ` | Amenities: ${v.amenities}` : ''
-          }\n[View details](https://esdmelfzeszjtbnoajig.supabase.co/venue/${v.id})${v.description ? `\n${v.description}` : ''}`
+          }\n[View details](${baseUrl}/venue/${v.id})${v.description ? `\n${v.description}` : ''}`
         ).join('\n\n')
         : '';
 
@@ -203,13 +204,13 @@ serve(async (req) => {
         The user is looking for venues with this query: "${query}"
 
         ${venueDetailLinks.length > 0
-          ? `Here are some venues I found (show a short summary for each and include a "View details" link):
+          ? `Here are some venues I found (provide a short summary and include a "View details" link for each):
 
 ${venuesText}`
           : 'I could not find any venues matching your query.'}
 
-        Acknowledge the user's query briefly. If you found venues, summarize the top 3 options and suggest clicking 'View details' to learn more. If not, suggest alternative keywords.
-        Always keep your response friendly, helpful, and to the point. If the query seems like a greeting, reply with a short acknowledgment.
+        Keep your response short, friendly, and to the point. If the query seems like a greeting, reply with a very brief acknowledgment.
+        For venue results, ALWAYS be concise. Limit your response to 3-4 sentences maximum.
       `;
 
       const chatCompletion = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -223,11 +224,12 @@ ${venuesText}`
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful venue search assistant for a venue booking platform.',
+              content: 'You are a helpful venue search assistant for a venue booking platform. Keep your answers brief.',
             },
             { role: 'user', content: promptContent },
           ],
           temperature: 0.5,
+          max_tokens: 250,
         }),
       });
 
@@ -243,7 +245,7 @@ ${venuesText}`
       return new Response(JSON.stringify({
         message: chatResponse,
         venues: venueDetailLinks,
-        speak: !!viaMic,
+        speak: viaMic,
         error: null,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -255,6 +257,7 @@ ${venuesText}`
         message: "I'm having trouble connecting to my assistant service right now. Please try again later.",
         venues: [],
         error: openAiError.message,
+        speak: viaMic,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -264,6 +267,7 @@ ${venuesText}`
     return new Response(JSON.stringify({
       message: 'An error occurred while processing your request.',
       error: error.message,
+      speak: false,
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
