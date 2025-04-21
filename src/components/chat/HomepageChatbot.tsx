@@ -442,41 +442,66 @@ const HomepageChatbot: React.FC = () => {
 
   // Venue card for chat - simplified and safe checks
   const renderVenueCard = (venue: Venue) => {
-    const imageUrl =
-      (venue.galleryImages && Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0 && venue.galleryImages[0]) ||
-      (venue.gallery_images && Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0 && venue.gallery_images[0]) ||
-      venue.imageUrl ||
-      venue.image_url ||
-      '/placeholder.svg';
+    // Use the first gallery image or a placeholder
+    const imageUrl = Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0
+      ? venue.gallery_images[0]
+      : (Array.isArray(venue.galleryImages) && venue.galleryImages.length > 0
+        ? venue.galleryImages[0]
+        : (venue.imageUrl || venue.image_url || '/placeholder.svg'));
 
-    const city = venue.city || (venue as any).city_name || "-";
-    const type = venue.type || "-";
-    const category = venue.category || "-";
-    const capacity = venue.capacity ? `${venue.capacity.min ?? '-'} - ${venue.capacity.max ?? '-'}` : "-";
-    let price = "-";
-    let currency = "SAR";
-    if (venue.pricing && (venue.pricing as any).startingPrice !== undefined) {
-      price = (venue.pricing as any).startingPrice.toLocaleString();
-      currency = (venue.pricing as any).currency || "SAR";
-    } else if ((venue as any).starting_price) {
-      price = (venue as any).starting_price.toLocaleString();
-      currency = (venue as any).currency || "SAR";
+    const venueName = venue.name || "-";
+
+    // Pick city (not shown but can be included if needed)
+    // const city = venue.city || (venue as any).city_name || "-";
+
+    // Price: prefer starting_price, then price_per_person, else '-'
+    let price: string = "-";
+    if (typeof (venue as any).starting_price === 'number') {
+      price = (venue as any).starting_price?.toLocaleString?.() || String((venue as any).starting_price);
+    } else if (venue.pricing && typeof venue.pricing.startingPrice === 'number') {
+      price = venue.pricing.startingPrice?.toLocaleString?.() || String(venue.pricing.startingPrice);
+    } else if (typeof (venue as any).price_per_person === 'number') {
+      price = (venue as any).price_per_person?.toLocaleString?.() || String((venue as any).price_per_person);
+    }
+    // Always SAR for this DB
+    const currency = (venue as any).currency || (venue.pricing && venue.pricing.currency) || "SAR";
+
+    // Capacity: use min_capacity/max_capacity or .capacity object
+    let guests = "-";
+    if (typeof (venue as any).min_capacity === 'number' && typeof (venue as any).max_capacity === 'number') {
+      guests = `${(venue as any).min_capacity} - ${(venue as any).max_capacity}`;
+    } else if (venue.capacity && typeof venue.capacity.min === 'number' && typeof venue.capacity.max === 'number') {
+      guests = `${venue.capacity.min} - ${venue.capacity.max}`;
     }
 
+    const detailsUrl = `/venue/${venue.id}`;
+
     return (
-      <Card key={venue.id} className="bg-white/90 border p-3 cursor-pointer hover:bg-blue-100 transition" onClick={() => viewVenueDetails(venue.id)}>
-        <div className="flex gap-3 items-center">
-          <img src={imageUrl} alt={venue.name} className="rounded object-cover w-14 h-14 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="font-medium text-gray-900 truncate">{venue.name}</div>
-            <div className="text-xs text-gray-600 truncate">{city} {type ? <span>| {type}</span> : null}</div>
-            <div className="text-xs text-gray-500 mt-1">Category: <b>{category}</b></div>
-            <div className="text-xs text-gray-500 mt-1">Capacity: {capacity}</div>
-            <div className="text-xs text-findvenue mt-1">Price: {price} {currency}</div>
-            <Button variant="outline" size="sm" className="mt-1" onClick={e => { e.stopPropagation(); viewVenueDetails(venue.id); }}>
-              View Details
-            </Button>
+      <Card key={venue.id} className="bg-white/90 border p-3 flex gap-3 items-center hover:bg-blue-50 transition cursor-pointer"
+        onClick={() => viewVenueDetails(venue.id)}
+      >
+        <img src={imageUrl} alt={venueName} className="rounded object-cover w-14 h-14 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-gray-900 truncate">{venueName}</div>
+          <div className="text-xs text-gray-800">
+            <b className="mr-1">Price:</b>
+            {price} {currency}
           </div>
+          <div className="text-xs text-gray-800">
+            <b className="mr-1">Guests:</b>
+            {guests}
+          </div>
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="mt-1"
+            onClick={e => { e.stopPropagation(); viewVenueDetails(venue.id); }}
+          >
+            <a href={detailsUrl} tabIndex={-1}>
+              View Details
+            </a>
+          </Button>
         </div>
       </Card>
     );
