@@ -117,19 +117,167 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
     return Math.random().toString(36).substring(2, 11);
   };
 
+  // Function to detect if text is Arabic
+  const isArabicText = (text: string): boolean => {
+    return /[\u0600-\u06FF]/.test(text);
+  };
+
+  // Function to generate a detailed response using all venue attributes
+  const generateDetailedResponse = (venue: Venue): string => {
+    // Determine if we should respond in Arabic based on whether venue name contains Arabic characters
+    const useArabic = isArabicText(venue.name);
+    
+    if (useArabic) {
+      // Arabic detailed response
+      let response = `${venue.name} هي قاعة مناسبات `;
+      
+      if (venue.city) {
+        response += `تقع في ${venue.city}. `;
+      }
+      
+      if (venue.description) {
+        response += `\n\nالوصف: ${venue.description} `;
+      }
+      
+      if (venue.capacity && (venue.capacity.min || venue.capacity.max)) {
+        response += `\n\nالسعة: تستوعب من ${venue.capacity.min || '?'} إلى ${venue.capacity.max || '?'} ضيف. `;
+      }
+      
+      if (venue.pricing) {
+        response += `\n\nالأسعار: تبدأ من ${venue.pricing.startingPrice || 0} ${venue.pricing.currency || 'SAR'}`;
+        if (venue.pricing.pricePerPerson) {
+          response += `، مع سعر ${venue.pricing.pricePerPerson} ${venue.pricing.currency || 'SAR'} للشخص الواحد`;
+        }
+        response += `. `;
+      }
+      
+      if (venue.address) {
+        response += `\n\nالعنوان: ${venue.address}، ${venue.city || ''}. `;
+      }
+      
+      if (venue.categoryNames && venue.categoryNames.length > 0) {
+        response += `\n\nالفئات: ${venue.categoryNames.join('، ')}. `;
+      }
+      
+      if (venue.amenities && venue.amenities.length > 0) {
+        response += `\n\nالمرافق: ${venue.amenities.join('، ')}. `;
+      }
+      
+      if (venue.wifi !== undefined) {
+        response += `\n\nواي فاي: ${venue.wifi ? 'متوفر' : 'غير متوفر'}. `;
+      }
+      
+      if (venue.parking !== undefined) {
+        response += `\n\nموقف سيارات: ${venue.parking ? 'متوفر' : 'غير متوفر'}. `;
+      }
+      
+      if (venue.accessibilityFeatures && venue.accessibilityFeatures.length > 0) {
+        response += `\n\nميزات سهولة الوصول: ${venue.accessibilityFeatures.join('، ')}. `;
+      }
+      
+      if (venue.rating) {
+        response += `\n\nالتقييم: ${venue.rating}/5 (${venue.reviews || 0} تقييم). `;
+      }
+      
+      if (venue.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0) {
+        response += `\n\nطرق الدفع المقبولة: ${venue.acceptedPaymentMethods.join('، ')}. `;
+      }
+      
+      return response;
+    } else {
+      // English detailed response
+      let response = `${venue.name} is a venue `;
+      
+      if (venue.city) {
+        response += `located in ${venue.city}. `;
+      }
+      
+      if (venue.description) {
+        response += `\n\nDescription: ${venue.description} `;
+      }
+      
+      if (venue.capacity && (venue.capacity.min || venue.capacity.max)) {
+        response += `\n\nCapacity: Accommodates from ${venue.capacity.min || '?'} to ${venue.capacity.max || '?'} guests. `;
+      }
+      
+      if (venue.pricing) {
+        response += `\n\nPricing: Starting at ${venue.pricing.startingPrice || 0} ${venue.pricing.currency || 'SAR'}`;
+        if (venue.pricing.pricePerPerson) {
+          response += `, with a per-person rate of ${venue.pricing.pricePerPerson} ${venue.pricing.currency || 'SAR'}`;
+        }
+        response += `. `;
+      }
+      
+      if (venue.address) {
+        response += `\n\nAddress: ${venue.address}, ${venue.city || ''}. `;
+      }
+      
+      if (venue.categoryNames && venue.categoryNames.length > 0) {
+        response += `\n\nCategories: ${venue.categoryNames.join(', ')}. `;
+      }
+      
+      if (venue.amenities && venue.amenities.length > 0) {
+        response += `\n\nAmenities: ${venue.amenities.join(', ')}. `;
+      }
+      
+      if (venue.wifi !== undefined) {
+        response += `\n\nWiFi: ${venue.wifi ? 'Available' : 'Not available'}. `;
+      }
+      
+      if (venue.parking !== undefined) {
+        response += `\n\nParking: ${venue.parking ? 'Available' : 'Not available'}. `;
+      }
+      
+      if (venue.accessibilityFeatures && venue.accessibilityFeatures.length > 0) {
+        response += `\n\nAccessibility features: ${venue.accessibilityFeatures.join(', ')}. `;
+      }
+      
+      if (venue.rating) {
+        response += `\n\nRating: ${venue.rating}/5 (${venue.reviews || 0} reviews). `;
+      }
+      
+      if (venue.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0) {
+        response += `\n\nAccepted payment methods: ${venue.acceptedPaymentMethods.join(', ')}. `;
+      }
+      
+      return response;
+    }
+  };
+
   const getResponseForVenueQuery = (query: string): string => {
     query = query.toLowerCase();
     
+    // Check for conversational phrases that should trigger detailed responses
+    if (/more details|tell me more|explain|elaborate|details|all info|full details|everything|more information|كل التفاصيل|شرح|تفاصيل/i.test(query)) {
+      return generateDetailedResponse(venue);
+    }
+
+    // Check for short greetings that should get a summary response
+    if (/^(hi|hello|hey|مرحبا|اهلا|السلام عليكم)$/i.test(query.trim())) {
+      const isArabic = isArabicText(query);
+      
+      if (isArabic) {
+        return `${venue.name} هي قاعة في ${venue.city || ''}. تستوعب من ${venue.capacity?.min || '?'} إلى ${venue.capacity?.max || '?'} ضيف بأسعار تبدأ من ${venue.pricing?.startingPrice || 0} ${venue.pricing?.currency || 'SAR'}. يمكنك أن تسألني عن المزيد من التفاصيل مثل المرافق، الموقع، ساعات العمل، إلخ.`;
+      } else {
+        return `${venue.name} is a venue in ${venue.city || ''}. It can accommodate ${venue.capacity?.min || '?'}-${venue.capacity?.max || '?'} guests with pricing starting at ${venue.pricing?.startingPrice || 0} ${venue.pricing?.currency || 'SAR'}. You can ask me about specific details like amenities, location, hours, etc.`;
+      }
+    }
+
+    // If venue has a description and user asks about the venue in general
+    if ((/about|describe|what is|tell me about|overview|وصف/i.test(query)) && venue.description) {
+      return venue.description;
+    }
+    
     // Handle capacity queries
     if (/max(imum)? capacity|max guests|most people|how many people|max attendees/i.test(query)) {
-      return `${venue.name} can accommodate up to ${venue.capacity.max} guests.`;
+      return `${venue.name} can accommodate up to ${venue.capacity?.max || '?'} guests.`;
     }
 
     // Handle price queries
     if (/price|cost|fee|how much|rate|pricing/i.test(query)) {
-      const currency = venue.pricing.currency || 'SAR';
-      const startingPrice = venue.pricing.startingPrice || 0;
-      const pricePerPerson = venue.pricing.pricePerPerson;
+      const currency = venue.pricing?.currency || 'SAR';
+      const startingPrice = venue.pricing?.startingPrice || 0;
+      const pricePerPerson = venue.pricing?.pricePerPerson;
       
       let priceResponse = `The starting price for ${venue.name} is ${startingPrice.toLocaleString()} ${currency}.`;
       if (pricePerPerson) {
@@ -140,7 +288,7 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
 
     // Handle location queries
     if (/location|address|where|place|situated|city|area/i.test(query)) {
-      return `${venue.name} is located at ${venue.address}, ${venue.city}.`;
+      return `${venue.name} is located at ${venue.address || '(address not specified)'}, ${venue.city || ''}.`;
     }
 
     // Handle amenities queries
@@ -173,11 +321,6 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       return `${venue.name} offers these accessibility features: ${venue.accessibilityFeatures.join(', ')}.`;
     }
 
-    // Handle description query
-    if (/about|describe|tell me|what is|overview/i.test(query)) {
-      return venue.description || `${venue.name} is a venue located in ${venue.city}.`;
-    }
-
     // Handle payment methods query
     if (/payment|pay|credit card|cash/i.test(query)) {
       if (!venue.acceptedPaymentMethods || venue.acceptedPaymentMethods.length === 0) {
@@ -189,12 +332,14 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
     // Handle categories query
     if (/category|type|kind|event type/i.test(query)) {
       const categories = Array.isArray(venue.categoryNames) ? venue.categoryNames.join(', ') : venue.category;
-      return `${venue.name} is categorized as: ${categories}.`;
+      return `${venue.name} is categorized as: ${categories || 'No category information available'}.`;
     }
 
     // Handle rating query
     if (/rating|review|score|stars/i.test(query)) {
-      return `${venue.name} has a rating of ${venue.rating} out of 5 based on ${venue.reviews} reviews.`;
+      return venue.rating
+        ? `${venue.name} has a rating of ${venue.rating} out of 5 based on ${venue.reviews || 0} reviews.`
+        : `${venue.name} does not have any ratings yet.`;
     }
 
     // Handle operating hours query
@@ -219,7 +364,13 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
     }
 
     // Default response with general venue information
-    return `${venue.name} is a ${venue.category || 'venue'} located in ${venue.city}. It can accommodate ${venue.capacity.min}-${venue.capacity.max} guests with pricing starting at ${venue.pricing.startingPrice} ${venue.pricing.currency || 'SAR'}. ${venue.description ? 'Description: ' + venue.description : ''}`;
+    const isArabic = isArabicText(query);
+    
+    if (isArabic) {
+      return `${venue.name} هي ${venue.category || 'قاعة'} تقع في ${venue.city || ''}. تستوعب من ${venue.capacity?.min || '?'} إلى ${venue.capacity?.max || '?'} ضيف بأسعار تبدأ من ${venue.pricing?.startingPrice || 0} ${venue.pricing?.currency || 'SAR'}. ${venue.description ? 'الوصف: ' + venue.description : ''}`;
+    } else {
+      return `${venue.name} is a ${venue.category || 'venue'} located in ${venue.city || ''}. It can accommodate ${venue.capacity?.min || '?'}-${venue.capacity?.max || '?'} guests with pricing starting at ${venue.pricing?.startingPrice || 0} ${venue.pricing?.currency || 'SAR'}. ${venue.description ? 'Description: ' + venue.description : ''}`;
+    }
   };
 
   const handleSendMessage = async (customMessage?: string, options?: { viaMic?: boolean }) => {
@@ -298,8 +449,7 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
     }
     
     stop();
-    speak(
-      text, 
+    speak(text, 
       () => setIsSpeaking(true), 
       () => setIsSpeaking(false)
     );
@@ -397,35 +547,15 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
             </Button>
           </div>
           
-          <div className="flex items-center justify-between p-4 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-findvenue" />
-              <h2 className="text-white font-medium">{venue.name} Assistant</h2>
-            </div>
+          {/* Enhanced header with more prominence */}
+          <div className="w-full flex flex-col items-center p-5 border-b border-white/10 bg-blue-950/80 gap-1">
             <div className="flex gap-2 items-center">
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-400">Speaker</span>
-                <Button
-                  size="icon"
-                  variant={isSpeakerOn ? "default" : "outline"}
-                  className={isSpeakerOn ? "bg-blue-700" : ""}
-                  title={isSpeakerOn ? "Speaker on" : "Speaker off"}
-                  aria-pressed={isSpeakerOn}
-                  onClick={() => setIsSpeakerOn(on => !on)}
-                  tabIndex={0}
-                >
-                  <Volume2 className={`h-4 w-4 ${isSpeakerOn ? "text-findvenue" : "text-gray-400"}`} />
-                </Button>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={clearChatHistory} 
-                className="text-xs text-gray-400 hover:text-white"
-              >
-                Clear Chat
-              </Button>
+              <Bot className="h-6 w-6 text-blue-300 animate-bounce-slow" />
+              <span className="text-2xl font-bold text-white">{venue.name} Assistant</span>
             </div>
+            <span className="text-xs text-blue-200 italic whitespace-pre-line text-center">
+              {"Ask about capacity, prices, amenities...\nيمكنك السؤال عن القاعة بالعربية أيضاً!"}
+            </span>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -516,12 +646,35 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
                 </Button>
               )}
             </div>
-            <p className="text-xs text-findvenue-text-muted mt-2">
-              Ask about capacity, pricing, amenities, or any other venue details!
-              {speechRecognitionSupported === false && (
-                <span className="text-yellow-500 ml-2">Voice features not supported in your browser.</span>
-              )}
-            </p>
+            <div className="flex justify-between mt-2">
+              <p className="text-xs text-findvenue-text-muted">
+                Ask about capacity, pricing, amenities, or any other venue details!
+                {speechRecognitionSupported === false && (
+                  <span className="text-yellow-500 ml-2">Voice features not supported in your browser.</span>
+                )}
+              </p>
+              <div className="flex gap-2 items-center">
+                <Button
+                  size="icon"
+                  variant={isSpeakerOn ? "default" : "outline"}
+                  className={`h-7 w-7 ${isSpeakerOn ? "bg-blue-700" : ""}`}
+                  title={isSpeakerOn ? "Speaker on" : "Speaker off"}
+                  aria-pressed={isSpeakerOn}
+                  onClick={() => setIsSpeakerOn(on => !on)}
+                  tabIndex={0}
+                >
+                  <Volume2 className={`h-4 w-4 ${isSpeakerOn ? "text-findvenue" : "text-gray-400"}`} />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={clearChatHistory} 
+                  className="text-xs text-gray-400 hover:text-white"
+                >
+                  Clear Chat
+                </Button>
+              </div>
+            </div>
             {isListening && (
               <div className="mt-2 flex items-center gap-2 text-xs text-blue-300">
                 <Mic className="w-4 h-4 animate-pulse" />
@@ -544,3 +697,4 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
 };
 
 export default VenueDetailsChatbot;
+
