@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -54,13 +55,33 @@ serve(async (req) => {
     }
     
     // For simple list requests, we can respond without needing OpenAI
-    if (query.toLowerCase().includes('list') || query.toLowerCase().includes('show me')) {
+    if (query.toLowerCase().includes('list') || 
+        query.toLowerCase().includes('show me') || 
+        query.toLowerCase().includes('venues')) {
       try {
+        console.log('Processing list request without OpenAI');
+        // Try to extract city name from the query
+        let cityFilter = '';
+        
+        const commonCities = ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina', 'abha', 'taif'];
+        for (const city of commonCities) {
+          if (query.toLowerCase().includes(city)) {
+            cityFilter = city;
+            break;
+          }
+        }
+        
         // Use a simple search to get some venues
-        const { data } = await supabase
-          .from('venues')
-          .select('*')
-          .limit(5);
+        const { data } = cityFilter ? 
+          await supabase
+            .from('venues')
+            .select('*')
+            .ilike('city_name', `%${cityFilter}%`)
+            .limit(5) :
+          await supabase
+            .from('venues')
+            .select('*')
+            .limit(5);
 
         const venues = (data || []) as VenueSearchResult[];
         
@@ -79,9 +100,10 @@ serve(async (req) => {
           }
         }).slice(0, 5);
 
+        const cityName = cityFilter ? cityFilter.charAt(0).toUpperCase() + cityFilter.slice(1) : '';
         const message = venues.length > 0
-          ? `Here are some popular venues I found for you:`
-          : "I couldn't find any venues at the moment. Please try a more specific search.";
+          ? `Here are ${cityFilter ? `${cityName} venues` : 'some venues'} I found for you. Click any venue for details.`
+          : `I couldn't find any venues ${cityFilter ? `in ${cityName}` : ''}. Try another search.`;
 
         return new Response(JSON.stringify({
           message,
@@ -99,8 +121,7 @@ serve(async (req) => {
     // Try to use OpenAI if available
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
     if (!openaiApiKey) {
-      // Fallback when OpenAI API key is missing
-      console.error('Missing OpenAI API key');
+      console.warn('OpenAI API key is missing');
       
       // Fetch some default venues
       const { data } = await supabase
@@ -126,7 +147,7 @@ serve(async (req) => {
       }).slice(0, 5);
 
       return new Response(JSON.stringify({
-        message: "Here are some venues that might interest you. You can click on any venue to see more details.",
+        message: "Here are some recommended venues. Click any venue to see more details.",
         venues: venueDetailLinks,
         speak: viaMic,
         error: null
@@ -137,6 +158,7 @@ serve(async (req) => {
 
     // Continue with OpenAI processing if API key is available
     try {
+      console.log('Using OpenAI for advanced query processing');
       const searchQueryPrompt = `
       Create a SQL query to search venues in the database based on this user query: "${query}".
       The venues table has columns: id, name, description, address, city_id, city_name, category_id, category_name, 
@@ -144,7 +166,7 @@ serve(async (req) => {
       Category names are stored as arrays and can include values like: "Graduation party", "Training Course", "Birthday", "Business Meeting", etc.
       Amenities are stored as arrays and can include values like: "WiFi", "Parking", "Catering", "Fine Dining", etc.
       Return just the SQL query, nothing else.
-    `
+      `
 
       try {
         const searchQueryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -164,7 +186,9 @@ serve(async (req) => {
         });
         
         if (!searchQueryResponse.ok) {
-          throw new Error(`OpenAI API error: ${searchQueryResponse.status} ${await searchQueryResponse.text()}`);
+          const errorText = await searchQueryResponse.text();
+          console.error(`OpenAI API error: ${searchQueryResponse.status} ${errorText}`);
+          throw new Error(`OpenAI API error: ${searchQueryResponse.status} ${errorText}`);
         }
 
         const searchQueryData = await searchQueryResponse.json();
@@ -216,78 +240,27 @@ serve(async (req) => {
 
         console.log(`Found ${venues.length} venues`);
 
-        const transformedVenues = venues.map((venue) => {
-          return {
-            id: venue.id,
-            name: venue.name,
-            description: venue.description ?? '',
-            imageUrl: venue.image_url ?? '',
-            galleryImages: venue.gallery_images ?? [],
-            city: venue.city_name ?? '',
-            pricing: {
-              startingPrice: venue.starting_price || 0,
-              currency: venue.currency || 'SAR',
-            },
-            image_url: venue.image_url ?? '',
-            gallery_images: venue.gallery_images ?? [],
-            city_name: venue.city_name ?? '',
-            starting_price: venue.starting_price ?? 0,
-            currency: venue.currency ?? 'SAR',
-          };
-        });
-
-        const venueData = venues.map((venue) => ({
-          id: venue.id,
-          name: venue.name,
-          description: venue.description
-            ? venue.description.substring(0, 100) + (venue.description.length > 100 ? '...' : '')
-            : 'No description',
-          city: venue.city_name || '',
-          category: Array.isArray(venue.category_name)
-            ? venue.category_name.join(', ')
-            : venue.category_name || '',
-          capacity: `${venue.min_capacity || 0} - ${venue.max_capacity || 0} guests`,
-          price: `${venue.starting_price || 0} ${venue.currency || 'SAR'}${
-            venue.price_per_person ? ' per person' : ''
-          }`,
-          amenities: Array.isArray(venue.amenities)
-            ? venue.amenities.join(', ')
-            : venue.amenities || '',
-          type: venue.type || 'Venue',
-        }));
-
         const venueDetailLinks = venues.map((venue) => {
           return {
+            id: venue.id,
             name: venue.name,
             city: venue.city_name || '',
             price: (venue.starting_price ?? 0) + ' ' + (venue.currency || 'SAR') + (venue.price_per_person ? ' per person' : ''),
             capacity: `${venue.min_capacity || 0} - ${venue.max_capacity || 0}`,
             amenities: Array.isArray(venue.amenities) ? venue.amenities.join(', ') : venue.amenities ?? '',
             url: `/venue/${venue.id}`,
-            id: venue.id,
             description: (venue.description && venue.description.length > 150)
               ? venue.description.slice(0, 150) + '...'
               : (venue.description || ''),
           }
-        }).slice(0, 3);
-
-        const baseUrl = `${supabaseUrl}/venue`;
-        const venuesText = venueDetailLinks.length > 0
-          ? venueDetailLinks.map((v, i) =>
-            `${i + 1}. **${v.name} (${v.city})** - ${v.capacity} guests, ${v.price}${
-              v.amenities ? ` | Amenities: ${v.amenities}` : ''
-            }\n[View details](${baseUrl}/${v.id})${v.description ? `\n${v.description}` : ''}`
-          ).join('\n\n')
-          : '';
+        }).slice(0, 5);
 
         const promptContent = `
         You are a helpful venue search assistant for a venue booking platform.
         The user is looking for venues with this query: "${query}"
 
         ${venueDetailLinks.length > 0
-            ? `Here are some venues I found (provide a short summary and include a "View details" link for each):
-
-${venuesText}`
+            ? `Here are some venues I found (provide a short summary and include a "View details" link for each):`
             : 'I could not find any venues matching your query.'}
 
         Keep your response short, friendly, and to the point. If the query seems like a greeting, reply with a very brief acknowledgment.
@@ -315,7 +288,9 @@ ${venuesText}`
         });
 
         if (!chatCompletion.ok) {
-          throw new Error(`OpenAI API error: ${chatCompletion.status} ${await chatCompletion.text()}`);
+          const errorText = await chatCompletion.text();
+          console.error(`OpenAI API error: ${chatCompletion.status} ${errorText}`);
+          throw new Error(`OpenAI API error: ${chatCompletion.status} ${errorText}`);
         }
 
         const completionData = await chatCompletion.json();
@@ -361,7 +336,7 @@ ${venuesText}`
         return new Response(JSON.stringify({
           message: "Here are some venues that might interest you. Click on any venue to view full details.",
           venues: venueDetailLinks,
-          error: null,
+          error: openAiError.message || "Error processing with AI",
           speak: viaMic,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -379,3 +354,4 @@ ${venuesText}`
       });
     }
   });
+
