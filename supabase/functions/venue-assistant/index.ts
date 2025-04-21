@@ -1,3 +1,6 @@
+
+// Venue Assistant Function: Enhanced to search all attributes and provide pro answers
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
@@ -7,14 +10,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
-// Define venue attributes for search
-const venueAttributes = {
-  basic: ['name', 'description', 'address', 'city_name', 'type'],
-  numeric: ['min_capacity', 'max_capacity', 'starting_price', 'price_per_person'],
-  arrays: ['category_name', 'amenities', 'additional_services', 'accepted_payment_methods', 'accessibility_features'],
-  boolean: ['wifi', 'parking', 'featured', 'popular'],
-  status: ['status', 'availability']
-};
+const allVenueColumns = [
+  "id", "name", "description", "gallery_images", "address", "city_id", "city_name",
+  "category_id", "category_name", "min_capacity", "max_capacity", "currency",
+  "starting_price", "price_per_person", "amenities", "availability", "rating",
+  "reviews_count", "featured", "popular", "created_at", "updated_at", "latitude",
+  "longitude", "parking", "wifi", "accessibility_features", "accepted_payment_methods",
+  "opening_hours", "owner_info", "additional_services", "rules_and_regulations",
+  "type", "zipcode", "image_url", "status"
+];
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -30,8 +34,7 @@ serve(async (req) => {
     );
 
     const { query, type = 'search' } = await req.json();
-    
-    // Basic input validation
+
     if (!query || typeof query !== 'string') {
       return new Response(
         JSON.stringify({ error: 'Invalid query parameter' }),
@@ -39,68 +42,60 @@ serve(async (req) => {
       );
     }
 
-    const queryLower = query.toLowerCase();
-    
-    // Extract search parameters
-    const searchParams = {
-      keywords: queryLower.split(/\s+/).filter(Boolean),
-      city: extractCity(queryLower),
-      capacity: extractCapacity(queryLower),
-      price: extractPrice(queryLower),
-      amenities: extractAmenities(queryLower),
-      eventType: extractEventType(queryLower),
-      features: extractFeatures(queryLower)
-    };
+    const keywords = query.trim().toLowerCase().split(/\s+/);
+    // Build complex "or" filter to match any keyword in any attribute
+    let orFilters: string[] = [];
+    for (const keyword of keywords) {
+      // Numeric: try to match on min/max capacity, price, rating, zipcode etc
+      for (const column of allVenueColumns) {
+        // Choose string or array search
+        if (column === 'min_capacity' || column === 'max_capacity' ||
+            column === 'starting_price' || column === 'price_per_person' ||
+            column === 'rating' || column === 'reviews_count' ||
+            column === 'latitude' || column === 'longitude' ||
+            column === 'zipcode') {
+          // Numeric: try exact or ilike
+          if (!isNaN(Number(keyword))) {
+            orFilters.push(`${column}.eq.${keyword}`);
+          }
+        } else if (
+          column === 'amenities' || column === 'gallery_images' ||
+          column === 'category_name' || column === 'accepted_payment_methods' ||
+          column === 'accessibility_features' || column === 'additional_services'
+        ) {
+          // Array columns: cs (contains) for strings
+          orFilters.push(`${column}.cs.{${keyword}}`);
+        } else if (
+          column === 'featured' || column === 'popular' ||
+          column === 'wifi' || column === 'parking'
+        ) {
+          // Boolean: catch true if keywords match
+          if (
+            (column === "featured" && ["featured", "premium"].includes(keyword)) ||
+            (column === "popular" && ["popular", "famous"].includes(keyword)) ||
+            (column === "wifi" && ["wifi", "internet"].includes(keyword)) ||
+            (column === "parking" && ["parking"].includes(keyword))
+          ) {
+            orFilters.push(`${column}.eq.true`);
+          }
+        } else {
+          // Default string, ilike
+          const safeKeyword = keyword.replace(/"/g, "");
+          orFilters.push(`${column}.ilike.%${safeKeyword}%`);
+        }
+      }
+    }
 
-    // Build Supabase query
     let venueQuery = supabaseClient.from('venues').select('*');
 
-    // Apply text search across all relevant columns
-    if (searchParams.keywords.length > 0) {
-      const textSearchConditions = searchParams.keywords.map(keyword => {
-        const pattern = `%${keyword}%`;
-        return `
-          name.ilike.${pattern},
-          description.ilike.${pattern},
-          address.ilike.${pattern},
-          city_name.ilike.${pattern},
-          category_name.cs.{${keyword}},
-          amenities.cs.{${keyword}},
-          additional_services.cs.{${keyword}},
-          type.ilike.${pattern}
-        `;
-      }).join(',');
-      venueQuery = venueQuery.or(textSearchConditions);
+    if (orFilters.length > 0) {
+      venueQuery = venueQuery.or(orFilters.join(','));
     }
 
-    // Apply specific filters
-    if (searchParams.city) {
-      venueQuery = venueQuery.ilike('city_name', `%${searchParams.city}%`);
-    }
+    // Sort by rating and popularity
+    venueQuery = venueQuery.order('rating', { ascending: false }).order('popular', { ascending: false }).limit(10);
 
-    if (searchParams.capacity) {
-      venueQuery = venueQuery.and(`min_capacity.lte.${searchParams.capacity},max_capacity.gte.${searchParams.capacity}`);
-    }
-
-    if (searchParams.price) {
-      venueQuery = venueQuery.lte('starting_price', searchParams.price);
-    }
-
-    if (searchParams.amenities.length > 0) {
-      venueQuery = venueQuery.contains('amenities', searchParams.amenities);
-    }
-
-    if (searchParams.eventType) {
-      venueQuery = venueQuery.or(`category_name.cs.{${searchParams.eventType}},type.ilike.%${searchParams.eventType}%`);
-    }
-
-    // Add feature-based filters
-    if (searchParams.features.wifi) venueQuery = venueQuery.eq('wifi', true);
-    if (searchParams.features.parking) venueQuery = venueQuery.eq('parking', true);
-    if (searchParams.features.premium) venueQuery = venueQuery.eq('featured', true);
-
-    // Execute query
-    const { data: venues, error } = await venueQuery.order('rating', { ascending: false }).limit(10);
+    const { data: venues, error } = await venueQuery;
 
     if (error) {
       console.error('Venue search error:', error);
@@ -113,138 +108,55 @@ serve(async (req) => {
     if (!venues || venues.length === 0) {
       return new Response(
         JSON.stringify({
-          answer: "I couldn't find any venues matching your criteria. Would you like to try a broader search?",
+          answer: "I couldn't find any venues matching your criteria. Try using different keywords or fewer filters.",
           venues: []
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Format venue results
-    const formattedVenues = venues.map(formatVenueResponse);
-    const answer = generateVenueResponse(query, venues, searchParams);
+    // Assemble a "pro" answer referencing all matching attributes
+    let proAnswer = `I found ${venues.length} venue${venues.length > 1 ? "s" : ""} based on your keywords. Here are the top results:\n\n`;
+    // For each venue, display all attributes that match the keywords
+    venues.forEach((venue, idx) => {
+      proAnswer += `${idx + 1}. ${venue.name || "No name"}\n`;
+      for (const key of allVenueColumns) {
+        const val = venue[key];
+        // For each keyword, if it occurs in this value (case-insensitive, stringified for arrays/objects), show that line:
+        if (val !== null && val !== undefined) {
+          const valueString = Array.isArray(val) ? val.join(", ") : String(val);
+          for (const keyword of keywords) {
+            if (valueString.toLowerCase().includes(keyword)) {
+              proAnswer += `   • ${key.replace(/_/g, " ")}: ${valueString}\n`;
+              break;
+            }
+          }
+        }
+      }
+      proAnswer += `   • Venue Status: ${venue.status || "Unknown"}\n`;
+      if (venue.image_url) {
+        proAnswer += `   • [View Image](${venue.image_url})\n`;
+      }
+      proAnswer += "\n";
+    });
+    proAnswer += "Would you like more details about any venue? You can ask for that venue by name or id.\n";
+
+    const formattedVenues = venues.map(v =>
+      Object.fromEntries(allVenueColumns.map(col => [col, v[col]]))
+    );
 
     return new Response(
       JSON.stringify({
-        answer,
+        answer: proAnswer,
         venues: formattedVenues
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Venue Assistant Error:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });
-
-// Helper functions
-function extractCity(query: string): string | null {
-  const cities = ['riyadh', 'jeddah', 'dammam', 'mecca', 'medina', 'khobar', 'taif', 'abha'];
-  return cities.find(city => query.includes(city)) || null;
-}
-
-function extractCapacity(query: string): number | null {
-  const match = query.match(/(\d+)\s*(?:people|guests|persons?|capacity|attendees)/i);
-  return match ? parseInt(match[1]) : null;
-}
-
-function extractPrice(query: string): number | null {
-  const match = query.match(/(\d+)\s*(?:sar|price|\$|budget|cost)/i);
-  return match ? parseInt(match[1]) : null;
-}
-
-function extractAmenities(query: string): string[] {
-  const amenityKeywords = {
-    wifi: ['wifi', 'internet', 'connection'],
-    parking: ['parking', 'car park', 'valet'],
-    catering: ['catering', 'food', 'cuisine'],
-    av: ['projector', 'screen', 'sound system', 'audio'],
-    outdoor: ['outdoor', 'garden', 'terrace']
-  };
-
-  return Object.entries(amenityKeywords)
-    .filter(([_, keywords]) => keywords.some(k => query.includes(k)))
-    .map(([amenity]) => amenity);
-}
-
-function extractEventType(query: string): string | null {
-  const eventTypes = {
-    wedding: ['wedding', 'marriage', 'bride', 'groom'],
-    conference: ['conference', 'meeting', 'seminar', 'corporate'],
-    party: ['party', 'birthday', 'celebration'],
-    exhibition: ['exhibition', 'showcase', 'expo']
-  };
-
-  for (const [type, keywords] of Object.entries(eventTypes)) {
-    if (keywords.some(k => query.includes(k))) {
-      return type;
-    }
-  }
-  return null;
-}
-
-function extractFeatures(query: string): { wifi: boolean; parking: boolean; premium: boolean } {
-  return {
-    wifi: /\b(wifi|internet|connection)\b/i.test(query),
-    parking: /\b(parking|car\s+park|valet)\b/i.test(query),
-    premium: /\b(premium|luxury|exclusive|high(-|\s)end)\b/i.test(query)
-  };
-}
-
-function formatVenueResponse(venue: any) {
-  return {
-    id: venue.id,
-    name: venue.name,
-    city: venue.city_name,
-    type: Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.category_name,
-    capacity: `${venue.min_capacity || '?'}-${venue.max_capacity || '?'}`,
-    price: venue.starting_price ? `SAR ${venue.starting_price}` : 'Contact for pricing',
-    pricePerPerson: venue.price_per_person ? `SAR ${venue.price_per_person}` : null,
-    rating: venue.rating || 'Unrated',
-    reviews: venue.reviews_count || 0,
-    amenities: venue.amenities || [],
-    features: {
-      wifi: venue.wifi || false,
-      parking: venue.parking || false,
-      featured: venue.featured || false,
-      popular: venue.popular || false
-    },
-    image: venue.image_url || null,
-    description: venue.description || null,
-    address: venue.address || null,
-    status: venue.status || 'Available'
-  };
-}
-
-function generateVenueResponse(query: string, venues: any[], searchParams: any): string {
-  let response = `I found ${venues.length} venue${venues.length > 1 ? 's' : ''} `;
-  
-  if (searchParams.city) {
-    response += `in ${searchParams.city} `;
-  }
-  
-  if (searchParams.eventType) {
-    response += `suitable for ${searchParams.eventType}s `;
-  }
-  
-  response += "that match your criteria:\n\n";
-  
-  venues.forEach((venue, index) => {
-    response += `${index + 1}. ${venue.name}\n`;
-    response += `   📍 ${venue.city_name}\n`;
-    response += `   👥 Capacity: ${venue.min_capacity}-${venue.max_capacity} guests\n`;
-    response += `   💰 ${venue.starting_price ? `Starting at SAR ${venue.starting_price}` : 'Contact for pricing'}\n`;
-    if (venue.rating) {
-      response += `   ⭐ ${venue.rating}/5 (${venue.reviews_count || 0} reviews)\n`;
-    }
-    response += '\n';
-  });
-  
-  response += "\nWould you like more specific details about any of these venues?";
-  
-  return response;
-}
