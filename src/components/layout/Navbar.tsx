@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -14,31 +13,31 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Search, LogIn, Menu, X, Heart, 
   Calendar, User, Building, PlusCircle, LogOut,
-  Home, MessageCircle, Book
+  Home, MessageCircle, Book, Bell
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
+import { useUnreadChatsCount } from '@/hooks/useUnreadChatsCount';
 
 const Navbar = () => {
   const { user, profile, isVenueOwner, signOut } = useAuth();
+  const unreadChats = useUnreadChatsCount(user?.id);
   const navigate = useNavigate();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
-    
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
-  
+
   const isActive = (path: string) => {
     if (path === '/') {
       return location.pathname === path;
@@ -53,12 +52,12 @@ const Navbar = () => {
     }
     return location.pathname.startsWith(path);
   };
-  
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
   };
-  
+
   const handleLogoClick = () => {
     if (user && isVenueOwner) {
       navigate('/dashboard');
@@ -66,22 +65,19 @@ const Navbar = () => {
       navigate('/');
     }
   };
-  
+
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 bg-findvenue-bg backdrop-blur-lg transition-all duration-300 ${
-        isScrolled ? 'shadow-md border-b border-white/5 py-3' : 'py-5'
-      }`}
+      className={`fixed top-0 left-0 right-0 z-50 bg-findvenue-bg backdrop-blur-lg transition-all duration-300 ${isScrolled ? 'shadow-md border-b border-white/5 py-3' : 'py-5'}`}
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
-          <div 
-            className="text-xl md:text-2xl font-bold text-white cursor-pointer flex items-center" 
+          <div
+            className="text-xl md:text-2xl font-bold text-white cursor-pointer flex items-center"
             onClick={handleLogoClick}
           >
             <span className="bg-findvenue px-2 py-0 rounded text-white mr-0.5 ml-1"> A </span>vnu
           </div>
-          
           <nav className="hidden md:flex items-center space-x-1">
             {!isVenueOwner && (
               <>
@@ -183,22 +179,25 @@ const Navbar = () => {
               </Link>
             )}
           </nav>
-          
           <div className="flex items-center">
             <Button variant="ghost" size="icon" className="mr-1">
               <Search className="h-5 w-5" />
             </Button>
-            
             {user && <NotificationCenter />}
             
             {user && (
-              <Link to="/messages">
-                <Button 
-                  variant={isActive('/messages') ? 'secondary' : 'ghost'} 
+              <Link to="/messages" className="relative">
+                <Button
+                  variant={isActive('/messages') ? 'secondary' : 'ghost'}
                   size="icon"
                   className={isActive('/messages') ? 'bg-findvenue-surface mr-1' : 'mr-1'}
                 >
                   <MessageCircle className="h-5 w-5" />
+                  {unreadChats > 0 && (
+                    <span className="absolute -top-1.5 -right-1 bg-green-500 text-white text-xs rounded-full px-1.5 py-0 min-w-[22px] flex items-center justify-center font-bold border-2 border-findvenue-bg z-10">
+                      {unreadChats > 99 ? '99+' : unreadChats}
+                    </span>
+                  )}
                 </Button>
               </Link>
             )}
@@ -270,6 +269,11 @@ const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate('/messages')}>
                     <MessageCircle className="mr-2 h-4 w-4" />
                     <span>Messages</span>
+                    {unreadChats > 0 && (
+                      <span className="ml-auto bg-green-500 text-white text-xs rounded-full px-1 font-bold">
+                        {unreadChats > 99 ? '99+' : unreadChats}
+                      </span>
+                    )}
                   </DropdownMenuItem>
                   
                   <DropdownMenuItem onClick={() => navigate('/profile')}>
@@ -417,6 +421,11 @@ const Navbar = () => {
                     >
                       <MessageCircle className="mr-2 h-4 w-4" />
                       Messages
+                      {unreadChats > 0 && (
+                        <span className="absolute top-2 right-3 bg-green-500 text-white text-xs rounded-full px-1.5 font-bold">
+                          {unreadChats > 99 ? '99+' : unreadChats}
+                        </span>
+                      )}
                     </Button>
                   </Link>
                 )}

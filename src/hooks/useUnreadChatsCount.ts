@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 export const useUnreadChatsCount = (userId?: string) => {
@@ -11,7 +12,6 @@ export const useUnreadChatsCount = (userId?: string) => {
     let cancelled = false;
 
     const fetchCount = async () => {
-      // Count messages where the user is receiver, unread, latest per conversation
       const { data, error } = await supabase
         .from("messages")
         .select('id', { count: "exact", head: true })
@@ -25,7 +25,6 @@ export const useUnreadChatsCount = (userId?: string) => {
 
     fetchCount();
 
-    // Realtime updates: subscribe to new/unread messages
     const channel = supabase.channel('chats-unread-count')
       .on(
         'postgres_changes',
