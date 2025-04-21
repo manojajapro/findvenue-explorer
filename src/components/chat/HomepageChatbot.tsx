@@ -226,6 +226,17 @@ const HomepageChatbot: React.FC = () => {
     }
   }, [messages, lastBotShouldSpeak, speechSynthesisSupported]);
 
+  // Function to get the first image from gallery or use imageUrl
+  const getVenueImage = (venue: any) => {
+    if (venue.imageUrl) {
+      return venue.imageUrl;
+    } else if (venue.galleryImages && venue.galleryImages.length > 0) {
+      return venue.galleryImages[0];
+    } else {
+      return null;
+    }
+  };
+
   return (
     <>
       <TooltipProvider>
@@ -327,9 +338,9 @@ const HomepageChatbot: React.FC = () => {
                       onClick={() => viewVenueDetails(venue.id)}
                     >
                       <div className="flex">
-                        {venue.imageUrl || (venue.galleryImages && venue.galleryImages[0]) ? (
+                        {venue.imageUrl ? (
                           <img 
-                            src={venue.imageUrl || venue.galleryImages[0]} 
+                            src={venue.imageUrl} 
                             alt={venue.name}
                             className="h-16 w-16 object-cover rounded mr-2"
                           />
@@ -343,9 +354,12 @@ const HomepageChatbot: React.FC = () => {
                           <p className="text-xs text-findvenue-text-muted truncate">
                             {venue.city || 'Location not specified'}
                           </p>
-                          {venue.pricing && venue.pricing.startingPrice && (
+                          <p className="text-xs text-findvenue-text-muted mt-1 truncate">
+                            {venue.capacity ? `Capacity: ${venue.capacity}` : ''}
+                          </p>
+                          {venue.price && (
                             <Badge variant="secondary" className="mt-1 text-xs">
-                              {venue.pricing.startingPrice} {venue.pricing.currency || 'SAR'}
+                              {venue.price}
                             </Badge>
                           )}
                         </div>

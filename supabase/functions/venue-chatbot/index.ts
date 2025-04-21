@@ -51,7 +51,7 @@ serve(async (req) => {
         speak: viaMic,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      });
     }
     
     // For simple list requests, we can respond without needing OpenAI
@@ -121,6 +121,8 @@ serve(async (req) => {
             description: (venue.description && venue.description.length > 150)
               ? venue.description.slice(0, 150) + '...'
               : (venue.description || ''),
+            imageUrl: venue.image_url || (Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0 
+              ? venue.gallery_images[0] : null)
           }
         }).slice(0, 5);
 
@@ -150,13 +152,38 @@ serve(async (req) => {
     if (!openaiApiKey) {
       console.warn('OpenAI API key is missing');
       
-      // Fetch some default venues
-      const { data } = await supabase
-        .from('venues')
-        .select('*')
-        .limit(5);
-
-      const venues = (data || []) as VenueSearchResult[];
+      // Perform a comprehensive search across all fields without OpenAI
+      const searchTerm = query.toLowerCase();
+      
+      // Handle special case for Khamis Mushait
+      const isKhamisSearch = searchTerm.includes('khamis');
+      
+      let result;
+      if (isKhamisSearch) {
+        result = await supabase
+          .from('venues')
+          .select('*')
+          .ilike('city_name', '%khamis%')
+          .limit(5);
+      } else {
+        // Perform a basic search across multiple fields
+        result = await supabase
+          .from('venues')
+          .select('*')
+          .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,city_name.ilike.%${searchTerm}%,type.ilike.%${searchTerm}%`)
+          .limit(5);
+        
+        // If no results, try a more advanced search with more fields
+        if (!result.data || result.data.length === 0) {
+          // This is a more general search across more fields
+          result = await supabase
+            .from('venues')
+            .select('*')
+            .limit(5);
+        }
+      }
+      
+      const venues = (result.data || []) as VenueSearchResult[];
       
       const venueDetailLinks = venues.map((venue) => {
         return {
@@ -170,11 +197,17 @@ serve(async (req) => {
           description: (venue.description && venue.description.length > 150)
             ? venue.description.slice(0, 150) + '...'
             : (venue.description || ''),
+          imageUrl: venue.image_url || (Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0 
+            ? venue.gallery_images[0] : null)
         }
       }).slice(0, 5);
 
+      const responseMessage = isKhamisSearch
+        ? "Here are venues in Khamis Mushait. Click any venue to see more details."
+        : "Here are some recommended venues. Click any venue to see more details.";
+
       return new Response(JSON.stringify({
-        message: "Here are some recommended venues. Click any venue to see more details.",
+        message: responseMessage,
         venues: venueDetailLinks,
         speak: viaMic,
         error: null
@@ -261,10 +294,11 @@ serve(async (req) => {
               
               venues = (data || []) as VenueSearchResult[];
             } else {
+              // Enhanced search across multiple columns
               const { data, error: queryError } = await supabase
                 .from('venues')
                 .select('*')
-                .textSearch('name', query.split(' ').join(' & '))
+                .or(`name.ilike.%${query}%,description.ilike.%${query}%,city_name.ilike.%${query}%,type.ilike.%${query}%`)
                 .limit(5);
 
               if (queryError) {
@@ -272,6 +306,16 @@ serve(async (req) => {
               }
 
               venues = (data || []) as VenueSearchResult[];
+              
+              // If no results found, try a more general search
+              if (venues.length === 0) {
+                const { data: generalData } = await supabase
+                  .from('venues')
+                  .select('*')
+                  .limit(5);
+                  
+                venues = (generalData || []) as VenueSearchResult[];
+              }
             }
           }
         } catch (e) {
@@ -299,6 +343,8 @@ serve(async (req) => {
             description: (venue.description && venue.description.length > 150)
               ? venue.description.slice(0, 150) + '...'
               : (venue.description || ''),
+            imageUrl: venue.image_url || (Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0 
+              ? venue.gallery_images[0] : null)
           }
         }).slice(0, 5);
 
@@ -357,8 +403,10 @@ serve(async (req) => {
       } catch (openAiError) {
         console.error('OpenAI API error:', openAiError);
         
-        // Special handling for Khamis/Khamis Mushait search
+        // Enhanced search across multiple fields as fallback
         let venues: VenueSearchResult[] = [];
+        
+        // Special handling for Khamis/Khamis Mushait search
         if (query.toLowerCase().includes('khamis')) {
           const { data, error: queryError } = await supabase
             .from('venues')
@@ -369,16 +417,25 @@ serve(async (req) => {
           if (!queryError) {
             venues = (data || []) as VenueSearchResult[];
           }
-        }
-        
-        // If no Khamis venues or error, fallback to basic venues
-        if (venues.length === 0) {
-          const { data } = await supabase
+        } else {
+          // Try more comprehensive search across multiple columns
+          const { data, error: queryError } = await supabase
             .from('venues')
             .select('*')
+            .or(`name.ilike.%${query}%,description.ilike.%${query}%,city_name.ilike.%${query}%,type.ilike.%${query}%`)
             .limit(5);
+          
+          if (!queryError && data && data.length > 0) {
+            venues = data as VenueSearchResult[];
+          } else {
+            // If no results, fall back to basic venues
+            const { data } = await supabase
+              .from('venues')
+              .select('*')
+              .limit(5);
 
-          venues = (data || []) as VenueSearchResult[];
+            venues = (data || []) as VenueSearchResult[];
+          }
         }
         
         const venueDetailLinks = venues.map((venue) => {
@@ -393,6 +450,8 @@ serve(async (req) => {
             description: (venue.description && venue.description.length > 150)
               ? venue.description.slice(0, 150) + '...'
               : (venue.description || ''),
+            imageUrl: venue.image_url || (Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0 
+              ? venue.gallery_images[0] : null)
           }
         }).slice(0, 5);
         
