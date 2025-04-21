@@ -28,6 +28,7 @@ import EditVenue from "./pages/EditVenue";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AuthCallback from "./pages/AuthCallback";
+import EnhancedVenueAssistant from './components/chat/EnhancedVenueAssistant';
 
 const queryClient = new QueryClient();
 
