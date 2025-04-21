@@ -22,6 +22,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log('Received query text:', query_text);
     
     // Use safer approach with simple search
     const { data, error } = await supabase
@@ -29,7 +31,10 @@ serve(async (req) => {
       .select('*')
       .limit(5)
       
-    if (error) throw error
+    if (error) {
+      console.error('Error in database query:', error);
+      throw error;
+    }
       
     return new Response(
       JSON.stringify({ data }),

@@ -51,7 +51,9 @@ const HomepageChatbot: React.FC = () => {
     onResult: (transcript) => {
       setInputMessage(transcript);
       setIsListening(false);
-      handleSendMessage(transcript);
+      if (transcript) {
+        handleSendMessage(transcript);
+      }
     },
     onEnd: () => setIsListening(false),
     onError: (err) => {
@@ -99,19 +101,23 @@ const HomepageChatbot: React.FC = () => {
 
     try {
       const response = await supabase.functions.invoke('venue-chatbot', {
-        body: { query: userMessage.content }
+        body: { query: messageText }
       });
 
+      // Check if there's a response error
       if (response.error) {
-        throw new Error(response.error.message);
+        console.error('Error from Supabase function:', response.error);
+        throw new Error(response.error.message || 'Error from chatbot service');
       }
 
+      // Extract the message and venues from the response data
       const { message, venues, error } = response.data || {};
 
       if (error) {
         console.error('Error from chatbot API:', error);
       }
 
+      // Create bot message from response
       const botMessage = {
         id: generateId(),
         sender: 'bot' as const,
@@ -121,6 +127,7 @@ const HomepageChatbot: React.FC = () => {
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
       
+      // Update suggested venues if any
       if (venues && venues.length > 0) {
         setSuggestedVenues(venues);
       } else {
@@ -128,7 +135,7 @@ const HomepageChatbot: React.FC = () => {
       }
       
       setChatbotState('idle');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error calling chatbot:', error);
       
       const errorMessage = {
@@ -140,6 +147,14 @@ const HomepageChatbot: React.FC = () => {
 
       setMessages(prevMessages => [...prevMessages, errorMessage]);
       setChatbotState('error');
+      
+      // Show error toast
+      toast({
+        variant: "destructive",
+        title: "Connection Error",
+        description: "Could not connect to the chatbot service. Please try again later."
+      });
+      
       setTimeout(() => setChatbotState('idle'), 2000);
     }
   };
@@ -185,6 +200,11 @@ const HomepageChatbot: React.FC = () => {
     startListening().catch(() => {
       setIsListening(false);
       setIsVoiceAvailable(false);
+      
+      toast({
+        title: "Microphone Access",
+        description: "Please allow microphone access to use voice features."
+      });
     });
   };
 

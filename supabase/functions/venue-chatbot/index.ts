@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Configuration, OpenAIApi } from 'https://esm.sh/openai@3.2.1'
@@ -26,7 +27,8 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
     // Parse request body
-    const { query } = await req.json()
+    const requestData = await req.json();
+    const query = requestData.query;
 
     if (!query) {
       throw new Error('No query provided')
@@ -53,7 +55,7 @@ serve(async (req) => {
     try {
       // Get search query from OpenAI
       const searchQueryResponse = await openai.createChatCompletion({
-        model: 'gpt-4o-mini',  // Updated to a supported model
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: 'You are a SQL expert who converts natural language to SQL queries.' },
           { role: 'user', content: searchQueryPrompt }
@@ -161,7 +163,7 @@ serve(async (req) => {
       `
 
       const completion = await openai.createChatCompletion({
-        model: 'gpt-4o-mini',  // Updated to a supported model
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: 'You are a helpful venue search assistant for a venue booking platform.' },
           { role: 'user', content: promptContent }
