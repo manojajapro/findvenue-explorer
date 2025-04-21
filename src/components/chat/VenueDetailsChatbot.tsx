@@ -130,78 +130,122 @@ const VenueDetailsChatbot: React.FC = () => {
     return arr.join(sep);
   }
 
-  // --- utility for better attribute wording (en/ar) ---
-  function humanizeKey(key: string): string {
-    // (basic mapping for more readable attribute names)
-    const dict: Record<string, string> = {
-      id: "Venue ID",
-      name: "Name",
-      description: "Description",
-      gallery_images: "Gallery Images",
-      address: "Address",
-      city_id: "City ID",
-      city_name: "City Name",
-      category_id: "Category ID",
-      category_name: "Category Name",
-      min_capacity: "Minimum Capacity",
-      max_capacity: "Maximum Capacity",
-      currency: "Currency",
-      starting_price: "Starting Price",
-      price_per_person: "Price Per Person",
-      amenities: "Amenities",
-      availability: "Availability",
-      rating: "Rating",
-      reviews_count: "Reviews Count",
-      featured: "Featured",
-      popular: "Popular",
-      created_at: "Created At",
-      updated_at: "Updated At",
-      latitude: "Latitude",
-      longitude: "Longitude",
-      parking: "Parking",
-      wifi: "WiFi",
-      accessibility_features: "Accessibility Features",
-      accepted_payment_methods: "Accepted Payment Methods",
-      opening_hours: "Opening Hours",
-      owner_info: "Owner Info",
-      additional_services: "Additional Services",
-      rules_and_regulations: "Rules & Regulations",
-      type: "Venue Type",
-      zipcode: "Zip Code",
-      image_url: "Image URL",
-      status: "Status",
-    };
-    return dict[key] || key.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase());
+  // --- NEW UTILITY: Detect if query is Arabic ---
+  function isArabicText(text: string) {
+    return /[\u0600-\u06FF]/.test(text);
   }
 
-  function allFieldsAnswer(venue: Venue): string {
-    let lines: string[] = [];
-    for (const key of Object.keys(venue)) {
-      const v = (venue as any)[key];
-      const prettyKey = humanizeKey(key);
-      let val = "";
-      if (Array.isArray(v)) val = v.length > 0 ? v.join(", ") : "Not available";
-      else if (typeof v === "object" && v !== null) val = JSON.stringify(v, null, 2);
-      else if (typeof v === "boolean") val = v ? "Yes" : "No";
-      else if (v === null || v === undefined || v === "") val = "Not available";
-      else val = String(v);
-      lines.push(`${prettyKey}: ${val}`);
-    }
-    return lines.join("\n");
+  // --- IMPROVED: English all-fields answer as pretty sectioned string ---
+  function allFieldsAnswerEn(venue: Venue): string {
+    let sections: string[] = [];
+    sections.push(`Name: ${venue.name || "Not available"}`);
+    if (venue.address || venue.city_name)
+      sections.push(`Address: ${venue.address || ""}${venue.city_name ? ", " + venue.city_name : ""}`);
+    if (venue.description) sections.push(`Description: ${venue.description}`);
+    if (venue.category_name?.length)
+      sections.push("Category: " + safeList(venue.category_name));
+    if (venue.type) sections.push("Venue Type: " + venue.type);
+    if (venue.min_capacity && venue.max_capacity)
+      sections.push(`Capacity: ${venue.min_capacity} - ${venue.max_capacity} guests`);
+    if (venue.starting_price)
+      sections.push(
+        `Starting Price: ${venue.starting_price} ${venue.currency || ""}` +
+          (venue.price_per_person ? ` | Per Person: ${venue.price_per_person} ${venue.currency || ""}` : "")
+      );
+    if (venue.amenities?.length)
+      sections.push("Amenities: " + safeList(venue.amenities));
+    if (venue.availability?.length)
+      sections.push("Available days: " + safeList(venue.availability));
+    if (venue.rating)
+      sections.push(`Rating: ${venue.rating}/5 from ${venue.reviews_count ?? 0} reviews`);
+    if (venue.parking !== null)
+      sections.push("Parking: " + (venue.parking ? "Available" : "Not available"));
+    if (venue.wifi !== null)
+      sections.push("WiFi: " + (venue.wifi ? "Available" : "Not available"));
+    if (venue.accessibility_features?.length)
+      sections.push("Accessibility: " + safeList(venue.accessibility_features));
+    if (venue.accepted_payment_methods?.length)
+      sections.push("Accepted Payment Methods: " + safeList(venue.accepted_payment_methods));
+    if (venue.opening_hours)
+      sections.push("Opening Hours: " + JSON.stringify(venue.opening_hours, null, 2));
+    if (venue.owner_info)
+      sections.push("Owner/Contact: " + JSON.stringify(venue.owner_info, null, 2));
+    if (venue.additional_services?.length)
+      sections.push("Additional Services: " + safeList(venue.additional_services));
+    if (venue.rules_and_regulations)
+      sections.push("Rules & Regulations: " + JSON.stringify(venue.rules_and_regulations, null, 2));
+    if (venue.status)
+      sections.push("Status: " + venue.status);
+    if (venue.zipcode)
+      sections.push("Zip Code: " + venue.zipcode);
+    return sections.join("\n");
   }
 
-  // Answer logic adjusted for "explain"/"detail"/Arabic queries
+  // --- NEW: Arabic version for all field info ---
+  function allFieldsAnswerAr(venue: Venue): string {
+    let sections: string[] = [];
+    sections.push(`الاسم: ${venue.name || "غير متوفر"}`);
+    if (venue.address || venue.city_name)
+      sections.push(`العنوان: ${venue.address || ""}${venue.city_name ? "، " + venue.city_name : ""}`);
+    if (venue.description) sections.push(`الوصف: ${venue.description}`);
+    if (venue.category_name?.length)
+      sections.push(`الفئة: ${safeList(venue.category_name, "، ")}`);
+    if (venue.type) sections.push("نوع القاعة: " + venue.type);
+    if (venue.min_capacity && venue.max_capacity)
+      sections.push(`السعة: من ${venue.min_capacity} إلى ${venue.max_capacity} ضيف`);
+    if (venue.starting_price)
+      sections.push(
+        `سعر البداية: ${venue.starting_price} ${venue.currency || ""}` +
+          (venue.price_per_person ? ` | لكل شخص: ${venue.price_per_person} ${venue.currency || ""}` : "")
+      );
+    if (venue.amenities?.length)
+      sections.push("وسائل الراحة: " + safeList(venue.amenities, "، "));
+    if (venue.availability?.length)
+      sections.push("أيام التوفر: " + safeList(venue.availability, "، "));
+    if (venue.rating)
+      sections.push(`التقييم: ${venue.rating}/5 من ${venue.reviews_count ?? 0} مراجعة`);
+    if (venue.parking !== null)
+      sections.push("موقف سيارات: " + (venue.parking ? "متوفر" : "غير متوفر"));
+    if (venue.wifi !== null)
+      sections.push("واي فاي: " + (venue.wifi ? "متوفر" : "غير متوفر"));
+    if (venue.accessibility_features?.length)
+      sections.push("إمكانيات الوصول: " + safeList(venue.accessibility_features, "، "));
+    if (venue.accepted_payment_methods?.length)
+      sections.push("طرق الدفع المقبولة: " + safeList(venue.accepted_payment_methods, "، "));
+    if (venue.opening_hours)
+      sections.push("ساعات العمل: " + JSON.stringify(venue.opening_hours, null, 2));
+    if (venue.owner_info)
+      sections.push("المالك/التواصل: " + JSON.stringify(venue.owner_info, null, 2));
+    if (venue.additional_services?.length)
+      sections.push("خدمات إضافية: " + safeList(venue.additional_services, "، "));
+    if (venue.rules_and_regulations)
+      sections.push("القوانين والتعليمات: " + JSON.stringify(venue.rules_and_regulations, null, 2));
+    if (venue.status)
+      sections.push("الحالة: " + venue.status);
+    if (venue.zipcode)
+      sections.push("الرمز البريدي: " + venue.zipcode);
+    return sections.join("\n");
+  }
+
+  // --- UPDATED getVenueAnswer to use improved all-fields answers & reply in Arabic if question is Arabic ---
   function getVenueAnswer(query: string): string {
     if (!venue) return "Sorry, I couldn't find information for this venue.";
     const v = venue;
     const q = query.trim().toLowerCase();
 
-    // Check for "explain in detail", "explain", "all attributes", "كل التفاصيل" (Arabic for all details), etc.
+    // Use Arabic output if query is Arabic or explicitly asks in Arabic
     if (
-      /explain( in detail)?|details|شرح|تفاصيل|عرض الكل|all fields|all attributes|all info|full details|everything/i.test(q)
+      /شرح|تفاصيل|عرض الكل|كل التفاصيل/i.test(q) ||
+      /explain( in detail)?|details|all fields|all attributes|all info|full details|everything/i.test(q)
     ) {
-      return allFieldsAnswer(v);
+      // If question is Arabic, reply in Arabic, else reply in English
+      if (isArabicText(query)) {
+        return allFieldsAnswerAr(v);
+      } else {
+        return allFieldsAnswerEn(v);
+      }
     }
+
     // Basic queries
     if (/name/i.test(q)) return `The venue's name is ${v.name}.`; 
     if (/(address|where|location)/i.test(q)) return v.address ? `Address: ${v.address}` : "No address is listed.";
@@ -249,16 +293,14 @@ const VenueDetailsChatbot: React.FC = () => {
     if (/zip(code)?/.test(q)) return v.zipcode ? `Zipcode: ${v.zipcode}` : "No zipcode info.";
     if(/status/.test(q)) return v.status ? `Status: ${v.status}` : "No status info.";
     if (/description|about|detail/.test(q)) return v.description ? `Description: ${v.description}` : "No description available.";
-    // move the fallback to the end
-    // ... keep fallback as last return ...
-    return `Please ask about this venue's name, address, price, categories, amenities, availability, contacts, type, etc.`;
+    return "Please ask about this venue's name, address, price, categories, amenities, availability, contacts, type, etc.";
   }
 
   // ---- Enhanced speechSynthesis to autodetect and speak Arabic or English ----
   function speakSmart(text: string, onStart?: () => void, onEnd?: () => void) {
     // Figure out if the text has significant Arabic codepoints
     const isArabic = /[\u0600-\u06FF]/.test(text);
-    speak(text, onStart, onEnd, isArabic ? "ar-SA" : "en-US");
+    speak(text, onStart, onEnd);
   }
 
   const handleSendMessage = (customMessage?: string, options?: { viaMic?: boolean }) => {
@@ -292,7 +334,6 @@ const VenueDetailsChatbot: React.FC = () => {
     }, 600);
   };
 
-  // ... keep effect for messages/lastBotShouldSpeak ...
   useEffect(() => {
     if (
       lastBotShouldSpeak &&
@@ -334,25 +375,23 @@ const VenueDetailsChatbot: React.FC = () => {
       </TooltipProvider>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[540px] h-[620px] p-0 overflow-hidden right-[5%] bg-gradient-to-b from-slate-950 to-slate-900 flex flex-col rounded-xl border border-white/10">
-          {/* --- NEW Assistant Header Below --- */}
-          <div className="w-full flex items-center p-4 border-b border-white/10 bg-slate-950/60 gap-2">
-            <Bot className="h-6 w-6 text-findvenue animate-bounce-slow" />
-            <div className="flex flex-col">
-              <span className="text-lg font-semibold text-white">
-                {venue?.name
-                  ? `${venue.name} Assistant`
-                  : "Venue Assistant"}
-              </span>
-              <span className="text-xs text-findvenue-text-muted">
-                Ask about capacity, prices, amenities... in English or العربية!
+          {/* --- NEW Clear Chatbot Header Section --- */}
+          <div className="w-full flex flex-col items-center p-5 border-b border-white/10 bg-blue-950/80 gap-1">
+            <div className="flex gap-2 items-center">
+              <Bot className="h-6 w-6 text-blue-300 animate-bounce-slow" />
+              <span className="text-2xl font-bold text-white">
+                {venue?.name ? `${venue.name} Assistant` : "Venue Assistant"}
               </span>
             </div>
+            <span className="text-xs text-blue-200 italic whitespace-pre-line text-center">
+              {"Ask about capacity, prices, amenities...\nيمكنك السؤال عن القاعة بالعربية أيضاً!"}
+            </span>
           </div>
           {/* DialogTitle (for accessibility, keep visually hidden) */}
           <DialogTitle className="sr-only">
             {venue?.name ? venue.name + " Assistant" : "Venue Assistant"}
           </DialogTitle>
-          {/* ... Close button ... */}
+          {/* Close button */}
           <div className="absolute top-2 right-2 z-10">
             <Button
               variant="ghost"
@@ -427,7 +466,6 @@ const VenueDetailsChatbot: React.FC = () => {
             )}
           </div>
           {/* Input */}
-          {/* ... keep input, mic, speaker buttons etc as before ... */}
           <div className="p-4 border-t border-white/10">
             <div className="flex gap-2 items-center">
               <Input
