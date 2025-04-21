@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import { Bot, Send, Volume2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,13 +55,35 @@ export default function HomeVenueAssistantChat() {
       const resp = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: userMsg }),
+        body: JSON.stringify({ 
+          query: userMsg,
+          type: 'search'
+        }),
       });
+      
       if (!resp.ok) {
         throw new Error("Unable to get answer from assistant");
       }
+      
       const data = await resp.json();
-      setMessages((prev) => [...prev, { role: "assistant", content: data.answer }]);
+      
+      // Format the answer with venue details if available
+      let formattedAnswer = data.answer;
+      if (data.venues && data.venues.length > 0) {
+        formattedAnswer += "\n\nHere are the matching venues:\n\n";
+        data.venues.forEach((venue: any) => {
+          formattedAnswer += `📍 ${venue.name} (${venue.city})\n`;
+          formattedAnswer += `   • Capacity: ${venue.capacity}\n`;
+          formattedAnswer += `   • Price: ${venue.price}\n`;
+          formattedAnswer += `   • Rating: ${venue.rating}\n`;
+          if (venue.image) {
+            formattedAnswer += `   • [View Images](${venue.image})\n`;
+          }
+          formattedAnswer += "\n";
+        });
+      }
+      
+      setMessages((prev) => [...prev, { role: "assistant", content: formattedAnswer }]);
     } catch (e: any) {
       setError(e.message || "Answer unavailable");
       setMessages((prev) => [
@@ -85,7 +106,7 @@ export default function HomeVenueAssistantChat() {
         <span>
           <Volume2
             className="cursor-pointer text-blue-400 hover:text-blue-600"
-            title="Test audio"
+            aria-label="Test audio"
             onClick={() => playSpeech("Venue Assistant is ready to help you!")}
           />
         </span>
