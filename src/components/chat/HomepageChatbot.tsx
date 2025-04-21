@@ -47,6 +47,7 @@ const HomepageChatbot: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const [lastBotShouldSpeak, setLastBotShouldSpeak] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -59,7 +60,7 @@ const HomepageChatbot: React.FC = () => {
       setInputMessage(transcript);
       setIsListening(false);
       if (transcript) {
-        handleSendMessage(transcript);
+        handleSendMessage(transcript, { viaMic: true });
       }
     },
     onEnd: () => setIsListening(false),
@@ -368,6 +369,10 @@ const HomepageChatbot: React.FC = () => {
     setChatbotState('thinking');
 
     const isVoiceInput = !!options?.viaMic;
+    
+    if (isVoiceInput) {
+      setAudioEnabled(true);
+    }
 
     try {
       if (isGreeting(messageText)) {
@@ -389,7 +394,7 @@ const HomepageChatbot: React.FC = () => {
         };
         
         setMessages(prevMessages => [...prevMessages, botMessage]);
-        setLastBotShouldSpeak(isVoiceInput);
+        setLastBotShouldSpeak(isVoiceInput || isSpeakerOn);
         setChatbotState('idle');
         setSuggestedVenues([]);
         return;
@@ -406,7 +411,7 @@ const HomepageChatbot: React.FC = () => {
           };
           
           setMessages(prevMessages => [...prevMessages, botMessage]);
-          setLastBotShouldSpeak(isVoiceInput);
+          setLastBotShouldSpeak(isVoiceInput || isSpeakerOn);
           setChatbotState('idle');
           setSuggestedVenues([]);
           return;
@@ -466,13 +471,32 @@ const HomepageChatbot: React.FC = () => {
           );
         }
         
+        if (matches.priceRange) {
+          filteredVenues = filteredVenues.filter(v => {
+            const price = v.pricing?.startingPrice || v.starting_price;
+            const [min, max] = matches.priceRange!;
+            
+            return price !== undefined && price >= min && price <= max;
+          });
+        }
+        
+        if (matches.amenities && matches.amenities.length > 0) {
+          filteredVenues = filteredVenues.filter(v => {
+            if (!v.amenities) return false;
+            return matches.amenities!.some(a => 
+              Array.isArray(v.amenities) && 
+              v.amenities.some(am => typeof am === 'string' && am.toLowerCase().includes(a))
+            );
+          });
+        }
+        
         response = {
           data: {
             message: isVenueListQuery(messageText) 
               ? `Here are some venues that match your query for ${messageText}.`
               : "Here are some venues you might be interested in:",
             venues: filteredVenues.slice(0, 5),
-            speak: options?.viaMic || false
+            speak: isVoiceInput || false
           }
         };
       }
