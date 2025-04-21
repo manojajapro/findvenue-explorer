@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -226,15 +225,11 @@ const HomepageChatbot: React.FC = () => {
     }
   }, [messages, lastBotShouldSpeak, speechSynthesisSupported]);
 
-  // Function to get the first image from gallery or use imageUrl
-  const getVenueImage = (venue: any) => {
-    if (venue.imageUrl) {
-      return venue.imageUrl;
-    } else if (venue.galleryImages && venue.galleryImages.length > 0) {
-      return venue.galleryImages[0];
-    } else {
-      return null;
+  const getVenueMainImage = (venue: any) => {
+    if (venue.gallery_images && Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) {
+      return venue.gallery_images[0];
     }
+    return '/placeholder.svg';
   };
 
   return (
@@ -261,7 +256,7 @@ const HomepageChatbot: React.FC = () => {
       
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent 
-          className="sm:max-w-[500px] h-[600px] p-0 overflow-hidden right-[5%] sm:right-[5%] translate-x-0 bg-gradient-to-b from-slate-950 to-slate-900 border border-white/10 shadow-2xl rounded-xl flex flex-col"
+          className="sm:max-w-[560px] h-[600px] p-0 overflow-hidden right-[5%] sm:right-[5%] translate-x-0 bg-gradient-to-b from-slate-950 to-slate-900 border border-white/10 shadow-2xl rounded-xl flex flex-col"
         >
           <DialogTitle className="sr-only">Venue Assistant</DialogTitle>
           <div className="absolute top-2 right-2 z-10">
@@ -327,41 +322,66 @@ const HomepageChatbot: React.FC = () => {
             
             {suggestedVenues.length > 0 && (
               <div className="space-y-2">
-                <Badge variant="outline" className="bg-findvenue/10 text-findvenue">
-                  Suggested Venues
+                <Badge variant="outline" className="bg-findvenue/10 text-findvenue mb-2">
+                  Matching Venues
                 </Badge>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {suggestedVenues.map((venue) => (
                     <Card 
-                      key={venue.id} 
-                      className="bg-findvenue-card-bg border border-findvenue-border p-2 cursor-pointer hover:bg-findvenue-surface/50 transition"
+                      key={venue.id}
+                      className="bg-findvenue-card-bg border border-findvenue-border p-3 cursor-pointer hover:bg-findvenue-surface/50 transition"
                       onClick={() => viewVenueDetails(venue.id)}
                     >
-                      <div className="flex">
-                        {venue.imageUrl ? (
-                          <img 
-                            src={venue.imageUrl} 
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="flex-shrink-0 relative w-full sm:w-24 h-24">
+                          <img
+                            src={getVenueMainImage(venue)}
                             alt={venue.name}
-                            className="h-16 w-16 object-cover rounded mr-2"
+                            className="rounded object-cover w-full h-full"
                           />
-                        ) : (
-                          <div className="h-16 w-16 bg-findvenue-surface rounded flex items-center justify-center mr-2">
-                            <Bot className="h-6 w-6 opacity-50" />
-                          </div>
-                        )}
-                        <div className="flex-1 overflow-hidden">
-                          <h4 className="text-sm font-medium text-white truncate">{venue.name}</h4>
-                          <p className="text-xs text-findvenue-text-muted truncate">
-                            {venue.city || 'Location not specified'}
-                          </p>
-                          <p className="text-xs text-findvenue-text-muted mt-1 truncate">
-                            {venue.capacity ? `Capacity: ${venue.capacity}` : ''}
-                          </p>
-                          {venue.price && (
-                            <Badge variant="secondary" className="mt-1 text-xs">
-                              {venue.price}
-                            </Badge>
+                          {venue.featured && (
+                            <span className="absolute top-0 right-0 bg-yellow-400 text-xs text-black px-1 rounded-tr rounded-bl">★</span>
                           )}
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <h4 className="text-md font-semibold text-white truncate">{venue.name}</h4>
+                          <div className="text-xs text-findvenue-text-muted flex flex-wrap gap-2">
+                            <span>{venue.city_name || venue.city || 'No city'}</span>
+                            <span>|</span>
+                            <span className="capitalize">{Array.isArray(venue.category_name) ? venue.category_name.join(', ') : (venue.category_name || venue.category)}</span>
+                            <span>|</span>
+                            <span>Type: {venue.type ?? 'Venue'}</span>
+                          </div>
+                          <div className="text-xs mt-1 flex flex-wrap gap-3">
+                            <span>
+                              <b>Capacity:</b> {venue.min_capacity ?? venue.capacity?.min ?? '-'} - {venue.max_capacity ?? venue.capacity?.max ?? '-'}
+                            </span>
+                            <span>
+                              <b>Price:</b> {venue.starting_price ?? venue.pricing?.startingPrice ?? '-'} {venue.currency ?? venue.pricing?.currency ?? 'SAR'}
+                              {venue.price_per_person || venue.pricing?.pricePerPerson ? ' per person' : ''}
+                            </span>
+                          </div>
+                          <p className="text-xs text-white/80 mt-1 line-clamp-3">{venue.description ?? '-'}</p>
+                          {venue.amenities && (
+                            <p className="text-[11px] text-findvenue mb-0 mt-1 truncate">
+                              <b>Amenities:</b> {Array.isArray(venue.amenities) ? venue.amenities.join(', ') : venue.amenities}
+                            </p>
+                          )}
+                          <p className="text-[11px] text-findvenue-text-muted mt-1 line-clamp-1">
+                            <b>Address:</b> {venue.address}
+                          </p>
+                          {venue.rating && (
+                            <span className="inline-block bg-green-800 text-xs px-2 py-0.5 rounded mt-1">★ {venue.rating} / 5</span>
+                          )}
+                          <div className="flex gap-2 flex-wrap mt-2">
+                            {venue.popular && <Badge variant="secondary" className="text-xs">Popular</Badge>}
+                            {venue.featured && <Badge variant="secondary" className="text-xs">Featured</Badge>}
+                            {venue.reviews_count && (
+                              <span className="text-xs text-white/70">
+                                {venue.reviews_count} reviews
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </Card>
