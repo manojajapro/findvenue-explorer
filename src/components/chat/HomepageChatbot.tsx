@@ -24,6 +24,10 @@ type Message = {
 
 type ChatbotState = 'idle' | 'thinking' | 'error';
 
+interface ExtendedVenue extends Venue {
+  price_per_person?: number;
+}
+
 const HomepageChatbot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -82,6 +86,54 @@ const HomepageChatbot: React.FC = () => {
     return Math.random().toString(36).substring(2, 11);
   };
 
+  // Function to check if query is a direct question about attributes
+  const isDirectAttributeQuestion = (query: string): boolean => {
+    const attributeKeywords = [
+      'city', 'cities', 'location', 'list', 'price', 'capacity', 'amenities', 
+      'type', 'category', 'categories', 'name', 'description', 'address', 'rating'
+    ];
+    
+    const normalizedQuery = query.toLowerCase();
+    return attributeKeywords.some(keyword => normalizedQuery.includes(keyword));
+  }
+
+  // Function to get direct answer for attribute questions
+  const getDirectAttributeAnswer = (query: string): string | null => {
+    const normalizedQuery = query.toLowerCase();
+    
+    // List of cities
+    if (normalizedQuery.includes('city') || normalizedQuery.includes('cities') || normalizedQuery.includes('locations')) {
+      return "The cities with available venues include: Riyadh, Jeddah, Khobar, Dammam, Mecca, Medina, Abha, Taif, and Khamis Mushait.";
+    }
+    
+    // List of venue types
+    if (normalizedQuery.includes('type') && (normalizedQuery.includes('list') || normalizedQuery.includes('what'))) {
+      return "Available venue types include: Wedding Halls, Hotel, Hotel Suites, Conference Spaces, Exhibition Halls, Party Venues, Corporate Events, and more.";
+    }
+    
+    // List of categories
+    if (normalizedQuery.includes('category') || normalizedQuery.includes('categories')) {
+      return "Venue categories include: Wedding Venues, Conference Spaces, Exhibition Halls, Party Venues, Corporate Events, and more.";
+    }
+    
+    // About prices
+    if (normalizedQuery.includes('price') || normalizedQuery.includes('cost') || normalizedQuery.includes('pricing')) {
+      return "Prices vary by venue size, location, and amenities. Venues start from around 12,000 SAR for small gatherings up to 40,000 SAR for luxury venues. Many venues offer per-person pricing options as well.";
+    }
+    
+    // About capacities
+    if (normalizedQuery.includes('capacity') || normalizedQuery.includes('how many') || normalizedQuery.includes('people')) {
+      return "Venues have different capacities ranging from small gatherings of 20 people to large events accommodating up to 800 guests. You can filter venues by your expected guest count.";
+    }
+    
+    // About amenities
+    if (normalizedQuery.includes('amenities') || normalizedQuery.includes('facilities') || normalizedQuery.includes('features')) {
+      return "Common amenities include WiFi, Parking, Catering, Sound Systems, Lighting, Bridal Suites, AV Equipment, Stage Setups, and Outdoor Spaces. Luxury venues may offer additional services like Valet Parking.";
+    }
+    
+    return null;
+  }
+
   const handleSendMessage = async (customMessage?: string, options?: { viaMic?: boolean }) => {
     const messageText = customMessage || inputMessage;
     
@@ -99,6 +151,22 @@ const HomepageChatbot: React.FC = () => {
     setChatbotState('thinking');
 
     try {
+      // Check if this is a direct attribute question that we can answer immediately
+      const directAnswer = getDirectAttributeAnswer(messageText);
+      if (directAnswer) {
+        const botMessage = {
+          id: generateId(),
+          sender: 'bot' as const,
+          content: directAnswer,
+          timestamp: new Date()
+        };
+        
+        setMessages(prevMessages => [...prevMessages, botMessage]);
+        setChatbotState('idle');
+        setSuggestedVenues([]); // Clear venues when giving a direct answer
+        return;
+      }
+
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error("Request timed out")), 30000)
       );
@@ -360,7 +428,7 @@ const HomepageChatbot: React.FC = () => {
                           </div>
                           <div className="flex flex-wrap gap-3 mt-1">
                             <span><b>Capacity:</b> {venue.capacity?.min ?? '-'} - {venue.capacity?.max ?? '-'}</span>
-                            <span><b>Price:</b> {venue.pricing?.startingPrice ?? venue.starting_price ?? '-'} {venue.pricing?.currency ?? venue.currency ?? 'SAR'}{(venue.pricing?.pricePerPerson || ((venue as any).price_per_person && (venue as any).price_per_person > 0)) ? ' per person' : ''}</span>
+                            <span><b>Price:</b> {venue.pricing?.startingPrice ?? venue.starting_price ?? '-'} {venue.pricing?.currency ?? venue.currency ?? 'SAR'}{(venue.pricing?.pricePerPerson || ((venue as ExtendedVenue).price_per_person && (venue as ExtendedVenue).price_per_person > 0)) ? ' per person' : ''}</span>
                           </div>
                           <div className="mt-1">
                             <div>
