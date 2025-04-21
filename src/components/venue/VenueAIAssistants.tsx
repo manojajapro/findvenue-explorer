@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Venue } from '@/hooks/useSupabaseVenues';
@@ -46,6 +47,9 @@ const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
             <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="rounded-full h-8 w-8 hover:bg-white/10">
               <X className="h-4 w-4 text-gray-400" />
             </Button>
+          </div>
+          <div className="p-6 text-center text-white">
+            <p>AI Assistant functionality has been removed.</p>
           </div>
         </DialogContent>
       </Dialog>

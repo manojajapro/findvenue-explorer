@@ -10,7 +10,6 @@ import GlobalVenues from '@/components/global/GlobalVenues';
 import AdviceSection from '@/components/advice/AdviceSection';
 import { useSearch } from '@/hooks/useSearch';
 import HomePageMap from '@/components/map/HomePageMap';
-import SmartVenueAssistant from '@/components/chat/SmartVenueAssistant';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -106,7 +105,6 @@ const Index = () => {
   
   return (
     <>
-      <SmartVenueAssistant />
       <HeroSection />
       
       <div id="find-venues-map" className="container mx-auto px-4 py-8">
