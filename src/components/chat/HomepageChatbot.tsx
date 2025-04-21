@@ -359,7 +359,7 @@ const HomepageChatbot: React.FC = () => {
                           </div>
                           <div className="flex flex-wrap gap-3 mt-1">
                             <span><b>Capacity:</b> {venue.capacity?.min ?? '-'} - {venue.capacity?.max ?? '-'}</span>
-                            <span><b>Price:</b> {venue.pricing?.startingPrice ?? '-'} {venue.pricing?.currency ?? venue.currency ?? 'SAR'}{venue.pricing?.pricePerPerson || venue.pricePerPerson ? ' per person' : ''}</span>
+                            <span><b>Price:</b> {venue.pricing?.startingPrice ?? venue.starting_price ?? '-'} {venue.pricing?.currency ?? venue.currency ?? 'SAR'}{venue.pricing?.pricePerPerson || (venue.price_per_person && venue.price_per_person > 0) ? ' per person' : ''}</span>
                           </div>
                           <div className="mt-1">
                             <div>
