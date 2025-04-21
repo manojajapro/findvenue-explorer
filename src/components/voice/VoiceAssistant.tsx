@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -8,68 +9,14 @@ import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 const VoiceAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
+  const [micActive, setMicActive] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+  
+  // Use our custom hooks for speech functionality
+  const { speak, stop } = useSpeechSynthesis();
   const [isSpeaking, setIsSpeaking] = useState(false);
-  
-  // Speech recognition setup
-  const recognition = useRef<SpeechRecognition | null>(null);
-  
-  // Initialize speech recognition
-  const initSpeechRecognition = () => {
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition.current = new SpeechRecognition();
-      recognition.current.continuous = false;
-      recognition.current.interimResults = false;
-      recognition.current.lang = 'en-US';
-      
-      recognition.current.onresult = (event) => {
-        const speechResult = event.results[0][0].transcript;
-        setTranscript(speechResult);
-        handleVoiceCommand(speechResult);
-        setIsListening(false);
-      };
-      
-      recognition.current.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        setIsListening(false);
-      };
-      
-      recognition.current.onend = () => {
-        setIsListening(false);
-      };
-    } else {
-      console.error('Speech recognition not supported in this browser');
-    }
-  };
-  
-  // Start listening
-  const startListening = () => {
-    if (!recognition.current) {
-      initSpeechRecognition();
-    }
-    
-    if (recognition.current) {
-      try {
-        recognition.current.start();
-        setIsListening(true);
-        setTranscript('');
-        setResponse('');
-      } catch (error) {
-        console.error('Error starting speech recognition:', error);
-      }
-    }
-  };
-  
-  // Stop listening
-  const stopListening = () => {
-    if (recognition.current) {
-      recognition.current.stop();
-      setIsListening(false);
-    }
-  };
   
   // Handle voice commands
   const handleVoiceCommand = (command: string) => {
@@ -98,60 +45,37 @@ const VoiceAssistant = () => {
     }
     
     setResponse(responseText);
-    speakResponse(responseText);
+    handleSpeakResponse(responseText);
   };
   
-  // Text-to-speech
-  const speakResponse = (text: string) => {
-    if ('speechSynthesis' in window) {
-      const speech = new SpeechSynthesisUtterance();
-      speech.text = text;
-      speech.volume = 1;
-      speech.rate = 1;
-      speech.pitch = 1;
-      
-      // Use a more natural voice if available
-      const voices = window.speechSynthesis.getVoices();
-      const preferredVoice = voices.find(voice => voice.lang === 'en-US' && voice.name.includes('Female'));
-      if (preferredVoice) {
-        speech.voice = preferredVoice;
-      }
-      
-      speech.onstart = () => setIsSpeaking(true);
-      speech.onend = () => setIsSpeaking(false);
-      
-      window.speechSynthesis.speak(speech);
-    }
-  };
-  
-  // Stop speaking
-  const stopSpeaking = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-    }
-  };
-
-  const { speak, stop } = useSpeechSynthesis();
-  const [isSpeaking, setIsSpeaking] = useState(false);
-
   // Enhanced: allow direct browser speech synthesis for responses
-  const speakResponse = (text: string) => {
+  const handleSpeakResponse = (text: string) => {
     speak(text, () => setIsSpeaking(true), () => setIsSpeaking(false));
   };
-
-  // mic for input
-  const [micError, setMicError] = useState<string | null>(null);
-  const [micActive, setMicActive] = useState(false);
+  
+  // Speech recognition with our custom hook
   const { startListening, stopListening } = useSpeechRecognition({
-    onResult: (t) => {
-      setTranscript(t);
-      handleVoiceCommand(t);
+    onResult: (text) => {
+      setTranscript(text);
+      handleVoiceCommand(text);
       setMicActive(false);
     },
     onEnd: () => setMicActive(false),
-    onError: (err) => { setMicError(err); setMicActive(false); }
+    onError: (err) => { 
+      setMicError(err); 
+      setMicActive(false); 
+    }
   });
+  
+  const handleMicStart = () => {
+    setMicActive(true);
+    startListening();
+  };
+  
+  const handleMicStop = () => {
+    setMicActive(false);
+    stopListening();
+  };
   
   return (
     <>
@@ -198,7 +122,7 @@ const VoiceAssistant = () => {
           </div>
           {/* --- Main Content --- */}
           <div className="p-6 flex flex-col items-center">
-            {(isListening || micActive) ? (
+            {micActive ? (
               <>
                 <div className="w-20 h-20 rounded-full bg-findvenue-surface flex items-center justify-center mb-6 relative">
                   <div className="absolute w-full h-full rounded-full bg-findvenue/20 animate-ping"></div>
@@ -211,7 +135,7 @@ const VoiceAssistant = () => {
                 <Button 
                   variant="outline" 
                   className="border-findvenue-gold text-findvenue-gold hover:bg-findvenue-gold/10"
-                  onClick={() => { stopListening(); setMicActive(false); }}
+                  onClick={handleMicStop}
                 >
                   <MicOff className="h-4 w-4 mr-2" />
                   Stop Listening
@@ -246,7 +170,7 @@ const VoiceAssistant = () => {
                       size="icon"
                       aria-label="Hear response"
                       className="ml-2 h-8 w-8"
-                      onClick={() => speakResponse(response)}
+                      onClick={() => handleSpeakResponse(response)}
                     >
                       <Volume2 className="h-5 w-5 text-findvenue" />
                     </Button>
@@ -264,7 +188,7 @@ const VoiceAssistant = () => {
                   <>
                     <Button 
                       className="bg-findvenue hover:bg-findvenue-dark mr-2"
-                      onClick={startListening}
+                      onClick={handleMicStart}
                     >
                       <Mic className="h-4 w-4 mr-2" />
                       Start Speaking

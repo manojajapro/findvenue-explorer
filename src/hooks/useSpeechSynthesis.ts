@@ -12,12 +12,26 @@ export function useSpeechSynthesis() {
     if (utteranceRef.current) {
       window.speechSynthesis.cancel(); // Stop previous
     }
+    
     const utterance = new window.SpeechSynthesisUtterance(text);
     utterance.lang = "en-US";
     utterance.rate = 1.01;
-    utterance.onstart = onStart || null;
-    utterance.onend = onEnd || null;
-    utterance.oncancel = onEnd || null;
+    
+    // Handle events
+    if (onStart) utterance.onstart = onStart;
+    if (onEnd) {
+      utterance.onend = onEnd;
+      // Handle cancel event by monitoring speechSynthesis state
+      const originalCancelHandler = window.speechSynthesis.onvoiceschanged;
+      const checkSpeechState = setInterval(() => {
+        if (!window.speechSynthesis.speaking && utteranceRef.current === utterance) {
+          clearInterval(checkSpeechState);
+          if (onEnd) onEnd();
+        }
+      }, 100);
+      utterance.addEventListener('end', () => clearInterval(checkSpeechState));
+    }
+    
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
   };

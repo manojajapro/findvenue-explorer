@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { Venue } from '@/hooks/useSupabaseVenues';
 import { Volume2, Mic } from "lucide-react";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { toast } from 'sonner';
 
 type Message = {
   id: string;
@@ -36,11 +38,30 @@ const HomepageChatbot: React.FC = () => {
   const [chatbotState, setChatbotState] = useState<ChatbotState>('idle');
   const [suggestedVenues, setSuggestedVenues] = useState<Venue[]>([]);
   const [isVoiceAvailable, setIsVoiceAvailable] = useState(true);
-  const { speak, stop } = useSpeechSynthesis();
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // Use custom speech hooks
+  const { speak, stop } = useSpeechSynthesis();
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const { startListening, stopListening } = useSpeechRecognition({
+    onResult: (transcript) => {
+      setInputMessage(transcript);
+      setIsListening(false);
+      handleSendMessage(transcript);
+    },
+    onEnd: () => setIsListening(false),
+    onError: (err) => {
+      setIsListening(false);
+      setIsVoiceAvailable(false);
+      toast({
+        title: "Speech Recognition Error",
+        description: "Speech recognition not supported or not permitted in your browser.",
+        variant: "destructive"
+      });
+    }
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,13 +75,15 @@ const HomepageChatbot: React.FC = () => {
     return Math.random().toString(36).substring(2, 11);
   };
 
-  const handleSendMessage = async () => {
-    if (inputMessage.trim() === '' || chatbotState === 'thinking') return;
+  const handleSendMessage = async (customMessage?: string) => {
+    const messageText = customMessage || inputMessage;
+    
+    if (messageText.trim() === '' || chatbotState === 'thinking') return;
 
     const userMessage = {
       id: generateId(),
       sender: 'user' as const,
-      content: inputMessage,
+      content: messageText,
       timestamp: new Date()
     };
 
@@ -128,25 +151,22 @@ const HomepageChatbot: React.FC = () => {
 
   const handleSpeak = (text: string) => {
     stop();
-    setIsSpeaking(true);
-    speak(text, () => setIsSpeaking(true), () => setIsSpeaking(false));
+    speak(
+      text, 
+      () => setIsSpeaking(true), 
+      () => setIsSpeaking(false)
+    );
   };
 
-  const onMicResult = (transcript: string) => {
-    setInputMessage(transcript);
-    setIsListening(false);
+  const handleStartListening = () => {
+    setIsListening(true);
+    startListening();
   };
-  const onMicEnd = () => setIsListening(false);
-  const onMicError = (err: string) => {
+
+  const handleStopListening = () => {
     setIsListening(false);
-    setIsVoiceAvailable(false);
-    alert("Speech recognition not supported or not permitted in your browser.");
+    stopListening();
   };
-  const { startListening, stopListening } = useSpeechRecognition({
-    onResult: onMicResult,
-    onEnd: onMicEnd,
-    onError: onMicError,
-  });
 
   return (
     <>
@@ -293,7 +313,7 @@ const HomepageChatbot: React.FC = () => {
                 aria-label="Chat message input"
               />
               <Button 
-                onClick={handleSendMessage}
+                onClick={() => handleSendMessage()}
                 disabled={inputMessage.trim() === '' || chatbotState === 'thinking'}
                 className="bg-findvenue hover:bg-findvenue-dark"
                 aria-label="Send"
@@ -305,12 +325,9 @@ const HomepageChatbot: React.FC = () => {
                 )}
               </Button>
               <Button
-                onClick={() => {
-                  setIsListening(true); 
-                  startListening();
-                }}
-                className={`ml-1 bg-findvenue-surface/80 border border-findvenue/30 hover:bg-findvenue/20 transition duration-150 ${isListening ? "animate-pulse" : ""}`}
-                disabled={chatbotState === 'thinking' || isListening || !isVoiceAvailable}
+                onClick={isListening ? handleStopListening : handleStartListening}
+                className={`ml-1 ${isListening ? 'bg-findvenue' : 'bg-findvenue-surface/80'} border border-findvenue/30 hover:bg-findvenue/20 transition duration-150 ${isListening ? "animate-pulse" : ""}`}
+                disabled={chatbotState === 'thinking' || !isVoiceAvailable}
                 size="icon"
                 aria-label="Voice input"
               >
@@ -327,7 +344,7 @@ const HomepageChatbot: React.FC = () => {
               <div className="mt-2 flex items-center gap-2 text-xs text-blue-300">
                 <Mic className="w-4 h-4 animate-pulse" />
                 Listening... Speak now!
-                <Button variant="outline" size="sm" className="ml-2 py-0 px-2" onClick={stopListening}>Stop</Button>
+                <Button variant="outline" size="sm" className="ml-2 py-0 px-2" onClick={handleStopListening}>Stop</Button>
               </div>
             )}
             {isSpeaking && (
