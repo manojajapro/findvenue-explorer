@@ -26,8 +26,28 @@ type ChatbotState = 'idle' | 'thinking' | 'error';
 const CHAT_STORAGE_KEY_PREFIX = 'venueDetailsAssistant_';
 const MAX_STORED_MESSAGES = 50; // Maximum number of messages to store in local storage
 
+// Extended type to support both model properties and direct DB fields
+interface VenueWithDBFields extends Venue {
+  // Direct database fields from Supabase
+  category_name?: string[] | string;
+  min_capacity?: number;
+  max_capacity?: number;
+  starting_price?: number;
+  price_per_person?: number;
+  reviews_count?: number;
+  accessibility_features?: string[];
+  accepted_payment_methods?: string[];
+  opening_hours?: Record<string, { open: string; close: string; }>;
+  additional_services?: string[];
+  rules_and_regulations?: Array<{
+    title: string;
+    description: string;
+    category?: string;
+  }>;
+}
+
 interface VenueDetailsChatbotProps {
-  venue: Venue;
+  venue: VenueWithDBFields;
 }
 
 const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
@@ -120,7 +140,7 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
     return /[\u0600-\u06FF]/.test(text);
   };
 
-  const generateDetailedResponse = (venue: Venue): string => {
+  const generateDetailedResponse = (venue: VenueWithDBFields): string => {
     const useArabic = isArabicText(venue.name);
     
     if (useArabic) {
@@ -135,13 +155,19 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       }
       
       if (venue.capacity && (venue.capacity.min || venue.capacity.max)) {
-        response += `\n\nالسعة: تستوعب من ${venue.capacity.min || '?'} إلى ${venue.capacity.max || '?'} ضيف. `;
+        response += `\n\nالسعة: تستوعب من ${venue.capacity.min || venue.min_capacity || '?'} إلى ${venue.capacity.max || venue.max_capacity || '?'} ضيف. `;
+      } else if (venue.min_capacity || venue.max_capacity) {
+        response += `\n\nالسعة: تستوعب من ${venue.min_capacity || '?'} إلى ${venue.max_capacity || '?'} ضيف. `;
       }
       
-      if (venue.pricing) {
-        response += `\n\nالأسعار: تبدأ من ${venue.pricing.startingPrice || 0} ${venue.pricing.currency || 'SAR'}`;
-        if (venue.pricing.pricePerPerson) {
-          response += `، مع سعر ${venue.pricing.pricePerPerson} ${venue.pricing.currency || 'SAR'} للشخص الواحد`;
+      if (venue.pricing || venue.starting_price) {
+        const currency = venue.pricing?.currency || venue.currency || 'SAR';
+        const startingPrice = venue.pricing?.startingPrice || venue.starting_price || 0;
+        const pricePerPerson = venue.pricing?.pricePerPerson || venue.price_per_person;
+        
+        response += `\n\nالأسعار: تبدأ من ${startingPrice} ${currency}`;
+        if (pricePerPerson) {
+          response += `، مع سعر ${pricePerPerson} ${currency} للشخص الواحد`;
         }
         response += `. `;
       }
@@ -152,6 +178,8 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       
       if (venue.categoryNames && venue.categoryNames.length > 0) {
         response += `\n\nالفئات: ${venue.categoryNames.join('، ')}. `;
+      } else if (venue.category_name && Array.isArray(venue.category_name)) {
+        response += `\n\nالفئات: ${venue.category_name.join('، ')}. `;
       }
       
       if (venue.amenities && venue.amenities.length > 0) {
@@ -168,14 +196,78 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       
       if (venue.accessibilityFeatures && venue.accessibilityFeatures.length > 0) {
         response += `\n\nميزات سهولة الوصول: ${venue.accessibilityFeatures.join('، ')}. `;
+      } else if (venue.accessibility_features && Array.isArray(venue.accessibility_features)) {
+        response += `\n\nميزات سهولة الوصول: ${venue.accessibility_features.join('، ')}. `;
       }
       
       if (venue.rating) {
-        response += `\n\nالتقييم: ${venue.rating}/5 (${venue.reviews || 0} تقييم). `;
+        response += `\n\nالتقييم: ${venue.rating}/5 (${venue.reviews || venue.reviews_count || 0} تقييم). `;
       }
       
       if (venue.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0) {
         response += `\n\nطرق الدفع المقبولة: ${venue.acceptedPaymentMethods.join('، ')}. `;
+      } else if (venue.accepted_payment_methods && Array.isArray(venue.accepted_payment_methods)) {
+        response += `\n\nطرق الدفع المقبولة: ${venue.accepted_payment_methods.join('، ')}. `;
+      }
+      
+      if (venue.openingHours && Object.keys(venue.openingHours).length > 0) {
+        response += `\n\nساعات العمل: `;
+        const days = ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
+        const daysMap: {[key: string]: string} = {
+          'monday': 'الإثنين',
+          'tuesday': 'الثلاثاء',
+          'wednesday': 'الأربعاء',
+          'thursday': 'الخميس',
+          'friday': 'الجمعة',
+          'saturday': 'السبت',
+          'sunday': 'الأحد'
+        };
+        
+        Object.entries(venue.openingHours).forEach(([day, hours]) => {
+          if (hours && hours.open && hours.close) {
+            response += `\n${daysMap[day] || day}: ${hours.open} - ${hours.close}`;
+          }
+        });
+      } else if (venue.opening_hours && typeof venue.opening_hours === 'object') {
+        response += `\n\nساعات العمل: `;
+        const daysMap: {[key: string]: string} = {
+          'monday': 'الإثنين',
+          'tuesday': 'الثلاثاء',
+          'wednesday': 'الأربعاء',
+          'thursday': 'الخميس',
+          'friday': 'الجمعة',
+          'saturday': 'السبت',
+          'sunday': 'الأحد'
+        };
+        
+        Object.entries(venue.opening_hours).forEach(([day, hours]) => {
+          if (hours && typeof hours === 'object' && 'open' in hours && 'close' in hours) {
+            const hourObj = hours as {open: string, close: string};
+            response += `\n${daysMap[day] || day}: ${hourObj.open} - ${hourObj.close}`;
+          }
+        });
+      }
+      
+      if (venue.additionalServices && venue.additionalServices.length > 0) {
+        response += `\n\nخدمات إضافية: ${Array.isArray(venue.additionalServices) ? venue.additionalServices.join('، ') : venue.additionalServices}. `;
+      } else if (venue.additional_services && venue.additional_services.length > 0) {
+        response += `\n\nخدمات إضافية: ${Array.isArray(venue.additional_services) ? venue.additional_services.join('، ') : venue.additional_services}. `;
+      }
+      
+      if (venue.rulesAndRegulations && Array.isArray(venue.rulesAndRegulations) && venue.rulesAndRegulations.length > 0) {
+        response += `\n\nالقواعد واللوائح: `;
+        venue.rulesAndRegulations.forEach((rule, index) => {
+          if (typeof rule === 'object' && rule.title && rule.description) {
+            response += `\n${index + 1}. ${rule.title}: ${rule.description}`;
+          }
+        });
+      } else if (venue.rules_and_regulations && Array.isArray(venue.rules_and_regulations) && venue.rules_and_regulations.length > 0) {
+        response += `\n\nالقواعد واللوائح: `;
+        venue.rules_and_regulations.forEach((rule, index) => {
+          if (typeof rule === 'object' && rule.title && rule.description) {
+            response += `\n${index + 1}. ${rule.title}: ${rule.description}`;
+          }
+        });
       }
       
       return response;
@@ -191,13 +283,19 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       }
       
       if (venue.capacity && (venue.capacity.min || venue.capacity.max)) {
-        response += `\n\nCapacity: Accommodates from ${venue.capacity.min || '?'} to ${venue.capacity.max || '?'} guests. `;
+        response += `\n\nCapacity: Accommodates from ${venue.capacity.min || venue.min_capacity || '?'} to ${venue.capacity.max || venue.max_capacity || '?'} guests. `;
+      } else if (venue.min_capacity || venue.max_capacity) {
+        response += `\n\nCapacity: Accommodates from ${venue.min_capacity || '?'} to ${venue.max_capacity || '?'} guests. `;
       }
       
-      if (venue.pricing) {
-        response += `\n\nPricing: Starting at ${venue.pricing.startingPrice || 0} ${venue.pricing.currency || 'SAR'}`;
-        if (venue.pricing.pricePerPerson) {
-          response += `, with a per-person rate of ${venue.pricing.pricePerPerson} ${venue.pricing.currency || 'SAR'}`;
+      if (venue.pricing || venue.starting_price) {
+        const currency = venue.pricing?.currency || venue.currency || 'SAR';
+        const startingPrice = venue.pricing?.startingPrice || venue.starting_price || 0;
+        const pricePerPerson = venue.pricing?.pricePerPerson || venue.price_per_person;
+        
+        response += `\n\nPricing: Starting at ${startingPrice} ${currency}`;
+        if (pricePerPerson) {
+          response += `, with a per-person rate of ${pricePerPerson} ${currency}`;
         }
         response += `. `;
       }
@@ -208,6 +306,8 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       
       if (venue.categoryNames && venue.categoryNames.length > 0) {
         response += `\n\nCategories: ${venue.categoryNames.join(', ')}. `;
+      } else if (venue.category_name && Array.isArray(venue.category_name)) {
+        response += `\n\nCategories: ${venue.category_name.join(', ')}. `;
       }
       
       if (venue.amenities && venue.amenities.length > 0) {
@@ -224,14 +324,57 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       
       if (venue.accessibilityFeatures && venue.accessibilityFeatures.length > 0) {
         response += `\n\nAccessibility features: ${venue.accessibilityFeatures.join(', ')}. `;
+      } else if (venue.accessibility_features && Array.isArray(venue.accessibility_features)) {
+        response += `\n\nAccessibility features: ${venue.accessibility_features.join(', ')}. `;
       }
       
       if (venue.rating) {
-        response += `\n\nRating: ${venue.rating}/5 (${venue.reviews || 0} reviews). `;
+        response += `\n\nRating: ${venue.rating}/5 (${venue.reviews || venue.reviews_count || 0} reviews). `;
       }
       
       if (venue.acceptedPaymentMethods && venue.acceptedPaymentMethods.length > 0) {
         response += `\n\nAccepted payment methods: ${venue.acceptedPaymentMethods.join(', ')}. `;
+      } else if (venue.accepted_payment_methods && Array.isArray(venue.accepted_payment_methods)) {
+        response += `\n\nAccepted payment methods: ${venue.accepted_payment_methods.join(', ')}. `;
+      }
+      
+      if (venue.openingHours && Object.keys(venue.openingHours).length > 0) {
+        response += `\n\nOpening Hours: `;
+        Object.entries(venue.openingHours).forEach(([day, hours]) => {
+          if (hours && hours.open && hours.close) {
+            response += `\n${day.charAt(0).toUpperCase() + day.slice(1)}: ${hours.open} - ${hours.close}`;
+          }
+        });
+      } else if (venue.opening_hours && typeof venue.opening_hours === 'object') {
+        response += `\n\nOpening Hours: `;
+        Object.entries(venue.opening_hours).forEach(([day, hours]) => {
+          if (hours && typeof hours === 'object' && 'open' in hours && 'close' in hours) {
+            const hourObj = hours as {open: string, close: string};
+            response += `\n${day.charAt(0).toUpperCase() + day.slice(1)}: ${hourObj.open} - ${hourObj.close}`;
+          }
+        });
+      }
+      
+      if (venue.additionalServices && venue.additionalServices.length > 0) {
+        response += `\n\nAdditional Services: ${Array.isArray(venue.additionalServices) ? venue.additionalServices.join(', ') : venue.additionalServices}. `;
+      } else if (venue.additional_services && venue.additional_services.length > 0) {
+        response += `\n\nAdditional Services: ${Array.isArray(venue.additional_services) ? venue.additional_services.join(', ') : venue.additional_services}. `;
+      }
+      
+      if (venue.rulesAndRegulations && Array.isArray(venue.rulesAndRegulations) && venue.rulesAndRegulations.length > 0) {
+        response += `\n\nRules and Regulations: `;
+        venue.rulesAndRegulations.forEach((rule, index) => {
+          if (typeof rule === 'object' && rule.title && rule.description) {
+            response += `\n${index + 1}. ${rule.title}: ${rule.description}`;
+          }
+        });
+      } else if (venue.rules_and_regulations && Array.isArray(venue.rules_and_regulations) && venue.rules_and_regulations.length > 0) {
+        response += `\n\nRules and Regulations: `;
+        venue.rules_and_regulations.forEach((rule, index) => {
+          if (typeof rule === 'object' && rule.title && rule.description) {
+            response += `\n${index + 1}. ${rule.title}: ${rule.description}`;
+          }
+        });
       }
       
       return response;
@@ -241,18 +384,19 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
   const getResponseForVenueQuery = (query: string): string => {
     query = query.toLowerCase();
     
-    if (/more details|tell me more|explain|elaborate|details|all info|full details|everything|more information|كل التفاصيل|شرح|تفاصيل/i.test(query)) {
-      return generateDetailedResponse(venue);
-    }
-
+    // Simple greeting - just respond with a friendly greeting without excessive information
     if (/^(hi|hello|hey|مرحبا|اهلا|السلام عليكم)$/i.test(query.trim())) {
       const isArabic = isArabicText(query);
       
       if (isArabic) {
-        return `${venue.name} هي قاعة في ${venue.city || ''}. تستوعب من ${venue.capacity?.min || '?'} إلى ${venue.capacity?.max || '?'} ضيف بأسعار تبدأ من ${venue.pricing?.startingPrice || 0} ${venue.pricing?.currency || 'SAR'}. يمكنك أن تسألني عن المزيد من التفاصيل مثل المرافق، الموقع، ساعات العمل، إلخ.`;
+        return `مرحباً! كيف يمكنني مساعدتك بخصوص ${venue.name}؟`;
       } else {
-        return `${venue.name} is a venue in ${venue.city || ''}. It can accommodate ${venue.capacity?.min || '?'}-${venue.capacity?.max || '?'} guests with pricing starting at ${venue.pricing?.startingPrice || 0} ${venue.pricing?.currency || 'SAR'}. You can ask me about specific details like amenities, location, hours, etc.`;
+        return `Hello! How can I help you with information about ${venue.name}?`;
       }
+    }
+    
+    if (/more details|tell me more|explain|elaborate|details|all info|full details|everything|more information|كل التفاصيل|شرح|تفاصيل/i.test(query)) {
+      return generateDetailedResponse(venue);
     }
 
     if ((/about|describe|what is|tell me about|overview|وصف/i.test(query)) && venue.description) {
@@ -260,13 +404,13 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
     }
     
     if (/max(imum)? capacity|max guests|most people|how many people|max attendees/i.test(query)) {
-      return `${venue.name} can accommodate up to ${venue.capacity?.max || '?'} guests.`;
+      return `${venue.name} can accommodate up to ${venue.capacity?.max || venue.max_capacity || '?'} guests.`;
     }
 
     if (/price|cost|fee|how much|rate|pricing/i.test(query)) {
-      const currency = venue.pricing?.currency || 'SAR';
-      const startingPrice = venue.pricing?.startingPrice || 0;
-      const pricePerPerson = venue.pricing?.pricePerPerson;
+      const currency = venue.pricing?.currency || venue.currency || 'SAR';
+      const startingPrice = venue.pricing?.startingPrice || venue.starting_price || 0;
+      const pricePerPerson = venue.pricing?.pricePerPerson || venue.price_per_person;
       
       let priceResponse = `The starting price for ${venue.name} is ${startingPrice.toLocaleString()} ${currency}.`;
       if (pricePerPerson) {
@@ -300,6 +444,9 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
 
     if (/accessibility|accessible|wheelchair|disabled/i.test(query)) {
       if (!venue.accessibilityFeatures || venue.accessibilityFeatures.length === 0) {
+        if (venue.accessibility_features && Array.isArray(venue.accessibility_features) && venue.accessibility_features.length > 0) {
+          return `${venue.name} offers these accessibility features: ${venue.accessibility_features.join(', ')}.`;
+        }
         return `I don't have specific information about accessibility features for ${venue.name}.`;
       }
       return `${venue.name} offers these accessibility features: ${venue.accessibilityFeatures.join(', ')}.`;
@@ -307,24 +454,42 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
 
     if (/payment|pay|credit card|cash/i.test(query)) {
       if (!venue.acceptedPaymentMethods || venue.acceptedPaymentMethods.length === 0) {
+        if (venue.accepted_payment_methods && Array.isArray(venue.accepted_payment_methods) && venue.accepted_payment_methods.length > 0) {
+          return `${venue.name} accepts the following payment methods: ${venue.accepted_payment_methods.join(', ')}.`;
+        }
         return `I don't have specific information about accepted payment methods for ${venue.name}.`;
       }
       return `${venue.name} accepts the following payment methods: ${venue.acceptedPaymentMethods.join(', ')}.`;
     }
 
     if (/category|type|kind|event type/i.test(query)) {
-      const categories = Array.isArray(venue.categoryNames) ? venue.categoryNames.join(', ') : venue.category;
-      return `${venue.name} is categorized as: ${categories || 'No category information available'}.`;
+      if (venue.categoryNames && Array.isArray(venue.categoryNames)) {
+        return `${venue.name} is categorized as: ${venue.categoryNames.join(', ')}.`;
+      } else if (venue.category_name && Array.isArray(venue.category_name)) {
+        return `${venue.name} is categorized as: ${venue.category_name.join(', ')}.`;
+      } else if (venue.type) {
+        return `${venue.name} is categorized as: ${venue.type}.`;
+      } else {
+        return `${venue.name} is categorized as: ${venue.category || 'No category information available'}.`;
+      }
     }
 
     if (/rating|review|score|stars/i.test(query)) {
       return venue.rating
-        ? `${venue.name} has a rating of ${venue.rating} out of 5 based on ${venue.reviews || 0} reviews.`
+        ? `${venue.name} has a rating of ${venue.rating} out of 5 based on ${venue.reviews || venue.reviews_count || 0} reviews.`
         : `${venue.name} does not have any ratings yet.`;
     }
 
     if (/hours|time|open|close|opening|closing/i.test(query)) {
-      if (!venue.openingHours) {
+      let hoursInfo;
+      
+      if (venue.openingHours && Object.keys(venue.openingHours).length > 0) {
+        hoursInfo = venue.openingHours;
+      } else if (venue.opening_hours && typeof venue.opening_hours === 'object') {
+        hoursInfo = venue.opening_hours;
+      }
+      
+      if (!hoursInfo) {
         return `I don't have specific information about operating hours for ${venue.name}.`;
       }
       
@@ -332,9 +497,10 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       let hoursText = `${venue.name} is open on:\n`;
       
       days.forEach(day => {
-        const hours = venue.openingHours?.[day];
-        if (hours) {
-          hoursText += `${day.charAt(0).toUpperCase() + day.slice(1)}: ${hours.open} - ${hours.close}\n`;
+        const hours = hoursInfo[day];
+        if (hours && typeof hours === 'object' && 'open' in hours && 'close' in hours) {
+          const hourObj = hours as {open: string, close: string};
+          hoursText += `${day.charAt(0).toUpperCase() + day.slice(1)}: ${hourObj.open} - ${hourObj.close}\n`;
         } else {
           hoursText += `${day.charAt(0).toUpperCase() + day.slice(1)}: Closed\n`;
         }
@@ -343,12 +509,56 @@ const VenueDetailsChatbot: React.FC<VenueDetailsChatbotProps> = ({ venue }) => {
       return hoursText;
     }
 
+    if (/rules|policies|regulations|terms/i.test(query)) {
+      if (venue.rulesAndRegulations && Array.isArray(venue.rulesAndRegulations) && venue.rulesAndRegulations.length > 0) {
+        let rulesText = `${venue.name} has the following rules and regulations:\n\n`;
+        
+        venue.rulesAndRegulations.forEach((rule, index) => {
+          if (typeof rule === 'object' && rule.title && rule.description) {
+            rulesText += `${index + 1}. ${rule.title}: ${rule.description}\n`;
+          }
+        });
+        
+        return rulesText;
+      } else if (venue.rules_and_regulations && Array.isArray(venue.rules_and_regulations) && venue.rules_and_regulations.length > 0) {
+        let rulesText = `${venue.name} has the following rules and regulations:\n\n`;
+        
+        venue.rules_and_regulations.forEach((rule, index) => {
+          if (typeof rule === 'object' && rule.title && rule.description) {
+            rulesText += `${index + 1}. ${rule.title}: ${rule.description}\n`;
+          }
+        });
+        
+        return rulesText;
+      }
+      
+      return `I don't have specific information about rules and regulations for ${venue.name}.`;
+    }
+
+    if (/additional services|extra services|special services/i.test(query)) {
+      if (venue.additionalServices && venue.additionalServices.length > 0) {
+        const services = Array.isArray(venue.additionalServices) 
+          ? venue.additionalServices.join(', ')
+          : venue.additionalServices;
+        
+        return `${venue.name} offers these additional services: ${services}.`;
+      } else if (venue.additional_services && venue.additional_services.length > 0) {
+        const services = Array.isArray(venue.additional_services) 
+          ? venue.additional_services.join(', ')
+          : venue.additional_services;
+        
+        return `${venue.name} offers these additional services: ${services}.`;
+      }
+      
+      return `I don't have information about additional services for ${venue.name}.`;
+    }
+
     const isArabic = isArabicText(query);
     
     if (isArabic) {
-      return `${venue.name} هي ${venue.category || 'قاعة'} تقع في ${venue.city || ''}. تستوعب من ${venue.capacity?.min || '?'} إلى ${venue.capacity?.max || '?'} ضيف بأسعار تبدأ من ${venue.pricing?.startingPrice || 0} ${venue.pricing?.currency || 'SAR'}. ${venue.description ? 'الوصف: ' + venue.description : ''}`;
+      return `${venue.name} هي ${venue.type || venue.category || 'قاعة'} تقع في ${venue.city || ''}. تستوعب من ${venue.capacity?.min || venue.min_capacity || '?'} إلى ${venue.capacity?.max || venue.max_capacity || '?'} ضيف بأسعار تبدأ من ${venue.pricing?.startingPrice || venue.starting_price || 0} ${venue.pricing?.currency || venue.currency || 'SAR'}. ${venue.description ? 'الوصف: ' + venue.description : ''}`;
     } else {
-      return `${venue.name} is a ${venue.category || 'venue'} located in ${venue.city || ''}. It can accommodate ${venue.capacity?.min || '?'}-${venue.capacity?.max || '?'} guests with pricing starting at ${venue.pricing?.startingPrice || 0} ${venue.pricing?.currency || 'SAR'}. ${venue.description ? 'Description: ' + venue.description : ''}`;
+      return `${venue.name} is a ${venue.type || venue.category || 'venue'} located in ${venue.city || ''}. It can accommodate ${venue.capacity?.min || venue.min_capacity || '?'}-${venue.capacity?.max || venue.max_capacity || '?'} guests with pricing starting at ${venue.pricing?.startingPrice || venue.starting_price || 0} ${venue.pricing?.currency || venue.currency || 'SAR'}. ${venue.description ? 'Description: ' + venue.description : ''}`;
     }
   };
 

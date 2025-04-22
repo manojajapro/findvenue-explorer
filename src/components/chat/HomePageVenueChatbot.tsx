@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Bot, Mic, Send, User, X, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,53 @@ type Message = {
   timestamp: Date;
 };
 
+// Extended venue type to match Supabase database fields
+interface VenueWithDBFields extends Venue {
+  id: string;
+  name: string;
+  description?: string | null;
+  gallery_images?: string[] | null;
+  address?: string | null;
+  city_id?: string | null;
+  city_name?: string | null;
+  category_id?: string[] | null;
+  category_name?: string[] | string | null;
+  min_capacity?: number | null;
+  max_capacity?: number | null;
+  currency?: string | null;
+  starting_price?: number | null;
+  price_per_person?: number | null;
+  amenities?: string[] | null;
+  availability?: string[] | null;
+  rating?: number | null;
+  reviews_count?: number | null;
+  featured?: boolean | null;
+  popular?: boolean | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  parking?: boolean | null;
+  wifi?: boolean | null;
+  accessibility_features?: string[] | null;
+  accepted_payment_methods?: string[] | null;
+  opening_hours?: Record<string, { open: string; close: string }> | null;
+  owner_info?: { 
+    name?: string; 
+    contact?: string;
+    user_id?: string;
+    response_time?: string;
+  } | null;
+  additional_services?: string[] | null;
+  rules_and_regulations?: Array<{
+    title: string;
+    description: string;
+    category?: string;
+  }> | null;
+  type?: string | null;
+  zipcode?: string | null;
+  image_url?: string | null;
+  status?: string | null;
+}
+
 const CHAT_STORAGE_KEY = "homeVenueAssistantChat";
 const MAX_MSGS = 40;
 
@@ -29,7 +75,7 @@ const HomePageVenueChatbot: React.FC = () => {
   const params = useParams();
   // extract id from `/venue/:id`
   const id = params.id || (location.pathname.startsWith("/venue/") && location.pathname.split("/")[2]);
-  const [venue, setVenue] = useState<Venue | null>(null);
+  const [venue, setVenue] = useState<VenueWithDBFields | null>(null);
   const [venueLoading, setVenueLoading] = useState(false);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -84,26 +130,7 @@ const HomePageVenueChatbot: React.FC = () => {
         .maybeSingle();
       if (!ignore) {
         if (data) {
-          setVenue({
-            ...data,
-            capacity: {
-              min: typeof data.min_capacity === "string" ? parseInt(data.min_capacity) : data.min_capacity || 0,
-              max: typeof data.max_capacity === "string" ? parseInt(data.max_capacity) : data.max_capacity || 0
-            },
-            pricing: {
-              currency: data.currency || "SAR",
-              startingPrice: data.starting_price || 0,
-              pricePerPerson: data.price_per_person,
-              hourlyRate: data.hourly_rate || undefined
-            },
-            amenities: data.amenities || [],
-            galleryImages: data.gallery_images || [],
-            city: data.city_name || "",
-            ownerInfo: data.owner_info,
-            accessibilityFeatures: data.accessibility_features,
-            acceptedPaymentMethods: data.accepted_payment_methods,
-            // ... add any other processing as needed
-          } as Venue);
+          setVenue(data as VenueWithDBFields);
         } else {
           setVenue(null);
         }
@@ -141,119 +168,232 @@ const HomePageVenueChatbot: React.FC = () => {
     const v = venue;
     query = query.toLowerCase();
     
+    // Simple greeting - just respond with a friendly greeting
+    if (/^(hi|hello|hey|مرحبا|اهلا|السلام عليكم)$/i.test(query.trim())) {
+      const isArabic = /[\u0600-\u06FF]/.test(query);
+      if (isArabic) {
+        return `مرحباً! كيف يمكنني مساعدتك بخصوص ${v.name}؟`;
+      } else {
+        return `Hello! How can I help you with information about ${v.name}?`;
+      }
+    }
+    
+    // Complete details
+    if (/more details|tell me more|explain|elaborate|details|all info|full details|everything|more information|كل التفاصيل|شرح|تفاصيل/i.test(query)) {
+      let response = `${v.name} is a venue `;
+      
+      if (v.city_name) {
+        response += `located in ${v.city_name}. `;
+      }
+      
+      if (v.description) {
+        response += `\n\nDescription: ${v.description} `;
+      }
+      
+      if (v.min_capacity || v.max_capacity) {
+        response += `\n\nCapacity: Accommodates from ${v.min_capacity || '?'} to ${v.max_capacity || '?'} guests. `;
+      }
+      
+      if (v.starting_price) {
+        const currency = v.currency || 'SAR';
+        response += `\n\nPricing: Starting at ${v.starting_price} ${currency}`;
+        if (v.price_per_person) {
+          response += `, with a per-person rate of ${v.price_per_person} ${currency}`;
+        }
+        response += `. `;
+      }
+      
+      if (v.address) {
+        response += `\n\nAddress: ${v.address}, ${v.city_name || ''}. `;
+      }
+      
+      if (v.category_name && Array.isArray(v.category_name)) {
+        response += `\n\nCategories: ${v.category_name.join(', ')}. `;
+      } else if (v.category_name) {
+        response += `\n\nCategories: ${v.category_name}. `;
+      }
+      
+      if (v.amenities && v.amenities.length > 0) {
+        response += `\n\nAmenities: ${v.amenities.join(', ')}. `;
+      }
+      
+      if (v.wifi !== undefined) {
+        response += `\n\nWiFi: ${v.wifi ? 'Available' : 'Not available'}. `;
+      }
+      
+      if (v.parking !== undefined) {
+        response += `\n\nParking: ${v.parking ? 'Available' : 'Not available'}. `;
+      }
+      
+      if (v.accessibility_features && v.accessibility_features.length > 0) {
+        response += `\n\nAccessibility features: ${v.accessibility_features.join(', ')}. `;
+      }
+      
+      if (v.rating) {
+        response += `\n\nRating: ${v.rating}/5 (${v.reviews_count || 0} reviews). `;
+      }
+      
+      if (v.accepted_payment_methods && v.accepted_payment_methods.length > 0) {
+        response += `\n\nAccepted payment methods: ${v.accepted_payment_methods.join(', ')}. `;
+      }
+      
+      if (v.opening_hours && Object.keys(v.opening_hours).length > 0) {
+        response += `\n\nOpening Hours: `;
+        Object.entries(v.opening_hours).forEach(([day, hours]) => {
+          if (hours && hours.open && hours.close) {
+            response += `\n${day.charAt(0).toUpperCase() + day.slice(1)}: ${hours.open} - ${hours.close}`;
+          }
+        });
+      }
+      
+      if (v.additional_services && v.additional_services.length > 0) {
+        response += `\n\nAdditional Services: ${v.additional_services.join(', ')}. `;
+      }
+      
+      if (v.rules_and_regulations && Array.isArray(v.rules_and_regulations) && v.rules_and_regulations.length > 0) {
+        response += `\n\nRules and Regulations: `;
+        v.rules_and_regulations.forEach((rule, index) => {
+          if (typeof rule === 'object' && rule.title && rule.description) {
+            response += `\n${index + 1}. ${rule.title}: ${rule.description}`;
+          }
+        });
+      }
+      
+      return response;
+    }
+    
     // Capacity queries
     if (/max(imum)? capacity|max guests|most people|how many people|max attendees/i.test(query)) {
-      return `${v.name} can accommodate up to ${v.capacity?.max ?? 0} guests.`;
+      return `${v.name} can accommodate up to ${v.max_capacity || '?'} guests.`;
     }
     if (/min(imum)? capacity|min guests|fewest people|least people|min attendees/i.test(query)) {
-      return `${v.name} requires a minimum of ${v.capacity?.min ?? 0} guests.`;
+      return `${v.name} requires a minimum of ${v.min_capacity || '?'} guests.`;
     }
 
     // Price related queries
     if (/price|cost|fee|how much|rate|pricing/i.test(query)) {
-      const currency = v.pricing?.currency || "SAR";
-      let start = v.pricing?.startingPrice || 0;
+      const currency = v.currency || "SAR";
+      let start = v.starting_price || 0;
       let text = `The starting price for ${v.name} is ${start.toLocaleString()} ${currency}.`;
-      if (v.pricing?.pricePerPerson)
-        text += ` There is also a per-person rate of ${v.pricing.pricePerPerson.toLocaleString()} ${currency}.`;
+      if (v.price_per_person)
+        text += ` There is also a per-person rate of ${v.price_per_person.toLocaleString()} ${currency}.`;
       return text;
     }
     
     // Location queries
     if (/location|address|where|place|situated|city|area/i.test(query)) {
-      return `${v.name} is located at ${v.address}, ${v.city}.`;
+      return `${v.name} is located at ${v.address || '(address not specified)'}, ${v.city_name || ''}.`;
     }
     
     // Amenities queries
     if (/amenities|facilities|features|offer|provide|service/i.test(query)) {
       if (!v.amenities || v.amenities.length === 0)
         return `${v.name} does not have any listed amenities.`;
-      return `${v.name} offers: ${v.amenities.join(", ")}.`;
+      return `${v.name} offers the following amenities: ${v.amenities.join(", ")}.`;
     }
     
     // Wi-Fi queries
     if (/wifi|internet|connection/i.test(query)) {
-      return v.wifi ? "Yes, WiFi is available at this venue." : "No, WiFi is not available at this venue.";
+      return v.wifi 
+        ? `Yes, ${v.name} provides WiFi connectivity.` 
+        : `No, ${v.name} does not offer WiFi.`;
     }
     
     // Parking queries
     if (/parking|car|vehicle|lot|garage/i.test(query)) {
-      return v.parking ? "Yes, parking is available at this venue." : "No, parking is not available at this venue.";
+      return v.parking 
+        ? `Yes, ${v.name} has parking facilities available.` 
+        : `No, ${v.name} does not have dedicated parking.`;
     }
     
     // Accessibility queries
     if (/accessibility|accessible|wheelchair|disabled|handicap/i.test(query)) {
-      let features = v.accessibilityFeatures;
-      if (!features || !features.length)
-        return "No specific accessibility features are listed for this venue.";
-      return `${v.name} accessibility features: ${features.join(", ")}.`;
+      if (!v.accessibility_features || v.accessibility_features.length === 0)
+        return `I don't have specific information about accessibility features for ${v.name}.`;
+      return `${v.name} offers these accessibility features: ${v.accessibility_features.join(", ")}.`;
     }
     
     // Category/Type queries
     if (/category|type|kind|event type/i.test(query)) {
-      return v.category
-        ? `${v.name} is categorized as: ${v.category}.`
-        : "I do not have the category for this venue.";
+      if (v.category_name && Array.isArray(v.category_name)) {
+        return `${v.name} is categorized as: ${v.category_name.join(', ')}.`;
+      } else if (v.category_name) {
+        return `${v.name} is categorized as: ${v.category_name}.`;
+      } else if (v.type) {
+        return `${v.name} is categorized as: ${v.type}.`;
+      } else {
+        return `I don't have specific category information for ${v.name}.`;
+      }
     }
     
     // Payment methods queries
     if (/payment|pay|credit card|cash/i.test(query)) {
-      return v.acceptedPaymentMethods && v.acceptedPaymentMethods.length
-        ? `${v.name} accepts: ${v.acceptedPaymentMethods.join(", ")}.`
-        : `No specific payment method info is available.`;
+      if (!v.accepted_payment_methods || v.accepted_payment_methods.length === 0)
+        return `I don't have specific information about accepted payment methods for ${v.name}.`;
+      return `${v.name} accepts the following payment methods: ${v.accepted_payment_methods.join(", ")}.`;
     }
     
     // Rating queries
     if (/rating|review|score|stars/i.test(query)) {
-      return `${v.name} is rated ${v.rating || 0}/5 from ${v.reviews || 0} reviews.`;
+      return v.rating 
+        ? `${v.name} has a rating of ${v.rating}/5 based on ${v.reviews_count || 0} reviews.`
+        : `${v.name} does not have any ratings yet.`;
     }
     
     // Hours queries
     if (/hours|open|close|opening|closing|time/i.test(query)) {
-      if (!v.openingHours) return "No operating hours are listed for this venue.";
+      if (!v.opening_hours || Object.keys(v.opening_hours).length === 0)
+        return `I don't have specific information about operating hours for ${v.name}.`;
+      
       const days = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
       let hoursText = `${v.name} operating hours:\n`;
       days.forEach(day => {
-        const h = v.openingHours?.[day];
-        hoursText += `${day[0].toUpperCase() + day.slice(1)}: ${h ? `${h.open}–${h.close}` : "Closed"}\n`;
+        const hours = v.opening_hours?.[day];
+        if (hours && hours.open && hours.close) {
+          hoursText += `${day.charAt(0).toUpperCase() + day.slice(1)}: ${hours.open} - ${hours.close}\n`;
+        } else {
+          hoursText += `${day.charAt(0).toUpperCase() + day.slice(1)}: Closed\n`;
+        }
       });
       return hoursText;
     }
     
     // Additional services queries
     if (/additional services|extra services|other services/i.test(query)) {
-      if (!v.additionalServices || v.additionalServices.length === 0) {
+      if (!v.additional_services || v.additional_services.length === 0) {
         return `${v.name} does not list any additional services.`;
       }
-      return `${v.name} offers these additional services: ${v.additionalServices.join(", ")}.`;
+      return `${v.name} offers these additional services: ${v.additional_services.join(", ")}.`;
     }
     
     // Rules and regulations queries
     if (/rules|regulations|policies|guidelines|restrictions/i.test(query)) {
-      if (!v.rulesAndRegulations) return "No specific rules and regulations are listed for this venue.";
-      let rulesText = `Rules and regulations for ${v.name}:\n`;
-      if (Array.isArray(v.rulesAndRegulations)) {
-        v.rulesAndRegulations.forEach(rule => {
-          rulesText += `• ${rule.title || rule.category}: ${rule.description}\n`;
-        });
-      }
+      if (!v.rules_and_regulations || !Array.isArray(v.rules_and_regulations) || v.rules_and_regulations.length === 0)
+        return `I don't have specific information about rules and regulations for ${v.name}.`;
+      
+      let rulesText = `Rules and regulations for ${v.name}:\n\n`;
+      v.rules_and_regulations.forEach((rule, index) => {
+        if (typeof rule === 'object' && rule.title && rule.description) {
+          rulesText += `${index + 1}. ${rule.title}: ${rule.description}\n`;
+        }
+      });
       return rulesText;
     }
     
     // Owner info queries
     if (/owner|contact person|manager|host/i.test(query)) {
-      if (!v.ownerInfo) return "No owner information is available for this venue.";
-      const owner = v.ownerInfo;
+      if (!v.owner_info) return `No owner information is available for ${v.name}.`;
+      const owner = v.owner_info;
       let ownerText = `Contact information for ${v.name}:\n`;
       if (owner.name) ownerText += `Name: ${owner.name}\n`;
       if (owner.contact) ownerText += `Contact: ${owner.contact}\n`;
-      if (owner.responseTime) ownerText += `Typical response time: ${owner.responseTime}\n`;
+      if (owner.response_time) ownerText += `Typical response time: ${owner.response_time}\n`;
       return ownerText;
     }
     
     // Gallery/Images queries
     if (/images|photos|gallery|pictures/i.test(query)) {
-      const count = v.galleryImages?.length || 0;
+      const count = v.gallery_images?.length || 0;
       return count > 0 
         ? `${v.name} has ${count} photos in the gallery. You can view them on this page.` 
         : "There are no images available for this venue.";
@@ -269,20 +409,68 @@ const HomePageVenueChatbot: React.FC = () => {
     
     // Description or unknown query
     if (/describe|about|what is|overview|details/.test(query)) {
-      return v.description || `This is ${v.name} in ${v.city}.`;
+      return v.description || `This is ${v.name} in ${v.city_name || ''}.`;
     }
 
     // Fallback for general queries
-    return `${v.name} is a venue in ${v.city}. It can accommodate ${v.capacity?.min || 0}-${v.capacity?.max || 0} guests with prices starting at ${v.pricing?.startingPrice || 0} ${v.pricing?.currency || "SAR"}. You can ask me about specific details like amenities, location, hours, etc.`;
+    return `${v.name} is a venue in ${v.city_name || ''}. It can accommodate ${v.min_capacity || 0}-${v.max_capacity || 0} guests with prices starting at ${v.starting_price || 0} ${v.currency || "SAR"}. You can ask me about specific details like amenities, location, hours, etc.`;
   };
 
   // Generic home page assistant
   const getDefaultAnswer = (query: string): string => {
     query = query.toLowerCase();
-    if (/venue|find|help/i.test(query)) {
-      return "You can search for venues, ask about events, or click on a venue card for more info!";
+    
+    // Simple greeting - just respond with a friendly greeting
+    if (/^(hi|hello|hey|مرحبا|اهلا|السلام عليكم)$/i.test(query.trim())) {
+      const isArabic = /[\u0600-\u06FF]/.test(query);
+      if (isArabic) {
+        return `مرحباً! كيف يمكنني مساعدتك اليوم؟`;
+      } else {
+        return `Hello! How can I help you today?`;
+      }
     }
-    return "I'm your assistant for FindVenue! Ask about venue discovery, the booking process, or anything else you need.";
+    
+    if (/venue|find|location|place|hall|space|where|help me find/i.test(query)) {
+      return "You can search for venues using the search bar or browse our featured venues below. What type of event are you planning?";
+    }
+    
+    if (/wedding|marriage|bride|groom/i.test(query)) {
+      return "We have beautiful wedding venues available! You can filter for wedding halls using the search function or browse our wedding category.";
+    }
+    
+    if (/conference|meeting|business|corporate|workshop/i.test(query)) {
+      return "For business events, we offer professional conference venues with all the amenities you need. Try searching for 'conference rooms' or 'meeting spaces'.";
+    }
+    
+    if (/party|celebration|birthday|anniversary/i.test(query)) {
+      return "Looking for a celebration venue? We have many options for parties and special occasions. Filter by 'party venue' or browse our listings.";
+    }
+    
+    if (/price|cost|fee|expensive|cheap|budget|affordable/i.test(query)) {
+      return "Our venues range from budget-friendly to luxury options. You can filter venues by price range in our search to find one that matches your budget.";
+    }
+    
+    if (/capacity|people|guests|group size|attendees/i.test(query)) {
+      return "You can filter venues by capacity to ensure they can accommodate your group size. Just use the capacity filter in our search functionality.";
+    }
+    
+    if (/location|city|area|region|neighborhood/i.test(query)) {
+      return "We have venues across multiple cities and neighborhoods. Use our location filter to find venues in your preferred area.";
+    }
+    
+    if (/reservation|booking|reserve|book|schedule/i.test(query)) {
+      return "To book a venue, select a venue you like, check its availability for your event date, and follow the booking process. You can contact venue owners directly through our platform.";
+    }
+    
+    if (/payment|pay|deposit|refund|cancel/i.test(query)) {
+      return "Payment methods vary by venue. Most venues require a deposit to secure your booking. Cancellation policies are listed on each venue's page.";
+    }
+    
+    if (/help|support|contact|assistance/i.test(query)) {
+      return "Need help? You can contact our support team through the 'Contact Us' link in the footer, or email support@findvenue.com.";
+    }
+    
+    return "I'm your assistant for FindVenue! Ask me about finding venues, booking processes, or any features of our platform. How can I help you today?";
   };
 
   const handleSendMessage = async (
