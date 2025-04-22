@@ -52,9 +52,9 @@ const MapControls = ({
   };
   
   return (
-    <div className="absolute right-4 top-4 z-10 flex flex-col gap-2">
+    <div className="absolute right-4 top-4 z-10 flex flex-col gap-2 mt-10 pt-10">
       <TooltipProvider delayDuration={300}>
-        <div className="flex flex-col gap-2 bg-black/70 backdrop-blur-md rounded-lg p-2 border border-white/10 shadow-lg">
+        <div className="flex flex-col gap-2 mt-10 bg-black/70 backdrop-blur-md rounded-lg p-2 border border-white/10 shadow-lg">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
