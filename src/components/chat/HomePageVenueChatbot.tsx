@@ -286,6 +286,15 @@ const HomePageVenueChatbot: React.FC = () => {
     
     // Location queries
     if (/location|address|where|place|situated|city|area/i.test(query)) {
+      if (query.toLowerCase().includes('cities') || query.toLowerCase().includes('locations')) {
+        return `We have venues available across major cities in Saudi Arabia. You can search for venues in any city and filter by:
+• Event type (wedding, conference, exhibition, etc.)
+• Capacity needs
+• Price range
+• Required amenities
+
+Would you like to explore venues in a specific city?`;
+      }
       return `${v.name} is located at ${v.address || '(address not specified)'}, ${v.city_name || ''}.`;
     }
     
@@ -461,7 +470,7 @@ const HomePageVenueChatbot: React.FC = () => {
       card += `  <div><span class="text-blue-400">Location:</span> ${venue.city_name}</div>\n`;
     }
     card += `  <div><span class="text-blue-400">Capacity:</span> ${venue.min_capacity || 0}-${venue.max_capacity || 0} guests</div>\n`;
-    card += `  <div><span class="text-blue-400">Price:</span> ${venue.starting_price || 0} ${venue.currency || 'SAR'}</div>\n`;
+    card += `  <div><span class="text-blue-400">Price:</span> ${venue.starting_price || 0} ${venue.currency || 'SAR'}/person</div>\n`;
     card += `</div>\n`;
     
     // View details button
@@ -485,6 +494,39 @@ const HomePageVenueChatbot: React.FC = () => {
         return `مرحباً! كيف يمكنني مساعدتك اليوم؟`;
       } else {
         return `Hello! How can I help you today?`;
+      }
+    }
+
+    // Cities query
+    if (query.includes('cities') || (query.includes('where') && query.includes('venues'))) {
+      try {
+        // Get all venues and group by city
+        const { data: cityVenues, error: cityVenuesError } = await supabase
+          .from('venues')
+          .select('city_name');
+
+        if (cityVenuesError) throw cityVenuesError;
+
+        // Create a map of cities to venue counts
+        const cityCounts: { [key: string]: number } = cityVenues.reduce((acc, venue) => {
+          const city = venue.city_name || 'Unknown';
+          acc[city] = (acc[city] || 0) + 1;
+          return acc;
+        }, {} as { [key: string]: number });
+
+        // Sort cities by venue count
+        const sortedCities = Object.entries(cityCounts)
+          .sort(([, a], [, b]) => b - a)
+          .map(([city, count]) => `${city} (${count} venues)`);
+
+        if (sortedCities.length === 0) {
+          return "I couldn't find any venues in our database at the moment.";
+        }
+
+        return `We have venues available in these Saudi Arabian cities:\n\n${sortedCities.join('\n')}\n\nWould you like to explore venues in any specific city?`;
+      } catch (error) {
+        console.error('Error fetching cities:', error);
+        return "I apologize, but I encountered an error while fetching the city information. Please try again later.";
       }
     }
     
@@ -515,7 +557,8 @@ const HomePageVenueChatbot: React.FC = () => {
           
         if (capacityMatch) {
           const capacity = parseInt(capacityMatch[1]);
-          baseQuery = baseQuery.gte("min_capacity", 0).lte("max_capacity", capacity);
+          // Updated capacity filter: venue's max capacity must be >= requested capacity
+          baseQuery = baseQuery.gte("max_capacity", capacity);
         } else if (minCapacityMatch) {
           const minCapacity = parseInt(minCapacityMatch[1]);
           baseQuery = baseQuery.gte("max_capacity", minCapacity);
@@ -899,6 +942,87 @@ const HomePageVenueChatbot: React.FC = () => {
                 <Volume2 className={`h-4 w-4 ${isSpeakerOn ? "text-findvenue" : "text-gray-400"}`} />
               </Button>
             </div>
+
+            {/* Suggested Prompts */}
+            <div className="mt-4 space-y-2">
+              <p className="text-xs text-findvenue-text-muted mb-2">Try asking:</p>
+              <div className="flex flex-wrap gap-2">
+                {venue ? (
+                  // Venue-specific prompts
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-blue-950/50 hover:bg-blue-900/50"
+                      onClick={() => handleSendMessage("Tell me more about this venue")}
+                    >
+                      Tell me more about this venue
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-blue-950/50 hover:bg-blue-900/50"
+                      onClick={() => handleSendMessage("What's the capacity?")}
+                    >
+                      What's the capacity?
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-blue-950/50 hover:bg-blue-900/50"
+                      onClick={() => handleSendMessage("Show me the pricing details")}
+                    >
+                      Show pricing details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-blue-950/50 hover:bg-blue-900/50"
+                      onClick={() => handleSendMessage("What amenities are available?")}
+                    >
+                      Available amenities
+                    </Button>
+                  </>
+                ) : (
+                  // General prompts
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-blue-950/50 hover:bg-blue-900/50"
+                      onClick={() => handleSendMessage("Show me wedding venues in Riyadh")}
+                    >
+                      Wedding venues in Riyadh
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-blue-950/50 hover:bg-blue-900/50"
+                      onClick={() => handleSendMessage("Find venues for 50 people")}
+                    >
+                      Venues for 50 people
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-blue-950/50 hover:bg-blue-900/50"
+                      onClick={() => handleSendMessage("Show me conference venues")}
+                    >
+                      Conference venues
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-blue-950/50 hover:bg-blue-900/50"
+                      onClick={() => handleSendMessage("What cities do you have venues in?")}
+                    >
+                      Available cities
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
             <p className="text-xs text-findvenue-text-muted mt-2">
               {venue?.name
                 ? `Ask about capacity, pricing, amenities, or any details of ${venue.name}!`
