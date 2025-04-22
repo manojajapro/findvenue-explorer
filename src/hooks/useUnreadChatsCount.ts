@@ -1,6 +1,5 @@
 
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 export const useUnreadChatsCount = (userId?: string) => {
