@@ -166,23 +166,23 @@ const VenueDetails = () => {
           setActiveImage(transformedVenue.imageUrl);
           
           // Get similar venues based on shared categories
-          const categories = venueData.category_name || [];
+          const venueCategories = venueData.category_name || [];
           const { data: similarData, error: similarError } = await supabase
             .from('venues')
             .select('*')
-            .overlaps('category_name', categories) // Use overlaps for array intersection
+            .overlaps('category_name', venueCategories)
             .neq('id', id)
-            .order('featured', { ascending: false }) // Featured venues first
-            .limit(8); // Fetch more to filter
+            .order('featured', { ascending: false })
+            .limit(8);
             
           if (similarError) throw similarError;
           
           if (similarData) {
             // Score venues by number of matching categories
             const scoredVenues = similarData.map(venue => {
-              const venueCategories = venue.category_name || [];
-              const matchingCategories = categories.filter(cat => 
-                venueCategories.includes(cat)
+              const venueCats = venue.category_name || [];
+              const matchingCategories = venueCategories.filter(cat => 
+                venueCats.includes(cat)
               ).length;
               return { ...venue, matchScore: matchingCategories };
             });
