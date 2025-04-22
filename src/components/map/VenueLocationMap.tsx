@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, Circle, useJsApiLoader } from '@react-google-maps/api';
 import { MapPin, Search, Ruler, Locate, Navigation, MapIcon, Building2 } from 'lucide-react';
@@ -8,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useGeocode } from '@/hooks/useGeocode';
 
 export interface VenueLocationMapProps {
   name: string;
@@ -27,21 +27,18 @@ export interface VenueLocationMapProps {
   highlightedVenueId?: string;
 }
 
-// Create custom venue marker icon using SVG
 const createVenueMarkerIcon = (featured: boolean = false) => {
-  const color = featured ? '#E6B325' : '#4F46E5'; // Gold for featured, indigo for regular
-  const svgMarker = {
-    path: 'M12 0C7.83 0 3 3.227 3 9c0 5.773 9 15 9 15s9-9.227 9-15c0-5.773-4.83-9-9-9zm0 13a4 4 0 100-8 4 4 0 000 8z',
-    fillColor: color,
-    fillOpacity: 1,
-    strokeWeight: 1,
-    strokeColor: '#FFFFFF',
-    rotation: 0,
-    scale: 1.5,
-    anchor: new google.maps.Point(12, 24),
+  return {
+    url: `data:image/svg+xml,${encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="36">
+        <path fill="${featured ? '#E6B325' : '#4F46E5'}" stroke="white" stroke-width="2" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <circle fill="white" cx="12" cy="9" r="3"/>
+      </svg>
+    `)}`,
+    scaledSize: new google.maps.Size(24, 36),
+    anchor: new google.maps.Point(12, 36),
+    origin: new google.maps.Point(0, 0)
   };
-  
-  return svgMarker;
 };
 
 const containerStyle = {
@@ -68,15 +65,30 @@ const VenueLocationMap = ({
     lat: latitude || DEFAULT_LOCATION.lat,
     lng: longitude || DEFAULT_LOCATION.lng
   });
+  const [addressLoaded, setAddressLoaded] = useState(false);
+  const { geocodePinCode } = useGeocode();
 
   useEffect(() => {
-    if (latitude !== undefined && longitude !== undefined) {
-      setPosition({
-        lat: latitude,
-        lng: longitude
-      });
-    }
-  }, [latitude, longitude]);
+    const loadAddressLocation = async () => {
+      if (!latitude && !longitude && address && !addressLoaded) {
+        try {
+          const coordinates = await geocodePinCode(address);
+          if (coordinates) {
+            setPosition({
+              lat: coordinates.lat,
+              lng: coordinates.lng
+            });
+            setAddressLoaded(true);
+          }
+        } catch (error) {
+          console.error("Error geocoding address:", error);
+          toast.error("Could not load exact location from address");
+        }
+      }
+    };
+
+    loadAddressLocation();
+  }, [address, latitude, longitude, addressLoaded, geocodePinCode]);
 
   const [infoWindowOpen, setInfoWindowOpen] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -239,6 +251,16 @@ const VenueLocationMap = ({
     }
   }, [isRadiusActive, handleManualLocationSetting]);
 
+  // Update position when props change
+  useEffect(() => {
+    if (latitude && longitude) {
+      setPosition({
+        lat: latitude,
+        lng: longitude
+      });
+    }
+  }, [latitude, longitude]);
+
   if (loadError) {
     return (
       <div className="bg-findvenue-card-bg rounded-lg overflow-hidden border border-white/10">
@@ -318,37 +340,37 @@ const VenueLocationMap = ({
             ]
           }}
         >
-          <Marker
-            position={position}
-            draggable={editable}
-            onDragEnd={handleMarkerDragEnd}
-            onClick={() => setInfoWindowOpen(true)}
-            icon={createVenueMarkerIcon()}
-          >
-            {!editable && infoWindowOpen && (
-              <InfoWindow
-                position={position}
-                onCloseClick={() => setInfoWindowOpen(false)}
-              >
-                <div className="text-black p-2">
-                  <strong className="text-findvenue-dark">{name}</strong><br/>
-                  {address}
-                </div>
-              </InfoWindow>
-            )}
-          </Marker>
+          {/* Main Venue Marker */}
+          {position && (
+            <Marker
+              position={position}
+              draggable={editable}
+              onDragEnd={handleMarkerDragEnd}
+              onClick={() => setInfoWindowOpen(true)}
+              icon={createVenueMarkerIcon(false)}
+            >
+              {infoWindowOpen && (
+                <InfoWindow
+                  position={position}
+                  onCloseClick={() => setInfoWindowOpen(false)}
+                >
+                  <div className="text-black p-2">
+                    <strong className="text-findvenue-dark">{name}</strong><br/>
+                    {address}
+                  </div>
+                </InfoWindow>
+              )}
+            </Marker>
+          )}
 
-          {nearbyVenues.length > 0 && nearbyVenues.map(venue => (
+          {/* Nearby Venue Markers */}
+          {nearbyVenues.map((venue) => (
             <Marker
               key={venue.id}
               position={{ lat: venue.latitude, lng: venue.longitude }}
               onClick={() => setSelectedVenue(venue.id)}
               icon={createVenueMarkerIcon(venue.featured)}
-              animation={
-                venue.id === highlightedVenueId
-                  ? google.maps.Animation.BOUNCE
-                  : undefined
-              }
+              animation={venue.id === highlightedVenueId ? google.maps.Animation.BOUNCE : undefined}
             >
               {selectedVenue === venue.id && (
                 <InfoWindow
@@ -374,6 +396,7 @@ const VenueLocationMap = ({
             </Marker>
           ))}
 
+          {/* User Location and Radius Circle */}
           {userLocation && isRadiusActive && (
             <>
               <Circle 
@@ -389,14 +412,7 @@ const VenueLocationMap = ({
               />
               <Marker
                 position={userLocation}
-                icon={{
-                  path: google.maps.SymbolPath.CIRCLE,
-                  fillColor: '#FF4B4B',
-                  fillOpacity: 1,
-                  strokeWeight: 2,
-                  strokeColor: '#FFFFFF',
-                  scale: 10,
-                }}
+                icon={createVenueMarkerIcon(true)}
               >
                 <InfoWindow>
                   <div className="text-black text-xs">
@@ -431,47 +447,46 @@ const VenueLocationMap = ({
               <TooltipProvider>
                 <div className="flex items-center gap-2">
                   {isRadiusActive && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7 bg-findvenue-card-bg/80 border-white/10"
-                          onClick={handleManualLocationSetting}
-                        >
-                          <MapIcon className="h-3.5 w-3.5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">
-                        Set location manually
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                  
-                  {isRadiusActive && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7 bg-findvenue-card-bg/80 border-white/10"
-                          onClick={() => {
-                            setUserLocation(DEFAULT_LOCATION);
-                            setIsRadiusActive(true);
-                            if (mapRef.current) {
-                              mapRef.current.panTo(DEFAULT_LOCATION);
-                              mapRef.current.setZoom(14);
-                            }
-                            toast.success("Reset to default location (11461)");
-                          }}
-                        >
-                          <Navigation className="h-3.5 w-3.5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">
-                        Use default location (11461)
-                      </TooltipContent>
-                    </Tooltip>
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 bg-findvenue-card-bg/80 border-white/10"
+                            onClick={handleManualLocationSetting}
+                          >
+                            <MapIcon className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          Set location manually
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 bg-findvenue-card-bg/80 border-white/10"
+                            onClick={() => {
+                              setUserLocation(DEFAULT_LOCATION);
+                              setIsRadiusActive(true);
+                              if (mapRef.current) {
+                                mapRef.current.panTo(DEFAULT_LOCATION);
+                                mapRef.current.setZoom(14);
+                              }
+                            }}
+                          >
+                            <Navigation className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          Use default location
+                        </TooltipContent>
+                      </Tooltip>
+                    </>
                   )}
                   
                   <Tooltip>

@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { 
   Star, 
   MapPin, 
@@ -22,7 +23,11 @@ import {
   Clock3,
   AccessibilityIcon,
   MessageCircle,
-  Building2
+  Building2,
+  ChevronRight,
+  ChevronLeft as ChevronLeftIcon,
+  X as CloseIcon,
+  Image as ImageIcon
 } from 'lucide-react';
 import { VenueCard } from '@/components/ui';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,7 +38,7 @@ import ContactVenueOwner from '@/components/venue/ContactVenueOwner';
 import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import VenueRating from '@/components/venue/VenueRating';
-import { getVenueOwnerId } from '@/utils/venueHelpers';
+import { getVenueOwnerId, processCategoryNames } from '@/utils/venueHelpers';
 
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
@@ -51,6 +56,8 @@ const VenueDetails = () => {
   const [similarVenues, setSimilarVenues] = useState<Venue[]>([]);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [showGallery, setShowGallery] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -105,17 +112,20 @@ const VenueDetails = () => {
             ? venueData.gallery_images[0] 
             : '';
           
+          const categories = processCategoryNames(venueData.category_name);
+          
           const transformedVenue: Venue = {
             id: venueData.id,
             name: venueData.name,
             description: venueData.description || '',
             imageUrl: defaultImage,
-            galleryImages: venueData.gallery_images || [],
+            galleryImages: Array.isArray(venueData.gallery_images) ? venueData.gallery_images : [],
             address: venueData.address || '',
             city: venueData.city_name || '',
             cityId: venueData.city_id || '',
-            category: venueData.category_name || '',
+            category: categories.length > 0 ? categories[0] : '',
             categoryId: venueData.category_id || '',
+            categories: categories,
             capacity: {
               min: venueData.min_capacity || 0,
               max: venueData.max_capacity || 0
@@ -125,12 +135,20 @@ const VenueDetails = () => {
               startingPrice: venueData.starting_price || 0,
               pricePerPerson: venueData.price_per_person || 0
             },
-            amenities: venueData.amenities || [],
+            amenities: Array.isArray(venueData.amenities) ? 
+              venueData.amenities : 
+              (typeof venueData.amenities === 'string' ? 
+                venueData.amenities.split(',').map(a => a.trim()) : 
+                []),
             rating: venueData.rating || 0,
             reviews: venueData.reviews_count || 0,
             featured: venueData.featured || false,
             popular: venueData.popular || false,
-            availability: venueData.availability || [],
+            availability: Array.isArray(venueData.availability) ? 
+              venueData.availability : 
+              (typeof venueData.availability === 'string' ? 
+                venueData.availability.split(',').map(a => a.trim()) : 
+                []),
             latitude: venueData.latitude,
             longitude: venueData.longitude,
             parking: venueData.parking,
@@ -147,17 +165,37 @@ const VenueDetails = () => {
           setVenue(transformedVenue);
           setActiveImage(transformedVenue.imageUrl);
           
+          // Get similar venues based on shared categories
+          const categories = venueData.category_name || [];
           const { data: similarData, error: similarError } = await supabase
             .from('venues')
             .select('*')
-            .eq('category_id', venueData.category_id)
+            .overlaps('category_name', categories) // Use overlaps for array intersection
             .neq('id', id)
-            .limit(4);
+            .order('featured', { ascending: false }) // Featured venues first
+            .limit(8); // Fetch more to filter
             
           if (similarError) throw similarError;
           
           if (similarData) {
-            const transformedSimilar = similarData.map(venue => {
+            // Score venues by number of matching categories
+            const scoredVenues = similarData.map(venue => {
+              const venueCategories = venue.category_name || [];
+              const matchingCategories = categories.filter(cat => 
+                venueCategories.includes(cat)
+              ).length;
+              return { ...venue, matchScore: matchingCategories };
+            });
+
+            // Sort by matching categories and featured status
+            const sortedVenues = scoredVenues.sort((a, b) => {
+              if (a.featured && !b.featured) return -1;
+              if (!a.featured && b.featured) return 1;
+              return b.matchScore - a.matchScore;
+            });
+
+            // Take top 4 most relevant venues
+            const transformedSimilar = sortedVenues.slice(0, 4).map(venue => {
               const venueImage = venue.gallery_images && venue.gallery_images.length > 0 
                 ? venue.gallery_images[0] 
                 : '';
@@ -188,18 +226,21 @@ const VenueDetails = () => {
               } catch (e) {
                 console.error("Error parsing rules_and_regulations for venue", venue.id, e);
               }
+
+              const categories = processCategoryNames(venue.category_name);
               
               return {
                 id: venue.id,
                 name: venue.name,
                 description: venue.description || '',
                 imageUrl: venueImage,
-                galleryImages: venue.gallery_images || [],
+                galleryImages: Array.isArray(venue.gallery_images) ? venue.gallery_images : [],
                 address: venue.address || '',
                 city: venue.city_name || '',
                 cityId: venue.city_id || '',
-                category: venue.category_name || '',
+                category: categories.length > 0 ? categories[0] : '',
                 categoryId: venue.category_id || '',
+                categories: categories,
                 capacity: {
                   min: venue.min_capacity || 0,
                   max: venue.max_capacity || 0
@@ -209,12 +250,20 @@ const VenueDetails = () => {
                   startingPrice: venue.starting_price || 0,
                   pricePerPerson: venue.price_per_person || 0
                 },
-                amenities: venue.amenities || [],
+                amenities: Array.isArray(venue.amenities) ? 
+                  venue.amenities : 
+                  (typeof venue.amenities === 'string' ? 
+                    venue.amenities.split(',').map(a => a.trim()) : 
+                    []),
                 rating: venue.rating || 0,
                 reviews: venue.reviews_count || 0,
                 featured: venue.featured || false,
                 popular: venue.popular || false,
-                availability: venue.availability || [],
+                availability: Array.isArray(venue.availability) ? 
+                  venue.availability : 
+                  (typeof venue.availability === 'string' ? 
+                    venue.availability.split(',').map(a => a.trim()) : 
+                    []),
                 latitude: venue.latitude,
                 longitude: venue.longitude,
                 parking: venue.parking,
@@ -370,6 +419,24 @@ const VenueDetails = () => {
     );
   };
   
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (venue?.galleryImages) {
+      setCurrentImageIndex((prev) => 
+        prev === venue.galleryImages.length - 1 ? 0 : prev + 1
+      );
+    }
+  };
+
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (venue?.galleryImages) {
+      setCurrentImageIndex((prev) => 
+        prev === 0 ? venue.galleryImages.length - 1 : prev - 1
+      );
+    }
+  };
+  
   if (loading) {
     return (
       <div className="pt-24 pb-16">
@@ -449,7 +516,7 @@ const VenueDetails = () => {
               </div>
             </div>
             <div className="grid grid-cols-4 md:grid-cols-1 gap-2">
-              {venue?.galleryImages?.slice(0, 4).map((img, index) => (
+              {venue?.galleryImages?.slice(0, 1).map((img, index) => (
                 <div 
                   key={index}
                   className={`rounded-lg overflow-hidden aspect-square cursor-pointer transition-all duration-300 ${
@@ -460,9 +527,93 @@ const VenueDetails = () => {
                   <img src={img} alt={`Gallery ${index+1}`} className="w-full h-full object-cover" />
                 </div>
               ))}
+              {venue?.galleryImages && venue.galleryImages.length > 3 && (
+                <div 
+                  className="relative rounded-lg overflow-hidden aspect-square cursor-pointer group"
+                  onClick={() => {
+                    setShowGallery(true);
+                    setCurrentImageIndex(3);
+                  }}
+                >
+                  <img 
+                    src={venue.galleryImages[3]} 
+                    alt={`Gallery 4`} 
+                    className="w-full h-full object-cover opacity-50 group-hover:opacity-75 transition-opacity"
+                  />
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="text-center text-white">
+                      <ImageIcon className="w-6 h-6 mx-auto mb-1" />
+                      <span className="text-sm font-medium">
+                        +{venue.galleryImages.length - 3} more
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
+        
+        {/* Gallery Dialog */}
+        <Dialog open={showGallery} onOpenChange={setShowGallery}>
+          <DialogContent className="max-w-7xl w-full h-[90vh] p-6 bg-black/95">
+            <div className="relative w-full h-full flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-white">Gallery</h2>
+                {/* <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/20"
+                  onClick={() => setShowGallery(false)}
+                >
+                  <CloseIcon className="h-6 w-6" />
+                </Button> */}
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {venue?.galleryImages?.map((img, index) => (
+                    <div 
+                      key={index}
+                      className="relative aspect-square rounded-lg overflow-hidden group cursor-pointer"
+                      onClick={() => {
+                        setCurrentImageIndex(index);
+                        setActiveImage(img);
+                      }}
+                    >
+                      <img 
+                        src={img} 
+                        alt={`Gallery ${index + 1}`} 
+                        className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-110 ${
+                          activeImage === img ? 'ring-2 ring-findvenue' : ''
+                        }`}
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">
+                          Image {index + 1}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Selected Image Preview */}
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="relative aspect-[16/9] rounded-lg overflow-hidden">
+                  <img 
+                    src={venue?.galleryImages?.[currentImageIndex]} 
+                    alt={`Selected Gallery ${currentImageIndex + 1}`}
+                    className="w-full h-full object-contain"
+                  />
+                  <div className="absolute bottom-4 right-4 bg-black/60 text-white text-sm px-3 py-1 rounded-full">
+                    {currentImageIndex + 1} / {venue?.galleryImages?.length}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
@@ -486,9 +637,11 @@ const VenueDetails = () => {
                   {venue.type}
                 </Badge>
               )}
-              <Badge className="bg-findvenue/20 text-findvenue border-0">
-                {venue?.category}
-              </Badge>
+              {venue?.categories && venue.categories.map((cat, index) => (
+                <Badge key={index} className="bg-findvenue/20 text-findvenue border-0">
+                  {cat}
+                </Badge>
+              ))}
             </div>
             
             <div className="mb-8">

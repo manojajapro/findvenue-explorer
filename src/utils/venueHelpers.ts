@@ -1,4 +1,3 @@
-
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { Json } from '@/integrations/supabase/types';
 
@@ -86,11 +85,6 @@ export const processCategoryNames = (categories: any): string[] => {
         }
       } catch (e) {
         console.error("Error parsing category JSON:", e);
-        // If parsing fails, try to extract from the string format ['item1', 'item2']
-        const matches = categories.match(/'([^']+)'/g) || categories.match(/"([^"]+)"/g) || [];
-        if (matches.length > 0) {
-          return matches.map(m => m.replace(/['"]/g, '').trim());
-        }
       }
     }
     
@@ -99,14 +93,40 @@ export const processCategoryNames = (categories: any): string[] => {
       return categories.split(',').map(cat => cat.trim());
     }
     
-    // Handle CamelCase concatenated categories (e.g., "ExhibitionsConferencesGraduation")
-    if (/[a-z][A-Z]/.test(categories)) {
-      return categories.replace(/([a-z])([A-Z])/g, '$1,$2').split(',')
-        .map(cat => cat.trim());
+    // Handle concatenated categories with CamelCase or specific words as boundaries
+    const knownCategories = [
+      'Exhibitions and Conferences',
+      'Graduation party',
+      'Training Course',
+      'Birthday',
+      'Auctions',
+      'Business Meeting',
+      'Workshops',
+      'Family Meeting',
+      'Engagement party'
+    ];
+    
+    // Try to match known categories in the string
+    let remainingString = categories;
+    const foundCategories: string[] = [];
+    
+    knownCategories.forEach(category => {
+      if (remainingString.includes(category)) {
+        foundCategories.push(category);
+        remainingString = remainingString.replace(category, '');
+      }
+    });
+    
+    if (foundCategories.length > 0) {
+      return foundCategories;
     }
     
-    // Return as single item if nothing else worked
-    return [categories.trim()];
+    // If no known categories found, try splitting by CamelCase
+    return categories
+      .replace(/([a-z])([A-Z])/g, '$1,$2')
+      .split(',')
+      .map(cat => cat.trim())
+      .filter(cat => cat.length > 0);
   }
   
   return [];

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -11,6 +10,8 @@ export interface Venue {
   cityId?: string;
   category?: string | string[];
   categoryId?: string | string[];
+  categoryNames?: string[];
+  categories?: string[];
   imageUrl?: string;
   galleryImages?: string[];
   capacity: {
@@ -56,7 +57,6 @@ export interface Venue {
     description: string;
   }>;
   zipcode?: string;
-  categoryNames?: string[];
   
   // Add these fields to bridge the gap between database fields and frontend expected fields
   // These are mapped from the database fields
