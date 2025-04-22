@@ -15,7 +15,7 @@ const Footer = () => {
     ],
     'For Venue Owners': [
       { name: 'List Your Venue', href: '/list-venue' },
-      { name: 'Owner Dashboard', href: '#' },
+      { name: 'Owner Dashboard', href: '/dashboard' },
       { name: 'Pricing', href: '#' },
       { name: 'Terms for Owners', href: '#' },
       { name: 'Success Stories', href: '#' },

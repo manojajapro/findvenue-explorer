@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Bot, Mic, Send, User, X, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,10 @@ import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { Venue } from "@/hooks/useSupabaseVenues";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 type Message = {
   id: string;
@@ -20,7 +24,7 @@ type Message = {
 };
 
 // Extended venue type to match Supabase database fields
-interface VenueWithDBFields extends Venue {
+interface VenueWithDBFields extends Omit<Venue, 'description'> {
   id: string;
   name: string;
   description?: string | null;
@@ -416,8 +420,62 @@ const HomePageVenueChatbot: React.FC = () => {
     return `${v.name} is a venue in ${v.city_name || ''}. It can accommodate ${v.min_capacity || 0}-${v.max_capacity || 0} guests with prices starting at ${v.starting_price || 0} ${v.currency || "SAR"}. You can ask me about specific details like amenities, location, hours, etc.`;
   };
 
+  // Format a venue card for display in chat
+  const formatVenueCard = (venue: any, index: number): string => {
+    // Get up to 3 images for the gallery row
+    const images = [];
+    if (Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) {
+      for (let i = 0; i < Math.min(3, venue.gallery_images.length); i++) {
+        images.push(venue.gallery_images[i]);
+      }
+    } else if (venue.image_url) {
+      images.push(venue.image_url);
+    } else {
+      // Fallback placeholder image
+      images.push("https://via.placeholder.com/300x200?text=No+Image");
+    }
+    
+    // Format venue type info
+    const venueType = venue.type || 'Venue';
+    const categories = Array.isArray(venue.category_name) 
+      ? venue.category_name.join(', ') 
+      : (venue.category_name || '');
+    
+    // Build card HTML
+    let card = `<div class="venue-card p-3 bg-blue-950/30 rounded-lg border border-blue-800/50 mb-4">\n`;
+    
+    // Title
+    card += `<div class="font-semibold text-blue-300 text-lg mb-2">${index + 1}. ${venue.name}</div>\n`;
+    
+    // Images row
+    card += `<div class="flex gap-1 mb-2">\n`;
+    images.forEach(img => {
+      card += `  <img src="${img}" alt="Venue" class="h-20 w-1/3 object-cover rounded" />\n`;
+    });
+    card += `</div>\n`;
+    
+    // Details
+    card += `<div class="text-sm text-gray-300">\n`;
+    card += `  <div><span class="text-blue-400">Type:</span> ${venueType}${categories ? ` (${categories})` : ''}</div>\n`;
+    if (venue.city_name) {
+      card += `  <div><span class="text-blue-400">Location:</span> ${venue.city_name}</div>\n`;
+    }
+    card += `  <div><span class="text-blue-400">Capacity:</span> ${venue.min_capacity || 0}-${venue.max_capacity || 0} guests</div>\n`;
+    card += `  <div><span class="text-blue-400">Price:</span> ${venue.starting_price || 0} ${venue.currency || 'SAR'}</div>\n`;
+    card += `</div>\n`;
+    
+    // View details button
+    card += `<div class="mt-2">\n`;
+    card += `  <a class="text-blue-400 underline cursor-pointer" data-venue-id="${venue.id}" onclick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venue.id}'}))">View details for ${venue.name}</a>\n`;
+    card += `</div>\n`;
+    
+    card += `</div>`;
+    
+    return card;
+  };
+  
   // Generic home page assistant
-  const getDefaultAnswer = (query: string): string => {
+  const getDefaultAnswer = async (query: string): Promise<string> => {
     query = query.toLowerCase();
     
     // Simple greeting - just respond with a friendly greeting
@@ -430,47 +488,146 @@ const HomePageVenueChatbot: React.FC = () => {
       }
     }
     
-    if (/venue|find|location|place|hall|space|where|help me find/i.test(query)) {
-      return "You can search for venues using the search bar or browse our featured venues below. What type of event are you planning?";
+    // Venue listing requests
+    if (/list|show|find|search|display|browse|get/i.test(query) && 
+        (/venue|hall|space|location|place/i.test(query) || 
+         /riyadh|jeddah|khobar|dammam|mecca|medina/i.test(query))) {
+      
+      // City detection
+      let city = "riyadh"; // Default
+      if (/riyadh/i.test(query)) city = "riyadh";
+      else if (/jeddah/i.test(query)) city = "jeddah";
+      else if (/khobar/i.test(query)) city = "khobar";
+      else if (/dammam/i.test(query)) city = "dammam";
+      else if (/mecca|makkah/i.test(query)) city = "mecca";
+      else if (/medina|madinah/i.test(query)) city = "medina";
+      
+      try {
+        // Get venues from Supabase with gallery images
+        let baseQuery = supabase
+          .from("venues")
+          .select("id, name, city_name, starting_price, min_capacity, max_capacity, type, currency, category_name, gallery_images, image_url")
+          .ilike("city_name", `%${city}%`);
+          
+        // Check for capacity queries
+        const capacityMatch = query.match(/(\d+)\s*(people|guests|persons)/i);
+        const minCapacityMatch = query.match(/(?:more than|at least|minimum|min|>)\s*(\d+)/i);
+          
+        if (capacityMatch) {
+          const capacity = parseInt(capacityMatch[1]);
+          baseQuery = baseQuery.gte("min_capacity", 0).lte("max_capacity", capacity);
+        } else if (minCapacityMatch) {
+          const minCapacity = parseInt(minCapacityMatch[1]);
+          baseQuery = baseQuery.gte("max_capacity", minCapacity);
+        }
+        
+        const { data: venues, error } = await baseQuery.limit(5);
+        
+        if (error) throw error;
+        
+        if (!venues || venues.length === 0) {
+          return `I couldn't find any venues in ${city}${capacityMatch ? ` for ${capacityMatch[1]} guests` : ''}${minCapacityMatch ? ` with more than ${minCapacityMatch[1]} guests capacity` : ''}. Please try searching for another city or capacity range, or use the search function at the top of the page.`;
+        }
+        
+        // Format venue list with cards
+        let response = `<div class="mb-3 text-blue-300">Here are some venues in ${city.charAt(0).toUpperCase() + city.slice(1)}${capacityMatch ? ` for ${capacityMatch[1]} guests` : ''}${minCapacityMatch ? ` with more than ${minCapacityMatch[1]} guests capacity` : ''}:</div>\n\n`;
+        
+        venues.forEach((venue, index) => {
+          response += formatVenueCard(venue, index);
+        });
+        
+        response += "\n<div class='text-sm text-blue-300 mt-2'>Click on any venue to see complete details!</div>";
+        return response;
+      } catch (error) {
+        console.error("Venue search error:", error);
+        return "Sorry, I had trouble finding venues. Please use the search function at the top of the page or try again later.";
+      }
     }
     
+    // Handle capacity queries without city
+    const capacityMatch = query.match(/(\d+)\s*(people|guests|persons)/i);
+    const minCapacityMatch = query.match(/(?:more than|at least|minimum|min|>)\s*(\d+)/i);
+    
+    if (capacityMatch || minCapacityMatch) {
+      try {
+        let baseQuery = supabase
+          .from("venues")
+          .select("id, name, city_name, starting_price, min_capacity, max_capacity, type, currency, category_name, gallery_images, image_url");
+        
+        if (capacityMatch) {
+          const capacity = parseInt(capacityMatch[1]);
+          baseQuery = baseQuery.gte("min_capacity", 0).lte("max_capacity", capacity);
+        } else if (minCapacityMatch) {
+          const minCapacity = parseInt(minCapacityMatch[1]);
+          baseQuery = baseQuery.gte("max_capacity", minCapacity);
+        }
+        
+        const { data: venues, error } = await baseQuery.limit(5);
+        
+        if (error) throw error;
+        
+        if (!venues || venues.length === 0) {
+          return `I couldn't find any venues${capacityMatch ? ` for ${capacityMatch[1]} guests` : ''}${minCapacityMatch ? ` with more than ${minCapacityMatch[1]} guests capacity` : ''}. Please try a different capacity range or other search criteria.`;
+        }
+        
+        // Format venue list
+        let capacityPhrase = "";
+        if (capacityMatch) capacityPhrase = ` for ${capacityMatch[1]} guests`;
+        if (minCapacityMatch) capacityPhrase = ` with more than ${minCapacityMatch[1]} guests capacity`;
+        
+        let response = `<div class="mb-3 text-blue-300">Here are some venues${capacityPhrase}:</div>\n\n`;
+        
+        venues.forEach((venue, index) => {
+          response += formatVenueCard(venue, index);
+        });
+        
+        response += "\n<div class='text-sm text-blue-300 mt-2'>Click on any venue to see complete details!</div>";
+        return response;
+      } catch (error) {
+        console.error("Venue search error:", error);
+        return "Sorry, I had trouble finding venues. Please use the search function at the top of the page or try again later.";
+      }
+    }
+    
+    // Booking process explanation
+    if (/process|how to|steps|procedure|guideline|book|reserve|booking/i.test(query)) {
+      return `The booking process on FindVenue is simple:\n\n1. Browse or search for venues that meet your requirements\n2. View venue details, photos, pricing, and availability\n3. Select your preferred date and time slot\n4. Fill out the booking form with your event details\n5. Make a deposit payment to secure your booking\n6. Receive confirmation from the venue owner\n\nYou can manage all your bookings from your account dashboard. Need more help with a specific part of the process?`;
+    }
+    
+    // Payment related
+    if (/payment|pay|cost|price|fee|deposit|refund|cancel/i.test(query)) {
+      return "Most venues require a deposit payment to secure your booking. Payment methods vary by venue but typically include credit/debit cards, bank transfers, and sometimes cash. Cancellation policies are set by each venue owner and are displayed on the venue details page. Would you like to know more about pricing or payment options?";
+    }
+    
+    // Event type specific
     if (/wedding|marriage|bride|groom/i.test(query)) {
-      return "We have beautiful wedding venues available! You can filter for wedding halls using the search function or browse our wedding category.";
+      return "We have beautiful wedding venues available! You can filter for wedding halls using the search function or browse our wedding category. Wedding venues typically offer packages that include decorations, catering, and sometimes photography services. Would you like me to list some popular wedding venues?";
     }
     
     if (/conference|meeting|business|corporate|workshop/i.test(query)) {
-      return "For business events, we offer professional conference venues with all the amenities you need. Try searching for 'conference rooms' or 'meeting spaces'.";
+      return "For business events, we offer professional conference venues with amenities like projectors, sound systems, and high-speed internet. Many venues also provide catering services for business lunches or coffee breaks. Try searching for 'conference rooms' or 'meeting spaces'. Would you like to see venue options for a specific city?";
     }
     
     if (/party|celebration|birthday|anniversary/i.test(query)) {
-      return "Looking for a celebration venue? We have many options for parties and special occasions. Filter by 'party venue' or browse our listings.";
+      return "Looking for a celebration venue? We have many options for parties and special occasions. Most party venues offer decoration services, sound systems, and catering options. You can filter venues by capacity to ensure they can accommodate your guest list. Would you like me to suggest some popular party venues?";
     }
     
-    if (/price|cost|fee|expensive|cheap|budget|affordable/i.test(query)) {
-      return "Our venues range from budget-friendly to luxury options. You can filter venues by price range in our search to find one that matches your budget.";
-    }
-    
-    if (/capacity|people|guests|group size|attendees/i.test(query)) {
-      return "You can filter venues by capacity to ensure they can accommodate your group size. Just use the capacity filter in our search functionality.";
-    }
-    
+    // Location specific
     if (/location|city|area|region|neighborhood/i.test(query)) {
-      return "We have venues across multiple cities and neighborhoods. Use our location filter to find venues in your preferred area.";
+      return "We have venues across multiple cities in Saudi Arabia, including Riyadh, Jeddah, Khobar, Dammam, Mecca, and Medina. You can use our location filter to find venues in your preferred area. Which city are you interested in?";
     }
     
-    if (/reservation|booking|reserve|book|schedule/i.test(query)) {
-      return "To book a venue, select a venue you like, check its availability for your event date, and follow the booking process. You can contact venue owners directly through our platform.";
-    }
-    
-    if (/payment|pay|deposit|refund|cancel/i.test(query)) {
-      return "Payment methods vary by venue. Most venues require a deposit to secure your booking. Cancellation policies are listed on each venue's page.";
-    }
-    
+    // Help/Support
     if (/help|support|contact|assistance/i.test(query)) {
-      return "Need help? You can contact our support team through the 'Contact Us' link in the footer, or email support@findvenue.com.";
+      return "Need help? You can contact our support team through the 'Contact Us' link in the footer, or email support@findvenue.com. We're available 7 days a week from 9 AM to 9 PM to assist with any questions about venues, bookings, or your account.";
     }
     
-    return "I'm your assistant for FindVenue! Ask me about finding venues, booking processes, or any features of our platform. How can I help you today?";
+    // General venue inquiry
+    if (/venue|find|help/i.test(query)) {
+      return "You can search for venues based on location, capacity, event type, and price range. Our platform offers detailed information about each venue, including photos, amenities, and reviews. Would you like me to help you find a specific type of venue?";
+    }
+    
+    return "I'm your assistant for FindVenue! I can help you find venues, explain the booking process, or answer questions about our platform features. What specific information are you looking for today?";
   };
 
   const handleSendMessage = async (
@@ -494,7 +651,10 @@ const HomePageVenueChatbot: React.FC = () => {
     if (options?.viaMic) setAudioEnabled(true);
 
     try {
-      let resp = venue ? getVenueAnswer(messageText) : getDefaultAnswer(messageText);
+      let resp = venue 
+        ? getVenueAnswer(messageText) 
+        : await getDefaultAnswer(messageText);
+        
       setTimeout(() => {
         setMessages(prev => [
           ...prev,
@@ -509,12 +669,13 @@ const HomePageVenueChatbot: React.FC = () => {
         setChatbotState("idle");
       }, 500);
     } catch (err: any) {
+      console.error("Chat error:", err);
       setMessages(prev => [
         ...prev,
         {
           id: generateId(),
           sender: "bot",
-          content: "Sorry, something went wrong.",
+          content: "Sorry, something went wrong while processing your request. Please try again.",
           timestamp: new Date()
         }
       ]);
@@ -531,6 +692,21 @@ const HomePageVenueChatbot: React.FC = () => {
     }
     // eslint-disable-next-line
   }, [messages, lastBotShouldSpeak, speechSynthesisSupported]);
+
+  useEffect(() => {
+    const handleVenueNavigation = (event: CustomEvent) => {
+      const venueId = event.detail;
+      if (venueId) {
+        navigate(`/venue/${venueId}`);
+      }
+    };
+
+    document.addEventListener('navigateToVenue', handleVenueNavigation as EventListener);
+    
+    return () => {
+      document.removeEventListener('navigateToVenue', handleVenueNavigation as EventListener);
+    };
+  }, [navigate]);
 
   // Chat widget UI
   return (
@@ -560,9 +736,12 @@ const HomePageVenueChatbot: React.FC = () => {
       </TooltipProvider>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-[540px] h-[620px] p-0 overflow-hidden right-[5%] bg-gradient-to-b from-slate-950 to-slate-900 flex flex-col rounded-xl border border-white/10">
-          <DialogTitle className="sr-only">
-            {venue?.name ? venue.name + " Assistant" : "FindVenue Home Assistant"}
-          </DialogTitle>
+          <div className="p-4 border-b border-white/10 bg-gradient-to-r from-blue-900 to-blue-800 flex items-center gap-2">
+            <Bot className="h-5 w-5 text-white" />
+            <DialogTitle className="text-white font-medium m-0">
+              {venue?.name ? venue.name + " Assistant" : "FindVenue Assistant"}
+            </DialogTitle>
+          </div>
           <div className="absolute top-2 right-2 z-10">
             <Button
               variant="ghost"
@@ -604,12 +783,41 @@ const HomePageVenueChatbot: React.FC = () => {
                           : "bg-findvenue-card-bg border border-findvenue-border flex items-center gap-2"
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {message.sender === "user" ? (
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      ) : (
+                        <div className="text-sm whitespace-pre-wrap venue-chat-content">
+                          {message.content.includes("<div") || message.content.includes("<img") ? (
+                            <div 
+                              dangerouslySetInnerHTML={{
+                                __html: message.content.replace(
+                                  /onclick="document\.dispatchEvent\(new CustomEvent\('navigateToVenue', \{detail: '(.+?)'\}\)\)"/g,
+                                  (match, venueId) => `onClick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venueId}'}))"` 
+                                )
+                              }}
+                            />
+                          ) : (
+                            <p 
+                              dangerouslySetInnerHTML={{
+                                __html: message.content.replace(
+                                  /\[View details for (.+?)\]\(\/venue\/(.+?)\)/g,
+                                  (match, venueName, venueId) => 
+                                    `<span class="text-blue-400 underline cursor-pointer" 
+                                      data-venue-id="${venueId}" 
+                                      onClick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venueId}'}))">
+                                      View details for ${venueName}
+                                    </span>`
+                                )
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
                       {message.sender === "bot" && speechSynthesisSupported && (
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => speak(message.content)}
+                          onClick={() => speak(message.content.replace(/<[^>]*>/g, ''))}
                           className="ml-1 h-7 w-7 flex-shrink-0"
                         >
                           <Volume2 className="h-4 w-4 text-findvenue cursor-pointer" />
