@@ -75,6 +75,15 @@ const MAX_MSGS = 40;
 
 const SAUDI_CITIES = ['Riyadh', 'Jeddah', 'Khobar', 'Dammam', 'Mecca', 'Medina', 'Abha', 'Taif'];
 
+const EVENT_CATEGORIES = [
+  "Graduation party",
+  "Training Course", 
+  "Birthday",
+  "Business Meeting",
+  "Workshops",
+  "Family Meeting"
+];
+
 const HomePageVenueChatbot: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -168,7 +177,7 @@ const HomePageVenueChatbot: React.FC = () => {
   const generateId = () => Math.random().toString(36).substring(2, 10);
 
   // Comprehensive entity-matching QA on venue object
-  const getVenueAnswer = (query: string): string => {
+  const getVenueAnswer = async (query: string): Promise<string> => {
     if (!venue) return "Sorry, I couldn't find venue information for this page.";
 
     const v = venue;
@@ -182,6 +191,34 @@ const HomePageVenueChatbot: React.FC = () => {
       } else {
         return `Hello! How can I help you with information about ${v.name}?`;
       }
+    }
+    
+    // Category/Type queries
+    if (/category|type|kind|event type/i.test(query)) {
+      let response = `${v.name} is suitable for the following event types:\n\n`;
+      
+      const categories = Array.isArray(v.category_name) 
+        ? v.category_name
+        : typeof v.category_name === 'string' 
+          ? [v.category_name]
+          : [];
+          
+      const types = v.type ? [v.type] : [];
+      const allEventTypes = [...new Set([...categories, ...types])].filter(Boolean);
+      
+      if (allEventTypes.length > 0) {
+        response += `<div class="space-y-2">`;
+        allEventTypes.forEach(eventType => {
+          response += `<div class="flex items-center gap-2">
+            <span class="text-blue-400">•</span> ${eventType}
+          </div>`;
+        });
+        response += `</div>`;
+      } else {
+        response += "No specific event types are listed for this venue.";
+      }
+      
+      return response;
     }
     
     // Complete details
@@ -328,19 +365,83 @@ Would you like to explore venues in a specific city?`;
       return `${v.name} offers these accessibility features: ${v.accessibility_features.join(", ")}.`;
     }
     
-    // Category/Type queries
-    if (/category|type|kind|event type/i.test(query)) {
-      if (v.category_name && Array.isArray(v.category_name)) {
-        return `${v.name} is categorized as: ${v.category_name.join(', ')}.`;
-      } else if (v.category_name) {
-        return `${v.name} is categorized as: ${v.category_name}.`;
-      } else if (v.type) {
-        return `${v.name} is categorized as: ${v.type}.`;
-      } else {
-        return `I don't have specific category information for ${v.name}.`;
+    // Event type specific queries
+    if (EVENT_CATEGORIES.some(category => 
+        new RegExp(category.replace(/\s+/g, '\\s+'), 'i').test(query)
+    )) {
+      try {
+        const matchedCategory = EVENT_CATEGORIES.find(category => 
+          new RegExp(category.replace(/\s+/g, '\\s+'), 'i').test(query)
+        );
+        
+        let baseQuery = supabase
+          .from("venues")
+          .select(`
+            id,
+            name,
+            city_name,
+            starting_price,
+            min_capacity,
+            max_capacity,
+            type,
+            currency,
+            category_name,
+            gallery_images,
+            image_url,
+            price_per_person,
+            amenities,
+            description,
+            rating,
+            reviews_count,
+            additional_services
+          `);
+
+        // Add city filter if specified
+        const cityMatch = new RegExp(SAUDI_CITIES.join('|'), 'i').exec(query);
+        if (cityMatch) {
+          baseQuery = baseQuery.ilike("city_name", `%${cityMatch[0]}%`);
+        }
+
+        // Filter for the specific category in both category_name and type fields
+        baseQuery = baseQuery.or(
+          `category_name.cs.{${matchedCategory}},type.ilike.%${matchedCategory}%`
+        );
+
+        const { data: venues, error } = await baseQuery
+          .order('rating', { ascending: false })
+          .limit(5);
+
+        if (error) throw error;
+
+        if (!venues || venues.length === 0) {
+          return `I couldn't find any venues${cityMatch ? ` in ${cityMatch[0]}` : ''} for ${matchedCategory}. Would you like to see venues for other event types?`;
+        }
+
+        let response = `<div class="mb-3 text-blue-300">Found ${venues.length} venues${cityMatch ? ` in ${cityMatch[0]}` : ''} perfect for ${matchedCategory}:</div>\n\n`;
+
+        venues.forEach((venue, index) => {
+          response += formatVenueCard(venue, index);
+        });
+
+        // Add suggestions for related event types
+        response += `\n<div class="text-sm text-blue-300 mt-3">
+          <p>Looking for other event types? Try:</p>
+          <div class="flex flex-wrap gap-2 mt-2">
+            ${EVENT_CATEGORIES
+              .filter(cat => cat !== matchedCategory)
+              .slice(0, 3)
+              .map(cat => `<button class="text-blue-400 underline cursor-pointer" onclick="document.querySelector('input').value='Show me venues for ${cat}'; document.querySelector('button[aria-label=\\'Send\\']').click()">${cat}</button>`)
+              .join(' • ')}
+          </div>
+        </div>`;
+
+        return response;
+      } catch (error) {
+        console.error("Error fetching venues:", error);
+        return "Sorry, I had trouble finding venues. Please try again or use the search function at the top of the page.";
       }
     }
-    
+
     // Payment methods queries
     if (/payment|pay|credit card|cash/i.test(query)) {
       if (!v.accepted_payment_methods || v.accepted_payment_methods.length === 0)
@@ -575,9 +676,323 @@ Would you like to explore venues in a specific city?`;
     }
   };
 
-  // Modify getDefaultAnswer to handle comparison requests
+  // Add this helper function to handle wedding venue queries
+  const getWeddingVenues = async (cityName?: string): Promise<string> => {
+    try {
+      let baseQuery = supabase
+        .from("venues")
+        .select("id, name, city_name, starting_price, min_capacity, max_capacity, type, currency, category_name, gallery_images, image_url, price_per_person, amenities");
+
+      // Add wedding category filter
+      baseQuery = baseQuery.or(
+        'category_name.cs.{Wedding Venues},category_name.cs.{Wedding},type.ilike.%wedding%'
+      );
+
+      // Add city filter if specified
+      if (cityName) {
+        baseQuery = baseQuery.ilike('city_name', `%${cityName}%`);
+      }
+
+      // Get results ordered by rating and popularity
+      const { data: venues, error } = await baseQuery
+        .order('rating', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      if (!venues || venues.length === 0) {
+        return `I couldn't find any wedding venues${cityName ? ` in ${cityName}` : ''}. Would you like to see venues in another city?`;
+      }
+
+      let response = `<div class="mb-3 text-blue-300">Here are some wedding venues${cityName ? ` in ${cityName}` : ''} perfect for your special day:</div>\n\n`;
+
+      venues.forEach((venue, index) => {
+        // Get special wedding features
+        const weddingFeatures = [
+          venue.amenities?.includes('Bridal Suite') ? 'Bridal Suite' : null,
+          venue.amenities?.includes('Catering') ? 'Catering Services' : null,
+          venue.amenities?.includes('Parking') ? 'Parking Available' : null,
+          venue.amenities?.includes('Sound System') ? 'Sound System' : null,
+          venue.amenities?.includes('Lighting') ? 'Special Lighting' : null
+        ].filter(Boolean);
+
+        // Create enhanced venue card with wedding-specific details
+        let card = `<div class="venue-card p-4 bg-blue-950/30 rounded-lg border border-blue-800/50 mb-4">\n`;
+        
+        // Title with special wedding icon
+        card += `<div class="font-semibold text-blue-300 text-lg mb-2">💒 ${index + 1}. ${venue.name}</div>\n`;
+        
+        // Images row
+        const images = (Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) 
+          ? venue.gallery_images.slice(0, 3) 
+          : [venue.image_url || "https://via.placeholder.com/300x200?text=Wedding+Venue"];
+
+        card += `<div class="flex gap-1 mb-3">\n`;
+        images.forEach(img => {
+          card += `  <img src="${img}" alt="Wedding Venue" class="h-24 w-1/3 object-cover rounded" />\n`;
+        });
+        card += `</div>\n`;
+        
+        // Details with wedding-specific information
+        card += `<div class="text-sm text-gray-300 space-y-2">\n`;
+        card += `  <div><span class="text-blue-400">Venue Type:</span> ${venue.type || 'Wedding Venue'}</div>\n`;
+        if (venue.city_name) {
+          card += `  <div><span class="text-blue-400">Location:</span> ${venue.city_name}</div>\n`;
+        }
+        card += `  <div><span class="text-blue-400">Capacity:</span> ${venue.min_capacity || 0}-${venue.max_capacity || 0} guests</div>\n`;
+        
+        // Price with wedding package note
+        const price = venue.price_per_person || venue.starting_price;
+        const currency = venue.currency || 'SAR';
+        card += `  <div><span class="text-blue-400">Starting Price:</span> ${price} ${currency}${venue.price_per_person ? '/person' : ''}</div>\n`;
+        
+        // Wedding features
+        if (weddingFeatures.length > 0) {
+          card += `  <div><span class="text-blue-400">Wedding Features:</span> ${weddingFeatures.join(' • ')}</div>\n`;
+        }
+        
+        card += `</div>\n`;
+        
+        // View details button
+        card += `<div class="mt-3">\n`;
+        card += `  <a class="text-blue-400 underline cursor-pointer" data-venue-id="${venue.id}" onclick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venue.id}'}))">View wedding packages and details for ${venue.name}</a>\n`;
+        card += `</div>\n`;
+        
+        card += `</div>`;
+        
+        response += card;
+      });
+
+      response += `\n<div class="text-sm text-blue-300 mt-3">
+        <p>💝 All wedding venues can be customized for your special day. Contact venues directly for:</p>
+        <ul class="list-disc ml-5 mt-2">
+          <li>Custom wedding packages</li>
+          <li>Decoration options</li>
+          <li>Catering menus</li>
+          <li>Available dates</li>
+        </ul>
+      </div>`;
+
+      return response;
+    } catch (error) {
+      console.error("Error fetching wedding venues:", error);
+      return "Sorry, I had trouble finding wedding venues. Please try again or use the search function at the top of the page.";
+    }
+  };
+
+  // Modify getDefaultAnswer to handle wedding venue queries
   const getDefaultAnswer = async (query: string): Promise<string> => {
     query = query.toLowerCase();
+    
+    // Event type specific queries - check this before other patterns
+    if (EVENT_CATEGORIES.some(category => 
+        new RegExp(category.replace(/\s+/g, '\\s+'), 'i').test(query)
+    )) {
+      try {
+        const matchedCategory = EVENT_CATEGORIES.find(category => 
+          new RegExp(category.replace(/\s+/g, '\\s+'), 'i').test(query)
+        );
+        
+        let baseQuery = supabase
+          .from("venues")
+          .select(`
+            id,
+            name,
+            city_name,
+            starting_price,
+            min_capacity,
+            max_capacity,
+            type,
+            currency,
+            category_name,
+            gallery_images,
+            image_url,
+            price_per_person,
+            amenities,
+            description,
+            rating,
+            reviews_count,
+            additional_services
+          `);
+
+        // Add city filter if specified
+        const cityMatch = new RegExp(SAUDI_CITIES.join('|'), 'i').exec(query);
+        if (cityMatch) {
+          baseQuery = baseQuery.ilike("city_name", `%${cityMatch[0]}%`);
+        }
+
+        // Filter for the specific category in both category_name and type fields
+        baseQuery = baseQuery.or(
+          `category_name.cs.{${matchedCategory}},type.ilike.%${matchedCategory}%`
+        );
+
+        const { data: venues, error } = await baseQuery
+          .order('rating', { ascending: false })
+          .limit(5);
+
+        if (error) throw error;
+
+        if (!venues || venues.length === 0) {
+          return `I couldn't find any venues${cityMatch ? ` in ${cityMatch[0]}` : ''} for ${matchedCategory}. Would you like to see venues for other event types?`;
+        }
+
+        let response = `<div class="mb-3 text-blue-300">Found ${venues.length} venues${cityMatch ? ` in ${cityMatch[0]}` : ''} perfect for ${matchedCategory}:</div>\n\n`;
+
+        venues.forEach((venue, index) => {
+          response += formatVenueCard(venue, index);
+        });
+
+        // Add suggestions for related event types
+        response += `\n<div class="text-sm text-blue-300 mt-3">
+          <p>Looking for other event types? Try:</p>
+          <div class="flex flex-wrap gap-2 mt-2">
+            ${EVENT_CATEGORIES
+              .filter(cat => cat !== matchedCategory)
+              .slice(0, 3)
+              .map(cat => `<button class="text-blue-400 underline cursor-pointer" onclick="document.querySelector('input').value='Show me venues for ${cat}'; document.querySelector('button[aria-label=\\'Send\\']').click()">${cat}</button>`)
+              .join(' • ')}
+          </div>
+        </div>`;
+
+        return response;
+      } catch (error) {
+        console.error("Error fetching venues:", error);
+        return "Sorry, I had trouble finding venues. Please try again or use the search function at the top of the page.";
+      }
+    }
+
+    // Handle wedding venue queries
+    if (/wedding|marriage|bride|groom|hall|قاعة|عرس|زفاف|زواج|عروس/i.test(query)) {
+      try {
+        let baseQuery = supabase
+          .from("venues")
+          .select(`
+            id,
+            name,
+            city_name,
+            starting_price,
+            min_capacity,
+            max_capacity,
+            type,
+            currency,
+            category_name,
+            gallery_images,
+            image_url,
+            price_per_person,
+            amenities,
+            description,
+            rating,
+            reviews_count,
+            additional_services,
+            rules_and_regulations,
+            owner_info
+          `);
+
+        // Check for city mention
+        const cityMatch = /(riyadh|jeddah|khobar|dammam|mecca|medina|جدة|مكة|الرياض|الخبر|الدمام|المدينة)/i.exec(query);
+        if (cityMatch) {
+          baseQuery = baseQuery.ilike('city_name', `%${cityMatch[0]}%`);
+        }
+
+        // Get results ordered by rating and popularity
+        const { data: venues, error } = await baseQuery
+          .order('rating', { ascending: false })
+          .limit(5);
+
+        if (error) throw error;
+
+        if (!venues || venues.length === 0) {
+          return `I couldn't find any venues${cityMatch ? ` in ${cityMatch[0]}` : ''}. Would you like to see venues in another city?`;
+        }
+
+        let response = `<div class="mb-3 text-blue-300">Here are venues${cityMatch ? ` in ${cityMatch[0]}` : ''}:</div>\n\n`;
+
+        venues.forEach((venue, index) => {
+          let card = `<div class="venue-card p-4 bg-blue-950/30 rounded-lg border border-blue-800/50 mb-4">\n`;
+          
+          // Title
+          card += `<div class="font-semibold text-blue-300 text-lg mb-2">${index + 1}. ${venue.name}</div>\n`;
+          
+          // Images row - use only provided images
+          const images = (Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) 
+            ? venue.gallery_images.slice(0, 3) 
+            : [venue.image_url].filter(Boolean);
+
+          if (images.length > 0) {
+            card += `<div class="flex gap-1 mb-3">\n`;
+            images.forEach(img => {
+              card += `  <img src="${img}" alt="${venue.name}" class="h-24 w-1/3 object-cover rounded" />\n`;
+            });
+            card += `</div>\n`;
+          }
+          
+          // Details using only available fields
+          card += `<div class="text-sm text-gray-300 space-y-2">\n`;
+          
+          // Type & Categories
+          if (venue.type || venue.category_name) {
+            card += `  <div><span class="text-blue-400">Type:</span> ${venue.type || ''}${
+              venue.category_name ? ` (${Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.category_name})` : ''
+            }</div>\n`;
+          }
+
+          // Location
+          if (venue.city_name) {
+            card += `  <div><span class="text-blue-400">Location:</span> ${venue.city_name}</div>\n`;
+          }
+
+          // Capacity
+          if (venue.min_capacity !== null || venue.max_capacity !== null) {
+            card += `  <div><span class="text-blue-400">Capacity:</span> ${venue.min_capacity || 0}-${venue.max_capacity || 0} guests</div>\n`;
+          }
+          
+          // Price
+          if (venue.starting_price !== null || venue.price_per_person !== null) {
+            const price = venue.price_per_person || venue.starting_price;
+            const currency = venue.currency || 'SAR';
+            card += `  <div><span class="text-blue-400">Price:</span> ${price} ${currency}${venue.price_per_person ? '/person' : ''}</div>\n`;
+          }
+          
+          // Amenities
+          if (Array.isArray(venue.amenities) && venue.amenities.length > 0) {
+            card += `  <div><span class="text-blue-400">Amenities:</span> ${venue.amenities.join(' • ')}</div>\n`;
+          }
+
+          // Additional Services
+          if (Array.isArray(venue.additional_services) && venue.additional_services.length > 0) {
+            card += `  <div><span class="text-blue-400">Additional Services:</span> ${venue.additional_services.join(' • ')}</div>\n`;
+          }
+
+          // Rating
+          if (venue.rating !== null) {
+            card += `  <div><span class="text-blue-400">Rating:</span> ${venue.rating}/5${
+              venue.reviews_count ? ` (${venue.reviews_count} reviews)` : ''
+            }</div>\n`;
+          }
+          
+          card += `</div>\n`;
+          
+          // Description
+          if (venue.description) {
+            card += `<div class="mt-2 text-sm text-gray-400">${venue.description}</div>\n`;
+          }
+          
+          // View details button
+          card += `<div class="mt-3">\n`;
+          card += `  <a class="text-blue-400 underline cursor-pointer" data-venue-id="${venue.id}" onclick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venue.id}'}))">View details for ${venue.name}</a>\n`;
+          card += `</div>\n`;
+          
+          card += `</div>`;
+          
+          response += card;
+        });
+
+        return response;
+      } catch (error) {
+        console.error("Error fetching venues:", error);
+        return "Sorry, I had trouble finding venues. Please try again or use the search function at the top of the page.";
+      }
+    }
 
     // Handle comparison requests
     if (/compare|comparison|vs|versus|difference between/i.test(query)) {
@@ -683,10 +1098,28 @@ Would you like to explore venues in a specific city?`;
       try {
         const maxPrice = parseInt(priceMatch[1]);
         
-        // Simplified query to properly handle price filtering
+        // Query all relevant fields from database
         let baseQuery = supabase
           .from("venues")
-          .select("id, name, city_name, starting_price, min_capacity, max_capacity, type, currency, category_name, gallery_images, image_url, price_per_person");
+          .select(`
+            id,
+            name,
+            city_name,
+            starting_price,
+            min_capacity,
+            max_capacity,
+            type,
+            currency,
+            category_name,
+            gallery_images,
+            image_url,
+            price_per_person,
+            amenities,
+            description,
+            rating,
+            reviews_count,
+            additional_services
+          `);
 
         // Add city filter if specified
         if (cityMatch) {
@@ -705,10 +1138,7 @@ Would you like to explore venues in a specific city?`;
           .order('price_per_person', { ascending: true, nullsLast: true })
           .limit(20);
 
-        if (error) {
-          console.error("Venue search error:", error);
-          throw error;
-        }
+        if (error) throw error;
 
         // Filter venues client-side to ensure we have valid prices under the limit
         const filteredVenues = (venues || []).filter(venue => {
@@ -742,18 +1172,90 @@ Would you like to explore venues in a specific city?`;
           return response;
         }
 
-        let response = `<div class="mb-3 text-blue-300">Found ${filteredVenues.length} venues${cityMatch ? ` in ${cityMatch[0]}` : ''} with prices under ${maxPrice} SAR (sorted by price):</div>\n\n`;
+        let response = `<div class="mb-3 text-blue-300">Found ${filteredVenues.length} venues${cityMatch ? ` in ${cityMatch[0]}` : ''} with prices under ${maxPrice} SAR:</div>\n\n`;
 
         filteredVenues.forEach((venue, index) => {
-          response += formatVenueCard(venue, index);
+          let card = `<div class="venue-card p-4 bg-blue-950/30 rounded-lg border border-blue-800/50 mb-4">\n`;
+          
+          // Title
+          card += `<div class="font-semibold text-blue-300 text-lg mb-2">${index + 1}. ${venue.name}</div>\n`;
+          
+          // Images
+          const images = (Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) 
+            ? venue.gallery_images.slice(0, 3) 
+            : [venue.image_url].filter(Boolean);
+
+          if (images.length > 0) {
+            card += `<div class="flex gap-1 mb-3">\n`;
+            images.forEach(img => {
+              card += `  <img src="${img}" alt="${venue.name}" class="h-24 w-1/3 object-cover rounded" />\n`;
+            });
+            card += `</div>\n`;
+          }
+          
+          // Details
+          card += `<div class="text-sm text-gray-300 space-y-2">\n`;
+          
+          // Type & Categories
+          if (venue.type || venue.category_name) {
+            card += `  <div><span class="text-blue-400">Type:</span> ${venue.type || ''}${
+              venue.category_name ? ` (${Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.category_name})` : ''
+            }</div>\n`;
+          }
+
+          // Location
+          if (venue.city_name) {
+            card += `  <div><span class="text-blue-400">Location:</span> ${venue.city_name}</div>\n`;
+          }
+
+          // Capacity
+          if (venue.min_capacity !== null || venue.max_capacity !== null) {
+            card += `  <div><span class="text-blue-400">Capacity:</span> ${venue.min_capacity || 0}-${venue.max_capacity || 0} guests</div>\n`;
+          }
+          
+          // Price
+          if (venue.starting_price !== null || venue.price_per_person !== null) {
+            const price = venue.price_per_person || venue.starting_price;
+            const currency = venue.currency || 'SAR';
+            card += `  <div><span class="text-blue-400">Price:</span> ${price} ${currency}${venue.price_per_person ? '/person' : ''}</div>\n`;
+          }
+          
+          // Amenities
+          if (Array.isArray(venue.amenities) && venue.amenities.length > 0) {
+            card += `  <div><span class="text-blue-400">Amenities:</span> ${venue.amenities.join(' • ')}</div>\n`;
+          }
+
+          // Additional Services
+          if (Array.isArray(venue.additional_services) && venue.additional_services.length > 0) {
+            card += `  <div><span class="text-blue-400">Additional Services:</span> ${venue.additional_services.join(' • ')}</div>\n`;
+          }
+
+          // Rating
+          if (venue.rating !== null) {
+            card += `  <div><span class="text-blue-400">Rating:</span> ${venue.rating}/5${
+              venue.reviews_count ? ` (${venue.reviews_count} reviews)` : ''
+            }</div>\n`;
+          }
+          
+          // Description
+          if (venue.description) {
+            card += `<div class="mt-2 text-sm text-gray-400">${venue.description}</div>\n`;
+          }
+          
+          // View details button
+          card += `<div class="mt-3">\n`;
+          card += `  <a class="text-blue-400 underline cursor-pointer" data-venue-id="${venue.id}" onclick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venue.id}'}))">View details for ${venue.name}</a>\n`;
+          card += `</div>\n`;
+          
+          card += `</div>`;
+          
+          response += card;
         });
 
-        response += "\n<div class='text-sm text-blue-300 mt-2'>Click on any venue to see complete details! You can also filter by other criteria like capacity or amenities.</div>";
         return response;
-
       } catch (error) {
         console.error("Venue search error:", error);
-        return `I encountered an error while searching for venues under ${priceMatch[1]} SAR${cityMatch ? ` in ${cityMatch[0]}` : ''}. Please try adjusting your search criteria or use the search function at the top of the page.`;
+        return "Sorry, I had trouble finding venues. Please try again or use the search function at the top of the page.";
       }
     }
 
@@ -815,17 +1317,17 @@ Would you like to explore venues in a specific city?`;
     }
     
     // Handle capacity queries without city
-    const capacityMatch = query.match(/(\d+)\s*(people|guests|persons)/i);
+    const capacityQueryMatch = query.match(/(\d+)\s*(people|guests|persons)/i);
     const minCapacityMatch = query.match(/(?:more than|at least|minimum|min|>)\s*(\d+)/i);
     
-    if (capacityMatch || minCapacityMatch) {
+    if (capacityQueryMatch || minCapacityMatch) {
       try {
         let baseQuery = supabase
           .from("venues")
           .select("id, name, city_name, starting_price, min_capacity, max_capacity, type, currency, category_name, gallery_images, image_url");
         
-        if (capacityMatch) {
-          const capacity = parseInt(capacityMatch[1]);
+        if (capacityQueryMatch) {
+          const capacity = parseInt(capacityQueryMatch[1]);
           baseQuery = baseQuery.gte("min_capacity", 0).lte("max_capacity", capacity);
         } else if (minCapacityMatch) {
           const minCapacity = parseInt(minCapacityMatch[1]);
@@ -837,12 +1339,12 @@ Would you like to explore venues in a specific city?`;
         if (error) throw error;
         
         if (!venues || venues.length === 0) {
-          return `I couldn't find any venues${capacityMatch ? ` for ${capacityMatch[1]} guests` : ''}${minCapacityMatch ? ` with more than ${minCapacityMatch[1]} guests capacity` : ''}. Please try a different capacity range or other search criteria.`;
+          return `I couldn't find any venues${capacityQueryMatch ? ` for ${capacityQueryMatch[1]} guests` : ''}${minCapacityMatch ? ` with more than ${minCapacityMatch[1]} guests capacity` : ''}. Please try a different capacity range or other search criteria.`;
         }
         
         // Format venue list
         let capacityPhrase = "";
-        if (capacityMatch) capacityPhrase = ` for ${capacityMatch[1]} guests`;
+        if (capacityQueryMatch) capacityPhrase = ` for ${capacityQueryMatch[1]} guests`;
         if (minCapacityMatch) capacityPhrase = ` with more than ${minCapacityMatch[1]} guests capacity`;
         
         let response = `<div class="mb-3 text-blue-300">Here are some venues${capacityPhrase}:</div>\n\n`;
@@ -870,10 +1372,6 @@ Would you like to explore venues in a specific city?`;
     }
     
     // Event type specific
-    if (/wedding|marriage|bride|groom/i.test(query)) {
-      return "We have beautiful wedding venues available! You can filter for wedding halls using the search function or browse our wedding category. Wedding venues typically offer packages that include decorations, catering, and sometimes photography services. Would you like me to list some popular wedding venues?";
-    }
-    
     if (/conference|meeting|business|corporate|workshop/i.test(query)) {
       return "For business events, we offer professional conference venues with amenities like projectors, sound systems, and high-speed internet. Many venues also provide catering services for business lunches or coffee breaks. Try searching for 'conference rooms' or 'meeting spaces'. Would you like to see venue options for a specific city?";
     }
@@ -897,6 +1395,169 @@ Would you like to explore venues in a specific city?`;
       return "You can search for venues based on location, capacity, event type, and price range. Our platform offers detailed information about each venue, including photos, amenities, and reviews. Would you like me to help you find a specific type of venue?";
     }
     
+    // Capacity query
+    const capacityMatch = query.match(/(?:capacity|fit|accommodate|hold|guests?|people)\s*(?:of|for)?\s*(\d+)/i);
+
+    if (capacityMatch) {
+      try {
+        const requiredCapacity = parseInt(capacityMatch[1]);
+        
+        // Query all relevant fields from database
+        let baseQuery = supabase
+          .from("venues")
+          .select(`
+            id,
+            name,
+            city_name,
+            starting_price,
+            min_capacity,
+            max_capacity,
+            type,
+            currency,
+            category_name,
+            gallery_images,
+            image_url,
+            price_per_person,
+            amenities,
+            description,
+            rating,
+            reviews_count,
+            additional_services
+          `);
+
+        // Add city filter if specified
+        const cityMatch = new RegExp(SAUDI_CITIES.join('|'), 'i').exec(query);
+        if (cityMatch) {
+          baseQuery = baseQuery.ilike("city_name", `%${cityMatch[0]}%`);
+        }
+
+        // Filter for venues that can accommodate the required capacity
+        baseQuery = baseQuery.and(
+          `min_capacity.lte.${requiredCapacity},` +
+          `max_capacity.gte.${requiredCapacity}`
+        );
+
+        // Get the results
+        const { data: venues, error } = await baseQuery
+          .order('rating', { ascending: false, nullsLast: true })
+          .limit(20);
+
+        if (error) throw error;
+
+        if (!venues || venues.length === 0) {
+          // If no venues found, get the closest available capacity ranges
+          const { data: capacityRanges } = await supabase
+            .from("venues")
+            .select("min_capacity, max_capacity")
+            .order('max_capacity', { ascending: true })
+            .limit(10);
+
+          let suggestedRange = null;
+          if (capacityRanges) {
+            for (const venue of capacityRanges) {
+              if (venue.max_capacity >= requiredCapacity) {
+                suggestedRange = venue;
+                break;
+              }
+            }
+          }
+
+          let response = `I couldn't find any venues${cityMatch ? ` in ${cityMatch[0]}` : ''} that can accommodate exactly ${requiredCapacity} guests.`;
+          if (suggestedRange) {
+            response += ` However, I found venues that can accommodate between ${suggestedRange.min_capacity} and ${suggestedRange.max_capacity} guests. Would you like to see those options?`;
+          }
+          return response;
+        }
+
+        let response = `<div class="mb-3 text-blue-300">Found ${venues.length} venues${cityMatch ? ` in ${cityMatch[0]}` : ''} that can accommodate ${requiredCapacity} guests:</div>\n\n`;
+
+        venues.forEach((venue, index) => {
+          let card = `<div class="venue-card p-4 bg-blue-950/30 rounded-lg border border-blue-800/50 mb-4">\n`;
+          
+          // Title
+          card += `<div class="font-semibold text-blue-300 text-lg mb-2">${index + 1}. ${venue.name}</div>\n`;
+          
+          // Images
+          const images = (Array.isArray(venue.gallery_images) && venue.gallery_images.length > 0) 
+            ? venue.gallery_images.slice(0, 3) 
+            : [venue.image_url].filter(Boolean);
+
+          if (images.length > 0) {
+            card += `<div class="flex gap-1 mb-3">\n`;
+            images.forEach(img => {
+              card += `  <img src="${img}" alt="${venue.name}" class="h-24 w-1/3 object-cover rounded" />\n`;
+            });
+            card += `</div>\n`;
+          }
+          
+          // Details
+          card += `<div class="text-sm text-gray-300 space-y-2">\n`;
+          
+          // Type & Categories
+          if (venue.type || venue.category_name) {
+            card += `  <div><span class="text-blue-400">Type:</span> ${venue.type || ''}${
+              venue.category_name ? ` (${Array.isArray(venue.category_name) ? venue.category_name.join(', ') : venue.category_name})` : ''
+            }</div>\n`;
+          }
+
+          // Location
+          if (venue.city_name) {
+            card += `  <div><span class="text-blue-400">Location:</span> ${venue.city_name}</div>\n`;
+          }
+
+          // Capacity
+          if (venue.min_capacity !== null || venue.max_capacity !== null) {
+            card += `  <div><span class="text-blue-400">Capacity:</span> ${venue.min_capacity || 0}-${venue.max_capacity || 0} guests</div>\n`;
+          }
+          
+          // Price
+          if (venue.starting_price !== null || venue.price_per_person !== null) {
+            const price = venue.price_per_person || venue.starting_price;
+            const currency = venue.currency || 'SAR';
+            card += `  <div><span class="text-blue-400">Price:</span> ${price} ${currency}${venue.price_per_person ? '/person' : ''}</div>\n`;
+          }
+          
+          // Amenities
+          if (Array.isArray(venue.amenities) && venue.amenities.length > 0) {
+            card += `  <div><span class="text-blue-400">Amenities:</span> ${venue.amenities.join(' • ')}</div>\n`;
+          }
+
+          // Additional Services
+          if (Array.isArray(venue.additional_services) && venue.additional_services.length > 0) {
+            card += `  <div><span class="text-blue-400">Additional Services:</span> ${venue.additional_services.join(' • ')}</div>\n`;
+          }
+
+          // Rating
+          if (venue.rating !== null) {
+            card += `  <div><span class="text-blue-400">Rating:</span> ${venue.rating}/5${
+              venue.reviews_count ? ` (${venue.reviews_count} reviews)` : ''
+            }</div>\n`;
+          }
+          
+          card += `</div>\n`;
+          
+          // Description
+          if (venue.description) {
+            card += `<div class="mt-2 text-sm text-gray-400">${venue.description}</div>\n`;
+          }
+          
+          // View details button
+          card += `<div class="mt-3">\n`;
+          card += `  <a class="text-blue-400 underline cursor-pointer" data-venue-id="${venue.id}" onclick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venue.id}'}))">View details for ${venue.name}</a>\n`;
+          card += `</div>\n`;
+          
+          card += `</div>`;
+          
+          response += card;
+        });
+
+        return response;
+      } catch (error) {
+        console.error("Venue search error:", error);
+        return "Sorry, I had trouble finding venues. Please try again or use the search function at the top of the page.";
+      }
+    }
+
     return "I'm your assistant for FindVenue! I can help you find venues, explain the booking process, or answer questions about our platform features. What specific information are you looking for today?";
   };
 
@@ -906,6 +1567,7 @@ Would you like to explore venues in a specific city?`;
   ) => {
     const messageText = customMessage || inputMessage;
     if (messageText.trim() === "" || chatbotState === "thinking") return;
+    
     setMessages(prev => [
       ...prev,
       {
@@ -915,16 +1577,18 @@ Would you like to explore venues in a specific city?`;
         timestamp: new Date()
       }
     ]);
+    
     setInputMessage("");
     setChatbotState("thinking");
+    
     // voice logic:
     if (options?.viaMic) setAudioEnabled(true);
 
     try {
-      let resp = venue 
-        ? getVenueAnswer(messageText) 
+      const resp = venue 
+        ? await getVenueAnswer(messageText) 
         : await getDefaultAnswer(messageText);
-        
+      
       setTimeout(() => {
         setMessages(prev => [
           ...prev,
