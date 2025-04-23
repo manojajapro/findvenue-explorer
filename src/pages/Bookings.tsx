@@ -39,6 +39,7 @@ type Booking = {
   special_requests?: string;
   owner_id?: string;
   owner_name?: string;
+  address?: string;
 };
 
 const Bookings = () => {
