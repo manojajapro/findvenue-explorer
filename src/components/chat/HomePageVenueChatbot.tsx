@@ -490,17 +490,137 @@ Would you like to explore venues in a specific city?`;
     return card;
   };
   
-  // Generic home page assistant
+  // Add this function to compare venues
+  const compareVenues = async (venueNames: string[]): Promise<string> => {
+    try {
+      // Fetch venues data
+      const { data: venues, error } = await supabase
+        .from("venues")
+        .select("*")
+        .in("name", venueNames);
+
+      if (error) throw error;
+      if (!venues || venues.length === 0) {
+        return "I couldn't find the venues you mentioned. Please check the venue names and try again.";
+      }
+
+      // Create comparison table
+      let response = `<div class="mb-4 text-blue-300">Comparison of ${venues.length} venues:</div>\n\n`;
+      response += `<div class="overflow-x-auto">\n<table class="w-full border-collapse">`;
+      
+      // Headers
+      response += `<tr class="bg-blue-900/30">
+        <th class="p-2 text-left border border-blue-800/30">Feature</th>
+        ${venues.map(v => `<th class="p-2 text-left border border-blue-800/30">${v.name}</th>`).join('')}
+      </tr>`;
+
+      // Price
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Price</span></td>
+        ${venues.map(v => {
+          const price = v.price_per_person || v.starting_price;
+          return `<td class="p-2 border border-blue-800/30">${price ? `${price} ${v.currency || 'SAR'}${v.price_per_person ? '/person' : ''}` : 'Not specified'}</td>`;
+        }).join('')}
+      </tr>`;
+
+      // Capacity
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Capacity</span></td>
+        ${venues.map(v => `<td class="p-2 border border-blue-800/30">${v.min_capacity || 0} - ${v.max_capacity || 0} guests</td>`).join('')}
+      </tr>`;
+
+      // Location
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Location</span></td>
+        ${venues.map(v => `<td class="p-2 border border-blue-800/30">${v.city_name || 'Not specified'}</td>`).join('')}
+      </tr>`;
+
+      // Type & Categories
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Type</span></td>
+        ${venues.map(v => {
+          const categories = Array.isArray(v.category_name) ? v.category_name.join(', ') : v.category_name;
+          return `<td class="p-2 border border-blue-800/30">${v.type || 'Venue'}${categories ? ` (${categories})` : ''}</td>`;
+        }).join('')}
+      </tr>`;
+
+      // Amenities
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Amenities</span></td>
+        ${venues.map(v => {
+          const amenities = Array.isArray(v.amenities) ? v.amenities.join(', ') : (v.amenities || 'None listed');
+          return `<td class="p-2 border border-blue-800/30">${amenities}</td>`;
+        }).join('')}
+      </tr>`;
+
+      // Rating
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Rating</span></td>
+        ${venues.map(v => `<td class="p-2 border border-blue-800/30">${v.rating ? `${v.rating}/5 (${v.reviews_count || 0} reviews)` : 'No ratings yet'}</td>`).join('')}
+      </tr>`;
+
+      response += `</table>\n</div>`;
+
+      // Add venue links
+      response += `\n<div class="mt-4 space-y-2">`;
+      venues.forEach(venue => {
+        response += `\n<div><a class="text-blue-400 underline cursor-pointer" data-venue-id="${venue.id}" onclick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venue.id}'}))">View details for ${venue.name}</a></div>`;
+      });
+      response += `</div>`;
+
+      return response;
+    } catch (error) {
+      console.error("Venue comparison error:", error);
+      return "Sorry, I encountered an error while comparing the venues. Please try again.";
+    }
+  };
+
+  // Modify getDefaultAnswer to handle comparison requests
   const getDefaultAnswer = async (query: string): Promise<string> => {
     query = query.toLowerCase();
-    
-    // Simple greeting - just respond with a friendly greeting
-    if (/^(hi|hello|hey|مرحبا|اهلا|السلام عليكم)$/i.test(query.trim())) {
-      const isArabic = /[\u0600-\u06FF]/.test(query);
-      if (isArabic) {
-        return `مرحباً! كيف يمكنني مساعدتك اليوم؟`;
-      } else {
-        return `Hello! How can I help you today?`;
+
+    // Handle comparison requests
+    if (/compare|comparison|vs|versus|difference between/i.test(query)) {
+      try {
+        // Get all venue names from the database for matching
+        const { data: allVenues } = await supabase
+          .from("venues")
+          .select("name")
+          .order("name");
+
+        const venueNames = allVenues?.map(v => v.name.toLowerCase()) || [];
+        const mentionedVenues: string[] = [];
+
+        // Find mentioned venue names in the query
+        allVenues?.forEach(venue => {
+          if (query.toLowerCase().includes(venue.name.toLowerCase())) {
+            mentionedVenues.push(venue.name);
+          }
+        });
+
+        if (mentionedVenues.length < 2) {
+          // If no specific venues mentioned, explain how to use comparison
+          let response = "I can help you compare venues! Please mention the venue names you want to compare. For example:\n\n";
+          response += "- Compare [Venue A] and [Venue B]\n";
+          response += "- What's the difference between [Venue A] and [Venue B]\n";
+          response += "- Show comparison of [Venue A], [Venue B], and [Venue C]\n\n";
+          
+          // Suggest some venues
+          if (allVenues && allVenues.length > 0) {
+            response += "Here are some venues you can compare:\n";
+            allVenues.slice(0, 5).forEach(venue => {
+              response += `- ${venue.name}\n`;
+            });
+          }
+          
+          return response;
+        }
+
+        // Compare the mentioned venues
+        return await compareVenues(mentionedVenues);
+      } catch (error) {
+        console.error("Error handling comparison:", error);
+        return "Sorry, I had trouble processing your comparison request. Please try again.";
       }
     }
 
