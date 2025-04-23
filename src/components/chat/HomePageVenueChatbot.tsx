@@ -594,7 +594,7 @@ Would you like to explore venues in a specific city?`;
   // Add this function to compare venues
   const compareVenues = async (venueNames: string[]): Promise<string> => {
     try {
-      // Fetch venues data
+      // Fetch venues data with all necessary fields
       const { data: venues, error } = await supabase
         .from("venues")
         .select("*")
@@ -606,7 +606,7 @@ Would you like to explore venues in a specific city?`;
       }
 
       // Create comparison table
-      let response = `<div class="mb-4 text-blue-300">Comparison of ${venues.length} venues:</div>\n\n`;
+      let response = `<div class="mb-4 text-blue-300">Detailed Comparison of ${venues.length} Venues:</div>\n\n`;
       response += `<div class="overflow-x-auto">\n<table class="w-full border-collapse">`;
       
       // Headers
@@ -615,12 +615,29 @@ Would you like to explore venues in a specific city?`;
         ${venues.map(v => `<th class="p-2 text-left border border-blue-800/30">${v.name}</th>`).join('')}
       </tr>`;
 
-      // Price
+      // Basic Information
       response += `<tr class="bg-blue-950/30">
-        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Price</span></td>
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Type</span></td>
         ${venues.map(v => {
-          const price = v.price_per_person || v.starting_price;
-          return `<td class="p-2 border border-blue-800/30">${price ? `${price} ${v.currency || 'SAR'}${v.price_per_person ? '/person' : ''}` : 'Not specified'}</td>`;
+          const categories = Array.isArray(v.category_name) ? v.category_name.join(', ') : v.category_name;
+          return `<td class="p-2 border border-blue-800/30">${v.type || 'Venue'}${categories ? ` (${categories})` : ''}</td>`;
+        }).join('')}
+      </tr>`;
+
+      // Location
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Location</span></td>
+        ${venues.map(v => `<td class="p-2 border border-blue-800/30">${v.address ? `${v.address}, ` : ''}${v.city_name || 'Not specified'}</td>`).join('')}
+      </tr>`;
+
+      // Pricing Details
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Pricing</span></td>
+        ${venues.map(v => {
+          let pricing = [];
+          if (v.starting_price) pricing.push(`Starting at ${v.starting_price} ${v.currency || 'SAR'}`);
+          if (v.price_per_person) pricing.push(`${v.price_per_person} ${v.currency || 'SAR'}/person`);
+          return `<td class="p-2 border border-blue-800/30">${pricing.length ? pricing.join('<br/>') : 'Not specified'}</td>`;
         }).join('')}
       </tr>`;
 
@@ -630,49 +647,84 @@ Would you like to explore venues in a specific city?`;
         ${venues.map(v => `<td class="p-2 border border-blue-800/30">${v.min_capacity || 0} - ${v.max_capacity || 0} guests</td>`).join('')}
       </tr>`;
 
-      // Location
+      // Rating & Reviews
       response += `<tr class="bg-blue-950/30">
-        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Location</span></td>
-        ${venues.map(v => `<td class="p-2 border border-blue-800/30">${v.city_name || 'Not specified'}</td>`).join('')}
-      </tr>`;
-
-      // Type & Categories
-      response += `<tr class="bg-blue-950/30">
-        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Type</span></td>
-        ${venues.map(v => {
-          const categories = Array.isArray(v.category_name) ? v.category_name.join(', ') : v.category_name;
-          return `<td class="p-2 border border-blue-800/30">${v.type || 'Venue'}${categories ? ` (${categories})` : ''}</td>`;
-        }).join('')}
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Rating</span></td>
+        ${venues.map(v => `<td class="p-2 border border-blue-800/30">${v.rating ? `${v.rating}/5 (${v.reviews_count || 0} reviews)` : 'No ratings yet'}</td>`).join('')}
       </tr>`;
 
       // Amenities
       response += `<tr class="bg-blue-950/30">
         <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Amenities</span></td>
         ${venues.map(v => {
-          const amenities = Array.isArray(v.amenities) ? v.amenities.join(', ') : (v.amenities || 'None listed');
+          const amenities = Array.isArray(v.amenities) ? v.amenities.join(' • ') : (v.amenities || 'None listed');
           return `<td class="p-2 border border-blue-800/30">${amenities}</td>`;
         }).join('')}
       </tr>`;
 
-      // Rating
+      // Additional Services
       response += `<tr class="bg-blue-950/30">
-        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Rating</span></td>
-        ${venues.map(v => `<td class="p-2 border border-blue-800/30">${v.rating ? `${v.rating}/5 (${v.reviews_count || 0} reviews)` : 'No ratings yet'}</td>`).join('')}
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Additional Services</span></td>
+        ${venues.map(v => {
+          const services = Array.isArray(v.additional_services) ? v.additional_services.join(' • ') : (v.additional_services || 'None listed');
+          return `<td class="p-2 border border-blue-800/30">${services}</td>`;
+        }).join('')}
+      </tr>`;
+
+      // Facilities
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Facilities</span></td>
+        ${venues.map(v => {
+          let facilities = [];
+          if (v.wifi) facilities.push('WiFi');
+          if (v.parking) facilities.push('Parking');
+          return `<td class="p-2 border border-blue-800/30">${facilities.length ? facilities.join(' • ') : 'None listed'}</td>`;
+        }).join('')}
+      </tr>`;
+
+      // Accessibility Features
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Accessibility</span></td>
+        ${venues.map(v => {
+          const features = Array.isArray(v.accessibility_features) ? v.accessibility_features.join(' • ') : (v.accessibility_features || 'None listed');
+          return `<td class="p-2 border border-blue-800/30">${features}</td>`;
+        }).join('')}
+      </tr>`;
+
+      // Payment Methods
+      response += `<tr class="bg-blue-950/30">
+        <td class="p-2 border border-blue-800/30"><span class="text-blue-400">Payment Methods</span></td>
+        ${venues.map(v => {
+          const methods = Array.isArray(v.accepted_payment_methods) ? v.accepted_payment_methods.join(' • ') : (v.accepted_payment_methods || 'Not specified');
+          return `<td class="p-2 border border-blue-800/30">${methods}</td>`;
+        }).join('')}
       </tr>`;
 
       response += `</table>\n</div>`;
 
-      // Add venue links
-      response += `\n<div class="mt-4 space-y-2">`;
+      // Add descriptions section
+      response += `\n<div class="mt-6 space-y-4">`;
+      response += `<div class="text-blue-300">Venue Descriptions:</div>`;
       venues.forEach(venue => {
-        response += `\n<div><a class="text-blue-400 underline cursor-pointer" data-venue-id="${venue.id}" onclick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venue.id}'}))">View details for ${venue.name}</a></div>`;
+        response += `\n<div class="bg-blue-950/30 p-4 rounded-lg border border-blue-800/50">
+          <div class="font-semibold text-blue-400">${venue.name}</div>
+          <div class="mt-2 text-sm">${venue.description || 'No description available.'}</div>
+        </div>`;
+      });
+      response += `</div>`;
+
+      // Add venue links
+      response += `\n<div class="mt-6 space-y-2">
+        <div class="text-blue-300">View Full Details:</div>`;
+      venues.forEach(venue => {
+        response += `\n<div><a class="text-blue-400 underline cursor-pointer" data-venue-id="${venue.id}" onclick="document.dispatchEvent(new CustomEvent('navigateToVenue', {detail: '${venue.id}'}))">View complete details for ${venue.name}</a></div>`;
       });
       response += `</div>`;
 
       return response;
     } catch (error) {
-      console.error("Venue comparison error:", error);
-      return "Sorry, I encountered an error while comparing the venues. Please try again.";
+      console.error("Error handling comparison:", error);
+      return "Sorry, I had trouble processing your comparison request. Please try again.";
     }
   };
 
@@ -1897,9 +1949,9 @@ Would you like to explore venues in a specific city?`;
                       variant="outline"
                       size="sm"
                       className="text-xs bg-blue-950/50 hover:bg-blue-900/50"
-                      onClick={() => handleSendMessage("Show me conference venues")}
+                      onClick={() => handleSendMessage("Compare venues")}
                     >
-                      Conference venues
+                      Compare venues
                     </Button>
                     <Button
                       variant="outline"
