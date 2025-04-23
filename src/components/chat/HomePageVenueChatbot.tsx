@@ -73,6 +73,8 @@ interface VenueWithDBFields extends Omit<Venue, 'description'> {
 const CHAT_STORAGE_KEY = "homeVenueAssistantChat";
 const MAX_MSGS = 40;
 
+const SAUDI_CITIES = ['Riyadh', 'Jeddah', 'Khobar', 'Dammam', 'Mecca', 'Medina', 'Abha', 'Taif'];
+
 const HomePageVenueChatbot: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -450,6 +452,11 @@ Would you like to explore venues in a specific city?`;
       ? venue.category_name.join(', ') 
       : (venue.category_name || '');
     
+    // Get the correct price
+    const price = venue.price_per_person || venue.starting_price || 0;
+    const currency = venue.currency || 'SAR';
+    const priceDisplay = `${price} ${currency}${venue.price_per_person ? '/person' : ''}`;
+    
     // Build card HTML
     let card = `<div class="venue-card p-3 bg-blue-950/30 rounded-lg border border-blue-800/50 mb-4">\n`;
     
@@ -470,7 +477,7 @@ Would you like to explore venues in a specific city?`;
       card += `  <div><span class="text-blue-400">Location:</span> ${venue.city_name}</div>\n`;
     }
     card += `  <div><span class="text-blue-400">Capacity:</span> ${venue.min_capacity || 0}-${venue.max_capacity || 0} guests</div>\n`;
-    card += `  <div><span class="text-blue-400">Price:</span> ${venue.starting_price || 0} ${venue.currency || 'SAR'}/person</div>\n`;
+    card += `  <div><span class="text-blue-400">Price:</span> ${priceDisplay}</div>\n`;
     card += `</div>\n`;
     
     // View details button
@@ -503,33 +510,133 @@ Would you like to explore venues in a specific city?`;
         // Get all venues and group by city
         const { data: cityVenues, error: cityVenuesError } = await supabase
           .from('venues')
-          .select('city_name');
+          .select('city_name, starting_price, price_per_person');
 
         if (cityVenuesError) throw cityVenuesError;
 
-        // Create a map of cities to venue counts
-        const cityCounts: { [key: string]: number } = cityVenues.reduce((acc, venue) => {
+        // Create a map of cities with price ranges
+        const cityPriceRanges: { [key: string]: { min: number, max: number, count: number } } = {};
+        
+        cityVenues.forEach(venue => {
           const city = venue.city_name || 'Unknown';
-          acc[city] = (acc[city] || 0) + 1;
-          return acc;
-        }, {} as { [key: string]: number });
+          if (!cityPriceRanges[city]) {
+            cityPriceRanges[city] = { min: Infinity, max: -Infinity, count: 0 };
+          }
+          
+          const price = venue.starting_price || venue.price_per_person || 0;
+          if (price > 0) {
+            cityPriceRanges[city].min = Math.min(cityPriceRanges[city].min, price);
+            cityPriceRanges[city].max = Math.max(cityPriceRanges[city].max, price);
+          }
+          cityPriceRanges[city].count++;
+        });
 
-        // Sort cities by venue count
-        const sortedCities = Object.entries(cityCounts)
-          .sort(([, a], [, b]) => b - a)
-          .map(([city, count]) => `${city} (${count} venues)`);
+        // Format the response with price ranges
+        let response = `<div class="text-blue-300 mb-4">Here are our available cities with venue price ranges:</div>\n\n`;
+        
+        Object.entries(cityPriceRanges)
+          .sort(([, a], [, b]) => b.count - a.count)
+          .forEach(([city, info]) => {
+            if (city !== 'Unknown' && info.count > 0) {
+              const minPrice = info.min === Infinity ? 0 : info.min;
+              const maxPrice = info.max === -Infinity ? 0 : info.max;
+              response += `<div class="mb-2">
+                <span class="text-blue-400 font-semibold">${city}</span>: ${info.count} venues
+                ${minPrice || maxPrice ? `\n<div class="text-sm ml-4">Price range: ${minPrice}-${maxPrice} SAR</div>` : ''}
+              </div>`;
+            }
+          });
 
-        if (sortedCities.length === 0) {
-          return "I couldn't find any venues in our database at the moment.";
-        }
-
-        return `We have venues available in these Saudi Arabian cities:\n\n${sortedCities.join('\n')}\n\nWould you like to explore venues in any specific city?`;
+        response += `\n<div class="text-sm text-blue-300 mt-4">You can search for venues in any city with specific price ranges. For example, try "Show me venues under 30 SAR in Riyadh"</div>`;
+        return response;
       } catch (error) {
         console.error('Error fetching cities:', error);
         return "I apologize, but I encountered an error while fetching the city information. Please try again later.";
       }
     }
+
+    // Price range query
+    const priceMatch = query.match(/(?:under|below|less than|maximum|max)\s*(\d+)\s*(?:sar|riyal)/i);
+    const cityMatch = new RegExp(SAUDI_CITIES.join('|'), 'i').exec(query);
     
+    if (priceMatch) {
+      try {
+        const maxPrice = parseInt(priceMatch[1]);
+        
+        // Simplified query to properly handle price filtering
+        let baseQuery = supabase
+          .from("venues")
+          .select("id, name, city_name, starting_price, min_capacity, max_capacity, type, currency, category_name, gallery_images, image_url, price_per_person");
+
+        // Add city filter if specified
+        if (cityMatch) {
+          baseQuery = baseQuery.ilike("city_name", `%${cityMatch[0]}%`);
+        }
+
+        // Filter for venues where either price is under the max
+        baseQuery = baseQuery.or(
+          `starting_price.lte.${maxPrice},` +
+          `price_per_person.lte.${maxPrice}`
+        );
+
+        // Get the results
+        const { data: venues, error } = await baseQuery
+          .order('starting_price', { ascending: true, nullsLast: true })
+          .order('price_per_person', { ascending: true, nullsLast: true })
+          .limit(20);
+
+        if (error) {
+          console.error("Venue search error:", error);
+          throw error;
+        }
+
+        // Filter venues client-side to ensure we have valid prices under the limit
+        const filteredVenues = (venues || []).filter(venue => {
+          const startingPrice = typeof venue.starting_price === 'number' ? venue.starting_price : Infinity;
+          const perPersonPrice = typeof venue.price_per_person === 'number' ? venue.price_per_person : Infinity;
+          const lowestPrice = Math.min(startingPrice, perPersonPrice);
+          return lowestPrice !== Infinity && lowestPrice <= maxPrice;
+        });
+
+        if (!filteredVenues.length) {
+          // If no venues found, get the minimum available price to suggest
+          const { data: minPriceData } = await supabase
+            .from("venues")
+            .select("starting_price, price_per_person")
+            .order('starting_price', { ascending: true })
+            .limit(10);
+
+          let minAvailablePrice = Infinity;
+          if (minPriceData) {
+            minPriceData.forEach(venue => {
+              const startingPrice = typeof venue.starting_price === 'number' ? venue.starting_price : Infinity;
+              const perPersonPrice = typeof venue.price_per_person === 'number' ? venue.price_per_person : Infinity;
+              minAvailablePrice = Math.min(minAvailablePrice, startingPrice, perPersonPrice);
+            });
+          }
+
+          let response = `I couldn't find any venues${cityMatch ? ` in ${cityMatch[0]}` : ''} with prices under ${maxPrice} SAR.`;
+          if (minAvailablePrice !== Infinity) {
+            response += ` The lowest priced venue starts at ${minAvailablePrice} SAR. Would you like to see venues in that price range?`;
+          }
+          return response;
+        }
+
+        let response = `<div class="mb-3 text-blue-300">Found ${filteredVenues.length} venues${cityMatch ? ` in ${cityMatch[0]}` : ''} with prices under ${maxPrice} SAR (sorted by price):</div>\n\n`;
+
+        filteredVenues.forEach((venue, index) => {
+          response += formatVenueCard(venue, index);
+        });
+
+        response += "\n<div class='text-sm text-blue-300 mt-2'>Click on any venue to see complete details! You can also filter by other criteria like capacity or amenities.</div>";
+        return response;
+
+      } catch (error) {
+        console.error("Venue search error:", error);
+        return `I encountered an error while searching for venues under ${priceMatch[1]} SAR${cityMatch ? ` in ${cityMatch[0]}` : ''}. Please try adjusting your search criteria or use the search function at the top of the page.`;
+      }
+    }
+
     // Venue listing requests
     if (/list|show|find|search|display|browse|get/i.test(query) && 
         (/venue|hall|space|location|place/i.test(query) || 
