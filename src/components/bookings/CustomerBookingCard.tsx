@@ -1,8 +1,7 @@
-
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, Users, Eye } from "lucide-react";
+import { Calendar, Clock, Users, Eye, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
@@ -41,6 +40,32 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
     navigate(`/venue/${booking.venue_id}`, { replace: false });
   };
   
+  const downloadBookingConfirmation = () => {
+    // Create booking confirmation text
+    const bookingDetails = `
+Booking Confirmation
+-------------------
+Venue: ${booking.venue_name}
+Date: ${format(new Date(booking.booking_date), "MMMM d, yyyy")}
+Time: ${booking.start_time} - ${booking.end_time}
+Number of Guests: ${booking.guests}
+Status: ${booking.status.toUpperCase()}
+Total Price: SAR ${booking.total_price.toLocaleString()}
+${booking.address ? `\nAddress: ${booking.address}` : ''}
+    `.trim();
+
+    // Create and download file
+    const blob = new Blob([bookingDetails], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `booking-confirmation-${booking.id}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+  
   return (
     <Card className="glass-card border-white/10 overflow-hidden">
       <CardHeader className="pb-2">
@@ -63,27 +88,32 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
           </div>
           {booking.address && (
             <div className="flex items-center text-sm">
-              <MapPin className="h-4 w-4 mr-2 text-findvenue-text-muted" />
-              <span className="truncate">{booking.address}</span>
+              <Users className="h-4 w-4 mr-2 text-findvenue-text-muted" />
+              <span>{booking.guests} guests</span>
             </div>
           )}
-          <div className="flex items-center text-sm">
-            <Users className="h-4 w-4 mr-2 text-findvenue-text-muted" />
-            <span>{booking.guests} guests</span>
-          </div>
           <div className="mt-2">
             <p className="text-right font-semibold">SAR {booking.total_price.toLocaleString()}</p>
           </div>
         </div>
       </CardContent>
-      <CardFooter className="pt-2 border-t border-white/10">
+      <CardFooter className="pt-2 border-t border-white/10 gap-2 flex-col">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+          onClick={downloadBookingConfirmation}
+        >
+          <FileText className="mr-2 h-4 w-4" />
+          Download Confirmation
+        </Button>
         <Button 
           variant="outline" 
           size="sm" 
           className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
           onClick={handleViewDetails}
         >
-          <Eye className="mr-1 h-4 w-4" />
+          <Eye className="mr-2 h-4 w-4" />
           View Venue Details
         </Button>
       </CardFooter>
