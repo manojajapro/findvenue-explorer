@@ -2,12 +2,9 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, Users, Download, ExternalLink } from "lucide-react";
+import { Calendar, Clock, MapPin, Users, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BookingCalendar } from "@/components/venue/BookingCalendar";
-import { useState } from "react";
 
 interface CustomerBookingCardProps {
   booking: {
@@ -26,7 +23,6 @@ interface CustomerBookingCardProps {
 
 export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
   const navigate = useNavigate();
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -45,30 +41,6 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
     navigate(`/venue/${booking.venue_id}`, { replace: false });
   };
   
-  const downloadBookingConfirmation = () => {
-    const bookingDetails = `
-Booking Confirmation
--------------------
-Venue: ${booking.venue_name}
-Date: ${format(new Date(booking.booking_date), "MMMM d, yyyy")}
-Time: ${booking.start_time} - ${booking.end_time}
-Guests: ${booking.guests}
-Status: ${booking.status.toUpperCase()}
-Total Price: SAR ${booking.total_price.toLocaleString()}
-${booking.address ? `Address: ${booking.address}` : ''}
-    `.trim();
-
-    const blob = new Blob([bookingDetails], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `booking-confirmation-${booking.id}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <Card className="glass-card border-white/10 overflow-hidden">
       <CardHeader className="pb-2">
@@ -104,52 +76,15 @@ ${booking.address ? `Address: ${booking.address}` : ''}
           </div>
         </div>
       </CardContent>
-      <CardFooter className="pt-2 border-t border-white/10 flex flex-wrap gap-2">
+      <CardFooter className="pt-2 border-t border-white/10">
         <Button 
           variant="outline" 
           size="sm" 
-          className="flex-1 min-w-[150px] border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+          className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
           onClick={handleViewDetails}
         >
-          <ExternalLink className="mr-2 h-4 w-4" />
+          <Eye className="mr-1 h-4 w-4" />
           View Venue Details
-        </Button>
-        
-        <Dialog open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="flex-1 min-w-[150px] border-findvenue/30 text-findvenue hover:bg-findvenue/5"
-            >
-              <Calendar className="mr-2 h-4 w-4" />
-              View Availability
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{booking.venue_name} - Availability Calendar</DialogTitle>
-            </DialogHeader>
-            <BookingCalendar 
-              selectedDate={new Date(booking.booking_date)}
-              onDateSelect={() => {}}
-              bookedDates={[]}
-              fullyBookedDates={[]}
-              dayBookedDates={[]}
-              hourlyBookedDates={[]}
-              bookingType="hourly"
-            />
-          </DialogContent>
-        </Dialog>
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1 min-w-[150px] border-findvenue/30 text-findvenue hover:bg-findvenue/5"
-          onClick={downloadBookingConfirmation}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Download Confirmation
         </Button>
       </CardFooter>
     </Card>
