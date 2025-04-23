@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, Trash2, Loader2 } from 'lucide-react';
+import { Calendar, Clock, Users, Trash2, Loader2, Eye, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,13 +84,11 @@ const Bookings = () => {
       let query;
       
       if (isVenueOwner) {
-        // Fetch venue owner bookings
         query = supabase
           .from('bookings')
           .select('*, venues:venue_id(name, gallery_images, owner_info)')
           .filter('venues.owner_info->user_id', 'eq', user.id);
       } else {
-        // Fetch customer bookings
         query = supabase
           .from('bookings')
           .select('*, venues:venue_id(name, gallery_images, owner_info)')
@@ -248,6 +246,34 @@ const Bookings = () => {
     } finally {
       setIsCancelling(false);
     }
+  };
+
+  const downloadBookingConfirmation = (booking: Booking) => {
+    const bookingDetails = `
+Booking Confirmation
+-------------------
+Venue: ${booking.venue_name}
+Date: ${format(new Date(booking.booking_date), "MMMM d, yyyy")}
+Time: ${booking.start_time} - ${booking.end_time}
+Number of Guests: ${booking.guests}
+Status: ${booking.status.toUpperCase()}
+Total Price: SAR ${booking.total_price.toLocaleString()}
+${booking.address ? `\nAddress: ${booking.address}` : ''}
+    `.trim();
+
+    const blob = new Blob([bookingDetails], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `booking-confirmation-${booking.id}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleViewVenueDetails = (venueId: string) => {
+    navigate(`/venue/${venueId}`, { replace: false });
   };
 
   const getStatusColor = (status: string) => {
@@ -489,6 +515,26 @@ const Bookings = () => {
                                   bookingId={firstBooking.id}
                                 />
                               )}
+
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+                                onClick={() => downloadBookingConfirmation(firstBooking)}
+                              >
+                                <FileText className="mr-2 h-4 w-4" />
+                                Download Confirmation
+                              </Button>
+                              
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+                                onClick={() => handleViewVenueDetails(firstBooking.venue_id)}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Venue Details
+                              </Button>
 
                               {(firstBooking.status === 'pending' || firstBooking.status === 'confirmed') && activeTab === 'upcoming' && (
                                 <AlertDialog>
