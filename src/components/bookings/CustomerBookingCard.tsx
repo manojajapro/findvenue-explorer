@@ -2,11 +2,9 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, Users, Eye, Download, CalendarDays } from "lucide-react";
+import { Calendar, Clock, MapPin, Users, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import BookingCalendar from "@/components/venue/BookingCalendar";
 
 interface CustomerBookingCardProps {
   booking: {
@@ -41,36 +39,6 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
 
   const handleViewDetails = () => {
     navigate(`/venue/${booking.venue_id}`, { replace: false });
-  };
-
-  const handleDownloadConfirmation = () => {
-    // Create a simple text content for the booking confirmation
-    const confirmationContent = `
-Booking Confirmation
--------------------
-Venue: ${booking.venue_name}
-Date: ${format(new Date(booking.booking_date), "MMMM d, yyyy")}
-Time: ${booking.start_time} - ${booking.end_time}
-Guests: ${booking.guests}
-Status: ${booking.status.toUpperCase()}
-Total Price: SAR ${booking.total_price.toLocaleString()}
-${booking.address ? `Address: ${booking.address}` : ''}
-    `;
-
-    // Create a Blob with the content
-    const blob = new Blob([confirmationContent], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    
-    // Create a temporary link and trigger download
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `booking-confirmation-${booking.id}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    
-    // Cleanup
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
   };
   
   return (
@@ -108,54 +76,17 @@ ${booking.address ? `Address: ${booking.address}` : ''}
           </div>
         </div>
       </CardContent>
-      <CardFooter className="pt-2 border-t border-white/10 flex-col gap-2">
-        <div className="flex gap-2 w-full">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
-            onClick={handleViewDetails}
-          >
-            <Eye className="mr-1 h-4 w-4" />
-            View Venue Details
-          </Button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="border-findvenue/30 text-findvenue hover:bg-findvenue/5"
-              >
-                <CalendarDays className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Venue Availability Calendar</DialogTitle>
-              </DialogHeader>
-              <BookingCalendar
-                selectedDate={new Date(booking.booking_date)}
-                onDateSelect={() => {}}
-                bookedDates={[]}
-                fullyBookedDates={[]}
-                dayBookedDates={[]}
-                hourlyBookedDates={[]}
-                bookingType="full-day"
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
+      <CardFooter className="pt-2 border-t border-white/10">
         <Button 
           variant="outline" 
           size="sm" 
           className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
-          onClick={handleDownloadConfirmation}
+          onClick={handleViewDetails}
         >
-          <Download className="mr-1 h-4 w-4" />
-          Download Confirmation
+          <Eye className="mr-1 h-4 w-4" />
+          View Venue Details
         </Button>
       </CardFooter>
     </Card>
   );
 };
-
