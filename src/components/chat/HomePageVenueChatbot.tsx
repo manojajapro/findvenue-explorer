@@ -1610,7 +1610,7 @@ Would you like to explore venues in a specific city?`;
       }
     }
 
-    return "I'm your assistant for FindVenue! I can help you find venues, explain the booking process, or answer questions about our platform features. What specific information are you looking for today?";
+    return "I'm your assistant for Avnu! I can help you find venues, explain the booking process, or answer questions about our platform features. What specific information are you looking for today?";
   };
 
   const handleSendMessage = async (
@@ -1715,17 +1715,17 @@ Would you like to explore venues in a specific city?`;
             <p>
               {venue?.name
                 ? `Chat with ${venue.name} Assistant`
-                : "FindVenue Home Assistant"}
+                : "Avnu Home Assistant"}
             </p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[540px] h-[620px] p-0 overflow-hidden right-[5%] bg-gradient-to-b from-slate-950 to-slate-900 flex flex-col rounded-xl border border-white/10">
+        <DialogContent className="sm:max-w-[540px] h-[620px] p-0 overflow-hidden right-[5%] bg-gradient-to-b from-slate-950 to-slate-900 flex flex-col rounded-xl border border-white/10 z-[1002]">
           <div className="p-4 border-b border-white/10 bg-gradient-to-r from-blue-900 to-blue-800 flex items-center gap-2">
             <Bot className="h-5 w-5 text-white" />
             <DialogTitle className="text-white font-medium m-0">
-              {venue?.name ? venue.name + " Assistant" : "FindVenue Assistant"}
+              {venue?.name ? venue.name + " Assistant" : "Avnu Assistant"}
             </DialogTitle>
           </div>
           <div className="absolute top-2 right-2 z-10">
