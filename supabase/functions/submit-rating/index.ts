@@ -30,6 +30,8 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzZG1lbGZ6ZXN6anRibm9hamlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4ODUwMTUsImV4cCI6MjA1ODQ2MTAxNX0.1z27OZ04RuR8AYlVGaE9L8vWWYilSrMlyq422BJcX94';
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     
+    console.log(`Processing rating ${rating} for venue ${venueId}`);
+    
     // First, get current venue data
     const { data: venueData, error: venueError } = await supabase
       .from('venues')
@@ -51,6 +53,9 @@ serve(async (req) => {
     const newRating = ((currentRating * currentReviews) + rating) / newReviews;
     const roundedRating = Math.round(newRating * 10) / 10; // Round to 1 decimal place
     
+    console.log(`Current rating: ${currentRating}, reviews: ${currentReviews}`);
+    console.log(`New rating: ${roundedRating}, reviews: ${newReviews}`);
+    
     // Update venue with new rating
     const { data, error } = await supabase
       .from('venues')
@@ -65,6 +70,8 @@ serve(async (req) => {
       console.error('Error updating venue rating:', error);
       throw error;
     }
+    
+    console.log('Successfully updated rating:', data);
     
     return new Response(JSON.stringify({ 
       success: true, 

@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import TranslatedText from '@/components/ui/TranslatedText';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAuth } from '@/hooks/useAuth';
 
 type VenueRatingProps = {
   venueId: string;
@@ -25,6 +27,7 @@ const VenueRating = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasRated, setHasRated] = useState(false);
   const { translate } = useTranslation();
+  const { user } = useAuth();
   
   const handleRatingClick = (selectedRating: number) => {
     if (hasRated) return;
@@ -42,14 +45,26 @@ const VenueRating = ({
     setIsSubmitting(true);
     
     try {
+      console.log(`Submitting rating ${rating} for venue ${venueId}`);
+      
       const { data, error } = await supabase.functions.invoke('submit-rating', {
         body: {
           venueId,
-          rating
+          rating,
+          userId: user?.id // Pass the user ID if available
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error from edge function:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        throw new Error('No data returned from rating submission');
+      }
+      
+      console.log('Rating submission response:', data);
       
       setHasRated(true);
       
