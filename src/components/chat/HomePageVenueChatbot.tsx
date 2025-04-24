@@ -6,8 +6,8 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
-import ChatHeader from './ChatHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { ChatContact } from './types';
 
 // Create a mock implementation of useChat since the real one doesn't have the props we need
 const useVenueSearchChat = () => {
@@ -94,7 +94,17 @@ const HomePageVenueChatbot = () => {
             </Button>
           </div>
           <div className="flex flex-col h-[70vh]">
-            <ChatHeader name="Venue Search Assistant" />
+            {/* Custom chat header instead of using ChatHeader component */}
+            <div className="p-3 border-b border-white/10 flex items-center gap-3">
+              <div className="h-8 w-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <Bot className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-medium">Venue Search Assistant</h3>
+                <p className="text-xs text-gray-400">AI Assistant</p>
+              </div>
+            </div>
+            
             <div className="flex-grow overflow-y-auto p-4 space-y-4">
               {messages.map((message) => (
                 <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
