@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,7 +13,7 @@ import {
   Card, 
   CardContent
 } from '@/components/ui/card';
-import { Bell, CheckCircle, Calendar, AlertCircle, X } from 'lucide-react';
+import { Bell, CheckCircle, Calendar, AlertCircle, X, Clock } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNavigate } from 'react-router-dom';
 import { markAllNotificationsAsRead, markNotificationAsRead } from '@/utils/notificationService';
@@ -143,32 +144,24 @@ const NotificationCenter = () => {
   }, [user, navigate]);
 
   const handleMarkAsRead = async (id?: string) => {
-    if (!user) return;
-
     try {
+      if (!user) return;
+      
       if (id) {
-        // Mark single notification as read
-        const { data, error } = await supabase
-          .from('notifications')
-          .update({ read: true })
-          .eq('id', id)
-          .select();
-          
-        if (!error && data) {
+        // Mark single notification as read using the utility function
+        const success = await markNotificationAsRead(id);
+        
+        if (success) {
           setNotifications(prev => 
             prev.map(n => n.id === id ? { ...n, read: true } : n)
           );
           setUnreadCount(prev => Math.max(0, prev - 1));
         }
       } else {
-        // Mark all as read
-        const { error } = await supabase
-          .from('notifications')
-          .update({ read: true })
-          .eq('user_id', user.id)
-          .eq('read', false);
-          
-        if (!error) {
+        // Mark all as read using the utility function
+        const success = await markAllNotificationsAsRead(user.id);
+        
+        if (success) {
           setNotifications(prev => 
             prev.map(n => ({ ...n, read: true }))
           );
@@ -192,19 +185,19 @@ const NotificationCenter = () => {
 
   const getBookingStatusLabel = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'Confirmed';
-      case 'cancelled': return 'Cancelled';
-      case 'pending': return 'Pending';
+      case "confirmed": return "Confirmed";
+      case "cancelled": return "Cancelled";
+      case "pending": return "Pending";
       default: return status;
     }
   };
 
   const getBookingStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'bg-green-500/10 text-green-500';
-      case 'cancelled': return 'bg-red-500/10 text-red-500';
-      case 'pending': return 'bg-yellow-500/10 text-yellow-500';
-      default: return 'bg-blue-500/10 text-blue-500';
+      case "confirmed": return "bg-green-500/10 text-green-500";
+      case "cancelled": return "bg-red-500/10 text-red-500";
+      case "pending": return "bg-yellow-500/10 text-yellow-500";
+      default: return "bg-blue-500/10 text-blue-500";
     }
   };
 
@@ -216,6 +209,8 @@ const NotificationCenter = () => {
           return <CheckCircle className="h-5 w-5 text-green-500" />;
         case 'cancelled':
           return <X className="h-5 w-5 text-red-500" />;
+        case 'pending':
+          return <Clock className="h-5 w-5 text-yellow-500" />;
         default:
           return <Calendar className="h-5 w-5 text-amber-500" />;
       }

@@ -12,7 +12,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
+import { 
+  notifyVenueOwnerAboutBooking, 
+  sendBookingStatusNotification, 
+  getVenueOwnerId, 
+  sendNotification 
+} from '@/utils/notificationService';
 import {
   Select,
   SelectContent,
@@ -204,11 +209,10 @@ export default function BookingForm({
             console.warn('[HOURLY_BOOKING] Booking confirmation notification may not have been sent');
             
             // Attempt direct notification as fallback
-            const venueOwnerId = await fetchVenueOwnerId(venueId);
+            const venueOwnerId = await getVenueOwnerId(venueId);
             if (venueOwnerId) {
               console.log("[HOURLY_BOOKING] Found venue owner ID for direct notification:", venueOwnerId);
               
-              const { sendNotification } = await import('@/utils/notificationService');
               await sendNotification(
                 venueOwnerId,
                 'Booking Confirmed',

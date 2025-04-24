@@ -17,7 +17,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
   
   const updateBookingStatus = async (
     bookingId: string, 
-    status: 'confirmed' | 'cancelled', 
+    status: 'confirmed' | 'cancelled' | 'pending', 
     booking: any,
     setBookings: React.Dispatch<React.SetStateAction<any[]>>
   ) => {
@@ -118,10 +118,13 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
               booking_type: bookingType
             };
             
-            const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
+            const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 
+                            status === 'cancelled' ? 'Booking Cancelled' : 'Booking Update';
             const ownerMessage = status === 'confirmed' 
               ? `A booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM dd, yyyy')} has been confirmed.`
-              : `You have cancelled a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM dd, yyyy')}.`;
+              : status === 'cancelled'
+              ? `You have cancelled a booking for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM dd, yyyy')}.`
+              : `A booking status for "${booking.venue_name}" on ${format(new Date(booking.booking_date), 'MMM dd, yyyy')} has been updated.`;
             
             console.log('[STATUS_UPDATE] Attempting direct notification to venue owner:', ownerId);
             const ownerNotification = await sendNotification(
@@ -154,10 +157,13 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
               booking_type: bookingType
             };
             
-            const customerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
+            const customerTitle = status === 'confirmed' ? 'Booking Confirmed' : 
+                               status === 'cancelled' ? 'Booking Cancelled' : 'Booking Update';
             const customerMessage = status === 'confirmed' 
               ? `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM dd, yyyy')} has been confirmed.`
-              : `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM dd, yyyy')} has been cancelled by the venue owner.`;
+              : status === 'cancelled'
+              ? `Your booking for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM dd, yyyy')} has been cancelled by the venue owner.`
+              : `Your booking status for ${booking.venue_name} on ${format(new Date(booking.booking_date), 'MMM dd, yyyy')} has been updated.`;
             
             console.log('[STATUS_UPDATE] Attempting direct notification to customer:', booking.user_id);
             await sendNotification(
@@ -185,7 +191,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
       // Dismiss the processing toast and show success
       processingToast.dismiss();
       toast({
-        title: status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled',
+        title: status === 'confirmed' ? 'Booking Confirmed' : status === 'cancelled' ? 'Booking Cancelled' : 'Booking Updated',
         description: `The booking has been ${status} successfully.`,
       });
       
@@ -244,7 +250,7 @@ export const useBookingStatusUpdate = (fetchBookings: () => Promise<void>) => {
           const notificationData = {
             booking_id: booking.id,
             venue_id: booking.venue_id,
-            status: booking.status,
+            status: booking.status || 'pending',
             booking_date: booking.booking_date, // Keep original for consistency
             venue_name: booking.venue_name,
             booking_type: bookingType

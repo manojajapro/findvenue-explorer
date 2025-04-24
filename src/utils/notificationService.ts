@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -162,7 +163,7 @@ export const formatRulesAndRegulations = (rules: any): any => {
  */
 export const sendBookingStatusNotification = async (
   booking: any,
-  status: 'confirmed' | 'cancelled'
+  status: 'confirmed' | 'cancelled' | 'pending'
 ): Promise<boolean> => {
   try {
     // Try both possible owner_id sources
@@ -185,11 +186,23 @@ export const sendBookingStatusNotification = async (
       booking_type: bookingType
     };
     
-    // Send notification to owner
-    const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
-    const ownerMessage = status === 'confirmed' 
-      ? `A booking for "${booking.venue_name}" on ${formattedDate} has been confirmed.`
-      : `A booking for "${booking.venue_name}" on ${formattedDate} has been cancelled.`;
+    // Send notification to owner with appropriate titles and messages based on status
+    let ownerTitle, ownerMessage;
+    
+    switch (status) {
+      case 'confirmed':
+        ownerTitle = 'Booking Confirmed';
+        ownerMessage = `A booking for "${booking.venue_name}" on ${formattedDate} has been confirmed.`;
+        break;
+      case 'cancelled':
+        ownerTitle = 'Booking Cancelled';
+        ownerMessage = `A booking for "${booking.venue_name}" on ${formattedDate} has been cancelled.`;
+        break;
+      case 'pending':
+        ownerTitle = 'New Booking Request';
+        ownerMessage = `A new booking request for "${booking.venue_name}" on ${formattedDate} requires your attention.`;
+        break;
+    }
     
     console.log(`Sending ${status} notification to owner ${ownerId}`);
     
@@ -203,15 +216,28 @@ export const sendBookingStatusNotification = async (
     );
     
     if (!ownerNotified) {
-      console.error('Failed to notify venue owner about booking status update');
+      console.error(`Failed to notify venue owner about booking ${status} update`);
     }
     
     // Send notification to customer if the user_id is available
     if (booking.user_id) {
-      const customerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
-      const customerMessage = status === 'confirmed' 
-        ? `Your booking for ${booking.venue_name} on ${formattedDate} has been confirmed.`
-        : `Your booking for ${booking.venue_name} on ${formattedDate} has been cancelled.`;
+      // Customize messages based on status
+      let customerTitle, customerMessage;
+      
+      switch (status) {
+        case 'confirmed':
+          customerTitle = 'Booking Confirmed';
+          customerMessage = `Your booking for ${booking.venue_name} on ${formattedDate} has been confirmed.`;
+          break;
+        case 'cancelled':
+          customerTitle = 'Booking Cancelled';
+          customerMessage = `Your booking for ${booking.venue_name} on ${formattedDate} has been cancelled.`;
+          break;
+        case 'pending':
+          customerTitle = 'Booking Submitted';
+          customerMessage = `Your booking request for ${booking.venue_name} on ${formattedDate} has been submitted and is awaiting confirmation.`;
+          break;
+      }
       
       console.log(`Sending ${status} notification to customer ${booking.user_id}`);
       
@@ -225,7 +251,7 @@ export const sendBookingStatusNotification = async (
       );
       
       if (!customerNotified) {
-        console.error('Failed to notify customer about booking status update');
+        console.error(`Failed to notify customer about booking ${status} update`);
       }
     }
     
