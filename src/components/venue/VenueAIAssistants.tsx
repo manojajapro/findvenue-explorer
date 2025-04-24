@@ -5,6 +5,7 @@ import { Venue } from '@/hooks/useSupabaseVenues';
 import { Bot, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAuth } from '@/hooks/useAuth';
 
 interface VenueAIAssistantsProps {
   venue: Venue | null;
@@ -12,6 +13,12 @@ interface VenueAIAssistantsProps {
 
 const VenueAIAssistants = ({ venue }: VenueAIAssistantsProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { isVenueOwner } = useAuth();
+  
+  // Don't render anything if the user is a venue owner
+  if (isVenueOwner) {
+    return null;
+  }
   
   return (
     <>
