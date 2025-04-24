@@ -172,7 +172,7 @@ function AppContent() {
         <Footer />
         <ScrollToTop />
         <RevealOnScroll />
-        <HomePageVenueChatbot />
+        {!isVenueOwner && <HomePageVenueChatbot />}
       </TooltipProvider>
     </div>
   );
