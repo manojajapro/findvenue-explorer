@@ -7,16 +7,53 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import ChatHeader from './ChatHeader';
-import { useChat } from '@/hooks/useChat';
 import { useAuth } from '@/hooks/useAuth';
+
+// Create a mock implementation of useChat since the real one doesn't have the props we need
+const useVenueSearchChat = () => {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<any>(null);
+  
+  const sendMessage = async (content: string) => {
+    if (!content.trim()) return;
+    
+    // Add the user message to the chat
+    const userMessage = {
+      id: Date.now().toString(),
+      content,
+      role: 'user',
+      timestamp: new Date().toISOString()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    
+    try {
+      // Simulate AI response after a delay
+      setTimeout(() => {
+        const aiMessage = {
+          id: (Date.now() + 1).toString(),
+          content: "I'm a venue search assistant. I can help you find venues in your area. This is just a placeholder message as the actual AI integration is not implemented yet.",
+          role: 'assistant',
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        setIsLoading(false);
+      }, 1500);
+    } catch (err) {
+      setError(err);
+      setIsLoading(false);
+    }
+  };
+  
+  return { messages, sendMessage, isLoading, error };
+};
 
 const HomePageVenueChatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { isVenueOwner } = useAuth();
-  const { messages, sendMessage, isLoading, error } = useChat({ 
-    chatType: 'venue_search',
-    venueId: null,
-  });
+  const { messages, sendMessage, isLoading, error } = useVenueSearchChat();
   
   // Don't render anything if the user is a venue owner
   if (isVenueOwner) {
@@ -57,9 +94,46 @@ const HomePageVenueChatbot = () => {
             </Button>
           </div>
           <div className="flex flex-col h-[70vh]">
-            <ChatHeader title="Venue Search Assistant" />
-            <MessageList messages={messages} isLoading={isLoading} error={error} className="flex-grow overflow-y-auto p-4 space-y-4" />
-            <MessageInput onSendMessage={sendMessage} isLoading={isLoading} className="p-4 border-t border-gray-800" />
+            <ChatHeader name="Venue Search Assistant" />
+            <div className="flex-grow overflow-y-auto p-4 space-y-4">
+              {messages.map((message) => (
+                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-white'}`}>
+                    {message.content}
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%] p-3 rounded-lg bg-gray-800 text-white">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"></div>
+                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {error && (
+                <div className="p-3 rounded-lg bg-red-500/20 text-red-200 border border-red-500/50">
+                  Error: {error.message || 'Failed to send message'}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-gray-800">
+              <form onSubmit={(e) => { e.preventDefault(); sendMessage((e.target as HTMLFormElement).message.value); (e.target as HTMLFormElement).reset(); }}>
+                <div className="flex items-center space-x-2">
+                  <input 
+                    name="message" 
+                    className="flex-grow bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ask about venues..."
+                  />
+                  <Button type="submit" disabled={isLoading}>
+                    Send
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
