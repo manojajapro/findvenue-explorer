@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +28,14 @@ const VenueRating = ({
   const { translate } = useTranslation();
   const { user } = useAuth();
   
+  useEffect(() => {
+    const userRatings = JSON.parse(localStorage.getItem('userVenueRatings') || '{}');
+    if (userRatings[venueId]) {
+      setHasRated(true);
+      setRating(userRatings[venueId]);
+    }
+  }, [venueId]);
+  
   const handleRatingClick = (selectedRating: number) => {
     if (hasRated) return;
     setRating(selectedRating);
@@ -40,7 +47,7 @@ const VenueRating = ({
   };
   
   const submitRating = async () => {
-    if (rating === 0 || !venueId) return;
+    if (rating === 0 || !venueId || hasRated) return;
     
     setIsSubmitting(true);
     
@@ -51,7 +58,7 @@ const VenueRating = ({
         body: {
           venueId,
           rating,
-          userId: user?.id // Pass the user ID if available
+          userId: user?.id
         }
       });
       
@@ -65,6 +72,10 @@ const VenueRating = ({
       }
       
       console.log('Rating submission response:', data);
+      
+      const userRatings = JSON.parse(localStorage.getItem('userVenueRatings') || '{}');
+      userRatings[venueId] = rating;
+      localStorage.setItem('userVenueRatings', JSON.stringify(userRatings));
       
       setHasRated(true);
       
