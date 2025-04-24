@@ -23,65 +23,84 @@ serve(async (req) => {
     if (!rating || rating < 1 || rating > 5) {
       throw new Error('Rating must be between 1 and 5');
     }
+
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://esdmelfzeszjtbnoajig.supabase.co';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzZG1lbGZ6ZXN6anRibm9hamlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4ODUwMTUsImV4cCI6MjA1ODQ2MTAxNX0.1z27OZ04RuR8AYlVGaE9L8vWWYilSrMlyq422BJcX94';
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     
-    console.log(`Processing rating ${rating} for venue ${venueId}`);
-    
-    // First, get current venue data
-    const { data: venueData, error: venueError } = await supabase
-      .from('venues')
-      .select('rating, reviews_count')
-      .eq('id', venueId)
+    // Check if user has already rated this venue
+    const { data: existingRating } = await supabase
+      .from('user_ratings')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('venue_id', venueId)
       .single();
       
-    if (venueError) {
-      console.error('Error fetching venue data:', venueError);
-      throw venueError;
+    if (existingRating) {
+      throw new Error('You have already rated this venue');
     }
     
-    // Calculate new rating and review count
-    const currentRating = venueData.rating || 0;
-    const currentReviews = venueData.reviews_count || 0;
-    const newReviews = currentReviews + 1;
+    // Insert the new user rating
+    const { error: ratingError } = await supabase
+      .from('user_ratings')
+      .insert({
+        user_id: userId,
+        venue_id: venueId,
+        rating
+      });
+      
+    if (ratingError) {
+      console.error('Error inserting user rating:', ratingError);
+      throw ratingError;
+    }
     
-    // Calculate weighted average for new rating
-    const newRating = ((currentRating * currentReviews) + rating) / newReviews;
-    const roundedRating = Math.round(newRating * 10) / 10; // Round to 1 decimal place
+    // Get all ratings for this venue
+    const { data: allRatings, error: ratingsError } = await supabase
+      .from('user_ratings')
+      .select('rating')
+      .eq('venue_id', venueId);
+      
+    if (ratingsError) {
+      console.error('Error fetching venue ratings:', ratingsError);
+      throw ratingsError;
+    }
     
-    console.log(`Current rating: ${currentRating}, reviews: ${currentReviews}`);
-    console.log(`New rating: ${roundedRating}, reviews: ${newReviews}`);
+    // Calculate new average rating
+    const totalRatings = allRatings.length;
+    const sumRatings = allRatings.reduce((sum, r) => sum + r.rating, 0);
+    const averageRating = Math.round((sumRatings / totalRatings) * 10) / 10; // Round to 1 decimal
     
-    // Update venue with new rating
-    const { data, error } = await supabase
+    // Update venue with new rating and review count
+    const { data: updatedVenue, error: updateError } = await supabase
       .from('venues')
       .update({
-        rating: roundedRating,
-        reviews_count: newReviews
+        rating: averageRating,
+        reviews_count: totalRatings
       })
       .eq('id', venueId)
-      .select();
+      .select('rating, reviews_count')
+      .single();
       
-    if (error) {
-      console.error('Error updating venue rating:', error);
-      throw error;
+    if (updateError) {
+      console.error('Error updating venue:', updateError);
+      throw updateError;
     }
-    
-    console.log('Successfully updated rating:', data);
     
     return new Response(JSON.stringify({ 
       success: true, 
-      rating: roundedRating, 
-      reviewsCount: newReviews 
+      rating: updatedVenue.rating, 
+      reviewsCount: updatedVenue.reviews_count 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('Error in submit-rating function:', error);
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

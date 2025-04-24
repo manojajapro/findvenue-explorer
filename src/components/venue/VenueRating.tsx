@@ -40,35 +40,28 @@ const VenueRating = ({
   };
   
   const submitRating = async () => {
-    if (rating === 0 || !venueId) return;
+    if (rating === 0 || !venueId || !user) return;
     
     setIsSubmitting(true);
     
     try {
-      console.log(`Submitting rating ${rating} for venue ${venueId}`);
-      
       const { data, error } = await supabase.functions.invoke('submit-rating', {
         body: {
           venueId,
           rating,
-          userId: user?.id // Pass the user ID if available
+          userId: user.id
         }
       });
       
-      if (error) {
-        console.error('Error from edge function:', error);
-        throw error;
-      }
+      if (error) throw error;
       
       if (!data) {
         throw new Error('No data returned from rating submission');
       }
       
-      console.log('Rating submission response:', data);
-      
       setHasRated(true);
       
-      if (onRatingUpdated && data) {
+      if (onRatingUpdated && data.rating !== undefined && data.reviewsCount !== undefined) {
         onRatingUpdated(data.rating, data.reviewsCount);
       }
       
