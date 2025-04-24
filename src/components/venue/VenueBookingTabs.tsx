@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Clock, Calendar as CalendarIcon, LogIn, Users } from 'lucide-react';
@@ -14,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import BookingCalendar from './BookingCalendar';
+import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -49,7 +49,6 @@ export default function VenueBookingTabs({
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [processingBooking, setProcessingBooking] = useState<boolean>(false);
   
-  // New fields for unified booking form
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [peopleCount, setPeopleCount] = useState<string>(minCapacity.toString());
   const [fromTime, setFromTime] = useState<string>('09:00');
@@ -57,7 +56,6 @@ export default function VenueBookingTabs({
   const [bookingType, setBookingType] = useState<'hourly' | 'full-day'>('full-day');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
 
-  // Fetch venue status
   useEffect(() => {
     if (venueId) {
       const fetchVenueStatus = async () => {
@@ -76,7 +74,6 @@ export default function VenueBookingTabs({
     }
   }, [venueId]);
 
-  // Fetch existing bookings for this venue to disable already booked dates/times
   useEffect(() => {
     const fetchBookings = async () => {
       try {
@@ -92,14 +89,12 @@ export default function VenueBookingTabs({
           return;
         }
 
-        // Process confirmed bookings to track booked dates and time slots
         const dates: string[] = [];
         const timeSlots: Record<string, string[]> = {};
         const fullyBooked: string[] = [];
         const hourlyBooked: string[] = [];
         const dayBooked: string[] = [];
         
-        // Group bookings by date
         const bookingsByDate: Record<string, any[]> = {};
         
         data.forEach(booking => {
@@ -110,9 +105,7 @@ export default function VenueBookingTabs({
           bookingsByDate[dateStr].push(booking);
         });
         
-        // Process bookings by date
         Object.entries(bookingsByDate).forEach(([dateStr, bookings]) => {
-          // Track day bookings (full day)
           const fullDayBookings = bookings.filter(b => 
             b.start_time === '00:00' && b.end_time === '23:59'
           );
@@ -122,13 +115,11 @@ export default function VenueBookingTabs({
             fullyBooked.push(dateStr);
             dayBooked.push(dateStr);
             
-            // Add all time slots as booked for this date to prevent hourly bookings
             if (!timeSlots[dateStr]) {
               timeSlots[dateStr] = [];
             }
             timeSlots[dateStr].push('00:00 - 23:59');
           } else {
-            // Track hourly bookings
             if (!timeSlots[dateStr]) {
               timeSlots[dateStr] = [];
             }
@@ -142,24 +133,19 @@ export default function VenueBookingTabs({
                 timeSlots[dateStr].push(timeSlot);
               }
               
-              // Track booked hours for 24-hour format
               const startHour = parseInt(booking.start_time.split(':')[0]);
               const endHour = parseInt(booking.end_time.split(':')[0]);
               totalBookedHours += (endHour - startHour);
               
-              // Mark all hours in this range as booked
               for (let hour = startHour; hour < endHour; hour++) {
                 bookedSlots.add(hour);
               }
             });
             
-            // If there are any hourly bookings, mark the date
             if (bookings.length > 0) {
               hourlyBooked.push(dateStr);
             }
             
-            // If more than 12 hours are booked (considering 24-hour day),
-            // consider the day unavailable for full-day booking
             if (bookedSlots.size >= 12 || totalBookedHours >= 12) {
               fullyBooked.push(dateStr);
             }
@@ -183,17 +169,13 @@ export default function VenueBookingTabs({
     }
   }, [venueId]);
 
-  // Update available time slots whenever the selected date changes
   useEffect(() => {
     if (selectedDate) {
-      // Generate all time slots
       const allTimeSlots = generateTimeSlots();
       
-      // Filter out booked time slots for the selected date
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const bookedSlots = bookedTimeSlots[dateStr] || [];
       
-      // Get booked hours for this date
       const bookedHours = new Set<number>();
       bookedSlots.forEach(slot => {
         const [start, end] = slot.split(' - ');
@@ -204,7 +186,6 @@ export default function VenueBookingTabs({
         }
       });
       
-      // Filter available time slots
       const available = allTimeSlots.filter(time => {
         const hour = parseInt(time.split(':')[0]);
         return !bookedHours.has(hour);
@@ -212,18 +193,14 @@ export default function VenueBookingTabs({
       
       setAvailableTimeSlots(available);
       
-      // Reset time selections if there are no available times or if current selections are no longer valid
       if (available.length === 0) {
-        // No times available
         setFromTime('');
         setToTime('');
       } else {
-        // Set default from time to first available slot
         if (!available.includes(fromTime)) {
           setFromTime(available[0]);
         }
         
-        // Set default to time if current one is invalid
         const validToTimes = available.filter(time => {
           const fromHour = fromTime ? parseInt(fromTime.split(':')[0]) : 0;
           const timeHour = parseInt(time.split(':')[0]);
@@ -237,7 +214,6 @@ export default function VenueBookingTabs({
     }
   }, [selectedDate, bookedTimeSlots, fromTime, toTime]);
   
-  // Helper function to generate time slots - Updated for 24 hours
   const generateTimeSlots = (): string[] => {
     const slots = [];
     for (let i = 0; i < 24; i++) {
@@ -266,10 +242,8 @@ export default function VenueBookingTabs({
       return;
     }
     
-    // Format date
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
     
-    // Validate people count
     const guests = parseInt(peopleCount);
     if (isNaN(guests) || guests < 1 || guests > maxCapacity) {
       toast({
@@ -287,13 +261,11 @@ export default function VenueBookingTabs({
       let endTime = toTime;
       let totalPrice = 0;
       
-      // Calculate price based on booking type
       if (bookingType === 'full-day') {
         startTime = '00:00';
         endTime = '23:59';
-        totalPrice = pricePerHour * 10; // Day rate
+        totalPrice = pricePerHour * 10;
       } else {
-        // Calculate hourly price
         const startHour = parseInt(fromTime.split(':')[0]);
         const endHour = parseInt(toTime.split(':')[0]);
         const hours = endHour - startHour;
@@ -311,7 +283,6 @@ export default function VenueBookingTabs({
         totalPrice = hours * pricePerHour;
       }
       
-      // Check if the slot is already booked
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const timeSlot = `${startTime} - ${endTime}`;
       
@@ -325,7 +296,6 @@ export default function VenueBookingTabs({
         return;
       }
       
-      // Create booking
       const { data, error } = await supabase
         .from('bookings')
         .insert([
@@ -354,65 +324,30 @@ export default function VenueBookingTabs({
         setProcessingBooking(false);
         return;
       }
+
+      const bookingData = {
+        id: data?.[0]?.id,
+        user_id: user.id,
+        venue_id: venueId,
+        venue_name: venueName,
+        booking_date: formattedDate,
+        start_time: startTime,
+        end_time: endTime,
+        status: 'pending',
+        booking_type: bookingType === 'full-day' ? 'full-day' : 'hourly'
+      };
       
-      // Send notification to venue owner
       try {
-        const { data: notificationData, error: notificationError } = await supabase
-          .from('notifications')
-          .insert([
-            {
-              user_id: ownerId,
-              title: 'New Booking Request',
-              message: `New booking request for ${venueName} on ${format(selectedDate, 'MMM dd, yyyy')}`,
-              type: 'booking',
-              link: '/customer-bookings',
-              data: {
-                booking_id: data?.[0]?.id,
-                venue_id: venueId,
-                status: 'pending',
-                booking_date: formattedDate,
-                venue_name: venueName,
-                booking_type: bookingType === 'full-day' ? 'day' : 'hourly'
-              }
-            }
-          ]);
-          
-        if (notificationError) {
-          console.warn('Failed to send notification to owner:', notificationError);
+        console.log(`Sending notification to venue owner ${ownerId} about new booking`);
+        const notified = await notifyVenueOwnerAboutBooking(bookingData);
+        
+        if (!notified) {
+          console.warn('Failed to notify venue owner about new booking request');
+        } else {
+          console.log('Successfully notified venue owner about new booking request');
         }
       } catch (notifyError) {
-        console.warn('Error in notification process:', notifyError);
-      }
-      
-      // Send notification to customer
-      try {
-        const { error: customerNotificationError } = await supabase
-          .from('notifications')
-          .insert([
-            {
-              user_id: user.id,
-              title: 'Booking Requested',
-              message: `You've requested to book ${venueName} on ${format(selectedDate, 'MMM dd, yyyy')}${
-                bookingType === 'hourly' ? ` from ${fromTime} to ${toTime}` : ' for the entire day'
-              }. Total: ${totalPrice} ${pricePerHour > 0 ? 'SAR' : ''}`,
-              type: 'booking',
-              link: '/bookings',
-              data: {
-                booking_id: data?.[0]?.id,
-                venue_id: venueId,
-                status: 'pending',
-                booking_date: formattedDate,
-                venue_name: venueName,
-                booking_type: bookingType === 'full-day' ? 'day' : 'hourly'
-              }
-            }
-          ]);
-          
-        if (customerNotificationError) {
-          console.warn('Failed to send notification to customer:', customerNotificationError);
-        }
-      } catch (notifyError) {
-        console.warn('Error in customer notification process:', notifyError);
+        console.error('Error in notification process:', notifyError);
       }
       
       toast({
@@ -422,7 +357,6 @@ export default function VenueBookingTabs({
         }. Total: ${totalPrice} ${pricePerHour > 0 ? 'SAR' : ''}`,
       });
       
-      // Redirect to bookings page
       navigate('/bookings');
     } catch (err) {
       console.error('Error during booking process:', err);
@@ -436,7 +370,6 @@ export default function VenueBookingTabs({
     }
   };
   
-  // Don't show booking tabs for the venue owner
   if (isOwner) {
     return (
       <div className="glass-card p-4 rounded-lg shadow-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
@@ -447,7 +380,6 @@ export default function VenueBookingTabs({
     );
   }
 
-  // If user is not logged in, show login prompt
   if (!user) {
     return (
       <div className="glass-card p-5 rounded-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
@@ -468,7 +400,6 @@ export default function VenueBookingTabs({
     );
   }
 
-  // Allow bookings for venues with status pending, confirmed, or active
   const bookableStatuses = ['pending', 'confirmed', 'active'];
   if (!bookableStatuses.includes(venueStatus)) {
     return (
@@ -480,15 +411,12 @@ export default function VenueBookingTabs({
     );
   }
 
-  // Parse pricePerHour to ensure it's a number
   const parsedPricePerHour = Number(pricePerHour) || 0;
   const parsedMinCapacity = Number(minCapacity) || 1;
   const parsedMaxCapacity = Number(maxCapacity) || 100;
   
-  // Format day price
   const dayPrice = parsedPricePerHour * 10;
 
-  // Check if there are no available time slots for the current date
   const currentDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
   const isCurrentDateFullyBooked = bookingType === 'full-day' 
     ? fullyBookedDates.includes(currentDateStr) || dayBookedDates.includes(currentDateStr)
@@ -610,7 +538,6 @@ export default function VenueBookingTabs({
                       <SelectContent>
                         {availableTimeSlots
                           .filter(time => {
-                            // Only show end times that are after the start time
                             const startHour = parseInt(fromTime.split(':')[0]);
                             const timeHour = parseInt(time.split(':')[0]);
                             return timeHour > startHour;

@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
+import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification } from '@/utils/notificationService';
 import {
   Select,
   SelectContent,
