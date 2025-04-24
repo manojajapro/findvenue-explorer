@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification, getVenueOwnerId as fetchVenueOwnerId } from '@/utils/notificationService';
+import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
 import {
   Select,
   SelectContent,
@@ -172,9 +172,30 @@ export default function BookingForm({
         ...bookingData[0],
         venue_name: venueName,
         booking_date: formattedDate,
+        booking_type: 'hourly',
+        owner_id: ownerId
       };
 
-      if (autoConfirm) {
+      if (!autoConfirm) {
+        console.log("[HOURLY_BOOKING] Sending pending notification to venue owner");
+        
+        notifyVenueOwnerAboutBooking(bookingWithDetails)
+          .then(success => {
+            if (success) {
+              console.log("[HOURLY_BOOKING] Successfully notified venue owner about new booking");
+            } else {
+              console.error("[HOURLY_BOOKING] Failed to notify venue owner about new booking");
+            }
+          })
+          .catch(error => {
+            console.error("[HOURLY_BOOKING] Error notifying venue owner:", error);
+          });
+        
+        toast({
+          title: "Booking requested!",
+          description: `You've successfully requested ${venueName} on ${format(data.date, 'PPP')} from ${data.startTime} to ${data.endTime}. Total: SAR ${totalPrice}`,
+        });
+      } else {
         console.log("[HOURLY_BOOKING] Sending auto-confirm notification for hourly booking");
         try {
           const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
@@ -216,51 +237,6 @@ export default function BookingForm({
         toast({
           title: "Booking confirmed!",
           description: `Your booking for ${venueName} on ${format(data.date, 'PPP')} from ${data.startTime} to ${data.endTime} has been automatically confirmed. Total: SAR ${totalPrice}`,
-        });
-      } else {
-        console.log("[HOURLY_BOOKING] Sending pending notification to venue owner for hourly booking");
-        try {
-          const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
-          
-          if (!notified) {
-            console.warn('[HOURLY_BOOKING] Venue owner notification may not have been sent, trying direct method');
-            
-            // Attempt direct notification as fallback
-            const venueOwnerId = await fetchVenueOwnerId(venueId);
-            if (venueOwnerId) {
-              console.log("[HOURLY_BOOKING] Found venue owner ID for direct notification:", venueOwnerId);
-              
-              const { sendNotification } = await import('@/utils/notificationService');
-              await sendNotification(
-                venueOwnerId,
-                'New Booking Request',
-                `A new booking request for "${venueName}" on ${formattedDate} has been received.`,
-                'booking',
-                '/customer-bookings',
-                {
-                  booking_id: bookingWithDetails.id,
-                  venue_id: venueId,
-                  status: 'pending',
-                  booking_date: formattedDate,
-                  venue_name: venueName,
-                  booking_type: 'hourly'
-                }
-              );
-              
-              console.log('[HOURLY_BOOKING] Fallback notification sent to venue owner');
-            } else {
-              console.error('[HOURLY_BOOKING] Could not find venue owner ID for fallback notification');
-            }
-          } else {
-            console.log('[HOURLY_BOOKING] Venue owner notification sent successfully');
-          }
-        } catch (notifyError) {
-          console.error("[HOURLY_BOOKING] Error notifying venue owner:", notifyError);
-        }
-        
-        toast({
-          title: "Booking requested!",
-          description: `You've successfully requested ${venueName} on ${format(data.date, 'PPP')} from ${data.startTime} to ${data.endTime}. Total: SAR ${totalPrice}`,
         });
       }
       

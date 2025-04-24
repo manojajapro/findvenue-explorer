@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -58,7 +57,14 @@ export const sendNotification = async (
   link?: string,
   data?: any
 ): Promise<boolean> => {
+  if (!userId) {
+    console.error('Cannot send notification: No target user ID provided');
+    return false;
+  }
+
   try {
+    console.log(`Sending notification to user ${userId}: ${title}`);
+    
     const { error } = await supabase
       .from('notifications')
       .insert([
@@ -72,8 +78,13 @@ export const sendNotification = async (
           read: false
         }
       ]);
+    
+    if (error) {
+      console.error('Error from Supabase when sending notification:', error);
+      return false;
+    }
       
-    return !error;
+    return true;
   } catch (error) {
     console.error('Error sending notification:', error);
     return false;
@@ -95,17 +106,28 @@ export const getVenueOwnerId = async (venueOrId: any): Promise<string | null> =>
         .eq('id', venueOrId)
         .single();
         
-      if (error || !venue) return null;
+      if (error || !venue) {
+        console.error('Error fetching venue data:', error);
+        return null;
+      }
       
       // Extract owner ID from venue.owner_info
       if (venue.owner_info && typeof venue.owner_info === 'object') {
-        return (venue.owner_info as any).user_id || null;
+        const ownerId = (venue.owner_info as any).user_id;
+        if (ownerId) {
+          console.log(`Found owner ID ${ownerId} for venue ${venueOrId}`);
+          return ownerId;
+        }
       }
     } else if (venueOrId && venueOrId.ownerInfo) {
       // If venueOrId is a venue object
       return venueOrId.ownerInfo.user_id || null;
+    } else if (venueOrId && venueOrId.owner_info) {
+      // Alternative property name
+      return (venueOrId.owner_info as any).user_id || null;
     }
     
+    console.error(`Could not find owner ID for venue:`, venueOrId);
     return null;
   } catch (error) {
     console.error('Error getting venue owner ID:', error);
@@ -143,7 +165,14 @@ export const sendBookingStatusNotification = async (
   status: 'confirmed' | 'cancelled'
 ): Promise<boolean> => {
   try {
+    // Try both possible owner_id sources
     const ownerId = booking.owner_id || await getVenueOwnerId(booking.venue_id);
+    
+    if (!ownerId) {
+      console.error('Failed to determine venue owner ID for booking status notification:', booking);
+      return false;
+    }
+    
     const formattedDate = booking.booking_date || 'scheduled date';
     const bookingType = booking.booking_type || 'booking';
     
@@ -156,31 +185,37 @@ export const sendBookingStatusNotification = async (
       booking_type: bookingType
     };
     
-    if (ownerId) {
-      // Send notification to owner
-      const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
-      const ownerMessage = status === 'confirmed' 
-        ? `A booking for "${booking.venue_name}" on ${formattedDate} has been confirmed.`
-        : `A booking for "${booking.venue_name}" on ${formattedDate} has been cancelled.`;
-      
-      await sendNotification(
-        ownerId,
-        ownerTitle,
-        ownerMessage,
-        'booking',
-        '/customer-bookings',
-        notificationData
-      );
+    // Send notification to owner
+    const ownerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
+    const ownerMessage = status === 'confirmed' 
+      ? `A booking for "${booking.venue_name}" on ${formattedDate} has been confirmed.`
+      : `A booking for "${booking.venue_name}" on ${formattedDate} has been cancelled.`;
+    
+    console.log(`Sending ${status} notification to owner ${ownerId}`);
+    
+    const ownerNotified = await sendNotification(
+      ownerId,
+      ownerTitle,
+      ownerMessage,
+      'booking',
+      '/customer-bookings',
+      notificationData
+    );
+    
+    if (!ownerNotified) {
+      console.error('Failed to notify venue owner about booking status update');
     }
     
+    // Send notification to customer if the user_id is available
     if (booking.user_id) {
-      // Send notification to customer
       const customerTitle = status === 'confirmed' ? 'Booking Confirmed' : 'Booking Cancelled';
       const customerMessage = status === 'confirmed' 
         ? `Your booking for ${booking.venue_name} on ${formattedDate} has been confirmed.`
         : `Your booking for ${booking.venue_name} on ${formattedDate} has been cancelled.`;
       
-      await sendNotification(
+      console.log(`Sending ${status} notification to customer ${booking.user_id}`);
+      
+      const customerNotified = await sendNotification(
         booking.user_id,
         customerTitle,
         customerMessage,
@@ -188,6 +223,10 @@ export const sendBookingStatusNotification = async (
         '/bookings',
         notificationData
       );
+      
+      if (!customerNotified) {
+        console.error('Failed to notify customer about booking status update');
+      }
     }
     
     return true;
@@ -203,37 +242,75 @@ export const sendBookingStatusNotification = async (
  * @returns true if successful, false otherwise
  */
 export const notifyVenueOwnerAboutBooking = async (booking: any): Promise<boolean> => {
+  if (!booking || !booking.venue_id) {
+    console.error('Invalid booking data provided for owner notification');
+    return false;
+  }
+
   try {
-    const ownerId = booking.owner_id || await getVenueOwnerId(booking.venue_id);
+    // Get the venue owner ID
+    let ownerId = null;
+    
+    // Try to get owner ID from the booking if available
+    if (booking.owner_id) {
+      ownerId = booking.owner_id;
+      console.log('[OWNER_NOTIFY] Using owner ID from booking:', ownerId);
+    } else {
+      // Otherwise, fetch it from the venue
+      ownerId = await getVenueOwnerId(booking.venue_id);
+      console.log('[OWNER_NOTIFY] Fetched owner ID for venue:', ownerId);
+    }
     
     if (!ownerId) {
-      console.error('Could not find owner ID for venue:', booking.venue_id);
+      console.error('[OWNER_NOTIFY] Could not find owner ID for venue:', booking.venue_id);
       return false;
     }
     
     const formattedDate = booking.booking_date || 'scheduled date';
+    const bookingType = booking.booking_type || 'booking';
+    const venueName = booking.venue_name || 'your venue';
     
     const notificationData = {
       booking_id: booking.id,
       venue_id: booking.venue_id,
-      status: booking.status,
+      status: booking.status || 'pending',
       booking_date: booking.booking_date,
-      venue_name: booking.venue_name,
-      booking_type: booking.booking_type || 'booking'
+      venue_name: venueName,
+      booking_type: bookingType
     };
     
-    await sendNotification(
+    // Determine the notification message based on whether it's a full-day or hourly booking
+    let detailText = '';
+    
+    if (bookingType === 'full-day' || 
+        (booking.start_time === '00:00' && booking.end_time === '23:59')) {
+      detailText = `for the entire day`;
+    } else {
+      detailText = `from ${booking.start_time} to ${booking.end_time}`;
+    }
+    
+    const message = `A new booking request for "${venueName}" on ${formattedDate} ${detailText} has been received.`;
+    
+    console.log(`[OWNER_NOTIFY] Sending notification to owner ${ownerId}: ${message}`);
+    
+    const success = await sendNotification(
       ownerId,
       'New Booking Request',
-      `A new booking request for "${booking.venue_name}" on ${formattedDate} has been received.`,
+      message,
       'booking',
       '/customer-bookings',
       notificationData
     );
     
+    if (!success) {
+      console.error('[OWNER_NOTIFY] Failed to send notification to owner');
+      return false;
+    }
+    
+    console.log('[OWNER_NOTIFY] Successfully sent notification to venue owner');
     return true;
   } catch (error) {
-    console.error('Error notifying venue owner about booking:', error);
+    console.error('[OWNER_NOTIFY] Error notifying venue owner about booking:', error);
     return false;
   }
 };

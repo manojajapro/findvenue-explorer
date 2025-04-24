@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification } from '@/utils/notificationService';
+import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
 import {
   Select,
   SelectContent,
@@ -181,9 +181,32 @@ export default function MultiDayBookingForm({
         ...bookingData[0],
         venue_name: venueName,
         booking_date: formattedDate,
+        booking_type: 'full-day'
       };
 
-      if (autoConfirm) {
+      // Send notification to venue owner about new booking request
+      if (!autoConfirm) {
+        console.log("[FULL_DAY_BOOKING] Sending booking request notification to venue owner");
+        
+        // Send the notification asynchronously without waiting for it to complete
+        // to improve user experience, but log any errors
+        notifyVenueOwnerAboutBooking(bookingWithDetails)
+          .then(success => {
+            if (!success) {
+              console.error("[FULL_DAY_BOOKING] Failed to notify venue owner about new booking");
+            } else {
+              console.log("[FULL_DAY_BOOKING] Successfully notified venue owner about new booking");
+            }
+          })
+          .catch(error => {
+            console.error("[FULL_DAY_BOOKING] Error in owner notification:", error);
+          });
+        
+        toast({
+          title: "Full-day booking requested!",
+          description: `You've successfully requested ${venueName} for ${format(data.date, 'PPP')}. Total: SAR ${totalPrice}`,
+        });
+      } else {
         console.log("[FULL_DAY_BOOKING] Sending auto-confirm notification for full day booking");
         try {
           // Use the enhanced sendBookingStatusNotification function for owner notification
@@ -201,55 +224,6 @@ export default function MultiDayBookingForm({
         toast({
           title: "Full-day booking confirmed!",
           description: `Your booking for ${venueName} on ${format(data.date, 'PPP')} has been automatically confirmed. Total: SAR ${totalPrice}`,
-        });
-      } else {
-        console.log("[FULL_DAY_BOOKING] Sending booking request notification for full day booking to venue owner");
-        try {
-          // Use the enhanced notifyVenueOwnerAboutBooking function
-          const notified = await notifyVenueOwnerAboutBooking(bookingWithDetails);
-          
-          if (!notified) {
-            console.warn('[FULL_DAY_BOOKING] Venue owner notification may not have been sent');
-            // Attempt a second notification to the owner using a direct approach
-            console.log('[FULL_DAY_BOOKING] Attempting fallback notification to venue owner...');
-            
-            // Import the notification service functions directly to avoid circular dependencies
-            const { getVenueOwnerId: fetchVenueOwnerId, sendNotification } = await import('@/utils/notificationService');
-            
-            const venueOwnerId = await fetchVenueOwnerId(venueId);
-            if (venueOwnerId) {
-              console.log('[FULL_DAY_BOOKING] Found venue owner ID for direct notification:', venueOwnerId);
-              
-              await sendNotification(
-                venueOwnerId,
-                'New Booking Request',
-                `A new booking request for "${venueName}" on ${formattedDate} has been received.`,
-                'booking',
-                '/customer-bookings',
-                {
-                  booking_id: bookingWithDetails.id,
-                  venue_id: venueId,
-                  status: 'pending',
-                  booking_date: formattedDate,
-                  venue_name: venueName,
-                  booking_type: 'full-day'
-                }
-              );
-              
-              console.log('[FULL_DAY_BOOKING] Fallback notification sent to venue owner');
-            } else {
-              console.error('[FULL_DAY_BOOKING] Could not find venue owner ID for fallback notification');
-            }
-          } else {
-            console.log('[FULL_DAY_BOOKING] Venue owner notification sent successfully');
-          }
-        } catch (notifyError) {
-          console.error("[FULL_DAY_BOOKING] Error notifying venue owner:", notifyError);
-        }
-        
-        toast({
-          title: "Full-day booking requested!",
-          description: `You've successfully requested ${venueName} for ${format(data.date, 'PPP')}. Total: SAR ${totalPrice}`,
         });
       }
 
