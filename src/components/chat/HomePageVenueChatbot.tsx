@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -14,6 +15,26 @@ export default function HomePageVenueChatbot() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  
+  const { speak, stop: stopSpeaking, isSupported: isSpeechSupported } = useSpeechSynthesis();
+
+  // Define handleSpeakResponse before it's used
+  const handleSpeakResponse = useCallback((text: string) => {
+    if (!text || !isSpeechSupported) return;
+
+    // Detect if the text contains Arabic characters
+    const containsArabic = /[\u0600-\u06FF]/.test(text);
+    
+    speak(
+      text,
+      () => setIsSpeaking(true),
+      () => setIsSpeaking(false),
+      {
+        lang: containsArabic ? 'ar-SA' : 'en-US', // Set language based on content
+        rate: containsArabic ? 0.9 : 1.0 // Slightly slower rate for Arabic
+      }
+    );
+  }, [speak, isSpeechSupported]);
   
   const scrollToBottom = useCallback(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -56,25 +77,6 @@ export default function HomePageVenueChatbot() {
     }
   });
 
-  const { speak, stop: stopSpeaking, isSupported: isSpeechSupported } = useSpeechSynthesis();
-
-  const handleSpeakResponse = useCallback((text: string) => {
-    if (!text || !isSpeechSupported) return;
-
-    // Detect if the text contains Arabic characters
-    const containsArabic = /[\u0600-\u06FF]/.test(text);
-    
-    speak(
-      text,
-      () => setIsSpeaking(true),
-      () => setIsSpeaking(false),
-      {
-        lang: containsArabic ? 'ar-SA' : 'en-US', // Set language based on content
-        rate: containsArabic ? 0.9 : 1.0 // Slightly slower rate for Arabic
-      }
-    );
-  }, [speak, isSpeechSupported]);
-
   return (
     <>
       <TooltipProvider>
@@ -100,6 +102,7 @@ export default function HomePageVenueChatbot() {
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent 
           className="sm:max-w-[500px] p-0 overflow-hidden left-[5%] sm:left-[5%] translate-x-0 bg-gradient-to-b from-slate-950 to-slate-900 border border-white/10 shadow-2xl rounded-xl"
+          aria-describedby="chatbot-description"
         >
           <div className="absolute top-2 right-2 z-10">
             <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="rounded-full h-8 w-8 hover:bg-white/10">
