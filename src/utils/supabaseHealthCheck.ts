@@ -2,44 +2,48 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Checks if the Supabase connection is working properly
- * @returns true if connected, false otherwise
+ * Checks if we can connect to the Supabase instance
+ * @returns true if connection is successful, false otherwise
  */
 export const checkSupabaseConnection = async (): Promise<boolean> => {
   try {
-    const { data, error } = await supabase.from('bookings').select('id').limit(1);
+    // A simple query to check if Supabase connection works
+    const { data, error } = await supabase.from('user_profiles').select('id').limit(1);
     return !error;
-  } catch (error) {
-    console.error('Supabase connection check failed:', error);
+  } catch (err) {
+    console.error('Supabase connection check failed:', err);
     return false;
   }
 };
 
 /**
- * Updates a booking's status in the database
+ * Updates a booking status in the database
  * @param bookingId ID of the booking to update
- * @param status New status ('confirmed' or 'cancelled')
- * @returns The response from the database
+ * @param status New status ('confirmed', 'cancelled', or 'pending')
+ * @returns The updated booking data if successful
  */
 export const updateBookingStatusInDatabase = async (
   bookingId: string, 
-  status: 'confirmed' | 'cancelled'
+  status: 'confirmed' | 'cancelled' | 'pending'
 ) => {
   try {
-    console.log(`Updating booking ${bookingId} to status ${status}`);
-    const result = await supabase
+    console.log(`[SUPABASE] Updating booking ${bookingId} status to ${status}`);
+    
+    const { data, error } = await supabase
       .from('bookings')
-      .update({ 
-        status, 
-        updated_at: new Date().toISOString() 
-      })
+      .update({ status, updated_at: new Date().toISOString() })
       .eq('id', bookingId)
-      .select();
+      .select()
+      .single();
       
-    console.log("Database update result:", result);
-    return result;
-  } catch (error) {
-    console.error("Error updating booking status in database:", error);
-    throw error;
+    if (error) {
+      console.error('[SUPABASE] Update booking status error:', error);
+      throw new Error(error.message);
+    }
+    
+    return { data, error: null };
+  } catch (error: any) {
+    console.error('[SUPABASE] Exception updating booking status:', error);
+    return { data: null, error };
   }
 };
