@@ -31,8 +31,16 @@ export function useSpeechSynthesis() {
     
     try {
       const utterance = new window.SpeechSynthesisUtterance(text);
-      utterance.lang = "en-US";
-      utterance.rate = 1.01;
+      
+      // Auto-detect language based on text content
+      if (/[\u0600-\u06FF]/.test(text)) {
+        // If Arabic characters are detected
+        utterance.lang = "ar-SA";
+        utterance.rate = 0.9; // Slightly slower rate for Arabic
+      } else {
+        utterance.lang = "en-US";
+        utterance.rate = 1.01;
+      }
       
       // Handle events
       if (onStart) {
