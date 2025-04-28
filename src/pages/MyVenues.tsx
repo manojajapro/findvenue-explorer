@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,7 +15,8 @@ import {
   Pencil,
   Trash,
   Plus,
-  Building
+  Building,
+  Calendar
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -48,7 +48,6 @@ const MyVenues = () => {
     if (user) {
       fetchMyVenues();
       
-      // Setup realtime subscription for venues
       const channel = supabase
         .channel('venues_changes')
         .on('postgres_changes', { 
@@ -79,7 +78,6 @@ const MyVenues = () => {
         throw error;
       }
       
-      // Filter venues owned by this user
       const myVenues = data?.filter(venue => {
         if (!venue.owner_info) return false;
         
@@ -127,7 +125,6 @@ const MyVenues = () => {
         throw error;
       }
       
-      // Update venues list
       setVenues(venues.filter(venue => venue.id !== id));
       
       toast({
@@ -142,6 +139,10 @@ const MyVenues = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleManageCalendar = (id: string) => {
+    navigate(`/venue/${id}/calendar`);
   };
 
   return (
@@ -226,7 +227,7 @@ const MyVenues = () => {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between">
+              <CardFooter className="flex justify-between gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -235,6 +236,15 @@ const MyVenues = () => {
                 >
                   <Pencil className="h-3.5 w-3.5 mr-1" />
                   Edit
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="border-purple-500/30 text-purple-500 hover:bg-purple-500/10"
+                  onClick={() => handleManageCalendar(venue.id)}
+                >
+                  <Calendar className="h-3.5 w-3.5 mr-1" />
+                  Calendar
                 </Button>
                 <Button 
                   variant="outline" 
