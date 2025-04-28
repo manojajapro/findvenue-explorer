@@ -48,6 +48,7 @@ export default function VenueBookingTabs({
   const [venueStatus, setVenueStatus] = useState<string>('active');
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [processingBooking, setProcessingBooking] = useState<boolean>(false);
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [peopleCount, setPeopleCount] = useState<string>(minCapacity.toString());
@@ -167,6 +168,29 @@ export default function VenueBookingTabs({
     if (venueId) {
       fetchBookings();
     }
+  }, [venueId]);
+
+  useEffect(() => {
+    const fetchBlockedDates = async () => {
+      if (!venueId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('blocked_dates')
+          .select('date')
+          .eq('venue_id', venueId);
+          
+        if (error) throw error;
+        
+        if (data) {
+          setBlockedDates(data.map(item => item.date));
+        }
+      } catch (err) {
+        console.error('Error fetching blocked dates:', err);
+      }
+    };
+    
+    fetchBlockedDates();
   }, [venueId]);
 
   useEffect(() => {
@@ -497,6 +521,7 @@ export default function VenueBookingTabs({
                   fullyBookedDates={fullyBookedDates}
                   dayBookedDates={dayBookedDates}
                   hourlyBookedDates={hourlyBookedDates}
+                  blockedDates={blockedDates}
                   bookingType={bookingType}
                 />
                 

@@ -55,9 +55,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
   }, [venue]);
 
   const fetchBookedDates = async (venueId: string) => {
-    // Mock implementation - replace with actual data fetching
     const today = new Date();
-    const future = addDays(today, 30); // Fetch for next 30 days
+    const future = addDays(today, 30);
 
     const booked: string[] = [];
     const fullyBooked: string[] = [];
@@ -68,7 +67,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
       const currentDate = addDays(today, i);
       const formattedDate = format(currentDate, 'yyyy-MM-dd');
 
-      // Simulate some dates being booked
       if (i % 5 === 0) {
         booked.push(formattedDate);
       }
@@ -93,6 +91,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
     setSelectedDate(date);
   };
 
+  const handleBookingTypeChange = (value: string) => {
+    if (value === 'hourly' || value === 'full-day') {
+      setBookingType(value);
+    }
+  };
+
   const handleAddToCart = async () => {
     if (!user) {
       toast({
@@ -115,15 +119,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
     setIsSubmitting(true);
 
     try {
-      // Basic validation
       if (!venue || !selectedDate) {
         throw new Error("Missing venue or date");
       }
 
-      // Calculate total price
-      const totalPrice = venue.starting_price || 100; // Fallback to 100 if starting_price is null
+      const totalPrice = venue.starting_price || 100;
 
-      // Create item object
       const item = {
         id: venue.id,
         name: venue.name,
@@ -139,7 +140,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
         },
       };
 
-      // Add item to cart
       addItem(item);
 
       toast({
@@ -202,15 +202,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
               selected={selectedDate}
               onSelect={handleDateSelect}
               disabled={(date) =>
-                date < new Date() || // Disable past dates
-                (blockedDates && blockedDates.includes(format(date, 'yyyy-MM-dd'))) // Disable blocked dates
+                date < new Date() ||
+                (blockedDates && blockedDates.includes(format(date, 'yyyy-MM-dd')))
               }
               className="rounded-md border"
             />
           </PopoverContent>
         </Popover>
 
-        <Select value={bookingType} onValueChange={setBookingType}>
+        <Select value={bookingType} onValueChange={handleBookingTypeChange}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select booking type" />
           </SelectTrigger>

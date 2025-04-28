@@ -1,7 +1,6 @@
-
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BlockedDatesCalendarTabs } from './BlockedDatesCalendarTabs';
+import { BlockedDatesCalendarTabs } from './BlockedDatesCalendarTab';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
