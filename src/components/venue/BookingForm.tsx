@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format, addDays, isSameDay, isWithinInterval, setHours, setMinutes } from 'date-fns';
 import { Calendar as CalendarIcon, ClockIcon, UsersIcon } from 'lucide-react';
@@ -46,7 +47,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const { blockedDates, isDateBlocked } = useBlockedDates(venue?.id);
+  // Use our blocked dates hook to get venue owner blocked dates
+  const { blockedDates, isLoading: isLoadingBlockedDates, isDateBlocked, isDateAndTimeBlocked } = useBlockedDates(venue?.id);
 
   useEffect(() => {
     if (venue) {
@@ -111,6 +113,26 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
     if (!selectedDate) {
       toast({
         title: "Please select a date.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if the date is blocked by venue owner
+    if (isDateBlocked(selectedDate)) {
+      toast({
+        title: "Date unavailable",
+        description: "This date has been blocked by the venue owner and is not available for booking.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // For hourly bookings, also check if the specific time slot is blocked
+    if (bookingType === 'hourly' && isDateAndTimeBlocked(selectedDate, startTime, endTime)) {
+      toast({
+        title: "Time slot unavailable",
+        description: "This time slot has been blocked by the venue owner and is not available for booking.",
         variant: "destructive",
       });
       return;
@@ -201,10 +223,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
               mode="single"
               selected={selectedDate}
               onSelect={handleDateSelect}
-              disabled={(date) =>
-                date < new Date() ||
-                (blockedDates && isDateBlocked && isDateBlocked(date))
-              }
+              disabled={(date) => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                // Disable dates in the past and dates blocked by venue owner
+                return date < today || isDateBlocked(date);
+              }}
               className="rounded-md border"
             />
           </PopoverContent>
@@ -261,7 +286,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
         </p>
       </div>
 
-      <Button onClick={handleAddToCart} disabled={isSubmitting}>
+      <Button onClick={handleAddToCart} disabled={isSubmitting || isLoadingBlockedDates}>
         {isSubmitting ? 'Adding to Cart...' : 'Add to Cart'}
       </Button>
     </div>

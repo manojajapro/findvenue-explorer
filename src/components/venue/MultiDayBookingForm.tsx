@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification, sendNotification, getVenueOwnerId } from '@/utils/notificationService';
+import { useBlockedDates } from '@/hooks/useBlockedDates';
 import {
   Select,
   SelectContent,
@@ -74,6 +75,8 @@ export default function MultiDayBookingForm({
   const [pricePerPerson, setPricePerPerson] = useState(0);
   const [basePrice, setBasePrice] = useState(0);
   
+  const { blockedDates: ownerBlockedDates, isDateBlocked } = useBlockedDates(venueId);
+  
   useEffect(() => {
     const fetchVenuePricing = async () => {
       try {
@@ -124,9 +127,18 @@ export default function MultiDayBookingForm({
     }
   }, [guestsCount, pricePerPerson, basePrice]);
 
-  const disabledDates = bookedDates.map(dateStr => new Date(dateStr));
+  const allDisabledDates = [...bookedDates.map(dateStr => new Date(dateStr))];
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    if (isDateBlocked(data.date)) {
+      toast({
+        title: "Date unavailable",
+        description: "This date has been blocked by the venue owner and is not available for booking.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!user) {
       toast({
         title: "Not logged in",
@@ -176,7 +188,6 @@ export default function MultiDayBookingForm({
       
       console.log("[FULL_DAY_BOOKING] Full day booking created:", bookingData[0]);
 
-      // Ensure we have consistent booking data format for notifications
       const bookingWithDetails = {
         ...bookingData[0],
         venue_name: venueName,
@@ -185,19 +196,16 @@ export default function MultiDayBookingForm({
       };
 
       try {
-        // Use sendBookingStatusNotification to ensure status is included properly
         if (autoConfirm) {
           console.log("[FULL_DAY_BOOKING] Sending auto-confirm notification for full day booking");
           await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
         } else {
-          // For pending bookings, use the status in the notification
           console.log("[FULL_DAY_BOOKING] Sending booking request notification for pending booking");
           await sendBookingStatusNotification(bookingWithDetails, 'pending');
         }
       } catch (notifyError) {
         console.error("[FULL_DAY_BOOKING] Error sending booking notifications, trying alternative method:", notifyError);
         
-        // Fallback notification method
         try {
           const ownerId = await getVenueOwnerId(venueId);
           if (ownerId) {
@@ -290,13 +298,17 @@ export default function MultiDayBookingForm({
                         today.setHours(0, 0, 0, 0);
                         if (date < today) return true;
                         
-                        return disabledDates.some(
+                        const isAlreadyBooked = bookedDates.some(
                           disabledDate => 
-                            format(disabledDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                            format(new Date(disabledDate), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
                         );
+                        
+                        const isBlockedByOwner = isDateBlocked(date);
+                        
+                        return isAlreadyBooked || isBlockedByOwner;
                       }}
                       modifiers={{
-                        booked: disabledDates,
+                        booked: allDisabledDates,
                       }}
                       className="p-3 pointer-events-auto"
                     />
