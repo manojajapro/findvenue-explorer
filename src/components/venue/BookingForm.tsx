@@ -203,7 +203,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
               onSelect={handleDateSelect}
               disabled={(date) =>
                 date < new Date() ||
-                (blockedDates && blockedDates.includes(format(date, 'yyyy-MM-dd')))
+                (blockedDates && isDateBlocked && isDateBlocked(date))
               }
               className="rounded-md border"
             />
