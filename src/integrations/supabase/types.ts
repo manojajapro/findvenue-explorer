@@ -9,6 +9,41 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      blocked_dates: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          reason: string | null
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          reason?: string | null
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          reason?: string | null
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocked_dates_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           booking_date: string
@@ -454,6 +489,10 @@ export type Database = {
           venue_name: string
           role: string
         }[]
+      }
+      is_date_blocked: {
+        Args: { venue_id: string; check_date: string }
+        Returns: boolean
       }
       update_booking_status: {
         Args: { p_booking_id: string; p_status: string }

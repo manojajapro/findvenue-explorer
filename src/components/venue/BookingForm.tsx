@@ -1,131 +1,112 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Clock, Users } from 'lucide-react';
-import { Calendar } from '@/components/ui/calendar';
+import React, { useState, useEffect } from 'react';
+import { format, addDays, isSameDay, isWithinInterval, setHours, setMinutes } from 'date-fns';
+import { Calendar as CalendarIcon, ClockIcon, UsersIcon } from 'lucide-react';
+import { DateRange } from "react-day-picker";
+
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { 
-  notifyVenueOwnerAboutBooking, 
-  sendBookingStatusNotification, 
-  getVenueOwnerId, 
-  sendNotification 
-} from '@/utils/notificationService';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+} from "@/components/ui/popover"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider"
+import { Venue } from '@/types';
+import { useToast } from '@/components/ui/use-toast';
+import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import { useBlockedDates } from '@/hooks/useBlockedDates';
 
 interface BookingFormProps {
-  venueId: string;
-  venueName: string;
-  pricePerHour?: number;
-  ownerId: string;
-  ownerName: string;
-  isLoading: boolean;
-  bookedTimeSlots: Record<string, string[]>;
-  fullyBookedDates: string[];
-  availableTimeSlots: string[];
-  autoConfirm?: boolean;
+  venue: Venue;
+  defaultBookingType?: 'hourly' | 'full-day';
 }
 
-const formSchema = z.object({
-  date: z.date({
-    required_error: "Please select a date",
-  }),
-  startTime: z.string({
-    required_error: "Please select a start time",
-  }),
-  endTime: z.string({
-    required_error: "Please select an end time",
-  }),
-  guests: z.number().min(1, "At least one guest is required"),
-  specialRequests: z.string().optional(),
-  customerEmail: z.string().email("Please enter a valid email"),
-  customerPhone: z.string().min(5, "Please enter a valid phone number"),
-  paymentMethod: z.string().min(1, "Please select a payment method"),
-});
-
-export default function BookingForm({
-  venueId,
-  venueName,
-  pricePerHour = 0,
-  ownerId,
-  ownerName,
-  isLoading,
-  bookedTimeSlots,
-  fullyBookedDates,
-  availableTimeSlots,
-  autoConfirm = false
-}: BookingFormProps) {
+const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = 'full-day' }) => {
+  const [date, setDate] = React.useState<DateRange | undefined>({
+    from: new Date(),
+    to: addDays(new Date(), 2),
+  })
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [startTime, setStartTime] = useState<string>('09:00');
+  const [endTime, setEndTime] = useState<string>('17:00');
+  const [guests, setGuests] = useState<number>(1);
+  const [bookingType, setBookingType] = useState<'hourly' | 'full-day'>(defaultBookingType);
+  const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [fullyBookedDates, setFullyBookedDates] = useState<string[]>([]);
+  const [dayBookedDates, setDayBookedDates] = useState<string[]>([]);
+  const [hourlyBookedDates, setHourlyBookedDates] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const { toast } = useToast();
+  const { addItem } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([]);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      date: new Date(),
-      startTime: availableTimeSlots[0] || '',
-      endTime: availableTimeSlots[1] || '',
-      guests: 1,
-      specialRequests: "",
-      customerEmail: user?.email ?? "",
-      customerPhone: "",
-      paymentMethod: "Cash",
-    },
-  });
-
-  const selectedDate = form.watch('date');
-  const selectedStartTime = form.watch('startTime');
-
-  const updateAvailableEndTimes = (startTime: string) => {
-    const startIndex = availableTimeSlots.indexOf(startTime);
-    if (startIndex !== -1) {
-      setAvailableEndTimes(availableTimeSlots.slice(startIndex + 1));
-    } else {
-      setAvailableEndTimes([]);
-    }
-  };
+  const { blockedDates, isDateBlocked } = useBlockedDates(venue?.id);
 
   useEffect(() => {
-    if (selectedStartTime) {
-      updateAvailableEndTimes(selectedStartTime);
+    if (venue) {
+      fetchBookedDates(venue.id);
     }
-  }, [selectedStartTime, availableTimeSlots]);
+  }, [venue]);
 
-  const disabledDates = fullyBookedDates.map(dateStr => new Date(dateStr));
+  const fetchBookedDates = async (venueId: string) => {
+    // Mock implementation - replace with actual data fetching
+    const today = new Date();
+    const future = addDays(today, 30); // Fetch for next 30 days
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    const booked: string[] = [];
+    const fullyBooked: string[] = [];
+    const dayBooked: string[] = [];
+    const hourlyBooked: string[] = [];
+
+    for (let i = 0; i < 30; i++) {
+      const currentDate = addDays(today, i);
+      const formattedDate = format(currentDate, 'yyyy-MM-dd');
+
+      // Simulate some dates being booked
+      if (i % 5 === 0) {
+        booked.push(formattedDate);
+      }
+      if (i % 7 === 0) {
+        fullyBooked.push(formattedDate);
+      }
+      if (i % 10 === 0) {
+        dayBooked.push(formattedDate);
+      }
+      if (i % 12 === 0) {
+        hourlyBooked.push(formattedDate);
+      }
+    }
+
+    setBookedDates(booked);
+    setFullyBookedDates(fullyBooked);
+    setDayBookedDates(dayBooked);
+    setHourlyBookedDates(hourlyBooked);
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date);
+  };
+
+  const handleAddToCart = async () => {
     if (!user) {
       toast({
-        title: "Not logged in",
-        description: "Please log in to book this venue.",
+        title: "You must be logged in to make a booking.",
+        description: "Please log in or create an account to continue.",
+        variant: "destructive",
+      });
+      navigate('/login');
+      return;
+    }
+
+    if (!selectedDate) {
+      toast({
+        title: "Please select a date.",
         variant: "destructive",
       });
       return;
@@ -134,347 +115,157 @@ export default function BookingForm({
     setIsSubmitting(true);
 
     try {
-      const startHour = parseInt(data.startTime.split(':')[0]);
-      const endHour = parseInt(data.endTime.split(':')[0]);
-      const hours = endHour - startHour;
-      const totalPrice = hours * pricePerHour;
-      
-      const initialStatus = autoConfirm ? 'confirmed' : 'pending';
-      const formattedDate = format(data.date, 'yyyy-MM-dd');
-      
-      console.log("[HOURLY_BOOKING] Creating hourly booking with status:", initialStatus, "for venue ID:", venueId);
-      
-      const { data: bookingData, error } = await supabase
-        .from('bookings')
-        .insert([
-          {
-            user_id: user.id,
-            venue_id: venueId,
-            venue_name: venueName,
-            booking_date: formattedDate,
-            start_time: data.startTime,
-            end_time: data.endTime,
-            status: initialStatus,
-            total_price: totalPrice,
-            guests: data.guests,
-            special_requests: data.specialRequests,
-            customer_email: data.customerEmail,
-            customer_phone: data.customerPhone,
-            payment_method: data.paymentMethod,
-          }
-        ])
-        .select();
-
-      if (error) throw error;
-      
-      if (!bookingData || bookingData.length === 0) {
-        throw new Error("Failed to create booking record");
+      // Basic validation
+      if (!venue || !selectedDate) {
+        throw new Error("Missing venue or date");
       }
-      
-      console.log("[HOURLY_BOOKING] Hourly booking created:", bookingData[0]);
-      
-      const bookingWithDetails = {
-        ...bookingData[0],
-        venue_name: venueName,
-        booking_date: formattedDate,
-        booking_type: 'hourly',
-        owner_id: ownerId
+
+      // Calculate total price
+      const totalPrice = venue.starting_price || 100; // Fallback to 100 if starting_price is null
+
+      // Create item object
+      const item = {
+        id: venue.id,
+        name: venue.name,
+        imageUrl: venue.gallery_images?.[0] || '/placeholder.svg',
+        price: totalPrice,
+        quantity: 1,
+        bookingDetails: {
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          startTime: startTime,
+          endTime: endTime,
+          guests: guests,
+          bookingType: bookingType,
+        },
       };
 
-      if (!autoConfirm) {
-        console.log("[HOURLY_BOOKING] Sending pending notification to venue owner");
-        
-        notifyVenueOwnerAboutBooking(bookingWithDetails)
-          .then(success => {
-            if (success) {
-              console.log("[HOURLY_BOOKING] Successfully notified venue owner about new booking");
-            } else {
-              console.error("[HOURLY_BOOKING] Failed to notify venue owner about new booking");
-            }
-          })
-          .catch(error => {
-            console.error("[HOURLY_BOOKING] Error notifying venue owner:", error);
-          });
-        
-        toast({
-          title: "Booking requested!",
-          description: `You've successfully requested ${venueName} on ${format(data.date, 'PPP')} from ${data.startTime} to ${data.endTime}. Total: SAR ${totalPrice}`,
-        });
-      } else {
-        console.log("[HOURLY_BOOKING] Sending auto-confirm notification for hourly booking");
-        try {
-          const notified = await sendBookingStatusNotification(bookingWithDetails, 'confirmed');
-          
-          if (!notified) {
-            console.warn('[HOURLY_BOOKING] Booking confirmation notification may not have been sent');
-            
-            // Attempt direct notification as fallback
-            const venueOwnerId = await getVenueOwnerId(venueId);
-            if (venueOwnerId) {
-              console.log("[HOURLY_BOOKING] Found venue owner ID for direct notification:", venueOwnerId);
-              
-              await sendNotification(
-                venueOwnerId,
-                'Booking Confirmed',
-                `A booking for "${venueName}" on ${formattedDate} has been automatically confirmed.`,
-                'booking',
-                '/customer-bookings',
-                {
-                  booking_id: bookingWithDetails.id,
-                  venue_id: venueId,
-                  status: 'confirmed',
-                  booking_date: formattedDate,
-                  venue_name: venueName,
-                  booking_type: 'hourly'
-                }
-              );
-              
-              console.log('[HOURLY_BOOKING] Fallback notification sent to venue owner');
-            }
-          } else {
-            console.log('[HOURLY_BOOKING] Booking confirmation notification sent successfully');
-          }
-        } catch (notifyError) {
-          console.error("[HOURLY_BOOKING] Error sending booking notifications:", notifyError);
-        }
-        
-        toast({
-          title: "Booking confirmed!",
-          description: `Your booking for ${venueName} on ${format(data.date, 'PPP')} from ${data.startTime} to ${data.endTime} has been automatically confirmed. Total: SAR ${totalPrice}`,
-        });
-      }
-      
-      navigate('/bookings');
-    } catch (error: any) {
+      // Add item to cart
+      addItem(item);
+
       toast({
-        title: "Booking failed",
-        description: error.message || "There was a problem creating your booking.",
+        title: "Added to cart!",
+        description: "Your booking has been added to the cart.",
+      });
+      navigate('/cart');
+    } catch (error: any) {
+      console.error("Error adding to cart:", error);
+      toast({
+        title: "Something went wrong!",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
-      console.error("[HOURLY_BOOKING] Booking error:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isTimeSlotBooked = (date: Date, timeSlot: string): boolean => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return bookedTimeSlots[dateStr]?.includes(timeSlot) || false;
-  };
-
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="date"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Date</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={`w-full text-left font-normal flex justify-between items-center ${!field.value && "text-muted-foreground"}`}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        if (date < today) return true;
-                        return disabledDates.some(
-                          disabledDate =>
-                            format(disabledDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-                        );
-                      }}
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="guests"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Number of Guests</FormLabel>
-                <FormControl>
-                  <div className="flex items-center">
-                    <Users className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="number"
-                      min="1"
-                      max="100"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value))}
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+    <div className="grid gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex items-center space-x-2">
+          <CalendarIcon className="h-4 w-4" />
+          <p className="text-sm font-medium">
+            {selectedDate ? format(selectedDate, 'PPP') : 'Select a date'}
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="startTime"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Start Time</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select start time" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {availableTimeSlots.map((time, index) => (
-                      <SelectItem key={index} value={time} disabled={isTimeSlotBooked(selectedDate, time)}>
-                        {time}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="endTime"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>End Time</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select end time" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {availableEndTimes.map((time, index) => {
-                      const startTime = form.getValues('startTime');
-                      const endTime = time;
-                      const timeSlot = `${startTime} - ${endTime}`;
-                      return (
-                        <SelectItem key={index} value={time} disabled={isTimeSlotBooked(selectedDate, timeSlot)}>
-                          {time}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <div className="flex items-center space-x-2">
+          <ClockIcon className="h-4 w-4" />
+          <p className="text-sm font-medium">
+            {bookingType === 'hourly' ? `${startTime} - ${endTime}` : 'Full Day'}
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="customerEmail"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="your.email@example.com" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="customerPhone"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Phone Number</FormLabel>
-                <FormControl>
-                  <Input placeholder="+1234567890" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <div className="flex items-center space-x-2">
+          <UsersIcon className="h-4 w-4" />
+          <p className="text-sm font-medium">{guests} Guests</p>
         </div>
+      </div>
 
-        <FormField
-          control={form.control}
-          name="paymentMethod"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Payment Method</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select payment method" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="Cash">Cash</SelectItem>
-                  <SelectItem value="Credit Card">Credit Card</SelectItem>
-                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={"outline"}
+              className={
+                "w-full justify-start text-left font-normal" +
+                (!selectedDate ? "text-muted-foreground" : "")
+              }
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={handleDateSelect}
+              disabled={(date) =>
+                date < new Date() || // Disable past dates
+                (blockedDates && blockedDates.includes(format(date, 'yyyy-MM-dd'))) // Disable blocked dates
+              }
+              className="rounded-md border"
+            />
+          </PopoverContent>
+        </Popover>
+
+        <Select value={bookingType} onValueChange={setBookingType}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select booking type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="full-day">Full Day</SelectItem>
+            <SelectItem value="hourly">Hourly</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {bookingType === 'hourly' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="start-time">Start Time</Label>
+            <Input
+              type="time"
+              id="start-time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <div>
+            <Label htmlFor="end-time">End Time</Label>
+            <Input
+              type="time"
+              id="end-time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="w-full"
+            />
+          </div>
+        </div>
+      )}
+
+      <div>
+        <Label htmlFor="guests">Number of Guests</Label>
+        <Slider
+          id="guests"
+          defaultValue={[1]}
+          max={venue.max_capacity || 10}
+          min={1}
+          step={1}
+          onValueChange={(value) => setGuests(value[0])}
         />
+        <p className="text-sm text-muted-foreground">
+          {guests} {guests === 1 ? 'guest' : 'guests'}
+        </p>
+      </div>
 
-        <FormField
-          control={form.control}
-          name="specialRequests"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Special Requests (Optional)</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Any special requirements for your booking?"
-                  className="min-h-24"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <Button
-          type="submit"
-          className="w-full bg-findvenue hover:bg-findvenue-dark"
-          disabled={isSubmitting || isLoading || !user}
-        >
-          {isSubmitting ? (
-            <><span className="animate-spin mr-2">◌</span> Processing...</>
-          ) : (
-            "Book Venue"
-          )}
-        </Button>
-      </form>
-    </Form>
+      <Button onClick={handleAddToCart} disabled={isSubmitting}>
+        {isSubmitting ? 'Adding to Cart...' : 'Add to Cart'}
+      </Button>
+    </div>
   );
-}
+};
+
+export default BookingForm;
