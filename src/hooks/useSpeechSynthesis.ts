@@ -1,16 +1,21 @@
 
 import { useRef, useState, useEffect } from "react";
 
+interface SpeakOptions {
+  lang?: string;
+  rate?: number;
+  pitch?: number;
+  volume?: number;
+}
+
 export function useSpeechSynthesis() {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [isSupported, setIsSupported] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Check if speech synthesis is supported
     const supported = typeof window !== 'undefined' && 'speechSynthesis' in window;
     setIsSupported(supported);
     
-    // Return cleanup function
     return () => {
       if (supported && window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
@@ -18,13 +23,17 @@ export function useSpeechSynthesis() {
     };
   }, []);
 
-  const speak = (text: string, onStart?: () => void, onEnd?: () => void) => {
+  const speak = (
+    text: string, 
+    onStart?: () => void, 
+    onEnd?: () => void,
+    options: SpeakOptions = {}
+  ) => {
     if (!isSupported) {
       console.error("Sorry, your browser does not support speech synthesis.");
       return;
     }
     
-    // Cancel any ongoing speech
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
     }
@@ -32,34 +41,23 @@ export function useSpeechSynthesis() {
     try {
       const utterance = new window.SpeechSynthesisUtterance(text);
       
-      // Auto-detect language based on text content
-      if (/[\u0600-\u06FF]/.test(text)) {
-        // If Arabic characters are detected
-        utterance.lang = "ar-SA";
-        utterance.rate = 0.9; // Slightly slower rate for Arabic
-      } else {
-        utterance.lang = "en-US";
-        utterance.rate = 1.01;
-      }
+      // Apply options with defaults
+      utterance.lang = options.lang || "en-US";
+      utterance.rate = options.rate || 1.0;
+      utterance.pitch = options.pitch || 1.0;
+      utterance.volume = options.volume || 1.0;
       
-      // Handle events
       if (onStart) {
-        utterance.onstart = () => {
-          onStart();
-        };
+        utterance.onstart = onStart;
       }
       
       if (onEnd) {
-        utterance.onend = () => {
-          onEnd();
-        };
-        
+        utterance.onend = onEnd;
         utterance.onerror = () => {
           console.error("Speech synthesis error");
           onEnd();
         };
         
-        // Create a monitoring mechanism for cancel/interruption
         const checkSpeechState = setInterval(() => {
           if (!window.speechSynthesis.speaking && utteranceRef.current === utterance) {
             clearInterval(checkSpeechState);
@@ -67,12 +65,10 @@ export function useSpeechSynthesis() {
           }
         }, 100);
         
-        // Clean up interval on proper end
         utterance.addEventListener('end', () => {
           clearInterval(checkSpeechState);
         });
         
-        // Clean up interval on error
         utterance.addEventListener('error', () => {
           clearInterval(checkSpeechState);
         });
@@ -97,3 +93,4 @@ export function useSpeechSynthesis() {
 
   return { speak, stop, isSupported };
 }
+
