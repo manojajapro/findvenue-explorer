@@ -18,14 +18,18 @@ export function useBlockedDates(venueId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('blocked_dates')
-          .select('date')
+          .select('date, start_time, end_time')
           .eq('venue_id', venueId);
 
         if (error) throw error;
 
         if (data) {
           // Format dates as 'yyyy-MM-dd' strings
-          const formattedDates = data.map(item => item.date);
+          const formattedDates = data.map(item => ({
+            date: item.date,
+            startTime: item.start_time,
+            endTime: item.end_time
+          }));
           setBlockedDates(formattedDates);
         }
       } catch (err: any) {
@@ -38,7 +42,6 @@ export function useBlockedDates(venueId: string | undefined) {
 
     fetchBlockedDates();
 
-    // Subscribe to changes in the blocked_dates table
     const channel = supabase
       .channel('blocked_dates_channel')
       .on('postgres_changes', 
@@ -53,15 +56,29 @@ export function useBlockedDates(venueId: string | undefined) {
   }, [venueId]);
 
   // Helper function to check if a date is blocked
-  const isDateBlocked = (date: Date): boolean => {
+  const isDateAndTimeBlocked = (date: Date, startTime?: string, endTime?: string): boolean => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return blockedDates.includes(dateStr);
+    const block = blockedDates.find(b => b.date === dateStr);
+    
+    if (!block) return false;
+    
+    // If the block has no time constraints, the entire day is blocked
+    if (!block.startTime || !block.endTime) return true;
+    
+    // If checking just the date without time, return true if there's any block
+    if (!startTime || !endTime) return true;
+    
+    // Check if the requested time slot overlaps with the blocked time slot
+    return (
+      startTime < block.endTime &&
+      endTime > block.startTime
+    );
   };
 
   return {
     blockedDates,
     isLoading,
     error,
-    isDateBlocked
+    isDateAndTimeBlocked
   };
 }

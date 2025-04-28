@@ -5,16 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { CalendarX, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
+import { CalendarX, Calendar as CalendarIcon, Clock, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface BlockedDate {
   id: string;
   date: string;
   reason: string | null;
   venue_id: string;
+  start_time: string | null;
+  end_time: string | null;
 }
 
 interface VenueBlockedDatesProps {
@@ -22,13 +25,21 @@ interface VenueBlockedDatesProps {
   venueName?: string;
 }
 
+const timeSlots = Array.from({ length: 24 }, (_, i) => {
+  const hour = i.toString().padStart(2, '0');
+  return `${hour}:00`;
+});
+
 export function VenueBlockedDates({ venueId, venueName }: VenueBlockedDatesProps) {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [reason, setReason] = useState<string>('');
+  const [startTime, setStartTime] = useState<string>('09:00');
+  const [endTime, setEndTime] = useState<string>('17:00');
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isFullDay, setIsFullDay] = useState(false);
 
   // Fetch blocked dates for this venue
   const fetchBlockedDates = async () => {
@@ -57,7 +68,6 @@ export function VenueBlockedDates({ venueId, venueName }: VenueBlockedDatesProps
   useEffect(() => {
     fetchBlockedDates();
     
-    // Subscribe to changes in the blocked_dates table
     const channel = supabase
       .channel('blocked_dates_changes')
       .on('postgres_changes', { 
@@ -84,19 +94,22 @@ export function VenueBlockedDates({ venueId, venueName }: VenueBlockedDatesProps
       const dateString = format(selectedDate, 'yyyy-MM-dd');
       
       // Check if the date is already blocked
-      const existingBlock = blockedDates.find(bd => bd.date === dateString);
+      const existingBlock = blockedDates.find(bd => 
+        bd.date === dateString && 
+        (!bd.start_time || (bd.start_time === startTime && bd.end_time === endTime))
+      );
       
       if (existingBlock) {
         toast({
           variant: "destructive",
           title: "Date already blocked",
-          description: "This date is already blocked in the calendar.",
+          description: "This date/time slot is already blocked in the calendar.",
         });
         setIsLoading(false);
         return;
       }
       
-      // Check if there are any bookings on this date
+      // Check for existing bookings
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select('id, status')
@@ -122,14 +135,16 @@ export function VenueBlockedDates({ venueId, venueName }: VenueBlockedDatesProps
         .insert({
           venue_id: venueId,
           date: dateString,
-          reason: reason || null
+          reason: reason || null,
+          start_time: isFullDay ? null : startTime,
+          end_time: isFullDay ? null : endTime
         });
         
       if (error) throw error;
       
       toast({
         title: "Date blocked successfully",
-        description: `${format(selectedDate, 'MMMM d, yyyy')} has been marked as unavailable.`,
+        description: `${format(selectedDate, 'MMMM d, yyyy')} has been marked as unavailable${!isFullDay ? ` from ${startTime} to ${endTime}` : ''}.`,
       });
       
       setReason('');
@@ -223,7 +238,52 @@ export function VenueBlockedDates({ venueId, venueName }: VenueBlockedDatesProps
                 />
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Input 
+                    type="checkbox"
+                    checked={isFullDay}
+                    onChange={(e) => setIsFullDay(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <label className="text-sm">Block entire day</label>
+                </div>
+
+                {!isFullDay && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Start Time</label>
+                      <Select value={startTime} onValueChange={setStartTime}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select start time" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {timeSlots.map(time => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">End Time</label>
+                      <Select value={endTime} onValueChange={setEndTime}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select end time" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {timeSlots.map(time => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
                 <Input 
                   placeholder="Reason for blocking (optional)" 
                   value={reason}
@@ -265,8 +325,14 @@ export function VenueBlockedDates({ venueId, venueName }: VenueBlockedDatesProps
                       <div className="font-medium">
                         {format(new Date(blockedDate.date), 'MMMM d, yyyy')}
                       </div>
+                      {blockedDate.start_time && blockedDate.end_time && (
+                        <div className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {blockedDate.start_time} - {blockedDate.end_time}
+                        </div>
+                      )}
                       {blockedDate.reason && (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-muted-foreground mt-1">
                           {blockedDate.reason}
                         </div>
                       )}
