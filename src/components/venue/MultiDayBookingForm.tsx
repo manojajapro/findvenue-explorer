@@ -106,10 +106,14 @@ export default function MultiDayBookingForm({
     fetchVenuePricing();
   }, [venueId, pricePerHour]);
 
+  // Enhanced useEffect to fetch blocked dates
   useEffect(() => {
     // Fetch blocked dates from the blocked_dates table
     const fetchBlockedDates = async () => {
+      if (!venueId) return;
+      
       try {
+        console.log("Fetching blocked dates for venue:", venueId);
         const { data, error } = await supabase
           .from('blocked_dates')
           .select('date')
@@ -122,7 +126,7 @@ export default function MultiDayBookingForm({
         
         // Extract the dates and format them
         const blocked = data?.map(item => format(new Date(item.date), 'yyyy-MM-dd')) || [];
-        console.log("Blocked dates found in MultiDayBookingForm:", blocked);
+        console.log("MultiDayBookingForm - Blocked dates found:", blocked);
         setBlockedDates(blocked);
         
         // If the form date is already set and it's blocked, we need to reset it
@@ -174,7 +178,7 @@ export default function MultiDayBookingForm({
       return;
     }
 
-    // Check if the date is blocked - Multiple checks for reliability
+    // Check if the date is blocked - Multiple thorough checks for reliability
     const formattedDate = format(data.date, 'yyyy-MM-dd');
     
     // Check local state first
@@ -187,7 +191,7 @@ export default function MultiDayBookingForm({
       return;
     }
     
-    // Double check with backend
+    // Double check with backend to be absolutely sure
     try {
       const isBlocked = await isDateBlockedForVenue(venueId, formattedDate);
       
@@ -362,6 +366,13 @@ export default function MultiDayBookingForm({
                       field.onChange(date);
                     } else if (!date) {
                       field.onChange(undefined);
+                    } else {
+                      // This is a blocked date
+                      toast({
+                        title: "Date unavailable",
+                        description: "This date is not available as it has been blocked by the venue owner.",
+                        variant: "destructive",
+                      });
                     }
                   }}
                   bookedDates={bookedDates}
