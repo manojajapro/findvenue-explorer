@@ -99,9 +99,10 @@ export const isDateBlockedForVenue = async (venueId: string, date: string): Prom
       return false;
     }
     
-    console.log("Blocked date check result:", data ? "Blocked" : "Not blocked");
+    const isBlocked = !!data;
+    console.log("Blocked date check result:", isBlocked ? "Blocked" : "Not blocked");
     
-    return !!data;
+    return isBlocked;
   } catch (err) {
     console.error('Error checking blocked date:', err);
     return false;

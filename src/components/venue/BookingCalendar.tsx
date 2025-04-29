@@ -61,9 +61,9 @@ export function BookingCalendar({
     // Can't book dates in the past
     if (date < today) return true;
     
-    // Can't book dates blocked by the owner
+    // Always check blocked dates first - highest priority
     if (isDateBlocked(date)) {
-      console.log(`Date ${dateStr} is blocked by venue owner and should be disabled`);
+      console.log(`Date ${dateStr} is blocked by venue owner and cannot be selected`);
       return true;
     }
     
@@ -106,20 +106,18 @@ export function BookingCalendar({
                 return;
               }
 
-              // Check if date is blocked
-              const dateStr = format(date, 'yyyy-MM-dd');
-              if (blockedDates.includes(dateStr)) {
-                console.log("Blocked date selected in calendar, preventing selection:", dateStr);
-                onDateSelect(undefined);
-                return;
+              // First check if date is blocked - this is the most important check
+              if (isDateBlocked(date)) {
+                console.log("Blocked date selected, preventing selection:", format(date, 'yyyy-MM-dd'));
+                return; // Don't even call onDateSelect
               }
 
               // Check other disabled conditions
               if (isDateDisabled(date)) {
-                onDateSelect(undefined);
-                return;
+                return; // Don't call onDateSelect
               }
 
+              // Only select date if it passes all checks
               onDateSelect(date);
             }}
             disabled={isDateDisabled}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -121,9 +120,21 @@ export default function MultiDayBookingForm({
           return;
         }
         
-        // Extract the dates
-        const blocked = data?.map(item => item.date) || [];
+        // Extract the dates and format them
+        const blocked = data?.map(item => format(new Date(item.date), 'yyyy-MM-dd')) || [];
+        console.log("Blocked dates found in MultiDayBookingForm:", blocked);
         setBlockedDates(blocked);
+        
+        // If the form date is already set and it's blocked, we need to reset it
+        const selectedDate = form.getValues('date');
+        if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
+          form.setValue('date', undefined as any);
+          toast({
+            title: "Date unavailable",
+            description: "The date you selected is not available as it has been blocked by the venue owner.",
+            variant: "destructive",
+          });
+        }
       } catch (err) {
         console.error('Error processing blocked dates:', err);
       }
@@ -163,11 +174,11 @@ export default function MultiDayBookingForm({
       return;
     }
 
-    // Check if the date is blocked
+    // Check if the date is blocked - Multiple checks for reliability
     const formattedDate = format(data.date, 'yyyy-MM-dd');
-    const isBlocked = await isDateBlockedForVenue(venueId, formattedDate);
     
-    if (isBlocked) {
+    // Check local state first
+    if (blockedDates.includes(formattedDate)) {
       toast({
         title: "Date unavailable",
         description: "This date is not available for booking as it has been blocked by the venue owner.",
@@ -175,12 +186,24 @@ export default function MultiDayBookingForm({
       });
       return;
     }
-
-    // Check if the date is in the blockedDates array
-    if (blockedDates.includes(formattedDate)) {
+    
+    // Double check with backend
+    try {
+      const isBlocked = await isDateBlockedForVenue(venueId, formattedDate);
+      
+      if (isBlocked) {
+        toast({
+          title: "Date unavailable",
+          description: "This date is not available for booking as it has been blocked by the venue owner.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking if date is blocked:', error);
       toast({
-        title: "Date unavailable",
-        description: "This date is not available for booking as it has been blocked by the venue owner.",
+        title: "Error",
+        description: "There was a problem checking date availability. Please try again.",
         variant: "destructive",
       });
       return;
@@ -190,6 +213,24 @@ export default function MultiDayBookingForm({
 
     try {
       const initialStatus = autoConfirm ? 'confirmed' : 'pending';
+      
+      // One last check for blocked dates before creating the booking
+      const { data: finalBlockCheck } = await supabase
+        .from('blocked_dates')
+        .select('id')
+        .eq('venue_id', venueId)
+        .eq('date', formattedDate)
+        .maybeSingle();
+        
+      if (finalBlockCheck) {
+        toast({
+          title: "Date unavailable",
+          description: "This date has been blocked by the venue owner and is not available.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
       
       console.log("[FULL_DAY_BOOKING] Creating full day booking with status:", initialStatus, "for venue ID:", venueId);
       
@@ -315,7 +356,14 @@ export default function MultiDayBookingForm({
                 <FormLabel>Date</FormLabel>
                 <BookingCalendar
                   selectedDate={field.value}
-                  onDateSelect={field.onChange}
+                  onDateSelect={(date) => {
+                    // Only set the date if it's not blocked
+                    if (date && !blockedDates.includes(format(date, 'yyyy-MM-dd'))) {
+                      field.onChange(date);
+                    } else if (!date) {
+                      field.onChange(undefined);
+                    }
+                  }}
                   bookedDates={bookedDates}
                   fullyBookedDates={bookedDates}
                   dayBookedDates={bookedDates}
