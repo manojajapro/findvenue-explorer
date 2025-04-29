@@ -45,7 +45,7 @@ export function BookingCalendar({
     setCalendarDays(days);
   }, [currentMonth]);
   
-  // Fetch blocked dates from the blocked_dates table
+  // Fetch blocked dates from the blocked_dates table with strong implementation
   useEffect(() => {
     if (venueId) {
       const fetchBlockedDates = async () => {
@@ -106,7 +106,7 @@ export function BookingCalendar({
     // Can't book dates in the past
     if (date < today) return true;
     
-    // Can't book dates blocked by venue owner
+    // Can't book dates blocked by venue owner - this is critical
     if (blockedDates.includes(dateStr)) {
       return true;
     }
