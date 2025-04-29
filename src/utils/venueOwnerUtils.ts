@@ -85,6 +85,8 @@ export const isDateBlockedForVenue = async (venueId: string, date: string): Prom
   try {
     if (!venueId || !date) return false;
     
+    console.log("Checking if date is blocked:", date, "for venue:", venueId);
+    
     const { data, error } = await supabase
       .from('blocked_dates')
       .select('id')
@@ -96,6 +98,8 @@ export const isDateBlockedForVenue = async (venueId: string, date: string): Prom
       console.error('Error checking blocked date:', error);
       return false;
     }
+    
+    console.log("Blocked date check result:", data ? "Blocked" : "Not blocked");
     
     return !!data;
   } catch (err) {

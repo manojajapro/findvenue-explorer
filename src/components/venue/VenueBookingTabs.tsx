@@ -245,10 +245,12 @@ export default function VenueBookingTabs({
         
         if (data) {
           const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
+          console.log("Blocked dates for booking tab:", blocked);
           setBlockedDates(blocked);
           
           // If currently selected date is blocked, reset it
           if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
+            console.log("Selected date is blocked, resetting selection in booking tab");
             setSelectedDate(undefined);
             setFromTime('09:00');
             setToTime('17:00');
@@ -534,7 +536,10 @@ export default function VenueBookingTabs({
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     
     // Check if date is blocked by owner (this should prevent booking)
-    if (blockedDates.includes(dateStr)) return true;
+    if (blockedDates.includes(dateStr)) {
+      console.log("Date is blocked by owner:", dateStr);
+      return true;
+    }
     
     // Check existing logic
     if (bookingType === 'full-day') {
