@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
 import { ChevronLeft, ChevronRight, ClockIcon, Calendar, Calendar as CalendarIcon } from 'lucide-react';
@@ -165,14 +166,6 @@ export function BookingCalendar({
               onDateSelect(date);
             }}
             disabled={(date) => {
-              const dateStr = format(date, 'yyyy-MM-dd');
-              
-              // First check if date is blocked
-              if (blockedDates.includes(dateStr)) {
-                return true;
-              }
-
-              // Then check other disabled conditions
               return isDateDisabled(date);
             }}
             modifiers={{
