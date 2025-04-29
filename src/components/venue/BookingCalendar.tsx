@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { supabase } from '@/integrations/supabase/client';
-import { isDateBlockedForVenue } from '@/utils/venueOwnerUtils';
+import CalendarLegend from './CalendarLegend';
+import { useBlockedDates } from '@/hooks/useBlockedDates';
 
 interface BookingCalendarProps {
   selectedDate: Date | undefined;
@@ -32,8 +32,14 @@ export function BookingCalendar({
 }: BookingCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
-  const [blockedDates, setBlockedDates] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Use our custom hook for blocked dates
+  const { 
+    blockedDates,
+    isLoading,
+    isDateInArray,
+    isDateBlocked 
+  } = useBlockedDates(venueId, selectedDate, onDateSelect);
   
   // Generate calendar days for the current month view
   useEffect(() => {
@@ -46,57 +52,6 @@ export function BookingCalendar({
     setCalendarDays(days);
   }, [currentMonth]);
   
-  // Fetch blocked dates from the blocked_dates table
-  useEffect(() => {
-    if (venueId) {
-      const fetchBlockedDates = async () => {
-        setIsLoading(true);
-        try {
-          const { data, error } = await supabase
-            .from('blocked_dates')
-            .select('date')
-            .eq('venue_id', venueId);
-            
-          if (error) {
-            console.error('Error fetching blocked dates:', error);
-            setBlockedDates([]);
-            setIsLoading(false);
-            return;
-          }
-          
-          if (data && data.length > 0) {
-            // Extract all blocked dates regardless of type
-            const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
-            console.log("Blocked dates found in calendar component:", blocked);
-            setBlockedDates(blocked);
-            
-            // If selected date is blocked, reset selection
-            if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
-              console.log("Selected date is blocked in calendar, resetting selection");
-              onDateSelect(undefined);
-            }
-          } else {
-            console.log("No blocked dates found for venue:", venueId);
-            setBlockedDates([]);
-          }
-        } catch (err) {
-          console.error('Error processing blocked dates:', err);
-          setBlockedDates([]);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
-      fetchBlockedDates();
-    }
-  }, [venueId, selectedDate, onDateSelect]);
-  
-  // Helper function to check if a date is in the given array
-  const isDateInArray = (date: Date, dateArray: string[]): boolean => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return dateArray.includes(dateStr);
-  };
-  
   // Helper function to determine if a date should be disabled
   const isDateDisabled = (date: Date): boolean => {
     const today = new Date();
@@ -107,7 +62,7 @@ export function BookingCalendar({
     if (date < today) return true;
     
     // Can't book blocked dates - this is the primary check for owner-blocked dates
-    if (blockedDates.includes(dateStr)) {
+    if (isDateBlocked(date)) {
       console.log(`Date ${dateStr} is blocked by owner and should be disabled`);
       return true;
     }
@@ -190,26 +145,7 @@ export function BookingCalendar({
             fromDate={new Date()} // Prevent selecting past dates
           />
           
-          <div className="p-3 border-t border-border bg-muted/20">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-3 h-3 bg-[#FEE2E2] rounded-full"></span>
-                <span className="text-xs">Fully booked</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-3 h-3 bg-[#DBEAFE] rounded-full"></span>
-                <span className="text-xs">Day booked</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-3 h-3 bg-[#FEF3C7] rounded-full"></span>
-                <span className="text-xs">Some hours booked</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-3 h-3 bg-[#F3E8FF] rounded-full"></span>
-                <span className="text-xs">Blocked by owner (not available)</span>
-              </div>
-            </div>
-          </div>
+          <CalendarLegend />
         </PopoverContent>
       </Popover>
     </div>
