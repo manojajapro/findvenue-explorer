@@ -134,7 +134,14 @@ export function BookingCalendar({
           <CalendarComponent
             mode="single"
             selected={selectedDate}
-            onSelect={onDateSelect}
+            onSelect={(date) => {
+              // Clear selection if trying to select a disabled date
+              if (date && isDateDisabled(date)) {
+                onDateSelect(undefined);
+                return;
+              }
+              onDateSelect(date);
+            }}
             disabled={isDateDisabled}
             modifiers={{
               booked: (date) => isDateInArray(date, fullyBookedDates),
