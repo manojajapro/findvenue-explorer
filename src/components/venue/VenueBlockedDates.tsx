@@ -66,6 +66,7 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
   const [existingBookings, setExistingBookings] = useState<Booking[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [venueOwnerId, setVenueOwnerId] = useState<string | null>(null);
 
   // Generate time options for select inputs
   const generateTimeOptions = () => {
@@ -79,8 +80,32 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
 
   const timeOptions = generateTimeOptions();
 
+  // Fetch venue owner ID
   useEffect(() => {
     if (venueId) {
+      const fetchVenueOwner = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('venues')
+            .select('owner_info')
+            .eq('id', venueId)
+            .single();
+            
+          if (error) throw error;
+          
+          if (data?.owner_info) {
+            const ownerInfo = typeof data.owner_info === 'string' 
+              ? JSON.parse(data.owner_info) 
+              : data.owner_info;
+            
+            setVenueOwnerId(ownerInfo.user_id);
+          }
+        } catch (err) {
+          console.error('Error fetching venue owner:', err);
+        }
+      };
+      
+      fetchVenueOwner();
       fetchBlockedDates();
       fetchExistingBookings();
     }
@@ -192,6 +217,15 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
       });
       return;
     }
+
+    if (!user?.id) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to block dates",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -206,12 +240,15 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
             end_time: isFullDay ? null : endTime,
             is_full_day: isFullDay,
             reason: reason || null,
-            created_by: user?.id
+            created_by: user.id
           }
         ])
         .select();
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error blocking date:', error);
+        throw error;
+      }
       
       toast({
         title: "Date blocked",

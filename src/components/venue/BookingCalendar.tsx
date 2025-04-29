@@ -59,8 +59,8 @@ export function BookingCalendar({
             return;
           }
           
-          // Extract dates that are fully blocked or have specific hours blocked
-          const blocked = data?.map(item => item.date) || [];
+          // Extract dates that are blocked
+          const blocked = data?.map(item => format(new Date(item.date), 'yyyy-MM-dd')) || [];
           setBlockedDates(blocked);
         } catch (err) {
           console.error('Error processing blocked dates:', err);
