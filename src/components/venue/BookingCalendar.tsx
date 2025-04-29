@@ -59,6 +59,8 @@ export function BookingCalendar({
             
           if (error) {
             console.error('Error fetching blocked dates:', error);
+            setBlockedDates([]);
+            setIsLoading(false);
             return;
           }
           
@@ -79,6 +81,7 @@ export function BookingCalendar({
           }
         } catch (err) {
           console.error('Error processing blocked dates:', err);
+          setBlockedDates([]);
         } finally {
           setIsLoading(false);
         }
