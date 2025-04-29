@@ -73,6 +73,15 @@ export function BookingCalendar({
     return false;
   };
   
+  // Function to handle date selection with validation
+  const handleDateSelect = (date: Date | undefined) => {
+    // If date is blocked, don't select it
+    if (date && isDateInArray(date, blockedDates)) {
+      return;
+    }
+    onDateSelect(date);
+  };
+  
   return (
     <div className="w-full">
       <Popover>
@@ -92,7 +101,7 @@ export function BookingCalendar({
           <CalendarComponent
             mode="single"
             selected={selectedDate}
-            onSelect={onDateSelect}
+            onSelect={handleDateSelect}
             disabled={isDateDisabled}
             modifiers={{
               booked: (date) => isDateInArray(date, fullyBookedDates),

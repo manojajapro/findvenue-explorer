@@ -90,7 +90,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
   };
 
   const handleDateSelect = (date: Date | undefined) => {
-    setSelectedDate(date);
+    // Only set the date if it's not blocked by the owner
+    if (date && !isDateBlocked(date)) {
+      setSelectedDate(date);
+    } else if (date && isDateBlocked(date)) {
+      toast({
+        title: "Date unavailable",
+        description: "This date has been blocked by the venue owner and is not available for booking.",
+        variant: "destructive",
+      });
+    } else {
+      setSelectedDate(date);
+    }
   };
 
   const handleBookingTypeChange = (value: string) => {
@@ -231,7 +242,19 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
                 return date < today || isDateBlocked(date);
               }}
               className="rounded-md border"
+              modifiers={{
+                blocked: blockedDates.map(dateStr => new Date(dateStr))
+              }}
+              modifiersStyles={{
+                blocked: { backgroundColor: '#F3F4F6', color: '#6B7280', textDecoration: 'line-through' }
+              }}
             />
+            <div className="p-3 border-t border-border">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#F3F4F6] rounded-full"></span>
+                <span className="text-xs">Blocked by venue owner</span>
+              </div>
+            </div>
           </PopoverContent>
         </Popover>
 
@@ -286,7 +309,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
         </p>
       </div>
 
-      <Button onClick={handleAddToCart} disabled={isSubmitting || isLoadingBlockedDates}>
+      <Button 
+        onClick={handleAddToCart} 
+        disabled={isSubmitting || isLoadingBlockedDates || (selectedDate && isDateBlocked(selectedDate))}
+      >
         {isSubmitting ? 'Adding to Cart...' : 'Add to Cart'}
       </Button>
     </div>
