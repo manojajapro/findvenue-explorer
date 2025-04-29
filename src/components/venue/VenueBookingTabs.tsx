@@ -224,11 +224,12 @@ export default function VenueBookingTabs({
     return slots;
   };
   
-  // Fetch blocked dates
+  // Improved fetch blocked dates function
   useEffect(() => {
     if (venueId) {
       const fetchBlockedDates = async () => {
         try {
+          console.log("Fetching blocked dates for venue:", venueId);
           const { data, error } = await supabase
             .from('blocked_dates')
             .select('date')
@@ -236,20 +237,28 @@ export default function VenueBookingTabs({
             
           if (error) {
             console.error('Error fetching blocked dates:', error);
+            setBlockedDates([]);
             return;
           }
           
-          if (data) {
+          if (data && data.length > 0) {
+            // Extract dates that are blocked
             const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
+            console.log("Blocked dates found:", blocked);
             setBlockedDates(blocked);
             
             // Reset selection if currently selected date is blocked
             if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
+              console.log("Selected date is blocked, resetting selection");
               setSelectedDate(undefined);
             }
+          } else {
+            console.log("No blocked dates found for venue:", venueId);
+            setBlockedDates([]);
           }
         } catch (err) {
           console.error('Error processing blocked dates:', err);
+          setBlockedDates([]);
         }
       };
       
@@ -257,6 +266,7 @@ export default function VenueBookingTabs({
     }
   }, [venueId, selectedDate]);
 
+  // Modified handleBookRequest function to properly check for blocked dates
   const handleBookRequest = async () => {
     if (!user) {
       toast({
@@ -279,27 +289,41 @@ export default function VenueBookingTabs({
     
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
     
-    // Check if date is blocked by owner
-    const isBlocked = blockedDates.includes(formattedDate);
-    if (isBlocked) {
+    // Check if date is blocked by owner (in our state first for instant feedback)
+    if (blockedDates.includes(formattedDate)) {
       toast({
         title: "Date unavailable",
-        description: "This date is not available for booking as it has been blocked by the venue owner.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Verify with backend that date isn't blocked (double-check)
-    const backendBlockCheck = await isDateBlockedForVenue(venueId, formattedDate);
-    if (backendBlockCheck) {
-      toast({
-        title: "Date unavailable",
-        description: "This date is not available for booking as it has been blocked by the venue owner.",
+        description: "This date has been blocked by the venue owner and is not available for booking.",
         variant: "destructive"
       });
       setSelectedDate(undefined);
       return;
+    }
+    
+    // Double-check with backend that the date isn't blocked
+    try {
+      const { data, error } = await supabase
+        .from('blocked_dates')
+        .select('id')
+        .eq('venue_id', venueId)
+        .eq('date', formattedDate)
+        .maybeSingle();
+        
+      if (error) {
+        console.error('Error checking blocked date:', error);
+      }
+      
+      if (data) {
+        toast({
+          title: "Date unavailable",
+          description: "This date has been blocked by the venue owner and is not available for booking.",
+          variant: "destructive"
+        });
+        setSelectedDate(undefined);
+        return;
+      }
+    } catch (err) {
+      console.error('Error checking blocked date:', err);
     }
     
     const guests = parseInt(peopleCount);
@@ -481,7 +505,7 @@ export default function VenueBookingTabs({
     
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     
-    // Check if date is blocked by owner
+    // Check if date is blocked by owner (this should prevent booking)
     if (blockedDates.includes(dateStr)) return true;
     
     // Check existing logic
@@ -582,7 +606,7 @@ export default function VenueBookingTabs({
                 )}
               </div>
               
-              {bookingType === 'hourly' && selectedDate && availableTimeSlots.length > 0 && (
+              {bookingType === 'hourly' && selectedDate && availableTimeSlots.length > 0 && !blockedDates.includes(currentDateStr) && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-sm font-medium mb-1">Start time</label>
