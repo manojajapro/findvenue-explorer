@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BookingCalendarProps {
   selectedDate: Date | undefined;
@@ -15,6 +16,7 @@ interface BookingCalendarProps {
   dayBookedDates: string[];
   hourlyBookedDates: string[];
   bookingType: 'hourly' | 'full-day';
+  venueId?: string; // Add venueId to check for blocked dates
 }
 
 export function BookingCalendar({
@@ -24,10 +26,12 @@ export function BookingCalendar({
   fullyBookedDates,
   dayBookedDates,
   hourlyBookedDates,
-  bookingType
+  bookingType,
+  venueId
 }: BookingCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
   
   // Generate calendar days for the current month view
   useEffect(() => {
@@ -40,6 +44,33 @@ export function BookingCalendar({
     setCalendarDays(days);
   }, [currentMonth]);
   
+  // Fetch blocked dates from the blocked_dates table
+  useEffect(() => {
+    if (venueId) {
+      const fetchBlockedDates = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('blocked_dates')
+            .select('date, is_full_day')
+            .eq('venue_id', venueId);
+            
+          if (error) {
+            console.error('Error fetching blocked dates:', error);
+            return;
+          }
+          
+          // Extract dates that are fully blocked or have specific hours blocked
+          const blocked = data?.map(item => item.date) || [];
+          setBlockedDates(blocked);
+        } catch (err) {
+          console.error('Error processing blocked dates:', err);
+        }
+      };
+      
+      fetchBlockedDates();
+    }
+  }, [venueId]);
+  
   // Helper function to check if a date is in the given array
   const isDateInArray = (date: Date, dateArray: string[]): boolean => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -50,9 +81,13 @@ export function BookingCalendar({
   const isDateDisabled = (date: Date): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const dateStr = format(date, 'yyyy-MM-dd');
     
     // Can't book dates in the past
     if (date < today) return true;
+    
+    // Can't book dates blocked by venue owner
+    if (blockedDates.includes(dateStr)) return true;
     
     // For full-day bookings, can't select dates that are fully booked or have day bookings
     if (bookingType === 'full-day' && 
@@ -93,11 +128,13 @@ export function BookingCalendar({
               booked: (date) => isDateInArray(date, fullyBookedDates),
               dayBooked: (date) => isDateInArray(date, dayBookedDates),
               hourlyBooked: (date) => isDateInArray(date, hourlyBookedDates),
+              blocked: (date) => isDateInArray(date, blockedDates),
             }}
             modifiersStyles={{
               booked: { backgroundColor: '#FEE2E2', textDecoration: 'line-through', color: '#B91C1C' },
               dayBooked: { backgroundColor: '#DBEAFE', color: '#1E40AF' },
               hourlyBooked: { backgroundColor: '#FEF3C7', color: '#92400E' },
+              blocked: { backgroundColor: '#F3E8FF', color: '#7E22CE', textDecoration: 'line-through' },
             }}
             className="rounded-md border"
           />
@@ -115,6 +152,10 @@ export function BookingCalendar({
               <div className="flex items-center gap-2">
                 <span className="inline-block w-3 h-3 bg-[#FEF3C7] rounded-full"></span>
                 <span className="text-xs">Some hours booked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#F3E8FF] rounded-full"></span>
+                <span className="text-xs">Blocked by owner</span>
               </div>
             </div>
           </div>

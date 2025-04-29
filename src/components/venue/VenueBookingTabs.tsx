@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
-import { format } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -48,7 +48,8 @@ export default function VenueBookingTabs({
   const [venueStatus, setVenueStatus] = useState<string>('active');
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [processingBooking, setProcessingBooking] = useState<boolean>(false);
-  
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [peopleCount, setPeopleCount] = useState<string>(minCapacity.toString());
   const [fromTime, setFromTime] = useState<string>('09:00');
@@ -418,9 +419,21 @@ export default function VenueBookingTabs({
   const dayPrice = parsedPricePerHour * 10;
 
   const currentDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
-  const isCurrentDateFullyBooked = bookingType === 'full-day' 
-    ? fullyBookedDates.includes(currentDateStr) || dayBookedDates.includes(currentDateStr)
-    : dayBookedDates.includes(currentDateStr) || availableTimeSlots.length === 0;
+  const isCurrentDateFullyBooked = () => {
+    if (!selectedDate) return false;
+    
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    
+    // Check if date is blocked by owner
+    if (blockedDates.includes(dateStr)) return true;
+    
+    // Check existing logic
+    if (bookingType === 'full-day') {
+      return fullyBookedDates.includes(dateStr) || dayBookedDates.includes(dateStr);
+    } else {
+      return dayBookedDates.includes(dateStr) || availableTimeSlots.length === 0;
+    }
+  };
 
   return (
     <div className="glass-card p-5 rounded-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
@@ -498,9 +511,10 @@ export default function VenueBookingTabs({
                   dayBookedDates={dayBookedDates}
                   hourlyBookedDates={hourlyBookedDates}
                   bookingType={bookingType}
+                  venueId={venueId}
                 />
                 
-                {isCurrentDateFullyBooked && selectedDate && (
+                {isCurrentDateFullyBooked() && selectedDate && (
                   <p className="text-red-500 text-xs mt-1">
                     {bookingType === 'full-day' 
                       ? 'This date is not available for full day booking' 
@@ -572,7 +586,7 @@ export default function VenueBookingTabs({
               <Button 
                 onClick={handleBookRequest}
                 className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg mt-4 shadow-md"
-                disabled={isLoadingBookings || processingBooking || isCurrentDateFullyBooked}
+                disabled={isLoadingBookings || processingBooking || isCurrentDateFullyBooked()}
               >
                 {isLoadingBookings || processingBooking ? (
                   <span className="flex items-center justify-center">
@@ -582,7 +596,7 @@ export default function VenueBookingTabs({
                     </svg>
                     {processingBooking ? "Processing..." : "Loading..."}
                   </span>
-                ) : isCurrentDateFullyBooked ? (
+                ) : isCurrentDateFullyBooked() ? (
                   'Not Available'
                 ) : (
                   'Request to book'
