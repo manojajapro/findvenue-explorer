@@ -65,11 +65,12 @@ export function BookingCalendar({
           if (data && data.length > 0) {
             // Extract dates that are blocked
             const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
-            console.log("Formatted blocked dates:", blocked);
+            console.log("Blocked dates found:", blocked);
             setBlockedDates(blocked);
             
             // If selected date is blocked, reset selection
             if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
+              console.log("Selected date is blocked, resetting selection");
               onDateSelect(undefined);
             }
           } else {
