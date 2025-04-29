@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,7 +29,6 @@ import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AuthCallback from "./pages/AuthCallback";
 import HomePageVenueChatbot from "@/components/chat/HomePageVenueChatbot";
-import ManageVenueCalendar from "@/components/calendar/ManageVenueCalendar";
 
 const queryClient = new QueryClient();
 
@@ -151,7 +149,6 @@ function AppContent() {
             <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             
             <Route path="/venue/:id" element={<VenueDetailsRoute />} />
-            <Route path="/venue/:id/calendar" element={<ProtectedRoute allowedRoles={['venue-owner']}><ManageVenueCalendar /></ProtectedRoute>} />
             
             {!isVenueOwner && (
               <>

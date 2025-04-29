@@ -48,7 +48,6 @@ export default function VenueBookingTabs({
   const [venueStatus, setVenueStatus] = useState<string>('active');
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [processingBooking, setProcessingBooking] = useState<boolean>(false);
-  const [blockedDates, setBlockedDates] = useState<string[]>([]);
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [peopleCount, setPeopleCount] = useState<string>(minCapacity.toString());
@@ -171,29 +170,6 @@ export default function VenueBookingTabs({
   }, [venueId]);
 
   useEffect(() => {
-    const fetchBlockedDates = async () => {
-      if (!venueId) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('blocked_dates')
-          .select('date')
-          .eq('venue_id', venueId);
-          
-        if (error) throw error;
-        
-        if (data) {
-          setBlockedDates(data.map(item => item.date));
-        }
-      } catch (err) {
-        console.error('Error fetching blocked dates:', err);
-      }
-    };
-    
-    fetchBlockedDates();
-  }, [venueId]);
-
-  useEffect(() => {
     if (selectedDate) {
       const allTimeSlots = generateTimeSlots();
       
@@ -266,17 +242,8 @@ export default function VenueBookingTabs({
       return;
     }
     
-    // Check if the selected date is in blockedDates
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-    if (blockedDates.includes(formattedDate)) {
-      toast({
-        title: "Date unavailable",
-        description: "This date has been blocked by the venue owner and is not available for booking.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+    
     const guests = parseInt(peopleCount);
     if (isNaN(guests) || guests < 1 || guests > maxCapacity) {
       toast({
@@ -451,10 +418,9 @@ export default function VenueBookingTabs({
   const dayPrice = parsedPricePerHour * 10;
 
   const currentDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
-  const isSelectedDateBlocked = selectedDate ? blockedDates.includes(format(selectedDate, 'yyyy-MM-dd')) : false;
   const isCurrentDateFullyBooked = bookingType === 'full-day' 
-    ? fullyBookedDates.includes(currentDateStr) || dayBookedDates.includes(currentDateStr) || isSelectedDateBlocked
-    : dayBookedDates.includes(currentDateStr) || availableTimeSlots.length === 0 || isSelectedDateBlocked;
+    ? fullyBookedDates.includes(currentDateStr) || dayBookedDates.includes(currentDateStr)
+    : dayBookedDates.includes(currentDateStr) || availableTimeSlots.length === 0;
 
   return (
     <div className="glass-card p-5 rounded-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
@@ -531,7 +497,6 @@ export default function VenueBookingTabs({
                   fullyBookedDates={fullyBookedDates}
                   dayBookedDates={dayBookedDates}
                   hourlyBookedDates={hourlyBookedDates}
-                  blockedDates={blockedDates}
                   bookingType={bookingType}
                 />
                 
@@ -607,9 +572,21 @@ export default function VenueBookingTabs({
               <Button 
                 onClick={handleBookRequest}
                 className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg mt-4 shadow-md"
-                disabled={isLoadingBookings || processingBooking || isCurrentDateFullyBooked || isSelectedDateBlocked}
+                disabled={isLoadingBookings || processingBooking || isCurrentDateFullyBooked}
               >
-                {processingBooking ? "Processing..." : isSelectedDateBlocked ? "Date Blocked" : "Loading..."}
+                {isLoadingBookings || processingBooking ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {processingBooking ? "Processing..." : "Loading..."}
+                  </span>
+                ) : isCurrentDateFullyBooked ? (
+                  'Not Available'
+                ) : (
+                  'Request to book'
+                )}
               </Button>
               
               <p className="text-center text-sm text-gray-500 mt-2">

@@ -1,12 +1,11 @@
 
 import { useState, useEffect } from 'react';
 import { format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
-import { ChevronLeft, ChevronRight, ClockIcon, Calendar, Calendar as CalendarIcon, Ban, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClockIcon, Calendar, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
 
 interface BookingCalendarProps {
   selectedDate: Date | undefined;
@@ -15,7 +14,6 @@ interface BookingCalendarProps {
   fullyBookedDates: string[];
   dayBookedDates: string[];
   hourlyBookedDates: string[];
-  blockedDates: string[];
   bookingType: 'hourly' | 'full-day';
 }
 
@@ -26,7 +24,6 @@ export function BookingCalendar({
   fullyBookedDates,
   dayBookedDates,
   hourlyBookedDates,
-  blockedDates,
   bookingType
 }: BookingCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
@@ -57,9 +54,6 @@ export function BookingCalendar({
     // Can't book dates in the past
     if (date < today) return true;
     
-    // Can't book blocked dates
-    if (isDateInArray(date, blockedDates)) return true;
-    
     // For full-day bookings, can't select dates that are fully booked or have day bookings
     if (bookingType === 'full-day' && 
         (isDateInArray(date, fullyBookedDates) || isDateInArray(date, dayBookedDates))) {
@@ -72,15 +66,6 @@ export function BookingCalendar({
     }
     
     return false;
-  };
-  
-  // Function to handle date selection with validation
-  const handleDateSelect = (date: Date | undefined) => {
-    // If date is blocked or has existing bookings that conflict, don't select it
-    if (date && isDateDisabled(date)) {
-      return;
-    }
-    onDateSelect(date);
   };
   
   return (
@@ -102,41 +87,19 @@ export function BookingCalendar({
           <CalendarComponent
             mode="single"
             selected={selectedDate}
-            onSelect={handleDateSelect}
+            onSelect={onDateSelect}
             disabled={isDateDisabled}
             modifiers={{
               booked: (date) => isDateInArray(date, fullyBookedDates),
               dayBooked: (date) => isDateInArray(date, dayBookedDates),
               hourlyBooked: (date) => isDateInArray(date, hourlyBookedDates),
-              blocked: (date) => isDateInArray(date, blockedDates),
             }}
             modifiersStyles={{
               booked: { backgroundColor: '#FEE2E2', textDecoration: 'line-through', color: '#B91C1C' },
               dayBooked: { backgroundColor: '#DBEAFE', color: '#1E40AF' },
               hourlyBooked: { backgroundColor: '#FEF3C7', color: '#92400E' },
-              blocked: { backgroundColor: '#F3F4F6', color: '#6B7280', textDecoration: 'line-through' },
             }}
             className="rounded-md border"
-            components={{
-              DayContent: ({ date, activeModifiers }) => {
-                return (
-                  <div className="relative flex items-center justify-center w-full h-full">
-                    <span className={activeModifiers.selected ? 'text-white' : ''}>
-                      {date.getDate()}
-                    </span>
-                    {activeModifiers.blocked && (
-                      <Ban className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-3 w-3 text-gray-500" />
-                    )}
-                    {activeModifiers.booked && (
-                      <Users className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-3 w-3 text-red-500" />
-                    )}
-                    {(activeModifiers.dayBooked || activeModifiers.hourlyBooked) && !activeModifiers.blocked && !activeModifiers.booked && (
-                      <ClockIcon className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-3 w-3 text-blue-500" />
-                    )}
-                  </div>
-                );
-              }
-            }}
           />
           
           <div className="p-3 border-t border-border bg-muted/20">
@@ -152,10 +115,6 @@ export function BookingCalendar({
               <div className="flex items-center gap-2">
                 <span className="inline-block w-3 h-3 bg-[#FEF3C7] rounded-full"></span>
                 <span className="text-xs">Some hours booked</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-3 h-3 bg-[#F3F4F6] rounded-full"></span>
-                <span className="text-xs">Blocked by venue owner</span>
               </div>
             </div>
           </div>
