@@ -16,7 +16,7 @@ interface BookingCalendarProps {
   dayBookedDates: string[];
   hourlyBookedDates: string[];
   bookingType: 'hourly' | 'full-day';
-  venueId?: string; // Add venueId to check for blocked dates
+  venueId?: string;
 }
 
 export function BookingCalendar({
@@ -32,6 +32,7 @@ export function BookingCalendar({
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   
   // Generate calendar days for the current month view
   useEffect(() => {
@@ -48,6 +49,7 @@ export function BookingCalendar({
   useEffect(() => {
     if (venueId) {
       const fetchBlockedDates = async () => {
+        setIsLoading(true);
         try {
           console.log("Fetching blocked dates for venue:", venueId);
           const { data, error } = await supabase
@@ -60,8 +62,6 @@ export function BookingCalendar({
             return;
           }
           
-          console.log("Blocked dates data:", data);
-          
           if (data && data.length > 0) {
             // Extract dates that are blocked
             const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
@@ -73,6 +73,8 @@ export function BookingCalendar({
           }
         } catch (err) {
           console.error('Error processing blocked dates:', err);
+        } finally {
+          setIsLoading(false);
         }
       };
       
@@ -97,7 +99,6 @@ export function BookingCalendar({
     
     // Can't book dates blocked by venue owner
     if (blockedDates.includes(dateStr)) {
-      console.log("Date is blocked:", dateStr);
       return true;
     }
     

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -18,6 +19,8 @@ import {
   getVenueOwnerId, 
   sendNotification 
 } from '@/utils/notificationService';
+import { isDateBlockedForVenue } from '@/utils/venueOwnerUtils';
+import BookingCalendar from './BookingCalendar';
 import {
   Select,
   SelectContent,
@@ -86,6 +89,7 @@ export default function BookingForm({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([]);
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -104,6 +108,34 @@ export default function BookingForm({
   const selectedDate = form.watch('date');
   const selectedStartTime = form.watch('startTime');
 
+  // Fetch blocked dates from the blocked_dates table
+  useEffect(() => {
+    const fetchBlockedDates = async () => {
+      if (!venueId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('blocked_dates')
+          .select('date')
+          .eq('venue_id', venueId);
+          
+        if (error) {
+          console.error('Error fetching blocked dates:', error);
+          return;
+        }
+        
+        if (data && data.length > 0) {
+          const blocked = data.map(item => item.date);
+          setBlockedDates(blocked);
+        }
+      } catch (err) {
+        console.error('Error processing blocked dates:', err);
+      }
+    };
+    
+    fetchBlockedDates();
+  }, [venueId]);
+
   const updateAvailableEndTimes = (startTime: string) => {
     const startIndex = availableTimeSlots.indexOf(startTime);
     if (startIndex !== -1) {
@@ -119,13 +151,24 @@ export default function BookingForm({
     }
   }, [selectedStartTime, availableTimeSlots]);
 
-  const disabledDates = fullyBookedDates.map(dateStr => new Date(dateStr));
-
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (!user) {
       toast({
         title: "Not logged in",
         description: "Please log in to book this venue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if the date is blocked
+    const formattedDate = format(data.date, 'yyyy-MM-dd');
+    const isBlocked = await isDateBlockedForVenue(venueId, formattedDate);
+    
+    if (isBlocked || blockedDates.includes(formattedDate)) {
+      toast({
+        title: "Date unavailable",
+        description: "This date is not available for booking as it has been blocked by the venue owner.",
         variant: "destructive",
       });
       return;
@@ -140,7 +183,6 @@ export default function BookingForm({
       const totalPrice = hours * pricePerHour;
       
       const initialStatus = autoConfirm ? 'confirmed' : 'pending';
-      const formattedDate = format(data.date, 'yyyy-MM-dd');
       
       console.log("[HOURLY_BOOKING] Creating hourly booking with status:", initialStatus, "for venue ID:", venueId);
       
@@ -272,40 +314,16 @@ export default function BookingForm({
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Date</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={`w-full text-left font-normal flex justify-between items-center ${!field.value && "text-muted-foreground"}`}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        if (date < today) return true;
-                        return disabledDates.some(
-                          disabledDate =>
-                            format(disabledDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-                        );
-                      }}
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+                <BookingCalendar
+                  selectedDate={field.value}
+                  onDateSelect={field.onChange}
+                  bookedDates={fullyBookedDates}
+                  fullyBookedDates={fullyBookedDates}
+                  dayBookedDates={[]}
+                  hourlyBookedDates={Object.keys(bookedTimeSlots)}
+                  bookingType="hourly"
+                  venueId={venueId}
+                />
                 <FormMessage />
               </FormItem>
             )}
@@ -342,7 +360,7 @@ export default function BookingForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Start Time</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select start time" />
@@ -367,7 +385,7 @@ export default function BookingForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>End Time</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select end time" />
@@ -428,7 +446,7 @@ export default function BookingForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Payment Method</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select payment method" />

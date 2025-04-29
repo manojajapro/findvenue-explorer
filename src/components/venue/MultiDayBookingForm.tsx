@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -14,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification, sendNotification, getVenueOwnerId } from '@/utils/notificationService';
 import BookingCalendar from './BookingCalendar';
+import { isDateBlockedForVenue } from '@/utils/venueOwnerUtils';
 import {
   Select,
   SelectContent,
@@ -151,11 +153,6 @@ export default function MultiDayBookingForm({
     }
   }, [guestsCount, pricePerPerson, basePrice]);
 
-  const disabledDates = [
-    ...bookedDates.map(dateStr => new Date(dateStr)),
-    ...blockedDates.map(dateStr => new Date(dateStr))
-  ];
-
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (!user) {
       toast({
@@ -168,10 +165,22 @@ export default function MultiDayBookingForm({
 
     // Check if the date is blocked
     const formattedDate = format(data.date, 'yyyy-MM-dd');
+    const isBlocked = await isDateBlockedForVenue(venueId, formattedDate);
+    
+    if (isBlocked) {
+      toast({
+        title: "Date unavailable",
+        description: "This date is not available for booking as it has been blocked by the venue owner.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if the date is in the blockedDates array
     if (blockedDates.includes(formattedDate)) {
       toast({
         title: "Date unavailable",
-        description: "This date is not available for booking.",
+        description: "This date is not available for booking as it has been blocked by the venue owner.",
         variant: "destructive",
       });
       return;
