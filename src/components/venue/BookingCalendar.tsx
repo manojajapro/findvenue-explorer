@@ -62,10 +62,15 @@ export function BookingCalendar({
           
           console.log("Blocked dates data:", data);
           
-          // Extract dates that are blocked
-          const blocked = data?.map(item => format(new Date(item.date), 'yyyy-MM-dd')) || [];
-          console.log("Formatted blocked dates:", blocked);
-          setBlockedDates(blocked);
+          if (data && data.length > 0) {
+            // Extract dates that are blocked
+            const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
+            console.log("Formatted blocked dates:", blocked);
+            setBlockedDates(blocked);
+          } else {
+            console.log("No blocked dates found for venue:", venueId);
+            setBlockedDates([]);
+          }
         } catch (err) {
           console.error('Error processing blocked dates:', err);
         }
@@ -91,7 +96,10 @@ export function BookingCalendar({
     if (date < today) return true;
     
     // Can't book dates blocked by venue owner
-    if (blockedDates.includes(dateStr)) return true;
+    if (blockedDates.includes(dateStr)) {
+      console.log("Date is blocked:", dateStr);
+      return true;
+    }
     
     // For full-day bookings, can't select dates that are fully booked or have day bookings
     if (bookingType === 'full-day' && 

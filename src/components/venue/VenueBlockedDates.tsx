@@ -68,6 +68,7 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [venueOwnerId, setVenueOwnerId] = useState<string | null>(null);
   const [isVenueOwner, setIsVenueOwner] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Generate time options for select inputs
   const generateTimeOptions = () => {
@@ -86,13 +87,19 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
     if (venueId && user) {
       const fetchVenueOwner = async () => {
         try {
+          console.log("Fetching venue owner for venue ID:", venueId);
+          console.log("Current user ID:", user.id);
+          
           const { data, error } = await supabase
             .from('venues')
             .select('owner_info')
             .eq('id', venueId)
             .single();
             
-          if (error) throw error;
+          if (error) {
+            console.error("Error fetching venue owner:", error);
+            throw error;
+          }
           
           if (data?.owner_info) {
             const ownerInfo = typeof data.owner_info === 'string' 
@@ -102,30 +109,45 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
             const ownerId = ownerInfo.user_id;
             setVenueOwnerId(ownerId);
             
+            console.log("Venue owner ID:", ownerId);
+            console.log("Is current user the venue owner?", user.id === ownerId);
+            
             // Check if current user is the venue owner
             setIsVenueOwner(user.id === ownerId);
           }
+          
+          setAuthChecked(true);
         } catch (err) {
           console.error('Error fetching venue owner:', err);
+          setAuthChecked(true);
         }
       };
       
       fetchVenueOwner();
       fetchBlockedDates();
       fetchExistingBookings();
+    } else if (!user) {
+      setAuthChecked(true);
+      setIsVenueOwner(false);
     }
   }, [venueId, user]);
 
   const fetchBlockedDates = async () => {
     try {
       setIsRefreshing(true);
+      console.log("Fetching blocked dates for venue ID:", venueId);
+      
       const { data, error } = await supabase
         .from('blocked_dates')
         .select('*')
         .eq('venue_id', venueId);
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching blocked dates:", error);
+        throw error;
+      }
       
+      console.log("Blocked dates retrieved:", data);
       setBlockedDates(data || []);
     } catch (err) {
       console.error('Error fetching blocked dates:', err);
@@ -246,7 +268,7 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
     try {
       setIsLoading(true);
       
-      console.log("Attempting to block date with data:", {
+      const newBlockedDate = {
         venue_id: venueId,
         date: formattedDate,
         start_time: isFullDay ? null : startTime,
@@ -254,21 +276,13 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
         is_full_day: isFullDay,
         reason: reason || null,
         created_by: user.id
-      });
+      };
+      
+      console.log("Attempting to block date with data:", newBlockedDate);
       
       const { data, error } = await supabase
         .from('blocked_dates')
-        .insert([
-          {
-            venue_id: venueId,
-            date: formattedDate,
-            start_time: isFullDay ? null : startTime,
-            end_time: isFullDay ? null : endTime,
-            is_full_day: isFullDay,
-            reason: reason || null,
-            created_by: user.id
-          }
-        ])
+        .insert([newBlockedDate])
         .select();
         
       if (error) {
@@ -280,6 +294,8 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
         });
         return;
       }
+      
+      console.log("Successfully blocked date:", data);
       
       toast({
         title: "Date blocked",
@@ -307,12 +323,17 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
 
   const handleUnblockDate = async (id: string) => {
     try {
+      console.log("Attempting to unblock date with ID:", id);
+      
       const { error } = await supabase
         .from('blocked_dates')
         .delete()
         .eq('id', id);
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error unblocking date:", error);
+        throw error;
+      }
       
       toast({
         title: "Date unblocked",
@@ -320,24 +341,51 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
       });
       
       fetchBlockedDates();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error unblocking date:', err);
       toast({
         title: "Error",
-        description: "Failed to unblock date. Please try again.",
+        description: `Failed to unblock date: ${err.message}`,
         variant: "destructive"
       });
     }
   };
 
+  // Show loading state
+  if (!authChecked) {
+    return (
+      <Card>
+        <CardContent className="p-8">
+          <div className="flex justify-center items-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-findvenue"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Show message if not the venue owner
-  if (user && venueOwnerId && user.id !== venueOwnerId) {
+  if (user && authChecked && !isVenueOwner) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Permission Denied</CardTitle>
           <CardDescription>
             Only the venue owner can manage blocked dates
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+  
+  // Show login message if not logged in
+  if (!user) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Authentication Required</CardTitle>
+          <CardDescription>
+            Please log in to manage blocked dates
           </CardDescription>
         </CardHeader>
       </Card>
