@@ -57,7 +57,7 @@ function Calendar({
         IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
       }}
       modifiersClassNames={{
-        booked: "bg-red-500/20 text-red-400 cursor-not-allowed",
+        booked: "bg-red-500/20 text-red-400 cursor-not-allowed line-through",
         dayBooked: "bg-blue-500/20 text-blue-400 cursor-not-allowed",
         hourlyBooked: "bg-yellow-500/20 text-yellow-400",
         blocked: "bg-purple-500/20 text-purple-500 cursor-not-allowed line-through",

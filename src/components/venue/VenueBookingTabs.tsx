@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import BookingCalendar from './BookingCalendar';
 import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
+import { isDateBlockedForVenue } from '@/utils/venueOwnerUtils';
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -223,6 +224,39 @@ export default function VenueBookingTabs({
     return slots;
   };
   
+  // Fetch blocked dates
+  useEffect(() => {
+    if (venueId) {
+      const fetchBlockedDates = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('blocked_dates')
+            .select('date')
+            .eq('venue_id', venueId);
+            
+          if (error) {
+            console.error('Error fetching blocked dates:', error);
+            return;
+          }
+          
+          if (data) {
+            const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
+            setBlockedDates(blocked);
+            
+            // Reset selection if currently selected date is blocked
+            if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
+              setSelectedDate(undefined);
+            }
+          }
+        } catch (err) {
+          console.error('Error processing blocked dates:', err);
+        }
+      };
+      
+      fetchBlockedDates();
+    }
+  }, [venueId, selectedDate]);
+
   const handleBookRequest = async () => {
     if (!user) {
       toast({
@@ -244,6 +278,29 @@ export default function VenueBookingTabs({
     }
     
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+    
+    // Check if date is blocked by owner
+    const isBlocked = blockedDates.includes(formattedDate);
+    if (isBlocked) {
+      toast({
+        title: "Date unavailable",
+        description: "This date is not available for booking as it has been blocked by the venue owner.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Verify with backend that date isn't blocked (double-check)
+    const backendBlockCheck = await isDateBlockedForVenue(venueId, formattedDate);
+    if (backendBlockCheck) {
+      toast({
+        title: "Date unavailable",
+        description: "This date is not available for booking as it has been blocked by the venue owner.",
+        variant: "destructive"
+      });
+      setSelectedDate(undefined);
+      return;
+    }
     
     const guests = parseInt(peopleCount);
     if (isNaN(guests) || guests < 1 || guests > maxCapacity) {
@@ -516,9 +573,11 @@ export default function VenueBookingTabs({
                 
                 {isCurrentDateFullyBooked() && selectedDate && (
                   <p className="text-red-500 text-xs mt-1">
-                    {bookingType === 'full-day' 
-                      ? 'This date is not available for full day booking' 
-                      : 'No available time slots on this date'}
+                    {blockedDates.includes(currentDateStr)
+                      ? 'This date is blocked by the venue owner'
+                      : bookingType === 'full-day' 
+                        ? 'This date is not available for full day booking' 
+                        : 'No available time slots on this date'}
                   </p>
                 )}
               </div>

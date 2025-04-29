@@ -67,6 +67,11 @@ export function BookingCalendar({
             const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
             console.log("Formatted blocked dates:", blocked);
             setBlockedDates(blocked);
+            
+            // If selected date is blocked, reset selection
+            if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
+              onDateSelect(undefined);
+            }
           } else {
             console.log("No blocked dates found for venue:", venueId);
             setBlockedDates([]);
@@ -80,7 +85,7 @@ export function BookingCalendar({
       
       fetchBlockedDates();
     }
-  }, [venueId]);
+  }, [venueId, selectedDate, onDateSelect]);
   
   // Helper function to check if a date is in the given array
   const isDateInArray = (date: Date, dateArray: string[]): boolean => {
@@ -136,7 +141,7 @@ export function BookingCalendar({
             mode="single"
             selected={selectedDate}
             onSelect={(date) => {
-              // Clear selection if trying to select a disabled date
+              // Prevent selection of disabled dates
               if (date && isDateDisabled(date)) {
                 onDateSelect(undefined);
                 return;
