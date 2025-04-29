@@ -16,6 +16,9 @@ import BookingCalendar from './BookingCalendar';
 import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
 import { isDateBlockedForVenue } from '@/utils/venueOwnerUtils';
 
+// Add type for booking type
+type BookingType = 'hourly' | 'full-day';
+
 interface VenueBookingTabsProps {
   venueId: string;
   venueName: string;
@@ -55,7 +58,7 @@ export default function VenueBookingTabs({
   const [peopleCount, setPeopleCount] = useState<string>(minCapacity.toString());
   const [fromTime, setFromTime] = useState<string>('09:00');
   const [toTime, setToTime] = useState<string>('17:00');
-  const [bookingType, setBookingType] = useState<'hourly' | 'full-day'>('full-day');
+  const [bookingType, setBookingType] = useState<BookingType>('full-day');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
 
   useEffect(() => {
@@ -224,49 +227,42 @@ export default function VenueBookingTabs({
     return slots;
   };
   
-  // Improved fetch blocked dates function
+  // Add this at the top of the useEffect where you fetch blocked dates
   useEffect(() => {
-    if (venueId) {
-      const fetchBlockedDates = async () => {
-        try {
-          console.log("Fetching blocked dates for venue:", venueId);
-          const { data, error } = await supabase
-            .from('blocked_dates')
-            .select('date')
-            .eq('venue_id', venueId);
-            
-          if (error) {
-            console.error('Error fetching blocked dates:', error);
-            setBlockedDates([]);
-            return;
-          }
-          
-          if (data && data.length > 0) {
-            // Extract dates that are blocked
-            const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
-            console.log("Blocked dates found:", blocked);
-            setBlockedDates(blocked);
-            
-            // Reset selection if currently selected date is blocked
-            if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
-              console.log("Selected date is blocked, resetting selection");
-              setSelectedDate(undefined);
-            }
-          } else {
-            console.log("No blocked dates found for venue:", venueId);
-            setBlockedDates([]);
-          }
-        } catch (err) {
-          console.error('Error processing blocked dates:', err);
-          setBlockedDates([]);
-        }
-      };
+    const fetchBlockedDates = async () => {
+      if (!venueId) return;
       
-      fetchBlockedDates();
-    }
+      try {
+        const { data, error } = await supabase
+          .from('blocked_dates')
+          .select('date')
+          .eq('venue_id', venueId);
+          
+        if (error) {
+          console.error('Error fetching blocked dates:', error);
+          return;
+        }
+        
+        if (data) {
+          const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
+          setBlockedDates(blocked);
+          
+          // If currently selected date is blocked, reset it
+          if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
+            setSelectedDate(undefined);
+            setFromTime('09:00');
+            setToTime('17:00');
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching blocked dates:', err);
+      }
+    };
+
+    fetchBlockedDates();
   }, [venueId, selectedDate]);
 
-  // Modified handleBookRequest function to properly check for blocked dates
+  // Modify the handleBookRequest function
   const handleBookRequest = async () => {
     if (!user) {
       toast({
@@ -289,7 +285,7 @@ export default function VenueBookingTabs({
     
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
     
-    // Check if date is blocked by owner (in our state first for instant feedback)
+    // Check if date is blocked (local state check)
     if (blockedDates.includes(formattedDate)) {
       toast({
         title: "Date unavailable",
@@ -302,18 +298,24 @@ export default function VenueBookingTabs({
     
     // Double-check with backend that the date isn't blocked
     try {
-      const { data, error } = await supabase
+      const { data: blockedCheck, error: blockedError } = await supabase
         .from('blocked_dates')
         .select('id')
         .eq('venue_id', venueId)
         .eq('date', formattedDate)
         .maybeSingle();
         
-      if (error) {
-        console.error('Error checking blocked date:', error);
+      if (blockedError) {
+        console.error('Error checking blocked dates:', blockedError);
+        toast({
+          title: "Error",
+          description: "Unable to verify date availability. Please try again.",
+          variant: "destructive"
+        });
+        return;
       }
       
-      if (data) {
+      if (blockedCheck) {
         toast({
           title: "Date unavailable",
           description: "This date has been blocked by the venue owner and is not available for booking.",
@@ -323,9 +325,16 @@ export default function VenueBookingTabs({
         return;
       }
     } catch (err) {
-      console.error('Error checking blocked date:', err);
+      console.error('Error checking blocked dates:', err);
+      toast({
+        title: "Error",
+        description: "Unable to verify date availability. Please try again.",
+        variant: "destructive"
+      });
+      return;
     }
-    
+
+    // Continue with the rest of your existing booking logic...
     const guests = parseInt(peopleCount);
     if (isNaN(guests) || guests < 1 || guests > maxCapacity) {
       toast({
@@ -338,6 +347,25 @@ export default function VenueBookingTabs({
 
     try {
       setProcessingBooking(true);
+      
+      // One final check for blocked dates before proceeding
+      const { data: finalBlockCheck } = await supabase
+        .from('blocked_dates')
+        .select('id')
+        .eq('venue_id', venueId)
+        .eq('date', formattedDate)
+        .maybeSingle();
+        
+      if (finalBlockCheck) {
+        toast({
+          title: "Date unavailable",
+          description: "This date is no longer available for booking.",
+          variant: "destructive"
+        });
+        setSelectedDate(undefined);
+        setProcessingBooking(false);
+        return;
+      }
       
       let startTime = fromTime;
       let endTime = toTime;
@@ -416,7 +444,7 @@ export default function VenueBookingTabs({
         start_time: startTime,
         end_time: endTime,
         status: 'pending',
-        booking_type: bookingType === 'full-day' ? 'full-day' : 'hourly'
+        booking_type: bookingType
       };
       
       try {
