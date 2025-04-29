@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, addDays, isSameDay, isWithinInterval, setHours, setMinutes } from 'date-fns';
 import { Calendar as CalendarIcon, ClockIcon, UsersIcon } from 'lucide-react';
@@ -57,36 +56,48 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
   }, [venue]);
 
   const fetchBookedDates = async (venueId: string) => {
+    // Here we would fetch actual booking data from the API
+    // For now, let's add some sample data
     const today = new Date();
-    const future = addDays(today, 30);
+    
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('booking_date, status, start_time, end_time')
+        .eq('venue_id', venueId);
 
-    const booked: string[] = [];
-    const fullyBooked: string[] = [];
-    const dayBooked: string[] = [];
-    const hourlyBooked: string[] = [];
+      if (error) {
+        console.error('Error fetching bookings:', error);
+        return;
+      }
 
-    for (let i = 0; i < 30; i++) {
-      const currentDate = addDays(today, i);
-      const formattedDate = format(currentDate, 'yyyy-MM-dd');
+      if (data) {
+        const booked: string[] = [];
+        const fullyBooked: string[] = [];
+        const dayBooked: string[] = [];
+        const hourlyBooked: string[] = [];
 
-      if (i % 5 === 0) {
-        booked.push(formattedDate);
+        data.forEach(booking => {
+          if (booking.status !== 'cancelled') {
+            booked.push(booking.booking_date);
+            
+            if (booking.start_time === '00:00' && booking.end_time === '23:59') {
+              dayBooked.push(booking.booking_date);
+              fullyBooked.push(booking.booking_date);
+            } else {
+              hourlyBooked.push(booking.booking_date);
+            }
+          }
+        });
+
+        setBookedDates(booked);
+        setFullyBookedDates(fullyBooked);
+        setDayBookedDates(dayBooked);
+        setHourlyBookedDates(hourlyBooked);
       }
-      if (i % 7 === 0) {
-        fullyBooked.push(formattedDate);
-      }
-      if (i % 10 === 0) {
-        dayBooked.push(formattedDate);
-      }
-      if (i % 12 === 0) {
-        hourlyBooked.push(formattedDate);
-      }
+    } catch (err) {
+      console.error("Error fetching bookings:", err);
     }
-
-    setBookedDates(booked);
-    setFullyBookedDates(fullyBooked);
-    setDayBookedDates(dayBooked);
-    setHourlyBookedDates(hourlyBooked);
   };
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -144,6 +155,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
       toast({
         title: "Time slot unavailable",
         description: "This time slot has been blocked by the venue owner and is not available for booking.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check against existing bookings
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    if (bookingType === 'full-day' && 
+        (fullyBookedDates.includes(dateStr) || dayBookedDates.includes(dateStr))) {
+      toast({
+        title: "Date already booked",
+        description: "This date is already booked for full-day rental.",
         variant: "destructive",
       });
       return;
@@ -216,47 +239,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant={"outline"}
-              className={
-                "w-full justify-start text-left font-normal" +
-                (!selectedDate ? "text-muted-foreground" : "")
-              }
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleDateSelect}
-              disabled={(date) => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                
-                // Disable dates in the past and dates blocked by venue owner
-                return date < today || isDateBlocked(date);
-              }}
-              className="rounded-md border"
-              modifiers={{
-                blocked: blockedDates.map(dateStr => new Date(dateStr))
-              }}
-              modifiersStyles={{
-                blocked: { backgroundColor: '#F3F4F6', color: '#6B7280', textDecoration: 'line-through' }
-              }}
-            />
-            <div className="p-3 border-t border-border">
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-3 h-3 bg-[#F3F4F6] rounded-full"></span>
-                <span className="text-xs">Blocked by venue owner</span>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+        <BookingCalendar
+          selectedDate={selectedDate}
+          onDateSelect={handleDateSelect}
+          bookedDates={bookedDates}
+          fullyBookedDates={fullyBookedDates}
+          dayBookedDates={dayBookedDates}
+          hourlyBookedDates={hourlyBookedDates}
+          blockedDates={blockedDates}
+          bookingType={bookingType}
+        />
 
         <Select value={bookingType} onValueChange={handleBookingTypeChange}>
           <SelectTrigger className="w-full">
@@ -311,7 +303,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ venue, defaultBookingType = '
 
       <Button 
         onClick={handleAddToCart} 
-        disabled={isSubmitting || isLoadingBlockedDates || (selectedDate && isDateBlocked(selectedDate))}
+        disabled={
+          isSubmitting || 
+          isLoadingBlockedDates || 
+          (selectedDate && isDateBlocked(selectedDate)) ||
+          (selectedDate && bookingType === 'full-day' && 
+            (fullyBookedDates.includes(format(selectedDate, 'yyyy-MM-dd')) || 
+             dayBookedDates.includes(format(selectedDate, 'yyyy-MM-dd'))))
+        }
       >
         {isSubmitting ? 'Adding to Cart...' : 'Add to Cart'}
       </Button>

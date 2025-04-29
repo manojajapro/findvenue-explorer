@@ -1,11 +1,12 @@
 
 import { useState, useEffect } from 'react';
 import { format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
-import { ChevronLeft, ChevronRight, ClockIcon, Calendar, Calendar as CalendarIcon, Ban } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClockIcon, Calendar, Calendar as CalendarIcon, Ban, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Badge } from '@/components/ui/badge';
 
 interface BookingCalendarProps {
   selectedDate: Date | undefined;
@@ -75,8 +76,8 @@ export function BookingCalendar({
   
   // Function to handle date selection with validation
   const handleDateSelect = (date: Date | undefined) => {
-    // If date is blocked, don't select it
-    if (date && isDateInArray(date, blockedDates)) {
+    // If date is blocked or has existing bookings that conflict, don't select it
+    if (date && isDateDisabled(date)) {
       return;
     }
     onDateSelect(date);
@@ -116,6 +117,26 @@ export function BookingCalendar({
               blocked: { backgroundColor: '#F3F4F6', color: '#6B7280', textDecoration: 'line-through' },
             }}
             className="rounded-md border"
+            components={{
+              DayContent: ({ date, activeModifiers }) => {
+                return (
+                  <div className="relative flex items-center justify-center w-full h-full">
+                    <span className={activeModifiers.selected ? 'text-white' : ''}>
+                      {date.getDate()}
+                    </span>
+                    {activeModifiers.blocked && (
+                      <Ban className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-3 w-3 text-gray-500" />
+                    )}
+                    {activeModifiers.booked && (
+                      <Users className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-3 w-3 text-red-500" />
+                    )}
+                    {(activeModifiers.dayBooked || activeModifiers.hourlyBooked) && !activeModifiers.blocked && !activeModifiers.booked && (
+                      <ClockIcon className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 h-3 w-3 text-blue-500" />
+                    )}
+                  </div>
+                );
+              }
+            }}
           />
           
           <div className="p-3 border-t border-border bg-muted/20">
