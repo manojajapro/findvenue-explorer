@@ -61,9 +61,9 @@ export function BookingCalendar({
     // Can't book dates in the past
     if (date < today) return true;
     
-    // Can't book blocked dates - this is the primary check for owner-blocked dates
+    // Can't book dates blocked by the owner
     if (isDateBlocked(date)) {
-      console.log(`Date ${dateStr} is blocked by owner and should be disabled`);
+      console.log(`Date ${dateStr} is blocked by venue owner and should be disabled`);
       return true;
     }
     

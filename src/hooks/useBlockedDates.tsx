@@ -28,12 +28,12 @@ export function useBlockedDates(venueId: string | undefined, selectedDate: Date 
           if (data && data.length > 0) {
             // Extract all blocked dates regardless of type
             const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
-            console.log("Blocked dates found in calendar component:", blocked);
+            console.log("Blocked dates found in useBlockedDates hook:", blocked);
             setBlockedDates(blocked);
             
             // If selected date is blocked, reset selection
             if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
-              console.log("Selected date is blocked in calendar, resetting selection");
+              console.log("Selected date is blocked, resetting selection in useBlockedDates");
               onDateSelect(undefined);
             }
           } else {
