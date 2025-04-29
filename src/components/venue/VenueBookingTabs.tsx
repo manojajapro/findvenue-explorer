@@ -233,6 +233,7 @@ export default function VenueBookingTabs({
       if (!venueId) return;
       
       try {
+        setIsLoadingBookings(true);
         const { data, error } = await supabase
           .from('blocked_dates')
           .select('date')
@@ -258,13 +259,15 @@ export default function VenueBookingTabs({
         }
       } catch (err) {
         console.error('Error fetching blocked dates:', err);
+      } finally {
+        setIsLoadingBookings(false);
       }
     };
 
     fetchBlockedDates();
   }, [venueId, selectedDate]);
 
-  // Modify the handleBookRequest function
+  // Modify the handleBookRequest function to double check if the date is blocked
   const handleBookRequest = async () => {
     if (!user) {
       toast({
@@ -300,24 +303,9 @@ export default function VenueBookingTabs({
     
     // Double-check with backend that the date isn't blocked
     try {
-      const { data: blockedCheck, error: blockedError } = await supabase
-        .from('blocked_dates')
-        .select('id')
-        .eq('venue_id', venueId)
-        .eq('date', formattedDate)
-        .maybeSingle();
-        
-      if (blockedError) {
-        console.error('Error checking blocked dates:', blockedError);
-        toast({
-          title: "Error",
-          description: "Unable to verify date availability. Please try again.",
-          variant: "destructive"
-        });
-        return;
-      }
+      const isBlocked = await isDateBlockedForVenue(venueId, formattedDate);
       
-      if (blockedCheck) {
+      if (isBlocked) {
         toast({
           title: "Date unavailable",
           description: "This date has been blocked by the venue owner and is not available for booking.",

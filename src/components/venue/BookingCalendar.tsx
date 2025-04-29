@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { supabase } from '@/integrations/supabase/client';
+import { isDateBlockedForVenue } from '@/utils/venueOwnerUtils';
 
 interface BookingCalendarProps {
   selectedDate: Date | undefined;
@@ -66,12 +67,12 @@ export function BookingCalendar({
           if (data && data.length > 0) {
             // Extract all blocked dates regardless of type
             const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
-            console.log("Blocked dates found:", blocked);
+            console.log("Blocked dates found in calendar component:", blocked);
             setBlockedDates(blocked);
             
             // If selected date is blocked, reset selection
             if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
-              console.log("Selected date is blocked, resetting selection");
+              console.log("Selected date is blocked in calendar, resetting selection");
               onDateSelect(undefined);
             }
           } else {
@@ -107,6 +108,7 @@ export function BookingCalendar({
     
     // Can't book blocked dates - this is the primary check for owner-blocked dates
     if (blockedDates.includes(dateStr)) {
+      console.log(`Date ${dateStr} is blocked by owner and should be disabled`);
       return true;
     }
     
@@ -152,7 +154,7 @@ export function BookingCalendar({
               // Check if date is blocked
               const dateStr = format(date, 'yyyy-MM-dd');
               if (blockedDates.includes(dateStr)) {
-                console.log("Blocked date selected, preventing selection:", dateStr);
+                console.log("Blocked date selected in calendar, preventing selection:", dateStr);
                 onDateSelect(undefined);
                 return;
               }
