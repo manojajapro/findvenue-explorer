@@ -52,7 +52,7 @@ export function BookingCalendar({
           console.log("Fetching blocked dates for venue:", venueId);
           const { data, error } = await supabase
             .from('blocked_dates')
-            .select('date, is_full_day')
+            .select('date')
             .eq('venue_id', venueId);
             
           if (error) {
