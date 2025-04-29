@@ -67,6 +67,7 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
   const [existingBookings, setExistingBookings] = useState<Booking[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [venueOwnerId, setVenueOwnerId] = useState<string | null>(null);
+  const [isVenueOwner, setIsVenueOwner] = useState(false);
 
   // Generate time options for select inputs
   const generateTimeOptions = () => {
@@ -80,9 +81,9 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
 
   const timeOptions = generateTimeOptions();
 
-  // Fetch venue owner ID
+  // Verify venue ownership and fetch necessary data
   useEffect(() => {
-    if (venueId) {
+    if (venueId && user) {
       const fetchVenueOwner = async () => {
         try {
           const { data, error } = await supabase
@@ -98,7 +99,11 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
               ? JSON.parse(data.owner_info) 
               : data.owner_info;
             
-            setVenueOwnerId(ownerInfo.user_id);
+            const ownerId = ownerInfo.user_id;
+            setVenueOwnerId(ownerId);
+            
+            // Check if current user is the venue owner
+            setIsVenueOwner(user.id === ownerId);
           }
         } catch (err) {
           console.error('Error fetching venue owner:', err);
@@ -109,7 +114,7 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
       fetchBlockedDates();
       fetchExistingBookings();
     }
-  }, [venueId]);
+  }, [venueId, user]);
 
   const fetchBlockedDates = async () => {
     try {
@@ -218,6 +223,7 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
       return;
     }
 
+    // Verify user is logged in
     if (!user?.id) {
       toast({
         title: "Authentication required",
@@ -227,8 +233,28 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
       return;
     }
     
+    // Verify user is venue owner
+    if (!isVenueOwner) {
+      toast({
+        title: "Permission denied",
+        description: "Only the venue owner can block dates",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       setIsLoading(true);
+      
+      console.log("Attempting to block date with data:", {
+        venue_id: venueId,
+        date: formattedDate,
+        start_time: isFullDay ? null : startTime,
+        end_time: isFullDay ? null : endTime,
+        is_full_day: isFullDay,
+        reason: reason || null,
+        created_by: user.id
+      });
       
       const { data, error } = await supabase
         .from('blocked_dates')
@@ -247,7 +273,12 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
         
       if (error) {
         console.error('Error blocking date:', error);
-        throw error;
+        toast({
+          title: "Error",
+          description: `Failed to block date: ${error.message}`,
+          variant: "destructive"
+        });
+        return;
       }
       
       toast({
@@ -262,11 +293,11 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
       setReason("");
       fetchBlockedDates();
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error blocking date:', err);
       toast({
         title: "Error",
-        description: "Failed to block date. Please try again.",
+        description: `Failed to block date: ${err.message}`,
         variant: "destructive"
       });
     } finally {
@@ -298,6 +329,20 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
       });
     }
   };
+
+  // Show message if not the venue owner
+  if (user && venueOwnerId && user.id !== venueOwnerId) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Permission Denied</CardTitle>
+          <CardDescription>
+            Only the venue owner can manage blocked dates
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -443,7 +488,7 @@ export default function VenueBlockedDates({ venueId }: VenueBlockedDatesProps) {
         <CardFooter>
           <Button 
             onClick={handleBlockDate} 
-            disabled={isLoading || !date}
+            disabled={isLoading || !date || !user}
             className="w-full bg-findvenue hover:bg-findvenue-dark"
           >
             {isLoading ? (

@@ -49,6 +49,7 @@ export function BookingCalendar({
     if (venueId) {
       const fetchBlockedDates = async () => {
         try {
+          console.log("Fetching blocked dates for venue:", venueId);
           const { data, error } = await supabase
             .from('blocked_dates')
             .select('date, is_full_day')
@@ -59,8 +60,11 @@ export function BookingCalendar({
             return;
           }
           
+          console.log("Blocked dates data:", data);
+          
           // Extract dates that are blocked
           const blocked = data?.map(item => format(new Date(item.date), 'yyyy-MM-dd')) || [];
+          console.log("Formatted blocked dates:", blocked);
           setBlockedDates(blocked);
         } catch (err) {
           console.error('Error processing blocked dates:', err);
