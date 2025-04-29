@@ -105,7 +105,7 @@ export function BookingCalendar({
     // Can't book dates in the past
     if (date < today) return true;
     
-    // Can't book blocked dates
+    // Can't book blocked dates - this is the primary check for owner-blocked dates
     if (blockedDates.includes(dateStr)) {
       return true;
     }
@@ -165,9 +165,7 @@ export function BookingCalendar({
 
               onDateSelect(date);
             }}
-            disabled={(date) => {
-              return isDateDisabled(date);
-            }}
+            disabled={isDateDisabled}
             modifiers={{
               booked: (date) => isDateInArray(date, fullyBookedDates),
               dayBooked: (date) => isDateInArray(date, dayBookedDates),
