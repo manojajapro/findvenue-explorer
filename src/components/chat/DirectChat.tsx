@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useChat } from '@/hooks/useChat';
 import { Loader2 } from 'lucide-react';
@@ -16,6 +16,7 @@ const DirectChat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const location = useLocation();
   
   const { 
     contact,
@@ -29,6 +30,12 @@ const DirectChat = () => {
     messagesEndRef,
     sendMessage
   } = useChat(contactId);
+
+  useEffect(() => {
+    if (!contactId && user) {
+      console.log("No contactId provided in URL, checking for messages");
+    }
+  }, [contactId, user]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();

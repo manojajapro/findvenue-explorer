@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -35,9 +36,12 @@ export const useChat = (contactId?: string) => {
           .from('user_profiles')
           .select('*')
           .eq('id', contactId)
-          .single();
+          .maybeSingle();
         
-        if (contactError) throw contactError;
+        if (contactError) {
+          console.error("Error fetching contact:", contactError);
+          throw contactError;
+        }
         
         console.log('Contact data:', contactData);
         
@@ -48,7 +52,8 @@ export const useChat = (contactId?: string) => {
             id: contactData.id,
             name: `${contactData.first_name} ${contactData.last_name}`,
             image: contactData.profile_image || undefined,
-            role: userRole
+            role: userRole,
+            phone: contactData.phone || undefined
           };
           
           if (venueId && venueName) {
@@ -57,6 +62,10 @@ export const useChat = (contactId?: string) => {
           }
           
           setContact(contactInfo);
+        } else {
+          console.error("Contact not found with ID:", contactId);
+          setHasError(true);
+          setErrorMessage("Contact not found");
         }
       } catch (error) {
         console.error('Error fetching contact:', error);
@@ -95,9 +104,12 @@ export const useChat = (contactId?: string) => {
           .or(`and(sender_id.eq.${user.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${user.id})`)
           .order('created_at', { ascending: true });
 
-        if (messagesError) throw messagesError;
+        if (messagesError) {
+          console.error("Error fetching messages:", messagesError);
+          throw messagesError;
+        }
         
-        console.log('Messages data:', messagesData);
+        console.log('Messages data:', messagesData?.length || 0, 'messages found');
         setMessages(messagesData || []);
         
         // Mark received messages as read
@@ -106,6 +118,7 @@ export const useChat = (contactId?: string) => {
         );
         
         if (unreadMessages?.length > 0) {
+          console.log("Marking messages as read:", unreadMessages.length);
           const unreadIds = unreadMessages.map((msg: Message) => msg.id);
           
           await supabase
@@ -146,6 +159,7 @@ export const useChat = (contactId?: string) => {
           
         // Mark message as read if it's for current user
         if (newMsg.receiver_id === user.id && !newMsg.read) {
+          console.log("Marking new message as read:", newMsg.id);
           supabase
             .from('messages')
             .update({ read: true })
@@ -164,6 +178,7 @@ export const useChat = (contactId?: string) => {
           .limit(1);
           
         if (!existingMessages?.length) {
+          console.log("No existing messages found, sending initial message about venue");
           const initialMessage = `Hi, I'm interested in ${venueName}.`;
           await sendMessageToDatabase(initialMessage);
         }
@@ -176,6 +191,7 @@ export const useChat = (contactId?: string) => {
           .limit(1);
           
         if (!existingMessages?.length) {
+          console.log("No existing messages found, sending initial message about booking");
           const initialMessage = `Hi, I have a question about my booking at ${venueName}.`;
           await sendMessageToDatabase(initialMessage, bookingId);
         }
@@ -201,6 +217,13 @@ export const useChat = (contactId?: string) => {
     if (!user || !contactId) return null;
     
     try {
+      console.log("Sending message to database:", {
+        sender: user.id,
+        receiver: contactId,
+        content: messageContent.substring(0, 20) + "...",
+        venue: venueId
+      });
+      
       const messageData = {
         sender_id: user.id,
         receiver_id: contactId,
@@ -217,8 +240,12 @@ export const useChat = (contactId?: string) => {
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error sending message:", error);
+        throw error;
+      }
       
+      console.log("Message sent successfully:", sentMessage?.id);
       return sentMessage;
     } catch (error) {
       console.error('Error sending message:', error);
