@@ -81,7 +81,13 @@ export const useBlockedDates = (venueId: string) => {
     return blockedDatesStrings.includes(dateStr);
   };
 
-  const blockDate = async (date: Date, fullDay: boolean = true, reason: string = ''): Promise<boolean> => {
+  const blockDate = async (
+    date: Date, 
+    fullDay: boolean = true, 
+    reason: string = '',
+    startTime: string | null = null,
+    endTime: string | null = null
+  ): Promise<boolean> => {
     if (!user) {
       toast({
         title: "Authentication required",
@@ -120,8 +126,8 @@ export const useBlockedDates = (venueId: string) => {
           {
             venue_id: venueId,
             date: dateStr,
-            start_time: fullDay ? null : '00:00',
-            end_time: fullDay ? null : '23:59',
+            start_time: fullDay ? null : startTime,
+            end_time: fullDay ? null : endTime,
             is_full_day: fullDay,
             reason,
             created_by: user.id

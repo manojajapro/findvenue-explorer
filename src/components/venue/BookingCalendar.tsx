@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface BookingCalendarProps {
   selectedDate: Date | undefined;
@@ -16,6 +17,13 @@ interface BookingCalendarProps {
   hourlyBookedDates: string[];
   bookingType: 'hourly' | 'full-day';
   blockedDates?: string[]; // New prop for blocked dates
+}
+
+interface BlockedDateInfo {
+  date: string;
+  is_full_day: boolean;
+  start_time?: string | null;
+  end_time?: string | null;
 }
 
 export function BookingCalendar({
