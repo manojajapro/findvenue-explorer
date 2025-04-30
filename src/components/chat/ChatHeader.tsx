@@ -2,47 +2,61 @@
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { ChatContact } from './types';
+import { Button } from '@/components/ui/button';
 import { getInitials } from '@/lib/utils';
+import { ChatContact } from './types';
+import { ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import WhatsAppIntegration from './WhatsAppIntegration';
 
-type ChatHeaderProps = {
+interface ChatHeaderProps {
   contact: ChatContact;
 }
 
 const ChatHeader = ({ contact }: ChatHeaderProps) => {
-  // Function to display the proper role label
-  const getRoleLabel = (role?: string) => {
-    if (!role) return null;
-    
-    // Convert database role to display label
-    if (role === 'venue-owner' || role === 'venue_owner') {
-      return 'Venue Owner';
-    } else {
-      return 'Customer';
-    }
-  };
+  const navigate = useNavigate();
 
   return (
-    <div className="p-3 border-b border-white/10 flex items-center gap-3">
-      <Avatar>
-        <AvatarImage src={contact.image} alt={contact.name} />
-        <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
-      </Avatar>
-      
-      <div className="flex-1 min-w-0">
-        <h3 className="font-medium truncate">{contact.name}</h3>
-        {contact.role && (
-          <p className="text-xs text-findvenue-text-muted">
-            {getRoleLabel(contact.role)}
-          </p>
-        )}
+    <div className="flex items-center justify-between p-4 border-b border-white/10 bg-findvenue-surface/20">
+      <div className="flex items-center gap-3">
+        <Button 
+          variant="ghost"
+          size="icon" 
+          className="md:hidden"
+          onClick={() => navigate('/messages')}
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        
+        <Avatar>
+          <AvatarImage src={contact.image} />
+          <AvatarFallback>
+            {getInitials(contact.name)}
+          </AvatarFallback>
+        </Avatar>
+        
+        <div>
+          <div className="font-medium">{contact.name}</div>
+          {contact.role && (
+            <div className="text-xs text-findvenue-text-muted">
+              {contact.role === 'venue-owner' ? 'Venue Owner' : 'Customer'}
+            </div>
+          )}
+        </div>
       </div>
       
-      {contact.venue_name && (
-        <Badge variant="outline" className="bg-findvenue/10 border-findvenue/20">
-          {contact.venue_name}
-        </Badge>
-      )}
+      <div className="flex items-center gap-2">
+        {contact.venue_name && (
+          <Badge variant="outline" className="bg-findvenue/20 text-white">
+            {contact.venue_name}
+          </Badge>
+        )}
+        
+        <WhatsAppIntegration 
+          recipientName={contact.name}
+          venueName={contact.venue_name}
+        />
+      </div>
     </div>
   );
 };

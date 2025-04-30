@@ -17,10 +17,18 @@ import {
   Trash,
   Plus,
   Building,
-  Calendar
+  Calendar,
+  MessageSquare
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import VenueBlockedDates from '@/components/venue/VenueBlockedDates';
+import WhatsAppIntegration from '@/components/chat/WhatsAppIntegration';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Venue {
   id: string;
@@ -155,6 +163,11 @@ const MyVenues = () => {
     }
   };
 
+  const handleViewMessages = (venueId: string, venueName: string) => {
+    // Navigate to messages filtered by venue
+    navigate(`/messages?venueId=${venueId}&venueName=${encodeURIComponent(venueName)}`);
+  };
+
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 mt-16 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
@@ -266,37 +279,55 @@ const MyVenues = () => {
                     </div>
                   </CardContent>
                   <CardFooter className="flex justify-between pt-4 border-t border-white/10">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-colors"
-                      onClick={() => handleEditVenue(venue.id)}
-                    >
-                      <Pencil className="h-3.5 w-3.5 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-findvenue/30 text-findvenue hover:bg-findvenue/10 transition-colors"
-                      onClick={() => {
-                        setSelectedVenueId(venue.id);
-                        setSelectedVenueName(venue.name);
-                        setActiveTab("availability");
-                      }}
-                    >
-                      <Calendar className="h-3.5 w-3.5 mr-1" />
-                      Calendar
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
-                      onClick={() => handleDeleteVenue(venue.id)}
-                    >
-                      <Trash className="h-3.5 w-3.5 mr-1" />
-                      Delete
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10 transition-colors"
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1" />
+                          Actions
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="bg-findvenue-card-bg border-white/10">
+                        <DropdownMenuItem onClick={() => handleEditVenue(venue.id)} className="cursor-pointer focus:bg-findvenue/10">
+                          <Pencil className="h-3.5 w-3.5 mr-2" />
+                          Edit Venue
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            setSelectedVenueId(venue.id);
+                            setSelectedVenueName(venue.name);
+                            setActiveTab("availability");
+                          }} 
+                          className="cursor-pointer focus:bg-findvenue/10"
+                        >
+                          <Calendar className="h-3.5 w-3.5 mr-2" />
+                          Manage Calendar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleViewMessages(venue.id, venue.name)} 
+                          className="cursor-pointer focus:bg-findvenue/10"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5 mr-2" />
+                          View Messages
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteVenue(venue.id)} 
+                          className="cursor-pointer focus:bg-red-500/10 text-red-500"
+                        >
+                          <Trash className="h-3.5 w-3.5 mr-2" />
+                          Delete Venue
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    
+                    <WhatsAppIntegration 
+                      recipientName="Customer"
+                      messageText={`Hi! Thank you for your interest in ${venue.name}. I'm the venue owner and would be happy to assist you.`}
+                      venueName={venue.name}
+                    />
                   </CardFooter>
                 </Card>
               ))}

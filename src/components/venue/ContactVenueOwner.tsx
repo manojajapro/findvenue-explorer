@@ -16,15 +16,23 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
+import WhatsAppIntegration from '../chat/WhatsAppIntegration';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
+} from '@/components/ui/tabs';
 
 type ContactVenueOwnerProps = {
   venueId: string;
   venueName: string;
   ownerId: string;
   ownerName: string;
+  ownerPhone?: string;
 };
 
-const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVenueOwnerProps) => {
+const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName, ownerPhone }: ContactVenueOwnerProps) => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -33,6 +41,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
   const [isInitiating, setIsInitiating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState(`Hello! I'm interested in your venue "${venueName}". Can you provide more information?`);
+  const [activeTab, setActiveTab] = useState('app');
 
   // Display an error if we don't have valid owner information
   const ownerError = !ownerId || !ownerName;
@@ -173,15 +182,26 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
               </div>
             </div>
             
-            <Button 
-              variant="default"
-              className="w-full mt-4 bg-findvenue hover:bg-findvenue-dark"
-              onClick={() => setIsDialogOpen(true)}
-              disabled={ownerError}
-            >
-              <MessageCircle className="mr-2 h-4 w-4" />
-              Message {ownerName || 'Venue Host'}
-            </Button>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Button 
+                variant="default"
+                className="bg-findvenue hover:bg-findvenue-dark"
+                onClick={() => setIsDialogOpen(true)}
+                disabled={ownerError}
+              >
+                <MessageCircle className="mr-2 h-4 w-4" />
+                Message
+              </Button>
+              
+              {ownerPhone && (
+                <WhatsAppIntegration
+                  recipientName={ownerName}
+                  recipientPhone={ownerPhone}
+                  venueName={venueName}
+                  messageText={`Hi! I'm interested in your venue "${venueName}". Can you provide more information?`}
+                />
+              )}
+            </div>
             
             {ownerError && (
               <div className="mt-2 text-sm text-red-500 flex items-center">
@@ -202,50 +222,79 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName }: ContactVe
             </DialogDescription>
           </DialogHeader>
           
-          {error || ownerError ? (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Unable to connect</AlertTitle>
-              <AlertDescription>
-                {error || (ownerError ? "Host information is currently unavailable. Please try again later or contact support." : "")}
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="py-4">
-              <div className="mb-4">
-                <label className="text-sm font-medium mb-1 block">Your message:</label>
-                <Textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="bg-findvenue-surface/50 border-white/10 h-32"
-                  placeholder="Enter your message to the venue host..."
-                />
-              </div>
-              
-              <DialogFooter className="flex justify-end gap-2 mt-6">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  className="bg-findvenue hover:bg-findvenue-dark"
-                  onClick={initiateChat}
-                  disabled={isInitiating || !message.trim()}
-                >
-                  {isInitiating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <MessageCircle className="mr-2 h-4 w-4" />
-                      Send Message
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2 bg-findvenue-surface/50">
+              <TabsTrigger value="app">In-App Chat</TabsTrigger>
+              {ownerPhone && <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>}
+            </TabsList>
+            
+            <TabsContent value="app">
+              {error || ownerError ? (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Unable to connect</AlertTitle>
+                  <AlertDescription>
+                    {error || (ownerError ? "Host information is currently unavailable. Please try again later or contact support." : "")}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="py-4">
+                  <div className="mb-4">
+                    <label className="text-sm font-medium mb-1 block">Your message:</label>
+                    <Textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      className="bg-findvenue-surface/50 border-white/10 h-32"
+                      placeholder="Enter your message to the venue host..."
+                    />
+                  </div>
+                  
+                  <DialogFooter className="flex justify-end gap-2 mt-6">
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      className="bg-findvenue hover:bg-findvenue-dark"
+                      onClick={initiateChat}
+                      disabled={isInitiating || !message.trim()}
+                    >
+                      {isInitiating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <MessageCircle className="mr-2 h-4 w-4" />
+                          Send Message
+                        </>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </div>
+              )}
+            </TabsContent>
+            
+            {ownerPhone && (
+              <TabsContent value="whatsapp" className="py-4">
+                <div className="text-sm text-findvenue-text-muted mb-4">
+                  Connect directly via WhatsApp with {ownerName}. This will open WhatsApp on your device.
+                </div>
+                
+                <div className="mt-6 flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <WhatsAppIntegration
+                    recipientName={ownerName}
+                    recipientPhone={ownerPhone}
+                    venueName={venueName}
+                    messageText={`Hi! I'm interested in your venue "${venueName}". Can you provide more information?`}
+                  />
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
         </DialogContent>
       </Dialog>
     </>

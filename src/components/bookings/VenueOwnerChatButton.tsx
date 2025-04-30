@@ -5,20 +5,29 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
+import WhatsAppIntegration from '../chat/WhatsAppIntegration';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface VenueOwnerChatButtonProps {
   ownerId: string;
   ownerName?: string;
   venueId: string;
   venueName: string;
+  ownerPhone?: string;
 }
 
 const VenueOwnerChatButton = ({ 
   ownerId, 
-  ownerName, 
+  ownerName = 'Venue Owner', 
   venueId, 
-  venueName 
+  venueName,
+  ownerPhone
 }: VenueOwnerChatButtonProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -95,15 +104,35 @@ const VenueOwnerChatButton = ({
   };
 
   return (
-    <Button 
-      onClick={handleChatWithOwner}
-      className="w-full" 
-      variant="outline"
-      disabled={isInitiating}
-    >
-      <MessageCircle className="mr-2 h-4 w-4" />
-      {isInitiating ? 'Connecting...' : 'Chat with Venue Owner'}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button 
+          className="w-full" 
+          variant="outline"
+          disabled={isInitiating}
+        >
+          <MessageCircle className="mr-2 h-4 w-4" />
+          {isInitiating ? 'Connecting...' : 'Contact Venue Owner'}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-findvenue-card-bg border-white/10 w-56">
+        <DropdownMenuItem onClick={handleChatWithOwner} className="cursor-pointer focus:bg-findvenue/10">
+          <MessageCircle className="mr-2 h-4 w-4" />
+          <span>Chat in App</span>
+        </DropdownMenuItem>
+        {ownerPhone && (
+          <DropdownMenuItem className="p-0 focus:bg-transparent">
+            <div className="w-full">
+              <WhatsAppIntegration 
+                recipientName={ownerName || 'Venue Owner'} 
+                recipientPhone={ownerPhone}
+                venueName={venueName}
+              />
+            </div>
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
