@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -7,9 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Phone } from 'lucide-react';
 import { AvatarSelector } from '@/components/profile/AvatarSelector';
 import { useUnreadChatsCount } from '@/hooks/useUnreadChatsCount';
+import { PhoneInput } from '@/components/ui/phone-input';
 
 const Profile = () => {
   const { user, profile, updateProfile, updatePassword } = useAuth();
@@ -186,6 +188,7 @@ const Profile = () => {
                               value={firstName}
                               onChange={(e) => setFirstName(e.target.value)}
                               required
+                              className="py-6"
                             />
                           </div>
                           <div className="space-y-2">
@@ -196,6 +199,7 @@ const Profile = () => {
                               value={lastName}
                               onChange={(e) => setLastName(e.target.value)}
                               required
+                              className="py-6"
                             />
                           </div>
                         </div>
@@ -207,7 +211,7 @@ const Profile = () => {
                             type="email"
                             value={user.email}
                             disabled
-                            className="opacity-70"
+                            className="opacity-70 py-6"
                           />
                           <p className="text-xs text-findvenue-text-muted">
                             Email cannot be changed.
@@ -216,13 +220,16 @@ const Profile = () => {
                         
                         <div className="space-y-2">
                           <Label htmlFor="phone">Phone Number</Label>
-                          <Input
+                          <PhoneInput
                             id="phone"
-                            type="tel"
                             value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            placeholder="Your phone number"
+                            onChange={(value) => setPhone(value)}
+                            placeholder="+1 (555) 123-4567"
+                            className="bg-findvenue-surface/50 border-white/10"
                           />
+                          <p className="text-xs text-findvenue-text-muted mt-1">
+                            Include country code (e.g., +1 for US, +44 for UK) for WhatsApp integration
+                          </p>
                         </div>
                         
                         <div className="space-y-2">
@@ -269,6 +276,7 @@ const Profile = () => {
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
                             required
+                            className="py-6"
                           />
                           <Button
                             type="button"
@@ -291,6 +299,7 @@ const Profile = () => {
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             required
+                            className="py-6"
                           />
                           <Button
                             type="button"
@@ -316,6 +325,7 @@ const Profile = () => {
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             required
+                            className="py-6"
                           />
                           <Button
                             type="button"

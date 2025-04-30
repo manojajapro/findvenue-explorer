@@ -1,6 +1,7 @@
 
 import * as React from "react"
 import { Input } from "@/components/ui/input"
+import { Phone } from "lucide-react"
 
 interface PhoneInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
@@ -27,11 +28,15 @@ export function PhoneInput({ className, onChange, ...props }: PhoneInputProps) {
   };
 
   return (
-    <Input
-      {...props}
-      type="tel"
-      onChange={handleChange}
-      className={className}
-    />
+    <div className="relative">
+      <Phone className="absolute left-3 top-3 h-4 w-4 text-findvenue-text-muted" />
+      <Input
+        {...props}
+        type="tel"
+        onChange={handleChange}
+        className={`pl-10 py-6 ${className || ''}`}
+        placeholder={props.placeholder || "+1 (555) 123-4567"}
+      />
+    </div>
   );
 }
