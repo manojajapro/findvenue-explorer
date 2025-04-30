@@ -147,7 +147,7 @@ const Register = () => {
         <Helmet>
           <title>Register | FindVenue</title>
         </Helmet>
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 mt-12">
           <h2 className="mt-6 text-3xl font-extrabold text-findvenue">
             Create your FindVenue account
           </h2>

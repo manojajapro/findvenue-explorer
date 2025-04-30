@@ -129,7 +129,7 @@ const Login = () => {
         <Helmet>
           <title>Login | FindVenue</title>
         </Helmet>
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 mt-12">
           <h2 className="mt-6 text-3xl font-extrabold text-findvenue">
             Sign in to your account
           </h2>
