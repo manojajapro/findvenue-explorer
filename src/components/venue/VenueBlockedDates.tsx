@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { Calendar as CalendarIcon, X, AlertCircle, Clock } from 'lucide-react';
+import { Calendar as CalendarIcon, X, AlertCircle, Clock, Info } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -224,19 +223,24 @@ export default function VenueBlockedDates({ venueId, venueName }: VenueBlockedDa
   }
 
   return (
-    <Card className="border border-white/10 bg-findvenue-card-bg">
-      <CardHeader>
-        <CardTitle>Venue Availability Management</CardTitle>
-        <CardDescription>
-          Block dates or specific time slots on your calendar to prevent new bookings. You cannot block dates that already have bookings.
+    <Card className="border border-white/10 bg-findvenue-card-bg shadow-xl animate-fade-in">
+      <CardHeader className="space-y-1">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-findvenue to-findvenue-light bg-clip-text text-transparent">
+            Venue Availability Management
+          </CardTitle>
+          <CalendarIcon className="h-6 w-6 text-findvenue" />
+        </div>
+        <CardDescription className="text-findvenue-text-muted">
+          Block dates or specific time slots on your calendar to prevent new bookings.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="bg-blue-50 text-blue-800 p-4 rounded-md flex items-start space-x-2">
-          <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+        <div className="bg-findvenue/5 border border-findvenue/10 text-findvenue-text rounded-lg p-4 flex items-start space-x-3">
+          <Info className="h-5 w-5 mt-0.5 flex-shrink-0 text-findvenue" />
           <div>
-            <p className="text-sm font-medium">Managing your venue calendar</p>
-            <ul className="list-disc pl-5 text-sm mt-1">
+            <p className="text-sm font-medium text-findvenue">Managing your venue calendar</p>
+            <ul className="list-disc pl-5 text-sm mt-2 space-y-1 text-findvenue-text-muted">
               <li>Click on a date to block or unblock it</li>
               <li>You can block the entire day or specific hours</li>
               <li>Blocked dates will not be available for customer bookings</li>
@@ -245,7 +249,7 @@ export default function VenueBlockedDates({ venueId, venueName }: VenueBlockedDa
           </div>
         </div>
 
-        <div className="border rounded-md p-4 bg-white">
+        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6 space-y-6">
           <Calendar
             mode="single"
             selected={selectedDate}
@@ -253,55 +257,92 @@ export default function VenueBlockedDates({ venueId, venueName }: VenueBlockedDa
             disabled={(date) => {
               const today = new Date();
               today.setHours(0, 0, 0, 0);
-              return date < today; // Only disable dates in the past
+              return date < today;
             }}
             modifiers={{
               blocked: (date) => isDateBlocked(date),
               booked: (date) => isDateBooked(date),
             }}
             modifiersStyles={{
-              blocked: { backgroundColor: '#F3F4F6', color: '#6B7280' },
-              booked: { backgroundColor: '#FEE2E2', color: '#B91C1C' },
+              blocked: { 
+                backgroundColor: 'rgba(16, 185, 129, 0.15)', // findvenue color with opacity
+                color: '#10B981', // findvenue color
+                fontWeight: '600',
+                borderRadius: '4px'
+              },
+              booked: { 
+                backgroundColor: 'rgba(239, 68, 68, 0.15)', 
+                color: '#EF4444',
+                fontWeight: '600',
+                borderRadius: '4px'
+              },
             }}
-            className="rounded-md"
+            className="rounded-md border-white/10 bg-transparent"
+            classNames={{
+              day_selected: "bg-findvenue text-white hover:bg-findvenue hover:text-white focus:bg-findvenue focus:text-white",
+              day_today: "bg-accent text-accent-foreground font-bold",
+              day: "hover:bg-findvenue/10 hover:text-findvenue focus:bg-findvenue/10 focus:text-findvenue h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+              day_disabled: "text-findvenue-text-muted opacity-50",
+              head_cell: "text-findvenue-text-muted font-normal",
+              cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+              nav_button: "border border-white/10 bg-findvenue-surface hover:bg-findvenue hover:text-white",
+              table: "w-full border-collapse space-y-1",
+              caption: "flex justify-center pt-1 relative items-center mb-4",
+              caption_label: "text-sm font-medium text-white",
+              nav: "space-x-1 flex items-center",
+            }}
           />
           
-          <div className="mt-4 flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 pt-4 border-t border-white/10">
             <div className="flex items-center gap-2">
-              <span className="inline-block w-4 h-4 bg-[#F3F4F6] rounded-full"></span>
-              <span className="text-sm">Blocked by you</span>
+              <span className="inline-block w-4 h-4 bg-findvenue/15 border border-findvenue/30 rounded"></span>
+              <span className="text-sm text-findvenue font-medium">Blocked by you</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="inline-block w-4 h-4 bg-[#FEE2E2] rounded-full"></span>
-              <span className="text-sm">Has bookings (cannot be blocked)</span>
+              <span className="inline-block w-4 h-4 bg-red-500/15 border border-red-500/30 rounded"></span>
+              <span className="text-sm text-red-500 font-medium">Has bookings</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="inline-block w-4 h-4 bg-white border border-gray-300 rounded-full"></span>
-              <span className="text-sm">Available (click to block)</span>
+              <span className="inline-block w-4 h-4 border border-white/20 rounded"></span>
+              <span className="text-sm text-findvenue-text-muted">Available</span>
             </div>
           </div>
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">Currently Blocked Dates</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">Currently Blocked Dates</h3>
+            <span className="text-sm text-findvenue-text-muted">{blockedDates.length} dates blocked</span>
+          </div>
+          
           {isBlockedDatesLoading ? (
-            <div className="py-4 text-center">Loading...</div>
+            <div className="py-8 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-findvenue border-t-transparent"></div>
+              <p className="mt-2 text-sm text-findvenue-text-muted">Loading blocked dates...</p>
+            </div>
           ) : blockedDates.length === 0 ? (
-            <div className="py-4 text-center text-findvenue-text-muted">
-              No dates are currently blocked. Click on dates in the calendar above to block them.
+            <div className="py-8 text-center text-findvenue-text-muted border border-dashed border-white/10 rounded-lg bg-white/5">
+              <CalendarIcon className="mx-auto h-8 w-8 mb-3 text-findvenue-text-muted" />
+              <p>No dates are currently blocked.</p>
+              <p className="text-sm mt-1">Click on dates in the calendar above to block them.</p>
             </div>
           ) : (
-            <div className="divide-y border rounded-md bg-white">
+            <div className="divide-y divide-white/10 border border-white/10 rounded-lg bg-white/5">
               {blockedDates.map((blockedDate) => (
-                <div key={blockedDate.id} className="flex items-center justify-between p-3">
+                <div key={blockedDate.id} className="flex items-center justify-between p-4 group hover:bg-white/5 transition-colors">
                   <div>
-                    <div className="font-medium">{format(parseISO(blockedDate.date), 'PPP')}</div>
-                    <div className="text-sm text-findvenue-text-muted">
+                    <div className="font-medium text-white">{format(parseISO(blockedDate.date), 'PPP')}</div>
+                    <div className="text-sm text-findvenue-text-muted flex items-center gap-2 mt-1">
+                      <Clock className="h-3.5 w-3.5" />
                       {blockedDate.is_full_day ? 
                         'Full day blocked' : 
-                        `Blocked: ${blockedDate.start_time} - ${blockedDate.end_time}`
+                        `${blockedDate.start_time} - ${blockedDate.end_time}`
                       }
-                      {blockedDate.reason && <div>{blockedDate.reason}</div>}
+                      {blockedDate.reason && (
+                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-findvenue/10 text-findvenue">
+                          {blockedDate.reason}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <Button 
@@ -312,6 +353,7 @@ export default function VenueBlockedDates({ venueId, venueName }: VenueBlockedDa
                       setSelectedBlockedId(blockedDate.id);
                       setShowUnblockConfirm(true);
                     }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="h-4 w-4 text-red-500" />
                   </Button>
