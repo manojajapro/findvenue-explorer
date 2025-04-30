@@ -141,7 +141,9 @@ const WhatsAppIntegration = ({
         description: `Redirecting to chat with ${recipientName}`,
       });
       
+      // Make sure dialog gets properly closed
       setIsDialogOpen(false);
+      setIsProcessing(false);
     } catch (error) {
       console.error("Error opening WhatsApp:", error);
       toast({
@@ -149,9 +151,13 @@ const WhatsAppIntegration = ({
         description: "Failed to open WhatsApp. Please try again.",
         variant: "destructive"
       });
-    } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Cleanup function to ensure the dialog state is reset
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
   };
 
   // Check if we have a valid phone number to enable direct opening
@@ -180,7 +186,13 @@ const WhatsAppIntegration = ({
         WhatsApp
       </Button>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog 
+        open={isDialogOpen} 
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) handleDialogClose();
+        }}
+      >
         <DialogContent className="sm:max-w-md bg-findvenue-card-bg border-white/10">
           <DialogHeader>
             <DialogTitle className="text-xl">WhatsApp {recipientName}</DialogTitle>
@@ -230,7 +242,7 @@ const WhatsAppIntegration = ({
           <DialogFooter className="flex justify-end gap-2 mt-2">
             <Button 
               variant="outline" 
-              onClick={() => setIsDialogOpen(false)}
+              onClick={() => handleDialogClose()}
               className="h-12"
             >
               Cancel

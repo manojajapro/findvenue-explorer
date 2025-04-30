@@ -73,13 +73,6 @@ const BookingOwnerChat = ({
     }
   };
 
-  // Handle direct WhatsApp click without dropdown
-  const handleDirectWhatsApp = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    // This is intentionally empty as the WhatsAppIntegration component handles the click
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -98,7 +91,7 @@ const BookingOwnerChat = ({
         </DropdownMenuItem>
         {ownerPhone && (
           <DropdownMenuItem className="p-0 focus:bg-transparent cursor-default">
-            <div className="w-full" onClick={handleDirectWhatsApp}>
+            <div className="w-full">
               <WhatsAppIntegration 
                 recipientName={ownerName || 'Venue Owner'} 
                 recipientPhone={ownerPhone}
