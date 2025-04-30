@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/components/ui/use-toast';
 
 interface BlockedDate {
   id: string;
@@ -16,6 +18,8 @@ interface BlockedDate {
 }
 
 export const useBlockedDates = (venueId: string) => {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
   const [blockedDatesStrings, setBlockedDatesStrings] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -78,6 +82,15 @@ export const useBlockedDates = (venueId: string) => {
   };
 
   const blockDate = async (date: Date, fullDay: boolean = true, reason: string = ''): Promise<boolean> => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to block dates.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
     try {
       const dateStr = format(date, 'yyyy-MM-dd');
       
@@ -93,7 +106,12 @@ export const useBlockedDates = (venueId: string) => {
       
       // Cannot block a date with existing bookings
       if (existingBookings && existingBookings.length > 0) {
-        throw new Error('Cannot block this date as there are existing bookings');
+        toast({
+          title: "Cannot block this date",
+          description: "There are existing bookings for this date.",
+          variant: "destructive",
+        });
+        return false;
       }
       
       const { error } = await supabase
@@ -105,21 +123,45 @@ export const useBlockedDates = (venueId: string) => {
             start_time: fullDay ? null : '00:00',
             end_time: fullDay ? null : '23:59',
             is_full_day: fullDay,
-            reason
+            reason,
+            created_by: user.id
           }
         ]);
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error blocking date:", error);
+        throw error;
+      }
+      
+      toast({
+        title: "Date blocked",
+        description: `${format(date, 'PPP')} has been blocked successfully.`,
+        variant: "default",
+      });
       
       return true;
     } catch (err: any) {
       console.error('Error blocking date:', err);
       setError(err.message || 'Failed to block date');
+      toast({
+        title: "Failed to block date",
+        description: err.message || "An error occurred while blocking the date.",
+        variant: "destructive",
+      });
       return false;
     }
   };
 
   const unblockDate = async (date: Date): Promise<boolean> => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to unblock dates.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
     try {
       const dateStr = format(date, 'yyyy-MM-dd');
       
@@ -131,10 +173,21 @@ export const useBlockedDates = (venueId: string) => {
         
       if (error) throw error;
       
+      toast({
+        title: "Date unblocked",
+        description: `${format(date, 'PPP')} has been unblocked successfully.`,
+        variant: "default",
+      });
+      
       return true;
     } catch (err: any) {
       console.error('Error unblocking date:', err);
       setError(err.message || 'Failed to unblock date');
+      toast({
+        title: "Failed to unblock date",
+        description: err.message || "An error occurred while unblocking the date.",
+        variant: "destructive",
+      });
       return false;
     }
   };

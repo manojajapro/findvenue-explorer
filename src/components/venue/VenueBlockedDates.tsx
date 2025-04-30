@@ -198,14 +198,14 @@ export default function VenueBlockedDates({ venueId, venueName }: VenueBlockedDa
           <div>
             <p className="text-sm font-medium">Managing your venue calendar</p>
             <ul className="list-disc pl-5 text-sm mt-1">
-              <li>Select dates to block or unblock them</li>
+              <li>Click on a date to block or unblock it</li>
+              <li>Blocked dates will not be available for customer bookings</li>
               <li>You cannot block dates that already have bookings</li>
-              <li>Blocked dates will not be available for new customer bookings</li>
             </ul>
           </div>
         </div>
 
-        <div className="border rounded-md p-4">
+        <div className="border rounded-md p-4 bg-white">
           <Calendar
             mode="single"
             selected={selectedDate}
@@ -223,17 +223,21 @@ export default function VenueBlockedDates({ venueId, venueName }: VenueBlockedDa
               blocked: { backgroundColor: '#F3F4F6', color: '#6B7280' },
               booked: { backgroundColor: '#FEE2E2', color: '#B91C1C' },
             }}
-            className="rounded-md border bg-white"
+            className="rounded-md"
           />
           
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
-              <span className="inline-block w-3 h-3 bg-[#F3F4F6] rounded-full"></span>
-              <span className="text-xs">Blocked by you</span>
+              <span className="inline-block w-4 h-4 bg-[#F3F4F6] rounded-full"></span>
+              <span className="text-sm">Blocked by you</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="inline-block w-3 h-3 bg-[#FEE2E2] rounded-full"></span>
-              <span className="text-xs">Has bookings (cannot be blocked)</span>
+              <span className="inline-block w-4 h-4 bg-[#FEE2E2] rounded-full"></span>
+              <span className="text-sm">Has bookings (cannot be blocked)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-4 h-4 bg-white border border-gray-300 rounded-full"></span>
+              <span className="text-sm">Available (click to block)</span>
             </div>
           </div>
         </div>
@@ -244,10 +248,10 @@ export default function VenueBlockedDates({ venueId, venueName }: VenueBlockedDa
             <div className="py-4 text-center">Loading...</div>
           ) : blockedDates.length === 0 ? (
             <div className="py-4 text-center text-findvenue-text-muted">
-              No dates are currently blocked. Select dates on the calendar to block them.
+              No dates are currently blocked. Click on dates in the calendar above to block them.
             </div>
           ) : (
-            <div className="divide-y border rounded-md">
+            <div className="divide-y border rounded-md bg-white">
               {blockedDates.map((blockedDate) => (
                 <div key={blockedDate.id} className="flex items-center justify-between p-3">
                   <div>

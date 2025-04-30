@@ -9,6 +9,42 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      blocked_dates: {
+        Row: {
+          created_at: string
+          created_by: string
+          date: string
+          end_time: string | null
+          id: string
+          is_full_day: boolean | null
+          reason: string | null
+          start_time: string | null
+          venue_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          date: string
+          end_time?: string | null
+          id?: string
+          is_full_day?: boolean | null
+          reason?: string | null
+          start_time?: string | null
+          venue_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          date?: string
+          end_time?: string | null
+          id?: string
+          is_full_day?: boolean | null
+          reason?: string | null
+          start_time?: string | null
+          venue_id?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           booking_date: string
