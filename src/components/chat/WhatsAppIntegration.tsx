@@ -34,7 +34,7 @@ const WhatsAppIntegration = ({
 }: WhatsAppIntegrationProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState(recipientPhone);
-  const [message, setMessage] = useState(messageText || `Hi! I'm interested in discussing ${venueName}.`);
+  const [message, setMessage] = useState(messageText || `Hi! I'm interested in discussing ${venueName || 'your venue'}.`);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSharingEnabled, setIsSharingEnabled] = useState(true);
   const [contactPhoneLoaded, setContactPhoneLoaded] = useState(false);
@@ -68,12 +68,19 @@ const WhatsAppIntegration = ({
     fetchContactPhone();
   }, [contactId, recipientPhone, contactPhoneLoaded]);
 
-  // Effect to set phone number when recipientPhone prop changes
+  // Effect to set phone number and message when props change
   useEffect(() => {
     if (recipientPhone) {
       setPhoneNumber(recipientPhone);
     }
-  }, [recipientPhone]);
+    
+    // Update the message when messageText or venueName props change
+    if (messageText) {
+      setMessage(messageText);
+    } else if (venueName) {
+      setMessage(`Hi! I'm interested in your venue "${venueName}". Can you provide more information?`);
+    }
+  }, [recipientPhone, messageText, venueName]);
 
   const formatPhoneNumber = (phone: string): string => {
     // Remove any non-digit characters 
@@ -117,11 +124,13 @@ const WhatsAppIntegration = ({
       }
       
       const finalMessage = isSharingEnabled && venueName ? 
-        `Hi! I'm interested in discussing ${venueName}.` : 
+        `Hi! I'm interested in your venue "${venueName}". Can you provide more information?` : 
         message;
       
       const encodedMessage = encodeURIComponent(finalMessage);
       const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+      
+      console.log("Opening WhatsApp URL:", whatsappUrl);
       
       // Open WhatsApp in a new tab
       window.open(whatsappUrl, '_blank');
@@ -148,7 +157,10 @@ const WhatsAppIntegration = ({
   const canDirectOpen = !!phoneNumber && phoneNumber.length > 8;
 
   // Direct open handler for when we already have the phone number
-  const handleDirectOpenWhatsApp = () => {
+  const handleDirectOpenWhatsApp = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (canDirectOpen) {
       handleOpenWhatsApp();
     } else {
@@ -160,7 +172,7 @@ const WhatsAppIntegration = ({
     <>
       <Button 
         variant="outline" 
-        className="flex items-center gap-2 border-green-500/30 text-green-500 hover:bg-green-500/10"
+        className="flex items-center gap-2 border-green-500/30 text-green-500 hover:bg-green-500/10 w-full"
         onClick={handleDirectOpenWhatsApp}
       >
         <MessageSquare className="h-4 w-4" />

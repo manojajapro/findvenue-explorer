@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Loader2, Clock, BarChart2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import WhatsAppIntegration from '../chat/WhatsAppIntegration';
+import { getVenueOwnerPhone } from '@/utils/venueHelpers';
 import {
   Tabs,
   TabsContent,
@@ -42,6 +42,25 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName, ownerPhone 
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState(`Hello! I'm interested in your venue "${venueName}". Can you provide more information?`);
   const [activeTab, setActiveTab] = useState('app');
+  const [ownerPhoneNumber, setOwnerPhoneNumber] = useState<string | undefined>(ownerPhone);
+
+  // Fetch owner's phone number if not provided
+  useEffect(() => {
+    const fetchOwnerPhone = async () => {
+      if (ownerPhone || !ownerId) return;
+      
+      try {
+        const phoneNumber = await getVenueOwnerPhone(ownerId);
+        if (phoneNumber) {
+          setOwnerPhoneNumber(phoneNumber);
+        }
+      } catch (err) {
+        console.error('Error fetching owner phone number:', err);
+      }
+    };
+    
+    fetchOwnerPhone();
+  }, [ownerId, ownerPhone]);
 
   // Display an error if we don't have valid owner information
   const ownerError = !ownerId || !ownerName;
@@ -193,10 +212,10 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName, ownerPhone 
                 Message
               </Button>
               
-              {ownerPhone && (
+              {(ownerPhoneNumber || ownerPhone) && (
                 <WhatsAppIntegration
                   recipientName={ownerName}
-                  recipientPhone={ownerPhone}
+                  recipientPhone={ownerPhoneNumber || ownerPhone}
                   venueName={venueName}
                   messageText={`Hi! I'm interested in your venue "${venueName}". Can you provide more information?`}
                 />
@@ -225,7 +244,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName, ownerPhone 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2 bg-findvenue-surface/50">
               <TabsTrigger value="app">In-App Chat</TabsTrigger>
-              {ownerPhone && <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>}
+              {(ownerPhoneNumber || ownerPhone) && <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>}
             </TabsList>
             
             <TabsContent value="app">
@@ -275,7 +294,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName, ownerPhone 
               )}
             </TabsContent>
             
-            {ownerPhone && (
+            {(ownerPhoneNumber || ownerPhone) && (
               <TabsContent value="whatsapp" className="py-4">
                 <div className="text-sm text-findvenue-text-muted mb-4">
                   Connect directly via WhatsApp with {ownerName}. This will open WhatsApp on your device.
@@ -287,7 +306,7 @@ const ContactVenueOwner = ({ venueId, venueName, ownerId, ownerName, ownerPhone 
                   </Button>
                   <WhatsAppIntegration
                     recipientName={ownerName}
-                    recipientPhone={ownerPhone}
+                    recipientPhone={ownerPhoneNumber || ownerPhone}
                     venueName={venueName}
                     messageText={`Hi! I'm interested in your venue "${venueName}". Can you provide more information?`}
                   />

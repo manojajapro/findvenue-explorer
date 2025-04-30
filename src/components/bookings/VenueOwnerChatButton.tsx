@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import WhatsAppIntegration from '../chat/WhatsAppIntegration';
+import { getVenueOwnerPhone } from '@/utils/venueHelpers';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,25 @@ const VenueOwnerChatButton = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [isInitiating, setIsInitiating] = useState(false);
+  const [ownerPhoneNumber, setOwnerPhoneNumber] = useState<string | undefined>(ownerPhone);
+
+  // If ownerPhone wasn't provided, fetch it
+  useEffect(() => {
+    const fetchOwnerPhone = async () => {
+      if (ownerPhone || !ownerId) return;
+      
+      try {
+        const phoneNumber = await getVenueOwnerPhone(ownerId);
+        if (phoneNumber) {
+          setOwnerPhoneNumber(phoneNumber);
+        }
+      } catch (err) {
+        console.error('Error fetching owner phone number:', err);
+      }
+    };
+    
+    fetchOwnerPhone();
+  }, [ownerId, ownerPhone]);
 
   const handleChatWithOwner = async () => {
     if (!user) {
@@ -90,7 +110,7 @@ const VenueOwnerChatButton = ({
       }
       
       // Navigate to messages with the owner
-      navigate(`/messages/${ownerId}`);
+      navigate(`/messages/${ownerId}?venueId=${venueId}&venueName=${encodeURIComponent(venueName)}`);
     } catch (error) {
       console.error('Error initiating chat:', error);
       toast({
@@ -120,13 +140,14 @@ const VenueOwnerChatButton = ({
           <MessageCircle className="mr-2 h-4 w-4" />
           <span>Chat in App</span>
         </DropdownMenuItem>
-        {ownerPhone && (
+        {(ownerPhoneNumber || ownerPhone) && (
           <DropdownMenuItem className="p-0 focus:bg-transparent">
             <div className="w-full">
               <WhatsAppIntegration 
                 recipientName={ownerName || 'Venue Owner'} 
-                recipientPhone={ownerPhone}
+                recipientPhone={ownerPhoneNumber || ownerPhone}
                 venueName={venueName}
+                messageText={`Hi! I'm interested in your venue "${venueName}". Can you provide more information?`}
               />
             </div>
           </DropdownMenuItem>

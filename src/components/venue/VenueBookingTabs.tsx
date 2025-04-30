@@ -17,6 +17,7 @@ import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
 import { isDateBlockedForVenue } from '@/utils/dateUtils';
 import VenueBlockedDates from './VenueBlockedDates';
 import WhatsAppIntegration from '../chat/WhatsAppIntegration';
+import { getVenueOwnerPhone } from '@/utils/venueHelpers';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -60,7 +61,8 @@ export default function VenueBookingTabs({
   const [processingBooking, setProcessingBooking] = useState<boolean>(false);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [isLoadingBlockedDates, setIsLoadingBlockedDates] = useState<boolean>(true);
-  
+  const [ownerPhone, setOwnerPhone] = useState<string | undefined>(undefined);
+
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [peopleCount, setPeopleCount] = useState<string>(minCapacity.toString());
   const [fromTime, setFromTime] = useState<string>('09:00');
@@ -870,7 +872,9 @@ export default function VenueBookingTabs({
             <div className="w-full">
               <WhatsAppIntegration 
                 recipientName={ownerName || 'Venue Owner'} 
+                recipientPhone={ownerPhone}
                 venueName={venueName}
+                messageText={`Hi! I'm interested in your venue "${venueName}". Can you provide more information?`}
               />
             </div>
           </DropdownMenuItem>
