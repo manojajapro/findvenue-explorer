@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -53,6 +52,12 @@ interface BookingFormProps {
   availableTimeSlots: string[];
   autoConfirm?: boolean;
   blockedDates?: string[];
+  blockedTimeSlots?: Array<{
+    date: string;
+    is_full_day: boolean;
+    start_time?: string | null;
+    end_time?: string | null;
+  }>;
 }
 
 const formSchema = z.object({
@@ -83,7 +88,8 @@ export default function BookingForm({
   fullyBookedDates,
   availableTimeSlots,
   autoConfirm = false,
-  blockedDates = []
+  blockedDates = [],
+  blockedTimeSlots = []
 }: BookingFormProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -91,6 +97,7 @@ export default function BookingForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([]);
   const [venueBlockedDates, setVenueBlockedDates] = useState<string[]>(blockedDates);
+  const [venueBlockedTimeSlots, setVenueBlockedTimeSlots] = useState<typeof blockedTimeSlots>(blockedTimeSlots);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -106,26 +113,33 @@ export default function BookingForm({
     },
   });
 
-  // Fetch blocked dates if not provided
+  // Fetch blocked dates and time slots if not provided
   useEffect(() => {
-    if (blockedDates.length === 0) {
-      const fetchBlockedDates = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('blocked_dates')
-            .select('date')
-            .eq('venue_id', venueId);
-            
-          if (error) throw error;
+    const fetchBlockedDatesAndTimeSlots = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('blocked_dates')
+          .select('date, is_full_day, start_time, end_time')
+          .eq('venue_id', venueId);
           
-          const blockedDateStrings = (data || []).map(item => item.date);
-          setVenueBlockedDates(blockedDateStrings);
-        } catch (err) {
-          console.error('Error fetching blocked dates:', err);
-        }
-      };
-      
-      fetchBlockedDates();
+        if (error) throw error;
+        
+        // Extract fully blocked dates
+        const fullBlockedDates = (data || [])
+          .filter(item => item.is_full_day)
+          .map(item => item.date);
+          
+        setVenueBlockedDates(fullBlockedDates);
+        
+        // Set all blocked time slots
+        setVenueBlockedTimeSlots(data || []);
+      } catch (err) {
+        console.error('Error fetching blocked dates and time slots:', err);
+      }
+    };
+    
+    if (blockedTimeSlots.length === 0) {
+      fetchBlockedDatesAndTimeSlots();
       
       const channel = supabase
         .channel('blocked_dates_changes')
@@ -135,7 +149,7 @@ export default function BookingForm({
           table: 'blocked_dates',
           filter: `venue_id=eq.${venueId}`
         }, () => {
-          fetchBlockedDates();
+          fetchBlockedDatesAndTimeSlots();
         })
         .subscribe();
         
@@ -143,9 +157,16 @@ export default function BookingForm({
         supabase.removeChannel(channel);
       };
     } else {
-      setVenueBlockedDates(blockedDates);
+      setVenueBlockedTimeSlots(blockedTimeSlots);
+      
+      // Extract fully blocked dates from time slots
+      const fullBlockedDates = blockedTimeSlots
+        .filter(item => item.is_full_day)
+        .map(item => item.date);
+        
+      setVenueBlockedDates(fullBlockedDates);
     }
-  }, [venueId, blockedDates]);
+  }, [venueId, blockedDates, blockedTimeSlots]);
 
   const selectedDate = form.watch('date');
   const selectedStartTime = form.watch('startTime');
@@ -154,21 +175,96 @@ export default function BookingForm({
   useEffect(() => {
     if (selectedDate) {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Check full day blocks
       if (venueBlockedDates.includes(dateStr)) {
         toast({
           title: "Date not available",
-          description: "This date has been blocked by the venue owner and is not available for booking.",
+          description: "This date has been fully blocked by the venue owner and is not available for booking.",
           variant: "destructive"
         });
         form.setValue('date', undefined as any);
+      } else {
+        // Filter available time slots based on blocked time slots
+        updateAvailableTimeSlotsForDate(selectedDate);
       }
     }
-  }, [selectedDate, venueBlockedDates, toast, form]);
+  }, [selectedDate, venueBlockedDates, toast, form, venueBlockedTimeSlots]);
+
+  // Update available time slots based on blocked time slots for the selected date
+  const updateAvailableTimeSlotsForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    // Get blocked time slots for this date
+    const dateBlockedSlots = venueBlockedTimeSlots.filter(slot => 
+      slot.date === dateStr && !slot.is_full_day && slot.start_time && slot.end_time
+    );
+    
+    if (dateBlockedSlots.length > 0) {
+      // Filter available time slots
+      const blockedRanges = dateBlockedSlots.map(slot => ({
+        start: slot.start_time as string,
+        end: slot.end_time as string
+      }));
+      
+      // Create a new filtered list of time slots
+      const filteredTimeSlots = availableTimeSlots.filter(timeSlot => {
+        // Check if this time slot falls within any blocked range
+        return !blockedRanges.some(range => 
+          timeSlot >= range.start && timeSlot < range.end
+        );
+      });
+      
+      // If selected start time is in blocked range, reset it
+      if (selectedStartTime) {
+        const isBlocked = blockedRanges.some(range => 
+          selectedStartTime >= range.start && selectedStartTime < range.end
+        );
+        
+        if (isBlocked) {
+          form.setValue('startTime', filteredTimeSlots[0] || '');
+          form.setValue('endTime', '');
+        }
+      }
+    }
+  };
 
   const updateAvailableEndTimes = (startTime: string) => {
+    const dateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+    
+    if (!dateStr || !startTime) {
+      setAvailableEndTimes([]);
+      return;
+    }
+    
+    // Get blocked time slots for this date
+    const dateBlockedSlots = venueBlockedTimeSlots.filter(slot => 
+      slot.date === dateStr && !slot.is_full_day && slot.start_time && slot.end_time
+    );
+    
     const startIndex = availableTimeSlots.indexOf(startTime);
     if (startIndex !== -1) {
-      setAvailableEndTimes(availableTimeSlots.slice(startIndex + 1));
+      // Get all time slots after the start time
+      const potentialEndTimes = availableTimeSlots.slice(startIndex + 1);
+      
+      if (dateBlockedSlots.length > 0) {
+        // Filter out end times that would create a booking that overlaps with blocked slots
+        const validEndTimes = potentialEndTimes.filter(endTime => {
+          return !dateBlockedSlots.some(block => {
+            const blockStart = block.start_time as string;
+            const blockEnd = block.end_time as string;
+            
+            // Check if booking would overlap with a blocked time slot
+            // Overlap occurs when: startTime < blockEnd && endTime > blockStart
+            return startTime < blockEnd && endTime > blockStart;
+          });
+        });
+        
+        setAvailableEndTimes(validEndTimes);
+      } else {
+        // No blocked slots, use all potential end times
+        setAvailableEndTimes(potentialEndTimes);
+      }
     } else {
       setAvailableEndTimes([]);
     }
@@ -178,7 +274,7 @@ export default function BookingForm({
     if (selectedStartTime) {
       updateAvailableEndTimes(selectedStartTime);
     }
-  }, [selectedStartTime, availableTimeSlots]);
+  }, [selectedStartTime, availableTimeSlots, selectedDate, venueBlockedTimeSlots]);
 
   // Combine booked and blocked dates for the calendar
   const disabledDates = [
@@ -336,7 +432,30 @@ export default function BookingForm({
 
   const isTimeSlotBooked = (date: Date, timeSlot: string): boolean => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return bookedTimeSlots[dateStr]?.includes(timeSlot) || false;
+    
+    // Check if time slot is already booked
+    if (bookedTimeSlots[dateStr]?.includes(timeSlot)) {
+      return true;
+    }
+    
+    // Check if time slot overlaps with blocked time slots
+    const [startTime, endTime] = timeSlot.split(' - ');
+    if (!startTime || !endTime) {
+      return false;
+    }
+    
+    // Get blocked time slots for this date
+    const blockedSlots = venueBlockedTimeSlots.filter(slot => 
+      slot.date === dateStr && !slot.is_full_day
+    );
+    
+    // Check if time slot overlaps with any blocked time slot
+    return blockedSlots.some(block => {
+      if (!block.start_time || !block.end_time) return false;
+      
+      // Check for overlap: startA < endB && endA > startB
+      return startTime < block.end_time && endTime > block.start_time;
+    });
   };
 
   const isDateDisabled = (date: Date) => {
@@ -346,7 +465,7 @@ export default function BookingForm({
     
     const dateStr = format(date, 'yyyy-MM-dd');
     
-    // Check if date is blocked by owner
+    // Check if date is fully blocked by owner
     if (venueBlockedDates.includes(dateStr)) return true;
     
     // Check if date is fully booked
@@ -390,10 +509,14 @@ export default function BookingForm({
                       modifiers={{
                         booked: fullyBookedDates.map(dateStr => new Date(dateStr)),
                         blocked: venueBlockedDates.map(dateStr => new Date(dateStr)),
+                        partiallyBlocked: venueBlockedTimeSlots
+                          .filter(slot => !slot.is_full_day)
+                          .map(slot => new Date(slot.date)),
                       }}
                       modifiersStyles={{
                         booked: { backgroundColor: '#FEE2E2', textDecoration: 'line-through', color: '#B91C1C' },
                         blocked: { backgroundColor: '#F3F4F6', textDecoration: 'line-through', color: '#6B7280' },
+                        partiallyBlocked: { backgroundColor: '#E5E7EB', color: '#4B5563' },
                       }}
                       className="p-3 pointer-events-auto"
                     />
@@ -405,7 +528,11 @@ export default function BookingForm({
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="inline-block w-3 h-3 bg-[#F3F4F6] rounded-full"></span>
-                          <span className="text-xs">Blocked by owner</span>
+                          <span className="text-xs">Blocked by owner (full day)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block w-3 h-3 bg-[#E5E7EB] rounded-full"></span>
+                          <span className="text-xs">Partially blocked (some hours available)</span>
                         </div>
                       </div>
                     </div>

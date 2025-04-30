@@ -8,6 +8,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+interface BlockedTimeSlot {
+  date: string;
+  is_full_day: boolean;
+  start_time?: string | null;
+  end_time?: string | null;
+}
+
 interface BookingCalendarProps {
   selectedDate: Date | undefined;
   onDateSelect: (date: Date | undefined) => void;
@@ -16,14 +23,8 @@ interface BookingCalendarProps {
   dayBookedDates: string[];
   hourlyBookedDates: string[];
   bookingType: 'hourly' | 'full-day';
-  blockedDates?: string[]; // New prop for blocked dates
-}
-
-interface BlockedDateInfo {
-  date: string;
-  is_full_day: boolean;
-  start_time?: string | null;
-  end_time?: string | null;
+  blockedDates?: string[];
+  blockedTimeSlots?: BlockedTimeSlot[];
 }
 
 export function BookingCalendar({
@@ -34,7 +35,8 @@ export function BookingCalendar({
   dayBookedDates,
   hourlyBookedDates,
   bookingType,
-  blockedDates = []
+  blockedDates = [],
+  blockedTimeSlots = []
 }: BookingCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
@@ -56,6 +58,12 @@ export function BookingCalendar({
     return dateArray.includes(dateStr);
   };
   
+  // Helper function to get blocked time slots for a specific date
+  const getBlockedTimeSlotsForDate = (date: Date): BlockedTimeSlot[] => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return blockedTimeSlots.filter(slot => slot.date === dateStr);
+  };
+  
   // Helper function to determine if a date should be disabled
   const isDateDisabled = (date: Date): boolean => {
     const today = new Date();
@@ -64,21 +72,57 @@ export function BookingCalendar({
     // Can't book dates in the past
     if (date < today) return true;
     
-    // Can't book blocked dates
-    if (isDateInArray(date, blockedDates)) return true;
-    
-    // For full-day bookings, can't select dates that are fully booked or have day bookings
-    if (bookingType === 'full-day' && 
-        (isDateInArray(date, fullyBookedDates) || isDateInArray(date, dayBookedDates))) {
-      return true;
+    // For full-day bookings
+    if (bookingType === 'full-day') {
+      // Can't select dates that are fully booked or have day bookings
+      if (isDateInArray(date, fullyBookedDates) || isDateInArray(date, dayBookedDates)) {
+        return true;
+      }
+      
+      // Can't select dates that are fully blocked
+      const dateBlocks = getBlockedTimeSlotsForDate(date);
+      if (dateBlocks.some(block => block.is_full_day)) {
+        return true;
+      }
+      
+      // Can select dates with only partial blocks for full-day bookings
+      return false;
     }
     
-    // For hourly bookings, can't select dates with day bookings
-    if (bookingType === 'hourly' && isDateInArray(date, dayBookedDates)) {
-      return true;
+    // For hourly bookings
+    if (bookingType === 'hourly') {
+      // Can't select dates with day bookings
+      if (isDateInArray(date, dayBookedDates)) {
+        return true;
+      }
+      
+      // Can't select dates that are fully blocked
+      const dateBlocks = getBlockedTimeSlotsForDate(date);
+      if (dateBlocks.some(block => block.is_full_day)) {
+        return true;
+      }
+      
+      // Can select dates with only partial blocks or hourly bookings
+      return false;
     }
     
     return false;
+  };
+  
+  // Helper function to determine if a date is partially blocked
+  const isDatePartiallyBlocked = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return blockedTimeSlots.some(slot => slot.date === dateStr && !slot.is_full_day);
+  };
+  
+  // Create tooltip content for partially blocked dates
+  const getPartiallyBlockedInfo = (date: Date): string => {
+    const slots = getBlockedTimeSlotsForDate(date).filter(slot => !slot.is_full_day);
+    if (slots.length === 0) return '';
+    
+    return slots.map(slot => 
+      `Blocked: ${slot.start_time} - ${slot.end_time}`
+    ).join('\n');
   };
   
   return (
@@ -106,13 +150,15 @@ export function BookingCalendar({
               booked: (date) => isDateInArray(date, fullyBookedDates),
               dayBooked: (date) => isDateInArray(date, dayBookedDates),
               hourlyBooked: (date) => isDateInArray(date, hourlyBookedDates),
-              blocked: (date) => isDateInArray(date, blockedDates),
+              blocked: (date) => getBlockedTimeSlotsForDate(date).some(slot => slot.is_full_day),
+              partiallyBlocked: (date) => isDatePartiallyBlocked(date),
             }}
             modifiersStyles={{
               booked: { backgroundColor: '#FEE2E2', textDecoration: 'line-through', color: '#B91C1C' },
               dayBooked: { backgroundColor: '#DBEAFE', color: '#1E40AF' },
               hourlyBooked: { backgroundColor: '#FEF3C7', color: '#92400E' },
               blocked: { backgroundColor: '#F3F4F6', textDecoration: 'line-through', color: '#6B7280' },
+              partiallyBlocked: { backgroundColor: '#E5E7EB', color: '#4B5563', position: 'relative' },
             }}
             className="rounded-md border"
           />
@@ -133,10 +179,42 @@ export function BookingCalendar({
               </div>
               <div className="flex items-center gap-2">
                 <span className="inline-block w-3 h-3 bg-[#F3F4F6] rounded-full"></span>
-                <span className="text-xs">Blocked by owner</span>
+                <span className="text-xs">Fully blocked by owner</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#E5E7EB] rounded-full"></span>
+                <span className="text-xs">Partially blocked (some hours available)</span>
               </div>
             </div>
           </div>
+          
+          {/* Display tooltip for partially blocked dates */}
+          <TooltipProvider>
+            {calendarDays.map((day, i) => (
+              isDatePartiallyBlocked(day) && (
+                <Tooltip key={i}>
+                  <TooltipTrigger asChild>
+                    <div 
+                      className="absolute" 
+                      style={{
+                        top: `${Math.floor(i / 7) * 36 + 50}px`,
+                        left: `${(i % 7) * 36 + 18}px`,
+                        width: '4px',
+                        height: '4px',
+                        zIndex: 10
+                      }}
+                    >
+                      <ClockIcon className="w-4 h-4 text-amber-500" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs whitespace-pre-line">{getPartiallyBlockedInfo(day)}</p>
+                    <p className="text-xs font-medium text-green-600 mt-1">Other hours available for booking</p>
+                  </TooltipContent>
+                </Tooltip>
+              )
+            ))}
+          </TooltipProvider>
         </PopoverContent>
       </Popover>
     </div>
