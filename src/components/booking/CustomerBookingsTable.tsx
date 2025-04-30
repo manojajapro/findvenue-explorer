@@ -180,7 +180,7 @@ export const CustomerBookingsTable = ({
                   {!processingBookingIds.has(booking.id) && booking.status !== 'pending' && (
                     <div className="flex space-x-2 justify-end">
                       <span className="text-findvenue-text-muted text-sm mr-2">
-                        {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'}
+                        {/* {booking.status === 'confirmed' ? 'Confirmed' : 'Cancelled'} */}
                       </span>
                       <Button
                         variant="outline"
