@@ -16,14 +16,6 @@ import BookingCalendar from './BookingCalendar';
 import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
 import { isDateBlockedForVenue } from '@/utils/dateUtils';
 import VenueBlockedDates from './VenueBlockedDates';
-import WhatsAppIntegration from '../chat/WhatsAppIntegration';
-import { getVenueOwnerPhone } from '@/utils/venueHelpers';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
 import { MessageCircle } from 'lucide-react';
 
 interface VenueBookingTabsProps {
@@ -855,31 +847,15 @@ export default function VenueBookingTabs({
         </div>
       </div>
       
-      {/* Replace the existing Message Host button with a dropdown */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="w-full mt-4">
-            <MessageCircle className="mr-2 h-4 w-4" />
-            Message host
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="bg-findvenue-card-bg border-white/10 w-56">
-          <DropdownMenuItem onClick={initiateChat} className="cursor-pointer focus:bg-findvenue/10">
-            <MessageCircle className="mr-2 h-4 w-4" />
-            <span>Chat in App</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="p-0 focus:bg-transparent">
-            <div className="w-full">
-              <WhatsAppIntegration 
-                recipientName={ownerName || 'Venue Owner'} 
-                recipientPhone={ownerPhone}
-                venueName={venueName}
-                messageText={`Hi! I'm interested in your venue "${venueName}". Can you provide more information?`}
-              />
-            </div>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Replace the dropdown with a direct chat button */}
+      <Button 
+        variant="outline" 
+        className="w-full mt-4"
+        onClick={initiateChat}
+      >
+        <MessageCircle className="mr-2 h-4 w-4" />
+        Message host
+      </Button>
     </div>
   );
 }
