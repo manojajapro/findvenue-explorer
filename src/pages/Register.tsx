@@ -1,14 +1,15 @@
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Mail, Lock, User, Building, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, Building, ArrowLeft, Phone } from 'lucide-react';
 import { Helmet } from 'react-helmet';
 import { supabase } from '@/integrations/supabase/client';
 import { Separator } from '@/components/ui/separator';
+import { PhoneInput } from '@/components/ui/phone-input';
 
 const Register = () => {
   const { toast } = useToast();
@@ -19,9 +20,14 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [userRole, setUserRole] = useState('customer');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const handlePhoneChange = (value: string) => {
+    setPhone(value);
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +35,7 @@ const Register = () => {
     if (!email || !password || !confirmPassword || !firstName || !lastName) {
       toast({
         title: 'Error',
-        description: 'Please fill in all fields',
+        description: 'Please fill in all required fields',
         variant: 'destructive'
       });
       return;
@@ -62,6 +68,14 @@ const Register = () => {
       if (error) throw error;
 
       if (data?.user) {
+        // If the user was created successfully, update their profile to include phone number
+        if (phone) {
+          await supabase
+            .from('user_profiles')
+            .update({ phone })
+            .eq('id', data.user.id);
+        }
+
         toast({
           title: 'Success',
           description: 'Registration successful! Please check your email to verify your account.',
@@ -161,6 +175,7 @@ const Register = () => {
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       disabled={isLoading}
+                      required
                     />
                   </div>
                 </div>
@@ -173,8 +188,27 @@ const Register = () => {
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     disabled={isLoading}
+                    required
                   />
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="phone" className="block text-sm font-medium">Phone Number (with country code)</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-findvenue-text-muted" />
+                  <PhoneInput
+                    id="phone"
+                    className="pl-10"
+                    placeholder="+1 (555) 123-4567"
+                    onChange={handlePhoneChange}
+                    value={phone}
+                    disabled={isLoading}
+                  />
+                </div>
+                <p className="text-xs text-findvenue-text-muted">
+                  Add your phone number with country code for WhatsApp integration
+                </p>
               </div>
               
               <div className="space-y-2">
@@ -189,6 +223,7 @@ const Register = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
@@ -205,6 +240,7 @@ const Register = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>
@@ -221,6 +257,7 @@ const Register = () => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={isLoading}
+                    required
                   />
                 </div>
               </div>

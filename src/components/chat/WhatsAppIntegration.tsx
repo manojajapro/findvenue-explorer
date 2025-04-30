@@ -1,10 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, MessageSquare, Send, Share } from 'lucide-react';
+import { Loader2, MessageSquare, Send } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
@@ -35,13 +35,19 @@ const WhatsAppIntegration = ({
   const [isSharingEnabled, setIsSharingEnabled] = useState(true);
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (recipientPhone) {
+      setPhoneNumber(recipientPhone);
+    }
+  }, [recipientPhone]);
+
   const formatPhoneNumber = (phone: string): string => {
-    // Remove any non-digit characters
+    // Remove any non-digit characters and spaces
     let digits = phone.replace(/\D/g, '');
     
-    // Ensure it starts with a plus sign if it doesn't
-    if (!digits.startsWith('+')) {
-      digits = '+' + digits;
+    // Make sure it doesn't start with a + sign (WhatsApp API doesn't need it)
+    if (digits.startsWith('+')) {
+      digits = digits.substring(1);
     }
     
     return digits;
@@ -106,7 +112,7 @@ const WhatsAppIntegration = ({
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
+              <Label htmlFor="phone">Phone Number (with country code)</Label>
               <Input
                 id="phone"
                 placeholder="+1234567890"
@@ -114,6 +120,9 @@ const WhatsAppIntegration = ({
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 className="bg-findvenue-surface/50 border-white/10"
               />
+              <p className="text-xs text-findvenue-text-muted">
+                Include country code (e.g., +1 for US, +44 for UK)
+              </p>
             </div>
             
             <div className="space-y-2">
