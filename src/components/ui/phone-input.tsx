@@ -34,7 +34,7 @@ export function PhoneInput({ className, onChange, ...props }: PhoneInputProps) {
         {...props}
         type="tel"
         onChange={handleChange}
-        className={`pl-10 py-2 ${className || ''}`}
+        className={`pl-10 py-2 h-12 ${className || ''}`}
         placeholder={props.placeholder || "+1 (555) 123-4567"}
       />
     </div>

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -60,7 +59,8 @@ const Register = () => {
           data: {
             first_name: firstName,
             last_name: lastName,
-            user_role: userRole
+            user_role: userRole,
+            phone: phone // Store phone in user metadata
           }
         }
       });
@@ -171,7 +171,7 @@ const Register = () => {
                       id="firstName"
                       type="text"
                       placeholder="John"
-                      className="pl-10"
+                      className="pl-10 h-12"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       disabled={isLoading}
@@ -186,6 +186,7 @@ const Register = () => {
                     type="text"
                     placeholder="Doe"
                     value={lastName}
+                    className="h-12"
                     onChange={(e) => setLastName(e.target.value)}
                     disabled={isLoading}
                     required
@@ -195,18 +196,14 @@ const Register = () => {
               
               <div className="space-y-2">
                 <label htmlFor="phone" className="block text-sm font-medium">Phone Number (with country code)</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-findvenue-text-muted" />
-                  <PhoneInput
-                    id="phone"
-                    className="pl-10"
-                    placeholder="+1 (555) 123-4567"
-                    onChange={handlePhoneChange}
-                    value={phone}
-                    disabled={isLoading}
-                  />
-                </div>
-                <p className="text-xs text-findvenue-text-muted">
+                <PhoneInput
+                  id="phone"
+                  placeholder="+1 (555) 123-4567"
+                  onChange={handlePhoneChange}
+                  value={phone}
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-findvenue-text-muted mt-1">
                   Add your phone number with country code for WhatsApp integration
                 </p>
               </div>
@@ -219,7 +216,7 @@ const Register = () => {
                     id="email"
                     type="email"
                     placeholder="your@email.com"
-                    className="pl-10"
+                    className="pl-10 h-12"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
@@ -236,7 +233,7 @@ const Register = () => {
                     id="password"
                     type="password"
                     placeholder="••••••••"
-                    className="pl-10"
+                    className="pl-10 h-12"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
@@ -253,7 +250,7 @@ const Register = () => {
                     id="confirm-password"
                     type="password"
                     placeholder="••••••••"
-                    className="pl-10"
+                    className="pl-10 h-12"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={isLoading}
@@ -268,7 +265,7 @@ const Register = () => {
                   <Button
                     type="button"
                     variant={userRole === 'customer' ? 'default' : 'outline'}
-                    className={`flex items-center justify-center ${userRole === 'customer' ? 'bg-findvenue' : ''}`}
+                    className={`flex items-center justify-center h-12 ${userRole === 'customer' ? 'bg-findvenue' : ''}`}
                     onClick={() => setUserRole('customer')}
                   >
                     <User className="mr-2 h-4 w-4" />
@@ -277,7 +274,7 @@ const Register = () => {
                   <Button
                     type="button"
                     variant={userRole === 'venue-owner' ? 'default' : 'outline'}
-                    className={`flex items-center justify-center ${userRole === 'venue-owner' ? 'bg-findvenue' : ''}`}
+                    className={`flex items-center justify-center h-12 ${userRole === 'venue-owner' ? 'bg-findvenue' : ''}`}
                     onClick={() => setUserRole('venue-owner')}
                   >
                     <Building className="mr-2 h-4 w-4" />
@@ -290,7 +287,7 @@ const Register = () => {
             <div>
               <Button 
                 type="submit" 
-                className="w-full bg-findvenue hover:bg-findvenue-dark"
+                className="w-full bg-findvenue hover:bg-findvenue-dark h-12"
                 disabled={isLoading}
               >
                 {isLoading ? 'Creating Account...' : 'Create Account'}

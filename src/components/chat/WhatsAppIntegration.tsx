@@ -121,7 +121,7 @@ const WhatsAppIntegration = ({
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md bg-findvenue-card-bg border-white/10">
           <DialogHeader>
-            <DialogTitle>WhatsApp {recipientName}</DialogTitle>
+            <DialogTitle className="text-xl">WhatsApp {recipientName}</DialogTitle>
             <DialogDescription className="text-findvenue-text-muted">
               Connect via WhatsApp to chat directly with {recipientName}.
             </DialogDescription>
@@ -129,7 +129,7 @@ const WhatsAppIntegration = ({
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number (with country code)</Label>
+              <Label htmlFor="phone" className="text-base font-medium">Phone Number (with country code)</Label>
               <PhoneInput
                 id="phone"
                 placeholder="+1 (555) 123-4567"
@@ -137,39 +137,44 @@ const WhatsAppIntegration = ({
                 onChange={(value) => setPhoneNumber(value)}
                 className="bg-findvenue-surface/50 border-white/10"
               />
-              <p className="text-xs text-findvenue-text-muted">
+              <p className="text-xs text-findvenue-text-muted mt-1">
                 Include country code (e.g., +1 for US, +44 for UK)
               </p>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="message">Message</Label>
+              <Label htmlFor="message" className="text-base font-medium">Message</Label>
               <Input
                 id="message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="bg-findvenue-surface/50 border-white/10"
+                className="bg-findvenue-surface/50 border-white/10 h-12"
               />
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 py-2">
               <Switch
                 id="sharing"
                 checked={isSharingEnabled}
                 onCheckedChange={setIsSharingEnabled}
+                className="bg-green-500"
               />
               <Label htmlFor="sharing">Share venue details in message</Label>
             </div>
           </div>
           
-          <DialogFooter className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          <DialogFooter className="flex justify-end gap-2 mt-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDialogOpen(false)}
+              className="h-12"
+            >
               Cancel
             </Button>
             <Button 
               onClick={handleOpenWhatsApp}
               disabled={isProcessing || !phoneNumber}
-              className="bg-green-500 hover:bg-green-600 text-white"
+              className="bg-green-500 hover:bg-green-600 text-white h-12"
             >
               {isProcessing ? (
                 <>

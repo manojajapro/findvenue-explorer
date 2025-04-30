@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
@@ -156,7 +155,7 @@ const Login = () => {
                         <Input
                           type="email"
                           placeholder="your@email.com"
-                          className="pl-10"
+                          className="pl-10 h-12"
                           {...field}
                           disabled={isLoading}
                         />
@@ -179,7 +178,7 @@ const Login = () => {
                         <Input
                           type="password"
                           placeholder="••••••••"
-                          className="pl-10"
+                          className="pl-10 h-12"
                           {...field}
                           disabled={isLoading}
                         />
@@ -211,7 +210,7 @@ const Login = () => {
                         disabled={isLoading}
                       />
                     </FormControl>
-                    <p className="text-xs text-findvenue-text-muted">
+                    <p className="text-xs text-findvenue-text-muted mt-1">
                       Add your phone number with country code for WhatsApp integration
                     </p>
                   </FormItem>
@@ -221,7 +220,7 @@ const Login = () => {
               <div>
                 <Button 
                   type="submit" 
-                  className="w-full bg-findvenue hover:bg-findvenue-dark"
+                  className="w-full bg-findvenue hover:bg-findvenue-dark h-12"
                   disabled={isLoading}
                 >
                   {isLoading ? 'Signing In...' : 'Sign In'}
