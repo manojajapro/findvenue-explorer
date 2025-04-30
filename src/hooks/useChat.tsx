@@ -26,7 +26,19 @@ export const useChat = (contactId?: string) => {
 
   // Effect to fetch contact info
   useEffect(() => {
-    if (!user || !contactId) return;
+    if (!user || !contactId) {
+      setIsLoading(false);
+      return;
+    }
+    
+    // Validate contactId to ensure it's not empty
+    if (contactId.trim() === '') {
+      console.error("Contact ID is empty or invalid");
+      setHasError(true);
+      setErrorMessage("Invalid contact ID");
+      setIsLoading(false);
+      return;
+    }
     
     const fetchContactInfo = async () => {
       try {
@@ -76,6 +88,8 @@ export const useChat = (contactId?: string) => {
           title: "Error",
           description: "Failed to load contact information"
         });
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -84,7 +98,7 @@ export const useChat = (contactId?: string) => {
 
   // Fetch messages and subscribe to new ones
   useEffect(() => {
-    if (!user || !contactId) {
+    if (!user || !contactId || contactId.trim() === '') {
       setIsLoading(false);
       return;
     }

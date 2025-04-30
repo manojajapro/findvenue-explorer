@@ -18,6 +18,22 @@ const DirectChat = () => {
   const { toast } = useToast();
   const location = useLocation();
   
+  // Log parameters for debugging
+  useEffect(() => {
+    if (contactId) {
+      console.log("DirectChat mounted with contactId:", contactId);
+    } else {
+      console.log("DirectChat mounted with no contactId");
+    }
+    
+    const searchParams = new URLSearchParams(location.search);
+    const venueId = searchParams.get('venueId');
+    const venueName = searchParams.get('venueName');
+    const bookingId = searchParams.get('bookingId');
+    
+    console.log("URL parameters:", { venueId, venueName, bookingId });
+  }, [contactId, location.search]);
+  
   const { 
     contact,
     messages, 

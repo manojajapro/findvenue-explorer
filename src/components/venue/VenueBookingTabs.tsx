@@ -478,6 +478,17 @@ export default function VenueBookingTabs({
       return;
     }
     
+    // Check if ownerId is empty
+    if (!ownerId) {
+      console.error("Owner ID is missing, cannot start chat");
+      toast({
+        title: "Error",
+        description: "Failed to start chat. Owner information is missing.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       console.log("Initiating chat with venue owner:", {
         ownerId,
@@ -487,11 +498,16 @@ export default function VenueBookingTabs({
       });
       
       // Get user profile for sender name
-      const { data: userProfile } = await supabase
+      const { data: userProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('first_name, last_name')
         .eq('id', user.id)
         .maybeSingle();
+      
+      if (profileError) {
+        console.error("Error fetching user profile:", profileError);
+        throw new Error("Failed to get user information");
+      }
       
       const senderName = userProfile 
         ? `${userProfile.first_name} ${userProfile.last_name}`
@@ -538,7 +554,7 @@ export default function VenueBookingTabs({
       
       // Navigate to messages with the owner
       console.log("Navigating to chat with owner ID:", ownerId);
-      navigate(`/messages/${ownerId}`);
+      navigate(`/messages/${ownerId}?venueId=${venueId}&venueName=${encodeURIComponent(venueName)}`);
       
       toast({
         title: "Conversation started",
