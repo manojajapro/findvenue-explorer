@@ -128,7 +128,8 @@ const WhatsAppIntegration = ({
         message;
       
       const encodedMessage = encodeURIComponent(finalMessage);
-      const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+      // Use the direct WhatsApp web API URL format
+      const whatsappUrl = `https://api.whatsapp.com/send/?phone=${formattedPhone}&text=${encodedMessage}&type=phone_number&app_absent=0`;
       
       console.log("Opening WhatsApp URL:", whatsappUrl);
       

@@ -1,10 +1,18 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { getVenueOwnerPhone } from '@/utils/venueHelpers';
+import WhatsAppIntegration from '../chat/WhatsAppIntegration';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface BookingOwnerChatProps {
   ownerId: string;
@@ -23,6 +31,24 @@ const BookingOwnerChat = ({
 }: BookingOwnerChatProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [ownerPhone, setOwnerPhone] = useState<string | undefined>(undefined);
+  
+  useEffect(() => {
+    const fetchOwnerPhone = async () => {
+      if (!ownerId) return;
+      
+      try {
+        const phoneNumber = await getVenueOwnerPhone(ownerId);
+        if (phoneNumber) {
+          setOwnerPhone(phoneNumber);
+        }
+      } catch (err) {
+        console.error('Error fetching owner phone number:', err);
+      }
+    };
+    
+    fetchOwnerPhone();
+  }, [ownerId]);
   
   if (!user) return null;
   
@@ -47,15 +73,43 @@ const BookingOwnerChat = ({
     }
   };
 
+  // Handle direct WhatsApp click without dropdown
+  const handleDirectWhatsApp = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    // This is intentionally empty as the WhatsAppIntegration component handles the click
+  };
+
   return (
-    <Button 
-      variant="outline" 
-      className="w-full border-findvenue text-findvenue hover:bg-findvenue/10"
-      onClick={handleChat}
-    >
-      <MessageCircle className="h-4 w-4 mr-2" />
-      Chat with {ownerName || 'Venue Owner'}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button 
+          variant="outline" 
+          className="w-full border-findvenue text-findvenue hover:bg-findvenue/10"
+        >
+          <MessageCircle className="h-4 w-4 mr-2" />
+          Contact {ownerName || 'Venue Owner'}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="bg-findvenue-card-bg border-white/10 w-56">
+        <DropdownMenuItem onClick={handleChat} className="cursor-pointer focus:bg-findvenue/10">
+          <MessageCircle className="mr-2 h-4 w-4" />
+          <span>Chat in App</span>
+        </DropdownMenuItem>
+        {ownerPhone && (
+          <DropdownMenuItem className="p-0 focus:bg-transparent cursor-default">
+            <div className="w-full" onClick={handleDirectWhatsApp}>
+              <WhatsAppIntegration 
+                recipientName={ownerName || 'Venue Owner'} 
+                recipientPhone={ownerPhone}
+                venueName={venueName}
+                messageText={`Hi! I'm contacting about my booking (ID: ${bookingId}) for "${venueName}". Can you provide more information?`}
+              />
+            </div>
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
