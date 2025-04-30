@@ -1,6 +1,6 @@
-
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { Json } from '@/integrations/supabase/types';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Extract owner user ID from venue owner_info
@@ -164,4 +164,31 @@ export const safeParseInt = (value: any, defaultValue: number = 0): number => {
   }
   
   return defaultValue;
+};
+
+/**
+ * Fetch venue owner's phone number from user profile
+ * @param ownerId The owner's user ID
+ * @returns The owner's phone number or null if not found
+ */
+export const getVenueOwnerPhone = async (ownerId: string): Promise<string | null> => {
+  if (!ownerId) return null;
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('phone')
+      .eq('id', ownerId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error("Error fetching owner's phone:", error);
+      throw error;
+    }
+    
+    return data?.phone || null;
+  } catch (err) {
+    console.error("Failed to fetch venue owner phone:", err);
+    return null;
+  }
 };
