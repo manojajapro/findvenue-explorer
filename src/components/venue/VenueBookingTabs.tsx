@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Clock, Calendar as CalendarIcon, LogIn, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -460,6 +459,72 @@ export default function VenueBookingTabs({
     );
   }
 
+  // Add a new function to handle chat with the venue owner
+  const initiateChat = async () => {
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "You need to login to chat with venue owners",
+      });
+      navigate('/login');
+      return;
+    }
+    
+    if (user.id === ownerId) {
+      toast({
+        title: "Can't chat with yourself",
+        description: "You own this venue",
+      });
+      return;
+    }
+    
+    try {
+      // Get user profile for sender name
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
+      
+      const senderName = userProfile 
+        ? `${userProfile.first_name} ${userProfile.last_name}`
+        : 'Customer';
+      
+      // Check if a conversation already exists
+      const { data: existingMessages } = await supabase
+        .from('messages')
+        .select('id')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .or(`sender_id.eq.${ownerId},receiver_id.eq.${ownerId}`)
+        .eq('venue_id', venueId)
+        .limit(1);
+      
+      // If no previous messages, create initial message
+      if (!existingMessages || existingMessages.length === 0) {
+        // Create first message
+        await supabase.from('messages').insert({
+          sender_id: user.id,
+          receiver_id: ownerId,
+          sender_name: senderName,
+          receiver_name: ownerName || 'Venue Owner',
+          content: `Hi, I'm interested in ${venueName}.`,
+          venue_id: venueId,
+          venue_name: venueName
+        });
+      }
+      
+      // Navigate to messages with the owner
+      navigate(`/messages/${ownerId}`);
+    } catch (error) {
+      console.error('Error initiating chat:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start chat. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+  
   if (!user) {
     return (
       <div className="glass-card p-5 rounded-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
@@ -712,6 +777,7 @@ export default function VenueBookingTabs({
       <Button 
         variant="outline" 
         className="w-full mt-4"
+        onClick={initiateChat}
       >
         Message host
       </Button>
