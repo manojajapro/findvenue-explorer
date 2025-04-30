@@ -6,8 +6,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import CalendarLegend from './CalendarLegend';
-import { useBlockedDates } from '@/hooks/useBlockedDates';
 
 interface BookingCalendarProps {
   selectedDate: Date | undefined;
@@ -17,7 +15,6 @@ interface BookingCalendarProps {
   dayBookedDates: string[];
   hourlyBookedDates: string[];
   bookingType: 'hourly' | 'full-day';
-  venueId?: string;
 }
 
 export function BookingCalendar({
@@ -27,19 +24,10 @@ export function BookingCalendar({
   fullyBookedDates,
   dayBookedDates,
   hourlyBookedDates,
-  bookingType,
-  venueId
+  bookingType
 }: BookingCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
-  
-  // Use our custom hook for blocked dates
-  const { 
-    blockedDates,
-    isLoading,
-    isDateInArray,
-    isDateBlocked 
-  } = useBlockedDates(venueId, selectedDate, onDateSelect);
   
   // Generate calendar days for the current month view
   useEffect(() => {
@@ -52,20 +40,19 @@ export function BookingCalendar({
     setCalendarDays(days);
   }, [currentMonth]);
   
+  // Helper function to check if a date is in the given array
+  const isDateInArray = (date: Date, dateArray: string[]): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return dateArray.includes(dateStr);
+  };
+  
   // Helper function to determine if a date should be disabled
   const isDateDisabled = (date: Date): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const dateStr = format(date, 'yyyy-MM-dd');
     
     // Can't book dates in the past
     if (date < today) return true;
-    
-    // Always check blocked dates first - highest priority
-    if (isDateBlocked(date)) {
-      console.log(`Date ${dateStr} is blocked by venue owner and cannot be selected`);
-      return true;
-    }
     
     // For full-day bookings, can't select dates that are fully booked or have day bookings
     if (bookingType === 'full-day' && 
@@ -100,50 +87,37 @@ export function BookingCalendar({
           <CalendarComponent
             mode="single"
             selected={selectedDate}
-            onSelect={(date) => {
-              if (!date) {
-                onDateSelect(undefined);
-                return;
-              }
-
-              // First check if date is blocked - this is the most important check
-              if (isDateBlocked(date)) {
-                console.log("Blocked date selected, preventing selection:", format(date, 'yyyy-MM-dd'));
-                return; // Don't even call onDateSelect
-              }
-
-              // Check other disabled conditions
-              if (isDateDisabled(date)) {
-                return; // Don't call onDateSelect
-              }
-
-              // Only select date if it passes all checks
-              onDateSelect(date);
-            }}
+            onSelect={onDateSelect}
             disabled={isDateDisabled}
             modifiers={{
               booked: (date) => isDateInArray(date, fullyBookedDates),
               dayBooked: (date) => isDateInArray(date, dayBookedDates),
               hourlyBooked: (date) => isDateInArray(date, hourlyBookedDates),
-              blocked: (date) => blockedDates.includes(format(date, 'yyyy-MM-dd')),
             }}
             modifiersStyles={{
               booked: { backgroundColor: '#FEE2E2', textDecoration: 'line-through', color: '#B91C1C' },
               dayBooked: { backgroundColor: '#DBEAFE', color: '#1E40AF' },
               hourlyBooked: { backgroundColor: '#FEF3C7', color: '#92400E' },
-              blocked: { 
-                backgroundColor: '#F3E8FF', 
-                color: '#7E22CE', 
-                textDecoration: 'line-through',
-                pointerEvents: 'none',
-                opacity: 0.5 
-              },
             }}
             className="rounded-md border"
-            fromDate={new Date()} // Prevent selecting past dates
           />
           
-          <CalendarLegend />
+          <div className="p-3 border-t border-border bg-muted/20">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#FEE2E2] rounded-full"></span>
+                <span className="text-xs">Fully booked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#DBEAFE] rounded-full"></span>
+                <span className="text-xs">Day booked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#FEF3C7] rounded-full"></span>
+                <span className="text-xs">Some hours booked</span>
+              </div>
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
     </div>

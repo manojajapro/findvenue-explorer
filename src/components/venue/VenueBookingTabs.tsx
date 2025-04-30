@@ -7,17 +7,13 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
-import { format, isSameDay } from 'date-fns';
+import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import BookingCalendar from './BookingCalendar';
 import { notifyVenueOwnerAboutBooking } from '@/utils/notificationService';
-import { isDateBlockedForVenue } from '@/utils/venueOwnerUtils';
-
-// Add type for booking type
-type BookingType = 'hourly' | 'full-day';
 
 interface VenueBookingTabsProps {
   venueId: string;
@@ -52,13 +48,12 @@ export default function VenueBookingTabs({
   const [venueStatus, setVenueStatus] = useState<string>('active');
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [processingBooking, setProcessingBooking] = useState<boolean>(false);
-  const [blockedDates, setBlockedDates] = useState<string[]>([]);
-
+  
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [peopleCount, setPeopleCount] = useState<string>(minCapacity.toString());
   const [fromTime, setFromTime] = useState<string>('09:00');
   const [toTime, setToTime] = useState<string>('17:00');
-  const [bookingType, setBookingType] = useState<BookingType>('full-day');
+  const [bookingType, setBookingType] = useState<'hourly' | 'full-day'>('full-day');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
 
   useEffect(() => {
@@ -227,47 +222,6 @@ export default function VenueBookingTabs({
     return slots;
   };
   
-  // Add this at the top of the useEffect where you fetch blocked dates
-  useEffect(() => {
-    const fetchBlockedDates = async () => {
-      if (!venueId) return;
-      
-      try {
-        setIsLoadingBookings(true);
-        const { data, error } = await supabase
-          .from('blocked_dates')
-          .select('date')
-          .eq('venue_id', venueId);
-          
-        if (error) {
-          console.error('Error fetching blocked dates:', error);
-          return;
-        }
-        
-        if (data) {
-          const blocked = data.map(item => format(new Date(item.date), 'yyyy-MM-dd'));
-          console.log("Blocked dates for booking tab:", blocked);
-          setBlockedDates(blocked);
-          
-          // If currently selected date is blocked, reset it
-          if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
-            console.log("Selected date is blocked, resetting selection in booking tab");
-            setSelectedDate(undefined);
-            setFromTime('09:00');
-            setToTime('17:00');
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching blocked dates:', err);
-      } finally {
-        setIsLoadingBookings(false);
-      }
-    };
-
-    fetchBlockedDates();
-  }, [venueId, selectedDate]);
-
-  // Modify the handleBookRequest function to double check if the date is blocked
   const handleBookRequest = async () => {
     if (!user) {
       toast({
@@ -290,41 +244,6 @@ export default function VenueBookingTabs({
     
     const formattedDate = format(selectedDate, 'yyyy-MM-dd');
     
-    // Check if date is blocked (local state check)
-    if (blockedDates.includes(formattedDate)) {
-      toast({
-        title: "Date unavailable",
-        description: "This date has been blocked by the venue owner and is not available for booking.",
-        variant: "destructive"
-      });
-      setSelectedDate(undefined);
-      return;
-    }
-    
-    // Double-check with backend that the date isn't blocked
-    try {
-      const isBlocked = await isDateBlockedForVenue(venueId, formattedDate);
-      
-      if (isBlocked) {
-        toast({
-          title: "Date unavailable",
-          description: "This date has been blocked by the venue owner and is not available for booking.",
-          variant: "destructive"
-        });
-        setSelectedDate(undefined);
-        return;
-      }
-    } catch (err) {
-      console.error('Error checking blocked dates:', err);
-      toast({
-        title: "Error",
-        description: "Unable to verify date availability. Please try again.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Continue with the rest of your existing booking logic...
     const guests = parseInt(peopleCount);
     if (isNaN(guests) || guests < 1 || guests > maxCapacity) {
       toast({
@@ -337,25 +256,6 @@ export default function VenueBookingTabs({
 
     try {
       setProcessingBooking(true);
-      
-      // One final check for blocked dates before proceeding
-      const { data: finalBlockCheck } = await supabase
-        .from('blocked_dates')
-        .select('id')
-        .eq('venue_id', venueId)
-        .eq('date', formattedDate)
-        .maybeSingle();
-        
-      if (finalBlockCheck) {
-        toast({
-          title: "Date unavailable",
-          description: "This date is no longer available for booking.",
-          variant: "destructive"
-        });
-        setSelectedDate(undefined);
-        setProcessingBooking(false);
-        return;
-      }
       
       let startTime = fromTime;
       let endTime = toTime;
@@ -434,7 +334,7 @@ export default function VenueBookingTabs({
         start_time: startTime,
         end_time: endTime,
         status: 'pending',
-        booking_type: bookingType
+        booking_type: bookingType === 'full-day' ? 'full-day' : 'hourly'
       };
       
       try {
@@ -518,24 +418,9 @@ export default function VenueBookingTabs({
   const dayPrice = parsedPricePerHour * 10;
 
   const currentDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
-  const isCurrentDateFullyBooked = () => {
-    if (!selectedDate) return false;
-    
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    
-    // Check if date is blocked by owner (this should prevent booking)
-    if (blockedDates.includes(dateStr)) {
-      console.log("Date is blocked by owner:", dateStr);
-      return true;
-    }
-    
-    // Check existing logic
-    if (bookingType === 'full-day') {
-      return fullyBookedDates.includes(dateStr) || dayBookedDates.includes(dateStr);
-    } else {
-      return dayBookedDates.includes(dateStr) || availableTimeSlots.length === 0;
-    }
-  };
+  const isCurrentDateFullyBooked = bookingType === 'full-day' 
+    ? fullyBookedDates.includes(currentDateStr) || dayBookedDates.includes(currentDateStr)
+    : dayBookedDates.includes(currentDateStr) || availableTimeSlots.length === 0;
 
   return (
     <div className="glass-card p-5 rounded-lg border border-white/10 bg-findvenue-card-bg/50 backdrop-blur-sm">
@@ -613,21 +498,18 @@ export default function VenueBookingTabs({
                   dayBookedDates={dayBookedDates}
                   hourlyBookedDates={hourlyBookedDates}
                   bookingType={bookingType}
-                  venueId={venueId}
                 />
                 
-                {isCurrentDateFullyBooked() && selectedDate && (
+                {isCurrentDateFullyBooked && selectedDate && (
                   <p className="text-red-500 text-xs mt-1">
-                    {blockedDates.includes(currentDateStr)
-                      ? 'This date is blocked by the venue owner'
-                      : bookingType === 'full-day' 
-                        ? 'This date is not available for full day booking' 
-                        : 'No available time slots on this date'}
+                    {bookingType === 'full-day' 
+                      ? 'This date is not available for full day booking' 
+                      : 'No available time slots on this date'}
                   </p>
                 )}
               </div>
               
-              {bookingType === 'hourly' && selectedDate && availableTimeSlots.length > 0 && !blockedDates.includes(currentDateStr) && (
+              {bookingType === 'hourly' && selectedDate && availableTimeSlots.length > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-sm font-medium mb-1">Start time</label>
@@ -690,7 +572,7 @@ export default function VenueBookingTabs({
               <Button 
                 onClick={handleBookRequest}
                 className="w-full bg-red-500 hover:bg-red-600 text-white h-12 text-lg mt-4 shadow-md"
-                disabled={isLoadingBookings || processingBooking || isCurrentDateFullyBooked()}
+                disabled={isLoadingBookings || processingBooking || isCurrentDateFullyBooked}
               >
                 {isLoadingBookings || processingBooking ? (
                   <span className="flex items-center justify-center">
@@ -700,7 +582,7 @@ export default function VenueBookingTabs({
                     </svg>
                     {processingBooking ? "Processing..." : "Loading..."}
                   </span>
-                ) : isCurrentDateFullyBooked() ? (
+                ) : isCurrentDateFullyBooked ? (
                   'Not Available'
                 ) : (
                   'Request to book'

@@ -13,8 +13,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { notifyVenueOwnerAboutBooking, sendBookingStatusNotification, sendNotification, getVenueOwnerId } from '@/utils/notificationService';
-import BookingCalendar from './BookingCalendar';
-import { isDateBlockedForVenue } from '@/utils/venueOwnerUtils';
 import {
   Select,
   SelectContent,
@@ -75,7 +73,6 @@ export default function MultiDayBookingForm({
   const [totalPrice, setTotalPrice] = useState(0);
   const [pricePerPerson, setPricePerPerson] = useState(0);
   const [basePrice, setBasePrice] = useState(0);
-  const [blockedDates, setBlockedDates] = useState<string[]>([]);
   
   useEffect(() => {
     const fetchVenuePricing = async () => {
@@ -106,47 +103,6 @@ export default function MultiDayBookingForm({
     fetchVenuePricing();
   }, [venueId, pricePerHour]);
 
-  // Enhanced useEffect to fetch blocked dates
-  useEffect(() => {
-    // Fetch blocked dates from the blocked_dates table
-    const fetchBlockedDates = async () => {
-      if (!venueId) return;
-      
-      try {
-        console.log("Fetching blocked dates for venue:", venueId);
-        const { data, error } = await supabase
-          .from('blocked_dates')
-          .select('date')
-          .eq('venue_id', venueId);
-          
-        if (error) {
-          console.error('Error fetching blocked dates:', error);
-          return;
-        }
-        
-        // Extract the dates and format them
-        const blocked = data?.map(item => format(new Date(item.date), 'yyyy-MM-dd')) || [];
-        console.log("MultiDayBookingForm - Blocked dates found:", blocked);
-        setBlockedDates(blocked);
-        
-        // If the form date is already set and it's blocked, we need to reset it
-        const selectedDate = form.getValues('date');
-        if (selectedDate && blocked.includes(format(selectedDate, 'yyyy-MM-dd'))) {
-          form.setValue('date', undefined as any);
-          toast({
-            title: "Date unavailable",
-            description: "The date you selected is not available as it has been blocked by the venue owner.",
-            variant: "destructive",
-          });
-        }
-      } catch (err) {
-        console.error('Error processing blocked dates:', err);
-      }
-    };
-    
-    fetchBlockedDates();
-  }, [venueId]);
-
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -168,6 +124,8 @@ export default function MultiDayBookingForm({
     }
   }, [guestsCount, pricePerPerson, basePrice]);
 
+  const disabledDates = bookedDates.map(dateStr => new Date(dateStr));
+
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (!user) {
       toast({
@@ -178,63 +136,11 @@ export default function MultiDayBookingForm({
       return;
     }
 
-    // Check if the date is blocked - Multiple thorough checks for reliability
-    const formattedDate = format(data.date, 'yyyy-MM-dd');
-    
-    // Check local state first
-    if (blockedDates.includes(formattedDate)) {
-      toast({
-        title: "Date unavailable",
-        description: "This date is not available for booking as it has been blocked by the venue owner.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Double check with backend to be absolutely sure
-    try {
-      const isBlocked = await isDateBlockedForVenue(venueId, formattedDate);
-      
-      if (isBlocked) {
-        toast({
-          title: "Date unavailable",
-          description: "This date is not available for booking as it has been blocked by the venue owner.",
-          variant: "destructive",
-        });
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking if date is blocked:', error);
-      toast({
-        title: "Error",
-        description: "There was a problem checking date availability. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
       const initialStatus = autoConfirm ? 'confirmed' : 'pending';
-      
-      // One last check for blocked dates before creating the booking
-      const { data: finalBlockCheck } = await supabase
-        .from('blocked_dates')
-        .select('id')
-        .eq('venue_id', venueId)
-        .eq('date', formattedDate)
-        .maybeSingle();
-        
-      if (finalBlockCheck) {
-        toast({
-          title: "Date unavailable",
-          description: "This date has been blocked by the venue owner and is not available.",
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return;
-      }
+      const formattedDate = format(data.date, 'yyyy-MM-dd');
       
       console.log("[FULL_DAY_BOOKING] Creating full day booking with status:", initialStatus, "for venue ID:", venueId);
       
@@ -358,30 +264,44 @@ export default function MultiDayBookingForm({
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Date</FormLabel>
-                <BookingCalendar
-                  selectedDate={field.value}
-                  onDateSelect={(date) => {
-                    // Only set the date if it's not blocked
-                    if (date && !blockedDates.includes(format(date, 'yyyy-MM-dd'))) {
-                      field.onChange(date);
-                    } else if (!date) {
-                      field.onChange(undefined);
-                    } else {
-                      // This is a blocked date
-                      toast({
-                        title: "Date unavailable",
-                        description: "This date is not available as it has been blocked by the venue owner.",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  bookedDates={bookedDates}
-                  fullyBookedDates={bookedDates}
-                  dayBookedDates={bookedDates}
-                  hourlyBookedDates={[]}
-                  bookingType="full-day"
-                  venueId={venueId}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={"outline"}
+                        className={`w-full text-left font-normal flex justify-between items-center ${!field.value && "text-muted-foreground"}`}
+                      >
+                        {field.value ? (
+                          format(field.value, "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      disabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        if (date < today) return true;
+                        
+                        return disabledDates.some(
+                          disabledDate => 
+                            format(disabledDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                        );
+                      }}
+                      modifiers={{
+                        booked: disabledDates,
+                      }}
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
                 <FormMessage />
               </FormItem>
             )}
