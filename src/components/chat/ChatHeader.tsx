@@ -79,12 +79,14 @@ const ChatHeader = ({ contact }: ChatHeaderProps) => {
           </Badge>
         )}
         
-        <WhatsAppIntegration 
-          recipientName={contact.name}
-          recipientPhone={contactPhone}
-          venueName={contact.venue_name}
-          messageText={`Hi! I'm interested in discussing ${contact.venue_name || 'your venue'}.`}
-        />
+        {contactPhone && (
+          <WhatsAppIntegration 
+            recipientName={contact.name}
+            recipientPhone={contactPhone}
+            venueName={contact.venue_name}
+            messageText={`Hi! I'm interested in discussing ${contact.venue_name || 'your venue'}.`}
+          />
+        )}
       </div>
     </div>
   );
