@@ -89,21 +89,24 @@ const Messages = () => {
   const getRoleLabel = (role?: string) => {
     if (!role) return null;
     
-    // Convert database role to display label
-    if (role === 'venue-owner' || role === 'venue_owner') {
-      return 'Venue Owner';
-    } else {
+    // Show opposite role based on logged in user
+    if (userRole === 'venue_owner' || userRole === 'venue-owner') {
       return 'Customer';
+    } else if (userRole === 'customer') {
+      return 'Venue Owner'; 
     }
+    return null;
   };
   
   // Function to determine if we should show the description based on the current user's role
   const getPageDescription = () => {
     if (userRole === 'venue_owner') {
       return 'Chat with customers';
-    } else {
+    } else if (userRole === 'customer') {
       return 'Chat with venue owners';
-    }
+    } else {
+      return 'Chat with customers';
+    } 
   };
   
   if (!user) {
