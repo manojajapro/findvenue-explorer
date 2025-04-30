@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -38,6 +39,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { isDateBlockedForVenue } from '@/utils/dateUtils';
 
 interface BookingFormProps {
   venueId: string;
@@ -50,6 +52,7 @@ interface BookingFormProps {
   fullyBookedDates: string[];
   availableTimeSlots: string[];
   autoConfirm?: boolean;
+  blockedDates?: string[];
 }
 
 const formSchema = z.object({
@@ -79,13 +82,15 @@ export default function BookingForm({
   bookedTimeSlots,
   fullyBookedDates,
   availableTimeSlots,
-  autoConfirm = false
+  autoConfirm = false,
+  blockedDates = []
 }: BookingFormProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableEndTimes, setAvailableEndTimes] = useState<string[]>([]);
+  const [venueBlockedDates, setVenueBlockedDates] = useState<string[]>(blockedDates);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -101,8 +106,64 @@ export default function BookingForm({
     },
   });
 
+  // Fetch blocked dates if not provided
+  useEffect(() => {
+    if (blockedDates.length === 0) {
+      const fetchBlockedDates = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('blocked_dates')
+            .select('date')
+            .eq('venue_id', venueId);
+            
+          if (error) throw error;
+          
+          const blockedDateStrings = (data || []).map(item => item.date);
+          setVenueBlockedDates(blockedDateStrings);
+        } catch (err) {
+          console.error('Error fetching blocked dates:', err);
+        }
+      };
+      
+      fetchBlockedDates();
+      
+      const channel = supabase
+        .channel('blocked_dates_changes')
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'blocked_dates',
+          filter: `venue_id=eq.${venueId}`
+        }, () => {
+          fetchBlockedDates();
+        })
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } else {
+      setVenueBlockedDates(blockedDates);
+    }
+  }, [venueId, blockedDates]);
+
   const selectedDate = form.watch('date');
   const selectedStartTime = form.watch('startTime');
+
+  // Check if selected date is blocked
+  useEffect(() => {
+    if (selectedDate) {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      if (venueBlockedDates.includes(dateStr)) {
+        toast({
+          title: "Date not available",
+          description: "This date has been blocked by the venue owner and is not available for booking.",
+          variant: "destructive"
+        });
+        form.setValue('date', undefined as any);
+      }
+    }
+  }, [selectedDate, venueBlockedDates, toast, form]);
 
   const updateAvailableEndTimes = (startTime: string) => {
     const startIndex = availableTimeSlots.indexOf(startTime);
@@ -119,7 +180,11 @@ export default function BookingForm({
     }
   }, [selectedStartTime, availableTimeSlots]);
 
-  const disabledDates = fullyBookedDates.map(dateStr => new Date(dateStr));
+  // Combine booked and blocked dates for the calendar
+  const disabledDates = [
+    ...fullyBookedDates.map(dateStr => new Date(dateStr)),
+    ...venueBlockedDates.map(dateStr => new Date(dateStr))
+  ];
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (!user) {
@@ -134,6 +199,18 @@ export default function BookingForm({
     setIsSubmitting(true);
 
     try {
+      // Double-check if the date is blocked
+      const isBlocked = await isDateBlockedForVenue(venueId, data.date);
+      if (isBlocked) {
+        toast({
+          title: "Date not available",
+          description: "This date has been blocked by the venue owner and is not available for booking.",
+          variant: "destructive"
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       const startHour = parseInt(data.startTime.split(':')[0]);
       const endHour = parseInt(data.endTime.split(':')[0]);
       const hours = endHour - startHour;
@@ -262,6 +339,22 @@ export default function BookingForm({
     return bookedTimeSlots[dateStr]?.includes(timeSlot) || false;
   };
 
+  const isDateDisabled = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date < today) return true;
+    
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    // Check if date is blocked by owner
+    if (venueBlockedDates.includes(dateStr)) return true;
+    
+    // Check if date is fully booked
+    return disabledDates.some(
+      disabledDate => format(disabledDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+    );
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -293,17 +386,29 @@ export default function BookingForm({
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
-                      disabled={(date) => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        if (date < today) return true;
-                        return disabledDates.some(
-                          disabledDate =>
-                            format(disabledDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-                        );
+                      disabled={isDateDisabled}
+                      modifiers={{
+                        booked: fullyBookedDates.map(dateStr => new Date(dateStr)),
+                        blocked: venueBlockedDates.map(dateStr => new Date(dateStr)),
+                      }}
+                      modifiersStyles={{
+                        booked: { backgroundColor: '#FEE2E2', textDecoration: 'line-through', color: '#B91C1C' },
+                        blocked: { backgroundColor: '#F3F4F6', textDecoration: 'line-through', color: '#6B7280' },
                       }}
                       className="p-3 pointer-events-auto"
                     />
+                    <div className="p-3 border-t border-border">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block w-3 h-3 bg-[#FEE2E2] rounded-full"></span>
+                          <span className="text-xs">Fully booked</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block w-3 h-3 bg-[#F3F4F6] rounded-full"></span>
+                          <span className="text-xs">Blocked by owner</span>
+                        </div>
+                      </div>
+                    </div>
                   </PopoverContent>
                 </Popover>
                 <FormMessage />

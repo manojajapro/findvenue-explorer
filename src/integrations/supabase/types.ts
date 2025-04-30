@@ -455,6 +455,19 @@ export type Database = {
           role: string
         }[]
       }
+      is_date_blocked: {
+        Args: { venue_id: string; check_date: string }
+        Returns: boolean
+      }
+      is_timeslot_blocked: {
+        Args: {
+          p_venue_id: string
+          p_date: string
+          p_start_time: string
+          p_end_time: string
+        }
+        Returns: boolean
+      }
       update_booking_status: {
         Args: { p_booking_id: string; p_status: string }
         Returns: Json

@@ -15,6 +15,7 @@ interface BookingCalendarProps {
   dayBookedDates: string[];
   hourlyBookedDates: string[];
   bookingType: 'hourly' | 'full-day';
+  blockedDates?: string[]; // New prop for blocked dates
 }
 
 export function BookingCalendar({
@@ -24,7 +25,8 @@ export function BookingCalendar({
   fullyBookedDates,
   dayBookedDates,
   hourlyBookedDates,
-  bookingType
+  bookingType,
+  blockedDates = []
 }: BookingCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
@@ -53,6 +55,9 @@ export function BookingCalendar({
     
     // Can't book dates in the past
     if (date < today) return true;
+    
+    // Can't book blocked dates
+    if (isDateInArray(date, blockedDates)) return true;
     
     // For full-day bookings, can't select dates that are fully booked or have day bookings
     if (bookingType === 'full-day' && 
@@ -93,11 +98,13 @@ export function BookingCalendar({
               booked: (date) => isDateInArray(date, fullyBookedDates),
               dayBooked: (date) => isDateInArray(date, dayBookedDates),
               hourlyBooked: (date) => isDateInArray(date, hourlyBookedDates),
+              blocked: (date) => isDateInArray(date, blockedDates),
             }}
             modifiersStyles={{
               booked: { backgroundColor: '#FEE2E2', textDecoration: 'line-through', color: '#B91C1C' },
               dayBooked: { backgroundColor: '#DBEAFE', color: '#1E40AF' },
               hourlyBooked: { backgroundColor: '#FEF3C7', color: '#92400E' },
+              blocked: { backgroundColor: '#F3F4F6', textDecoration: 'line-through', color: '#6B7280' },
             }}
             className="rounded-md border"
           />
@@ -115,6 +122,10 @@ export function BookingCalendar({
               <div className="flex items-center gap-2">
                 <span className="inline-block w-3 h-3 bg-[#FEF3C7] rounded-full"></span>
                 <span className="text-xs">Some hours booked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-[#F3F4F6] rounded-full"></span>
+                <span className="text-xs">Blocked by owner</span>
               </div>
             </div>
           </div>
