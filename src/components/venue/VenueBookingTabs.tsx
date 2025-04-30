@@ -478,9 +478,9 @@ export default function VenueBookingTabs({
       return;
     }
     
-    // Check if ownerId is empty
-    if (!ownerId) {
-      console.error("Owner ID is missing, cannot start chat");
+    // Verify owner information is available
+    if (!ownerId || ownerId.trim() === '') {
+      console.error("Owner ID is missing or invalid, cannot start chat");
       toast({
         title: "Error",
         description: "Failed to start chat. Owner information is missing.",
