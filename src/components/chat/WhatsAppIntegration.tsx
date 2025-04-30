@@ -6,6 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, MessageSquare, Send } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useParams } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -34,8 +37,38 @@ const WhatsAppIntegration = ({
   const [message, setMessage] = useState(messageText || `Hi! I'm interested in discussing ${venueName}.`);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSharingEnabled, setIsSharingEnabled] = useState(true);
+  const [contactPhoneLoaded, setContactPhoneLoaded] = useState(false);
   const { toast } = useToast();
+  const { contactId } = useParams<{ contactId: string }>();
+  const { user } = useAuth();
 
+  // Effect to load contact's phone number if not provided directly
+  useEffect(() => {
+    const fetchContactPhone = async () => {
+      if (!contactId || recipientPhone || contactPhoneLoaded) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('phone')
+          .eq('id', contactId)
+          .maybeSingle();
+        
+        if (error) throw error;
+        
+        if (data?.phone) {
+          setPhoneNumber(data.phone);
+          setContactPhoneLoaded(true);
+        }
+      } catch (error) {
+        console.error('Error fetching contact phone:', error);
+      }
+    };
+    
+    fetchContactPhone();
+  }, [contactId, recipientPhone, contactPhoneLoaded]);
+
+  // Effect to set phone number when recipientPhone prop changes
   useEffect(() => {
     if (recipientPhone) {
       setPhoneNumber(recipientPhone);
@@ -83,7 +116,11 @@ const WhatsAppIntegration = ({
         return;
       }
       
-      const encodedMessage = encodeURIComponent(message);
+      const finalMessage = isSharingEnabled && venueName ? 
+        `Hi! I'm interested in discussing ${venueName}.` : 
+        message;
+      
+      const encodedMessage = encodeURIComponent(finalMessage);
       const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
       
       // Open WhatsApp in a new tab
@@ -107,12 +144,24 @@ const WhatsAppIntegration = ({
     }
   };
 
+  // Check if we have a valid phone number to enable direct opening
+  const canDirectOpen = !!phoneNumber && phoneNumber.length > 8;
+
+  // Direct open handler for when we already have the phone number
+  const handleDirectOpenWhatsApp = () => {
+    if (canDirectOpen) {
+      handleOpenWhatsApp();
+    } else {
+      setIsDialogOpen(true);
+    }
+  };
+
   return (
     <>
       <Button 
         variant="outline" 
         className="flex items-center gap-2 border-green-500/30 text-green-500 hover:bg-green-500/10"
-        onClick={() => setIsDialogOpen(true)}
+        onClick={handleDirectOpenWhatsApp}
       >
         <MessageSquare className="h-4 w-4" />
         WhatsApp
@@ -152,15 +201,17 @@ const WhatsAppIntegration = ({
               />
             </div>
 
-            <div className="flex items-center space-x-2 py-2">
-              <Switch
-                id="sharing"
-                checked={isSharingEnabled}
-                onCheckedChange={setIsSharingEnabled}
-                className="bg-green-500"
-              />
-              <Label htmlFor="sharing">Share venue details in message</Label>
-            </div>
+            {venueName && (
+              <div className="flex items-center space-x-2 py-2">
+                <Switch
+                  id="sharing"
+                  checked={isSharingEnabled}
+                  onCheckedChange={setIsSharingEnabled}
+                  className="bg-green-500"
+                />
+                <Label htmlFor="sharing">Share venue details in message</Label>
+              </div>
+            )}
           </div>
           
           <DialogFooter className="flex justify-end gap-2 mt-2">

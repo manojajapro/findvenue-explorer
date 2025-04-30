@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { getInitials } from '@/lib/utils';
 import { ChatContact } from './types';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import WhatsAppIntegration from './WhatsAppIntegration';
 
 interface ChatHeaderProps {
@@ -15,6 +16,32 @@ interface ChatHeaderProps {
 
 const ChatHeader = ({ contact }: ChatHeaderProps) => {
   const navigate = useNavigate();
+  const [contactPhone, setContactPhone] = useState<string | undefined>(undefined);
+  
+  // Fetch contact's phone number if not already available
+  useEffect(() => {
+    const getContactPhone = async () => {
+      if (!contact?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('phone')
+          .eq('id', contact.id)
+          .maybeSingle();
+          
+        if (error) throw error;
+        
+        if (data?.phone) {
+          setContactPhone(data.phone);
+        }
+      } catch (error) {
+        console.error('Error fetching contact phone number:', error);
+      }
+    };
+    
+    getContactPhone();
+  }, [contact?.id]);
 
   return (
     <div className="flex items-center justify-between p-4 border-b border-white/10 bg-findvenue-surface/20">
@@ -54,7 +81,9 @@ const ChatHeader = ({ contact }: ChatHeaderProps) => {
         
         <WhatsAppIntegration 
           recipientName={contact.name}
+          recipientPhone={contactPhone}
           venueName={contact.venue_name}
+          messageText={`Hi! I'm interested in discussing ${contact.venue_name || 'your venue'}.`}
         />
       </div>
     </div>
