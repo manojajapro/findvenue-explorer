@@ -1,3 +1,4 @@
+
 import { Venue } from '@/hooks/useSupabaseVenues';
 import { Json } from '@/integrations/supabase/types';
 
@@ -7,21 +8,33 @@ import { Json } from '@/integrations/supabase/types';
  * @returns The owner user ID or null if not found
  */
 export const getVenueOwnerId = (venue: any): string | null => {
-  if (!venue || !venue.owner_info) return null;
+  if (!venue) return null;
   
   try {
-    if (typeof venue.owner_info === 'string') {
-      const parsedOwnerInfo = JSON.parse(venue.owner_info);
-      return parsedOwnerInfo.user_id || null;
-    } else if (typeof venue.owner_info === 'object') {
-      if (Array.isArray(venue.owner_info)) {
-        return null; // Handle array case (should not happen in practice)
+    // Handle the case when venue.ownerInfo already exists as a parsed object
+    if (venue.ownerInfo && typeof venue.ownerInfo === 'object') {
+      return venue.ownerInfo.user_id || null;
+    }
+    
+    // Handle the case when owner_info exists in the raw venue data
+    if (venue.owner_info) {
+      if (typeof venue.owner_info === 'string') {
+        try {
+          const parsedOwnerInfo = JSON.parse(venue.owner_info);
+          return parsedOwnerInfo.user_id || null;
+        } catch (e) {
+          console.error("Failed to parse owner_info string:", e);
+          return null;
+        }
+      } else if (typeof venue.owner_info === 'object') {
+        if (Array.isArray(venue.owner_info)) {
+          return null; // Handle array case (should not happen in practice)
+        }
+        return (venue.owner_info as any).user_id || null;
       }
-      // Access user_id safely from Json type
-      return (venue.owner_info as any).user_id || null;
     }
   } catch (err) {
-    console.error("Error parsing owner_info:", err);
+    console.error("Error extracting owner ID:", err);
   }
   
   return null;

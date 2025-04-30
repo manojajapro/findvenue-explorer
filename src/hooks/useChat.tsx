@@ -24,16 +24,23 @@ export const useChat = (contactId?: string) => {
   const venueName = queryParams.get('venueName');
   const bookingId = queryParams.get('bookingId');
 
+  console.log("useChat hook initializing with contactId:", contactId);
+  console.log("Current query params:", {
+    venueId,
+    venueName,
+    bookingId
+  });
+
   // Effect to fetch contact info
   useEffect(() => {
-    if (!user || !contactId) {
+    if (!user) {
+      console.log("No authenticated user, skipping contact fetch");
       setIsLoading(false);
       return;
     }
     
-    // Validate contactId to ensure it's not empty
-    if (contactId.trim() === '') {
-      console.error("Contact ID is empty or invalid");
+    if (!contactId || contactId.trim() === '') {
+      console.error("Contact ID is empty or invalid, cannot fetch contact info");
       setHasError(true);
       setErrorMessage("Invalid contact ID");
       setIsLoading(false);

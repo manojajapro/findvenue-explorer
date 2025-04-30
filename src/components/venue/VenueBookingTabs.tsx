@@ -478,7 +478,7 @@ export default function VenueBookingTabs({
       return;
     }
     
-    // Verify owner information is available
+    // Enhanced validation for owner information
     if (!ownerId || ownerId.trim() === '') {
       console.error("Owner ID is missing or invalid, cannot start chat");
       toast({
@@ -513,6 +513,27 @@ export default function VenueBookingTabs({
         ? `${userProfile.first_name} ${userProfile.last_name}`
         : 'Customer';
       
+      // Check if the owner exists in user_profiles
+      const { data: ownerProfile, error: ownerError } = await supabase
+        .from('user_profiles')
+        .select('id, first_name, last_name')
+        .eq('id', ownerId)
+        .maybeSingle();
+        
+      if (ownerError) {
+        console.error("Error verifying owner profile:", ownerError);
+      }
+      
+      if (!ownerProfile) {
+        console.error("Owner profile not found with ID:", ownerId);
+        toast({
+          title: "Error",
+          description: "Venue owner information is invalid or missing.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       // Check if a conversation already exists
       const { data: existingMessages, error: queryError } = await supabase
         .from('messages')
@@ -529,13 +550,17 @@ export default function VenueBookingTabs({
       if (!existingMessages || existingMessages.length === 0) {
         console.log("No existing conversation found, creating initial message");
         
+        const receiverName = ownerProfile 
+          ? `${ownerProfile.first_name} ${ownerProfile.last_name}`
+          : ownerName || 'Venue Owner';
+          
         const { data: msgData, error: insertError } = await supabase
           .from('messages')
           .insert({
             sender_id: user.id,
             receiver_id: ownerId,
             sender_name: senderName,
-            receiver_name: ownerName || 'Venue Owner',
+            receiver_name: receiverName,
             content: `Hi, I'm interested in ${venueName}.`,
             venue_id: venueId,
             venue_name: venueName
@@ -552,9 +577,10 @@ export default function VenueBookingTabs({
         console.log("Existing conversation found:", existingMessages);
       }
       
-      // Navigate to messages with the owner
-      console.log("Navigating to chat with owner ID:", ownerId);
-      navigate(`/messages/${ownerId}?venueId=${venueId}&venueName=${encodeURIComponent(venueName)}`);
+      // Navigate to messages with the owner, with venue context
+      const url = `/messages/${ownerId}?venueId=${venueId}&venueName=${encodeURIComponent(venueName)}`;
+      console.log("Navigating to:", url);
+      navigate(url);
       
       toast({
         title: "Conversation started",
