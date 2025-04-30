@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { PhoneInput } from '@/components/ui/phone-input';
 
 interface WhatsAppIntegrationProps {
   recipientName: string;
@@ -42,8 +43,13 @@ const WhatsAppIntegration = ({
   }, [recipientPhone]);
 
   const formatPhoneNumber = (phone: string): string => {
-    // Remove any non-digit characters and spaces
+    // Remove any non-digit characters 
     let digits = phone.replace(/\D/g, '');
+    
+    // If it doesn't have a country code, we can't proceed
+    if (digits.length < 8) {
+      return '';
+    }
     
     // Make sure it doesn't start with a + sign (WhatsApp API doesn't need it)
     if (digits.startsWith('+')) {
@@ -57,7 +63,7 @@ const WhatsAppIntegration = ({
     if (!phoneNumber) {
       toast({
         title: "Error",
-        description: "Please enter a valid phone number",
+        description: "Please enter a valid phone number with country code",
         variant: "destructive"
       });
       return;
@@ -66,6 +72,17 @@ const WhatsAppIntegration = ({
     setIsProcessing(true);
     try {
       const formattedPhone = formatPhoneNumber(phoneNumber);
+      
+      if (!formattedPhone) {
+        toast({
+          title: "Error",
+          description: "Please enter a valid phone number with country code (e.g. +1 for US)",
+          variant: "destructive"
+        });
+        setIsProcessing(false);
+        return;
+      }
+      
       const encodedMessage = encodeURIComponent(message);
       const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
       
@@ -113,11 +130,11 @@ const WhatsAppIntegration = ({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number (with country code)</Label>
-              <Input
+              <PhoneInput
                 id="phone"
-                placeholder="+1234567890"
+                placeholder="+1 (555) 123-4567"
                 value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
+                onChange={(value) => setPhoneNumber(value)}
                 className="bg-findvenue-surface/50 border-white/10"
               />
               <p className="text-xs text-findvenue-text-muted">
