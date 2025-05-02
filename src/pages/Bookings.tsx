@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, Trash2, Loader2, Eye, FileText } from 'lucide-react';
+import { Calendar, Clock, Users, Trash2, Loader2, Eye, FileText, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,6 +53,8 @@ const Bookings = () => {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   
   useEffect(() => {
     if (user) {
@@ -340,6 +342,11 @@ const Bookings = () => {
     navigate(`/venue/${venueId}`, { replace: false });
   };
 
+  const openInviteModal = (booking: Booking) => {
+    setSelectedBooking(booking);
+    setIsInviteModalOpen(true);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -566,7 +573,7 @@ const Bookings = () => {
                           <div className="flex flex-col items-end justify-between h-full">
                             <div className="text-right">
                               <p className="text-findvenue-text-muted text-sm">Total Price</p>
-                              <p className="text-xl font-bold">${firstBooking.total_price.toFixed(2)}</p>
+                              <p className="text-xl font-bold">SAR {firstBooking.total_price.toLocaleString()}</p>
                             </div>
                             
                             <div className="mt-4 flex flex-col gap-2">
@@ -578,6 +585,18 @@ const Bookings = () => {
                                   venueName={firstBooking.venue_name}
                                   bookingId={firstBooking.id}
                                 />
+                              )}
+
+                              {firstBooking.status === 'confirmed' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+                                  onClick={() => openInviteModal(firstBooking)}
+                                >
+                                  <UserPlus className="mr-2 h-4 w-4" />
+                                  Invite Guests
+                                </Button>
                               )}
 
                               <Button 

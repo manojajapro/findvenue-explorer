@@ -1,11 +1,13 @@
 
+import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Users, Eye, FileText } from "lucide-react";
+import { Calendar, Clock, Users, Eye, FileText, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
+import { InviteGuestsModal } from "./InviteGuestsModal";
 
 interface CustomerBookingCardProps {
   booking: {
@@ -24,6 +26,7 @@ interface CustomerBookingCardProps {
 
 export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
   const navigate = useNavigate();
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -127,58 +130,81 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
     // Save PDF
     doc.save(`booking-confirmation-${booking.id}.pdf`);
   };
+
+  const openInviteModal = () => {
+    setIsInviteModalOpen(true);
+  };
   
   return (
-    <Card className="glass-card border-white/10 overflow-hidden">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <h3 className="text-lg font-semibold">{booking.venue_name}</h3>
-          <Badge variant="outline" className={getStatusColor(booking.status)}>
-            {booking.status.toUpperCase()}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="pb-3">
-        <div className="space-y-3">
-          <div className="flex items-center text-sm">
-            <Calendar className="h-4 w-4 mr-2 text-findvenue-text-muted" />
-            <span>{format(new Date(booking.booking_date), "MMMM d, yyyy")}</span>
+    <>
+      <Card className="glass-card border-white/10 overflow-hidden">
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-start">
+            <h3 className="text-lg font-semibold">{booking.venue_name}</h3>
+            <Badge variant="outline" className={getStatusColor(booking.status)}>
+              {booking.status.toUpperCase()}
+            </Badge>
           </div>
-          <div className="flex items-center text-sm">
-            <Clock className="h-4 w-4 mr-2 text-findvenue-text-muted" />
-            <span>{booking.start_time} - {booking.end_time}</span>
-          </div>
-          {booking.address && (
+        </CardHeader>
+        <CardContent className="pb-3">
+          <div className="space-y-3">
             <div className="flex items-center text-sm">
-              <Users className="h-4 w-4 mr-2 text-findvenue-text-muted" />
-              <span>{booking.guests} guests</span>
+              <Calendar className="h-4 w-4 mr-2 text-findvenue-text-muted" />
+              <span>{format(new Date(booking.booking_date), "MMMM d, yyyy")}</span>
             </div>
-          )}
-          <div className="mt-2">
-            <p className="text-right font-semibold">SAR {booking.total_price.toLocaleString()}</p>
+            <div className="flex items-center text-sm">
+              <Clock className="h-4 w-4 mr-2 text-findvenue-text-muted" />
+              <span>{booking.start_time} - {booking.end_time}</span>
+            </div>
+            {booking.address && (
+              <div className="flex items-center text-sm">
+                <Users className="h-4 w-4 mr-2 text-findvenue-text-muted" />
+                <span>{booking.guests} guests</span>
+              </div>
+            )}
+            <div className="mt-2">
+              <p className="text-right font-semibold">SAR {booking.total_price.toLocaleString()}</p>
+            </div>
           </div>
-        </div>
-      </CardContent>
-      <CardFooter className="pt-2 border-t border-white/10 gap-2 flex-col">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
-          onClick={downloadBookingConfirmation}
-        >
-          <FileText className="mr-2 h-4 w-4" />
-          Download PDF Confirmation
-        </Button>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
-          onClick={handleViewDetails}
-        >
-          <Eye className="mr-2 h-4 w-4" />
-          View Venue Details
-        </Button>
-      </CardFooter>
-    </Card>
+        </CardContent>
+        <CardFooter className="pt-2 border-t border-white/10 gap-2 flex-col">
+          {booking.status === 'confirmed' && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+              onClick={openInviteModal}
+            >
+              <UserPlus className="mr-2 h-4 w-4" />
+              Invite Guests
+            </Button>
+          )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+            onClick={downloadBookingConfirmation}
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Download PDF Confirmation
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+            onClick={handleViewDetails}
+          >
+            <Eye className="mr-2 h-4 w-4" />
+            View Venue Details
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <InviteGuestsModal 
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        booking={booking}
+      />
+    </>
   );
 };
