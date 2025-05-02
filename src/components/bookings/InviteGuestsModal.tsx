@@ -75,23 +75,31 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
     setIsSending(true);
     
     try {
-      // Store invitations in database
+      console.log("Sending invitations to:", validEmails);
+      console.log("Booking ID:", booking.id);
+      
+      // Store invitations in database using upsert to avoid duplicates
       for (const email of validEmails) {
+        const trimmedEmail = email.toLowerCase().trim();
+        
         const { error } = await supabase
           .from('booking_invites')
-          .insert({
+          .upsert({
             booking_id: booking.id,
-            email: email.toLowerCase().trim(),
-            status: 'pending'
+            email: trimmedEmail,
+            status: 'pending',
+            created_at: new Date().toISOString()
           });
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error inserting invite:", error);
+          throw error;
+        }
       }
       
       // Create shareable link for the invitation
       const inviteLink = `${window.location.origin}/booking-invite/${booking.id}`;
       
-      // For now, we'll simulate sending emails - in production, this would use a proper email service
       console.log("Invitation emails would be sent to:", validEmails);
       console.log("With link:", inviteLink);
       
@@ -100,12 +108,14 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         description: `Successfully sent invitations to ${validEmails.length} guest(s).`,
       });
       
+      // Reset form state
+      setEmails(['']);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending invitations:", error);
       toast({
         title: "Failed to send invitations",
-        description: "There was an error sending the invitations. Please try again.",
+        description: error?.message || "There was an error sending the invitations. Please try again.",
         variant: "destructive",
       });
     } finally {
