@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { 
   Table, 
@@ -9,7 +10,16 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, MessageCircle, Calendar, CalendarPlus } from "lucide-react";
+import { 
+  CheckCircle, 
+  XCircle, 
+  MessageCircle, 
+  Calendar, 
+  CalendarPlus,
+  Mail,
+  Phone,
+  CreditCard
+} from "lucide-react";
 import { format } from 'date-fns';
 import { AddToCalendarModal } from '../bookings/AddToCalendarModal';
 
