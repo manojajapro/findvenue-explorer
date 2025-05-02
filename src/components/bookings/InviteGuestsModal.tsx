@@ -78,39 +78,63 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       console.log("Sending invitations to:", validEmails);
       console.log("Booking ID:", booking.id);
       
+      // Array to track successful inserts
+      const successfulInserts = [];
+      const failedInserts = [];
+      
       // Store invitations in database using upsert to avoid duplicates
       for (const email of validEmails) {
         const trimmedEmail = email.toLowerCase().trim();
         
-        const { error } = await supabase
+        console.log("Inserting invite for email:", trimmedEmail);
+        
+        const { data, error } = await supabase
           .from('booking_invites')
           .upsert({
             booking_id: booking.id,
             email: trimmedEmail,
-            status: 'pending',
-            created_at: new Date().toISOString()
+            status: 'pending'
+          }, { 
+            onConflict: 'booking_id,email',
+            returning: 'minimal'
           });
           
         if (error) {
           console.error("Error inserting invite:", error);
-          throw error;
+          failedInserts.push({ email: trimmedEmail, error: error.message });
+        } else {
+          successfulInserts.push(trimmedEmail);
+          console.log("Successfully inserted invite for:", trimmedEmail);
         }
       }
       
       // Create shareable link for the invitation
       const inviteLink = `${window.location.origin}/booking-invite/${booking.id}`;
       
-      console.log("Invitation emails would be sent to:", validEmails);
-      console.log("With link:", inviteLink);
+      console.log("Invitation link:", inviteLink);
+      console.log("Successful inserts:", successfulInserts);
+      console.log("Failed inserts:", failedInserts);
       
-      toast({
-        title: "Invitations sent!",
-        description: `Successfully sent invitations to ${validEmails.length} guest(s).`,
-      });
+      if (successfulInserts.length > 0) {
+        toast({
+          title: "Invitations sent!",
+          description: `Successfully sent invitations to ${successfulInserts.length} guest(s).`,
+        });
+      }
       
-      // Reset form state
-      setEmails(['']);
-      onClose();
+      if (failedInserts.length > 0) {
+        toast({
+          title: "Some invitations failed",
+          description: `Failed to send ${failedInserts.length} invitation(s). Please try again.`,
+          variant: "destructive",
+        });
+      }
+      
+      // Reset form state if at least some were successful
+      if (successfulInserts.length > 0) {
+        setEmails(['']);
+        onClose();
+      }
     } catch (error: any) {
       console.error("Error sending invitations:", error);
       toast({
