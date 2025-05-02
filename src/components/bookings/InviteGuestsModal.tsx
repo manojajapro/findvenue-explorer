@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Mail, Plus, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -194,6 +194,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               onClick={addEmailField}
               className="w-full mt-2"
             >
+              <Plus className="h-4 w-4 mr-2" />
               Add Another Guest
             </Button>
           </div>
@@ -208,7 +209,17 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             className="bg-findvenue hover:bg-findvenue-dark"
             disabled={isSending}
           >
-            {isSending ? "Sending..." : "Send Invitations"}
+            {isSending ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                Sending...
+              </>
+            ) : (
+              <>
+                <Mail className="h-4 w-4 mr-2" />
+                Send Invitations
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

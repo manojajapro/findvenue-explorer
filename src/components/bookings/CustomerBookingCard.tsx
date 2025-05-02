@@ -132,6 +132,7 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
   };
 
   const openInviteModal = () => {
+    console.log("Opening invite modal for booking:", booking.id);
     setIsInviteModalOpen(true);
   };
   
