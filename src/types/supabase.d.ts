@@ -11,6 +11,14 @@ interface Message {
   venue_name?: string;
 }
 
+interface BookingInvite {
+  id: string;
+  booking_id: string;
+  email: string;
+  status: string;
+  created_at: string;
+}
+
 interface Notification {
   id: string;
   user_id: string;
@@ -48,6 +56,11 @@ declare module '@supabase/supabase-js' {
           Row: Notification;
           Insert: Omit<Notification, 'id' | 'created_at'> & { id?: string; created_at?: string };
           Update: Partial<Omit<Notification, 'id'>>;
+        };
+        booking_invites: {
+          Row: BookingInvite;
+          Insert: Omit<BookingInvite, 'id' | 'created_at'> & { id?: string; created_at?: string };
+          Update: Partial<Omit<BookingInvite, 'id'>>;
         };
         bookings: {
           Row: {

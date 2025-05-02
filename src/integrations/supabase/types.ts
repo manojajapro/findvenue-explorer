@@ -45,6 +45,38 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_invites: {
+        Row: {
+          booking_id: string
+          created_at: string
+          email: string
+          id: string
+          status: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          email: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_invites_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           booking_date: string
