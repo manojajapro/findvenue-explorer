@@ -148,7 +148,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md glass-card border-white/10">
         <DialogHeader>
           <DialogTitle>Invite Guests</DialogTitle>
