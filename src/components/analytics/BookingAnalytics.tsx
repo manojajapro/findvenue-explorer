@@ -21,13 +21,15 @@ import {
   Line,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Area,
+  AreaChart
 } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Calendar, ChartPie, TrendingUp } from 'lucide-react';
+import { Calendar, ChartPie, TrendingUp, DollarSign } from 'lucide-react';
 
 interface BookingAnalyticsProps {
   venueIds: string[];
@@ -41,6 +43,7 @@ interface BookingData {
   confirmed: number;
   cancelled: number;
   completed: number;
+  revenue: number; // Added revenue field
 }
 
 interface PieChartData {
@@ -54,7 +57,8 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
   const [bookingsData, setBookingsData] = useState<BookingData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAsPercentage, setShowAsPercentage] = useState(false);
-  const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
+  const [chartType, setChartType] = useState<'bar' | 'line' | 'pie' | 'area'>('bar');
+  const [revenueTotal, setRevenueTotal] = useState<number>(0); // Added total revenue state
   const [summaryData, setSummaryData] = useState<{
     pending: number;
     confirmed: number;
@@ -75,6 +79,7 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
     confirmed: '#10b981',  // Green
     cancelled: '#ef4444',  // Red
     completed: '#3b82f6',  // Blue
+    revenue: '#8b5cf6',    // Purple for revenue
   };
 
   // Create the pie chart data
@@ -139,7 +144,7 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
       }
       
       // Group bookings by date and status
-      const groupedByDate: { [key: string]: { [key: string]: number } } = {};
+      const groupedByDate: { [key: string]: { [key: string]: number, revenue: number } } = {};
       const totalsByStatus = {
         pending: 0,
         confirmed: 0,
@@ -148,9 +153,12 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
         total: 0
       };
       
+      let totalRevenue = 0;
+      
       bookingsData?.forEach(booking => {
         const date = format(new Date(booking.booking_date), 'MMM dd');
         const status = booking.status || 'pending';
+        const price = Number(booking.total_price) || 0;
         
         // Initialize date in the groupedByDate object if it doesn't exist
         if (!groupedByDate[date]) {
@@ -159,11 +167,18 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
             confirmed: 0,
             cancelled: 0,
             completed: 0,
+            revenue: 0
           };
         }
         
         // Increment the count for the current status
         groupedByDate[date][status]++;
+        
+        // Only add revenue for confirmed and completed bookings
+        if (status === 'confirmed' || status === 'completed') {
+          groupedByDate[date].revenue += price;
+          totalRevenue += price;
+        }
         
         // Update totals
         if (status in totalsByStatus) {
@@ -179,10 +194,12 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
         confirmed: groupedByDate[date].confirmed || 0,
         cancelled: groupedByDate[date].cancelled || 0,
         completed: groupedByDate[date].completed || 0,
+        revenue: groupedByDate[date].revenue || 0,
       }));
       
       setBookingsData(chartData);
       setSummaryData(totalsByStatus);
+      setRevenueTotal(totalRevenue);
     } catch (error) {
       console.error('Error in fetchBookingData:', error);
     } finally {
@@ -212,6 +229,51 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
     }
 
     switch (chartType) {
+      case 'area':
+        return (
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={bookingsData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                <XAxis dataKey="date" stroke="#888" />
+                <YAxis stroke="#888" />
+                <Tooltip 
+                  contentStyle={{ background: '#222', borderRadius: '8px', border: '1px solid #333' }}
+                  labelStyle={{ color: '#fff' }}
+                />
+                <Legend />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  name="Revenue (SAR)" 
+                  stroke={statusColors.revenue} 
+                  fill={statusColors.revenue} 
+                  fillOpacity={0.6} 
+                  activeDot={{ r: 8 }} 
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="confirmed" 
+                  name="Confirmed" 
+                  stroke={statusColors.confirmed} 
+                  fill={statusColors.confirmed} 
+                  fillOpacity={0.3} 
+                  activeDot={{ r: 6 }} 
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="completed" 
+                  name="Completed" 
+                  stroke={statusColors.completed} 
+                  fill={statusColors.completed} 
+                  fillOpacity={0.3} 
+                  activeDot={{ r: 6 }} 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        );
+
       case 'pie': 
         return (
           <div className="h-80 w-full">
@@ -247,7 +309,8 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
               <LineChart data={bookingsData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#444" />
                 <XAxis dataKey="date" stroke="#888" />
-                <YAxis stroke="#888" />
+                <YAxis stroke="#888" yAxisId="left" />
+                <YAxis stroke="#888" yAxisId="right" orientation="right" />
                 <Tooltip
                   contentStyle={{ background: '#222', borderRadius: '8px', border: '1px solid #333' }}
                   labelStyle={{ color: '#fff' }}
@@ -258,6 +321,7 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
                   dataKey="pending"
                   name="Pending"
                   stroke={statusColors.pending}
+                  yAxisId="left"
                   activeDot={{ r: 8 }}
                   strokeWidth={2}
                 />
@@ -266,6 +330,7 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
                   dataKey="confirmed"
                   name="Confirmed"
                   stroke={statusColors.confirmed}
+                  yAxisId="left"
                   activeDot={{ r: 8 }}
                   strokeWidth={2}
                 />
@@ -274,6 +339,7 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
                   dataKey="cancelled"
                   name="Cancelled"
                   stroke={statusColors.cancelled}
+                  yAxisId="left"
                   activeDot={{ r: 8 }}
                   strokeWidth={2}
                 />
@@ -282,8 +348,18 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
                   dataKey="completed"
                   name="Completed"
                   stroke={statusColors.completed}
+                  yAxisId="left"
                   activeDot={{ r: 8 }}
                   strokeWidth={2}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="revenue"
+                  name="Revenue (SAR)"
+                  stroke={statusColors.revenue}
+                  yAxisId="right"
+                  activeDot={{ r: 8 }}
+                  strokeWidth={3}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -363,7 +439,7 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
             <ToggleGroup 
               type="single" 
               value={chartType} 
-              onValueChange={(value) => value && setChartType(value as 'bar' | 'line' | 'pie')}
+              onValueChange={(value) => value && setChartType(value as 'bar' | 'line' | 'pie' | 'area')}
               size="sm"
               className="justify-start"
             >
@@ -376,9 +452,12 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
               <ToggleGroupItem value="pie" title="Pie Chart">
                 <ChartPie className="h-4 w-4" />
               </ToggleGroupItem>
+              <ToggleGroupItem value="area" title="Area Chart">
+                <TrendingUp className="h-4 w-4" />
+              </ToggleGroupItem>
             </ToggleGroup>
             
-            {chartType !== 'pie' && (
+            {chartType !== 'pie' && chartType !== 'area' && (
               <div className="flex items-center space-x-2">
                 <Switch 
                   id="stacked-chart" 
@@ -392,7 +471,7 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-5 gap-4 mb-4">
           <div className="bg-card/50 rounded-md p-3 border border-border/20">
             <div className="text-sm text-muted-foreground">Pending</div>
             <div className="text-2xl font-semibold mt-1 text-amber-500">{summaryData.pending}</div>
@@ -408,6 +487,10 @@ const BookingAnalytics = ({ venueIds }: BookingAnalyticsProps) => {
           <div className="bg-card/50 rounded-md p-3 border border-border/20">
             <div className="text-sm text-muted-foreground">Completed</div>
             <div className="text-2xl font-semibold mt-1 text-blue-500">{summaryData.completed}</div>
+          </div>
+          <div className="bg-card/50 rounded-md p-3 border border-border/20">
+            <div className="text-sm text-muted-foreground">Total Revenue</div>
+            <div className="text-2xl font-semibold mt-1 text-purple-500">SAR {revenueTotal.toLocaleString()}</div>
           </div>
         </div>
         

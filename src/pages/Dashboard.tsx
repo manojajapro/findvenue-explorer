@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,7 +16,7 @@ import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
 import { OwnerBookingsCalendar } from '@/components/calendar/OwnerBookingsCalendar';
 import BookingAnalytics from '@/components/analytics/BookingAnalytics';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { SocialShareButtons } from '@/components/venue/SocialShareButtons';
+import SocialShareButtons from '@/components/venue/SocialShareButtons';
 
 const Dashboard = () => {
   const navigate = useNavigate();
