@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { 
   CalendarPlus, 
-  Calendar as CalendarIcon, 
-  Mail as MailIcon, 
-  ExternalLink
+  Calendar, 
+  ExternalLink,
+  Copy
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -26,8 +26,8 @@ interface AddToCalendarModalProps {
 export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarModalProps) => {
   const { toast } = useToast();
 
-  const generateGoogleCalendarUrl = () => {
-    // Format the date and times for Google Calendar
+  // Helper function to parse dates from booking data
+  const parseBookingDates = () => {
     const bookingDate = new Date(booking.booking_date);
     
     // Parse start time
@@ -39,6 +39,12 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
     const [endHour, endMinute] = booking.end_time.split(':').map(Number);
     const endDateTime = new Date(bookingDate);
     endDateTime.setHours(endHour, endMinute, 0);
+    
+    return { startDateTime, endDateTime };
+  };
+
+  const generateGoogleCalendarUrl = () => {
+    const { startDateTime, endDateTime } = parseBookingDates();
     
     // Format dates for Google Calendar
     const startDateStr = startDateTime.toISOString().replace(/-|:|\.\d+/g, '');
@@ -54,18 +60,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
   };
   
   const generateAppleCalendarFile = () => {
-    // Parse booking date and times
-    const bookingDate = new Date(booking.booking_date);
-    
-    // Parse start time
-    const [startHour, startMinute] = booking.start_time.split(':').map(Number);
-    const startDateTime = new Date(bookingDate);
-    startDateTime.setHours(startHour, startMinute, 0);
-    
-    // Parse end time
-    const [endHour, endMinute] = booking.end_time.split(':').map(Number);
-    const endDateTime = new Date(bookingDate);
-    endDateTime.setHours(endHour, endMinute, 0);
+    const { startDateTime, endDateTime } = parseBookingDates();
     
     // Format dates for iCal format (YYYYMMDDTHHMMSSZ)
     const formatDateForIcal = (date: Date) => {
@@ -168,7 +163,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
               className="w-full flex items-center justify-center"
               onClick={openInGoogleCalendar}
             >
-              <CalendarIcon className="h-4 w-4 mr-2" />
+              <Calendar className="h-4 w-4 mr-2" />
               <span>Open in Google Calendar</span>
               <ExternalLink className="h-3 w-3 ml-2 opacity-70" />
             </Button>
@@ -178,7 +173,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
               className="w-full flex items-center justify-center"
               onClick={generateAppleCalendarFile}
             >
-              <CalendarIcon className="h-4 w-4 mr-2" />
+              <Calendar className="h-4 w-4 mr-2" />
               <span>Download for Apple Calendar (.ics)</span>
             </Button>
             
@@ -187,7 +182,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
               className="w-full flex items-center justify-center"
               onClick={copyCalendarLink}
             >
-              <MailIcon className="h-4 w-4 mr-2" />
+              <Copy className="h-4 w-4 mr-2" />
               <span>Copy Calendar Link</span>
             </Button>
           </div>

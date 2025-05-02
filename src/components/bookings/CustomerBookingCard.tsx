@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +41,7 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
         return "bg-blue-500/10 text-blue-500";
     }
   };
-
+  
   const handleViewDetails = () => {
     navigate(`/venue/${booking.venue_id}`, { replace: false });
   };
