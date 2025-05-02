@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { WhatsApp, Instagram, Twitter, Send, Share2 } from 'lucide-react';
+import { MessageSquare, Instagram, Twitter, Send, Share2 } from 'lucide-react';
 
 interface SocialShareButtonsProps {
   url: string;
@@ -90,7 +90,7 @@ const SocialShareButtons = ({
         onClick={shareOnWhatsApp}
         title="Share on WhatsApp"
       >
-        <WhatsApp className="h-5 w-5" />
+        <MessageSquare className="h-5 w-5" />
       </Button>
       
       <Button
