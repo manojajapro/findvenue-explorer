@@ -74,35 +74,14 @@ const BookingOwnerChat = ({
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button 
-          variant="outline" 
-          className="w-full border-findvenue text-findvenue hover:bg-findvenue/10"
-        >
-          <MessageCircle className="h-4 w-4 mr-2" />
-          Contact {ownerName || 'Venue Owner'}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="bg-findvenue-card-bg border-white/10 w-56">
-        <DropdownMenuItem onClick={handleChat} className="cursor-pointer focus:bg-findvenue/10">
-          <MessageCircle className="mr-2 h-4 w-4" />
-          <span>Chat in App</span>
-        </DropdownMenuItem>
-        {ownerPhone && (
-          <DropdownMenuItem className="p-0 focus:bg-transparent cursor-default">
-            <div className="w-full">
-              <WhatsAppIntegration 
-                recipientName={ownerName || 'Venue Owner'} 
-                recipientPhone={ownerPhone}
-                venueName={venueName}
-                messageText={`Hi! I'm contacting about my booking (ID: ${bookingId}) for "${venueName}". Can you provide more information?`}
-              />
-            </div>
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button 
+      variant="outline" 
+      className="w-full border-findvenue text-findvenue hover:bg-findvenue/10"
+      onClick={handleChat}
+    >
+      <MessageCircle className="h-4 w-4 mr-2" />
+      Contact {ownerName || 'Venue Owner'}
+    </Button>
   );
 };
 

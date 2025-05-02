@@ -18,6 +18,7 @@ import { VenueCard } from '@/components/ui';
 import VenueLocationMap from '@/components/map/VenueLocationMap';
 import ShareVenue from '@/components/venue/ShareVenue';
 import VenueDetailsChatbot from '@/components/venue/VenueDetailsChatbot';
+import SocialShareButtons from './SocialShareButtons';
 
 const VenueDetails = () => {
   const { venueId } = useParams<{ venueId: string }>();
@@ -431,6 +432,18 @@ const VenueDetails = () => {
           />
         </div>
       )}
+      
+      {/* Social Media Sharing Section - Added before Similar Venues */}
+      <div className="my-10 py-6 bg-findvenue-surface/5 rounded-lg border border-white/10">
+        <h3 className="text-xl font-semibold text-center mb-4">Share This Venue</h3>
+        <SocialShareButtons 
+          url={`${window.location.origin}/venue/${venue.id}`}
+          title={`Check out ${venue.name} on FindVenue!`}
+          description={venue.description}
+          imageUrl={venue.galleryImages?.[0]}
+          className="mt-2"
+        />
+      </div>
       
       {similarVenues.length > 0 && (
         <div className="mt-12 mb-4">
