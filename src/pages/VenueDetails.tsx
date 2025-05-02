@@ -39,6 +39,7 @@ import { useAuth } from '@/hooks/useAuth';
 import VenueAIAssistants from '@/components/venue/VenueAIAssistants';
 import VenueRating from '@/components/venue/VenueRating';
 import { getVenueOwnerId, processCategoryNames } from '@/utils/venueHelpers';
+import SocialShareButtons from '@/components/venue/SocialShareButtons';
 
 const amenityIcons: Record<string, JSX.Element> = {
   'WiFi': <Wifi className="w-4 h-4" />,
