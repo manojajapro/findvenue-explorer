@@ -646,7 +646,7 @@ const VenueDetails = () => {
             </div>
             
             {/* Share this venue section - Added at the top of the venue details */}
-            <div className="mb-8 p-4 bg-findvenue-surface/10 rounded-lg border border-white/10">
+            {/* <div className="mb-8 p-4 bg-findvenue-surface/10 rounded-lg border border-white/10">
               <h3 className="text-lg font-semibold mb-3 text-center">Share This Venue</h3>
               <SocialShareButtons 
                 url={`${window.location.origin}/venue/${venue?.id}`}
@@ -655,7 +655,7 @@ const VenueDetails = () => {
                 imageUrl={venue?.galleryImages?.[0]}
                 className="mt-2"
               />
-            </div>
+            </div> */}
             
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-3">About this venue</h2>
