@@ -1,9 +1,11 @@
+
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Users, Eye, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { jsPDF } from "jspdf";
 
 interface CustomerBookingCardProps {
   booking: {
@@ -41,29 +43,89 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
   };
   
   const downloadBookingConfirmation = () => {
-    // Create booking confirmation text
-    const bookingDetails = `
-Booking Confirmation
--------------------
-Venue: ${booking.venue_name}
-Date: ${format(new Date(booking.booking_date), "MMMM d, yyyy")}
-Time: ${booking.start_time} - ${booking.end_time}
-Number of Guests: ${booking.guests}
-Status: ${booking.status.toUpperCase()}
-Total Price: SAR ${booking.total_price.toLocaleString()}
-${booking.address ? `\nAddress: ${booking.address}` : ''}
-    `.trim();
-
-    // Create and download file
-    const blob = new Blob([bookingDetails], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `booking-confirmation-${booking.id}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    // Create PDF document
+    const doc = new jsPDF();
+    
+    // Set PDF properties
+    doc.setProperties({
+      title: `Booking Confirmation - ${booking.id}`,
+      subject: `Booking for ${booking.venue_name}`,
+      creator: 'FindVenue App',
+    });
+    
+    // Add logo or header (placeholder text for now)
+    doc.setFontSize(22);
+    doc.setTextColor(41, 128, 185); // Use brand color
+    doc.text("FindVenue", 105, 20, { align: 'center' });
+    
+    // Add confirmation title
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Booking Confirmation", 105, 35, { align: 'center' });
+    
+    // Add horizontal line
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, 40, 190, 40);
+    
+    // Add booking details
+    doc.setFontSize(12);
+    
+    // Status indicator with color
+    doc.setFontSize(14);
+    const statusColors: Record<string, [number, number, number]> = {
+      'confirmed': [39, 174, 96],
+      'pending': [241, 196, 15],
+      'cancelled': [231, 76, 60],
+      'default': [52, 152, 219]
+    };
+    
+    const statusColor = statusColors[booking.status] || statusColors['default'];
+    doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+    doc.text(`Status: ${booking.status.toUpperCase()}`, 20, 55);
+    
+    // Reset text color for regular content
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    
+    // Booking details
+    let y = 70;
+    const leftMargin = 20;
+    const lineHeight = 10;
+    
+    const addLabelValuePair = (label: string, value: string) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(`${label}:`, leftMargin, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(value, leftMargin + 40, y);
+      y += lineHeight;
+    };
+    
+    addLabelValuePair("Venue", booking.venue_name);
+    addLabelValuePair("Date", format(new Date(booking.booking_date), "MMMM d, yyyy"));
+    addLabelValuePair("Time", `${booking.start_time} - ${booking.end_time}`);
+    addLabelValuePair("Guests", booking.guests.toString());
+    
+    if (booking.address) {
+      addLabelValuePair("Address", booking.address);
+    }
+    
+    // Add price with currency
+    y += lineHeight;
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Total Price:", leftMargin, y);
+    doc.text(`SAR ${booking.total_price.toLocaleString()}`, 190, y, { align: 'right' });
+    
+    // Add footer
+    const footerY = 270;
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Thank you for choosing FindVenue!", 105, footerY, { align: 'center' });
+    doc.text(`Confirmation ID: ${booking.id}`, 105, footerY + 7, { align: 'center' });
+    doc.text(`Generated on: ${format(new Date(), "MMMM d, yyyy, HH:mm")}`, 105, footerY + 14, { align: 'center' });
+    
+    // Save PDF
+    doc.save(`booking-confirmation-${booking.id}.pdf`);
   };
   
   return (
@@ -105,7 +167,7 @@ ${booking.address ? `\nAddress: ${booking.address}` : ''}
           onClick={downloadBookingConfirmation}
         >
           <FileText className="mr-2 h-4 w-4" />
-          Download Confirmation
+          Download PDF Confirmation
         </Button>
         <Button 
           variant="outline" 
