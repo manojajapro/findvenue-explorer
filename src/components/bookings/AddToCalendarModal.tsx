@@ -140,7 +140,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md glass-card border-white/10">
+      <DialogContent className="max-w-md glass-card border-white/10 bg-gradient-to-b from-findvenue-surface/5 to-transparent">
         <DialogHeader>
           <DialogTitle className="text-center">
             <div className="flex items-center justify-center mb-2">
@@ -151,8 +151,8 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
         </DialogHeader>
         
         <div className="py-4">
-          <div className="mb-6 text-center">
-            <h3 className="font-medium">{booking.venue_name}</h3>
+          <div className="mb-6 text-center bg-findvenue/5 p-4 rounded-lg">
+            <h3 className="font-medium text-lg text-findvenue">{booking.venue_name}</h3>
             <p className="text-sm text-findvenue-text-muted">{formattedDate}</p>
             <p className="text-sm text-findvenue-text-muted">{booking.start_time} - {booking.end_time}</p>
           </div>
@@ -160,7 +160,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
           <div className="space-y-4">
             <Button 
               variant="outline" 
-              className="w-full flex items-center justify-center"
+              className="w-full flex items-center justify-center border-findvenue text-findvenue hover:bg-findvenue/10 transition-all duration-300"
               onClick={openInGoogleCalendar}
             >
               <Calendar className="h-4 w-4 mr-2" />
@@ -170,7 +170,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
             
             <Button 
               variant="outline" 
-              className="w-full flex items-center justify-center"
+              className="w-full flex items-center justify-center border-findvenue text-findvenue hover:bg-findvenue/10 transition-all duration-300"
               onClick={generateAppleCalendarFile}
             >
               <Calendar className="h-4 w-4 mr-2" />
@@ -179,7 +179,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
             
             <Button 
               variant="outline" 
-              className="w-full flex items-center justify-center"
+              className="w-full flex items-center justify-center border-findvenue text-findvenue hover:bg-findvenue/10 transition-all duration-300"
               onClick={copyCalendarLink}
             >
               <Copy className="h-4 w-4 mr-2" />

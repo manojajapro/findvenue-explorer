@@ -47,13 +47,13 @@ export const CustomerBookingsTable = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
-        return 'bg-green-500/20 text-green-400 border-green-500/30';
+        return 'bg-green-500/20 text-green-500 border-green-500/50';
       case 'pending':
-        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+        return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/50';
       case 'cancelled':
-        return 'bg-destructive/20 text-destructive border-destructive/30';
+        return 'bg-destructive/20 text-destructive border-destructive/50';
       default:
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+        return 'bg-gray-500/20 text-gray-500 border-gray-500/50';
     }
   };
 
@@ -94,25 +94,26 @@ export const CustomerBookingsTable = ({
   const bookingGroups = getBookingGroups();
   
   const handleOpenCalendar = (booking: any) => {
+    console.log("Opening calendar modal for booking:", booking.id);
     setCalendarBooking(booking);
     setIsCalendarModalOpen(true);
   };
   
   return (
     <>
-      <Table>
+      <Table className="border border-white/10 rounded-lg overflow-hidden">
         <TableHeader>
-          <TableRow className="border-white/10">
-            <TableHead>Customer</TableHead>
-            <TableHead>Contact Info</TableHead>
-            <TableHead>Venue</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Time</TableHead>
-            <TableHead>Guests</TableHead>
-            <TableHead>Payment</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+          <TableRow className="bg-findvenue-surface/20 border-white/10">
+            <TableHead className="font-semibold">Customer</TableHead>
+            <TableHead className="font-semibold">Contact Info</TableHead>
+            <TableHead className="font-semibold">Venue</TableHead>
+            <TableHead className="font-semibold">Date</TableHead>
+            <TableHead className="font-semibold">Time</TableHead>
+            <TableHead className="font-semibold">Guests</TableHead>
+            <TableHead className="font-semibold">Payment</TableHead>
+            <TableHead className="font-semibold">Amount</TableHead>
+            <TableHead className="font-semibold">Status</TableHead>
+            <TableHead className="text-right font-semibold">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -122,7 +123,7 @@ export const CustomerBookingsTable = ({
               const hasMultipleBookings = group.length > 1;
               
               return group.map((booking, idx) => (
-                <TableRow key={booking.id} className={`border-white/10 ${hasMultipleBookings ? 'bg-findvenue-surface/20' : ''}`}>
+                <TableRow key={booking.id} className={`border-white/10 hover:bg-findvenue-surface/10 transition-colors ${hasMultipleBookings ? 'bg-findvenue-surface/5' : ''}`}>
                   <TableCell className="font-medium">{booking.user_name || 'Unknown'}</TableCell>
                   <TableCell>
                     <div className="text-xs space-y-1">
@@ -212,7 +213,7 @@ export const CustomerBookingsTable = ({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="border-findvenue text-findvenue hover:bg-findvenue/10"
+                            className="border-findvenue text-findvenue hover:bg-findvenue/10 font-semibold"
                             onClick={() => handleOpenCalendar(booking)}
                           >
                             <CalendarPlus className="h-4 w-4 mr-1" />
@@ -227,7 +228,7 @@ export const CustomerBookingsTable = ({
             })
           ) : (
             <TableRow>
-              <TableCell colSpan={10} className="text-center py-4 text-findvenue-text-muted">
+              <TableCell colSpan={10} className="text-center py-8 text-findvenue-text-muted">
                 No bookings found
               </TableCell>
             </TableRow>

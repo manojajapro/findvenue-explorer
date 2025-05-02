@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,13 +33,13 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
-        return "bg-green-500/10 text-green-500";
+        return "bg-green-500/10 text-green-500 border-green-500";
       case 'cancelled':
-        return "bg-red-500/10 text-red-500";
+        return "bg-red-500/10 text-red-500 border-red-500";
       case 'pending':
-        return "bg-yellow-500/10 text-yellow-500";
+        return "bg-yellow-500/10 text-yellow-500 border-yellow-500";
       default:
-        return "bg-blue-500/10 text-blue-500";
+        return "bg-blue-500/10 text-blue-500 border-blue-500";
     }
   };
   
@@ -144,11 +145,11 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
   
   return (
     <>
-      <Card className="glass-card border-white/10 overflow-hidden">
-        <CardHeader className="pb-2">
+      <Card className="glass-card border-white/10 overflow-hidden hover:shadow-lg transition-all duration-300">
+        <CardHeader className="pb-2 bg-gradient-to-r from-findvenue-surface/20 to-transparent">
           <div className="flex justify-between items-start">
             <h3 className="text-lg font-semibold">{booking.venue_name}</h3>
-            <Badge variant="outline" className={getStatusColor(booking.status)}>
+            <Badge variant="outline" className={`${getStatusColor(booking.status)}`}>
               {booking.status.toUpperCase()}
             </Badge>
           </div>
@@ -156,31 +157,31 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
         <CardContent className="pb-3">
           <div className="space-y-3">
             <div className="flex items-center text-sm">
-              <Calendar className="h-4 w-4 mr-2 text-findvenue-text-muted" />
+              <Calendar className="h-4 w-4 mr-2 text-findvenue" />
               <span>{format(new Date(booking.booking_date), "MMMM d, yyyy")}</span>
             </div>
             <div className="flex items-center text-sm">
-              <Clock className="h-4 w-4 mr-2 text-findvenue-text-muted" />
+              <Clock className="h-4 w-4 mr-2 text-findvenue" />
               <span>{booking.start_time} - {booking.end_time}</span>
             </div>
             {booking.address && (
               <div className="flex items-center text-sm">
-                <Users className="h-4 w-4 mr-2 text-findvenue-text-muted" />
+                <Users className="h-4 w-4 mr-2 text-findvenue" />
                 <span>{booking.guests} guests</span>
               </div>
             )}
             <div className="mt-2">
-              <p className="text-right font-semibold">SAR {booking.total_price.toLocaleString()}</p>
+              <p className="text-right font-semibold text-findvenue">SAR {booking.total_price.toLocaleString()}</p>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="pt-2 border-t border-white/10 gap-2 flex-col">
+        <CardFooter className="pt-2 border-t border-white/10 gap-2 flex flex-wrap">
           {booking.status === 'confirmed' && (
             <>
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+                className="flex-1 min-w-[45%] border-findvenue text-findvenue hover:bg-findvenue/5 hover:border-findvenue/80"
                 onClick={openInviteModal}
               >
                 <UserPlus className="mr-2 h-4 w-4" />
@@ -189,7 +190,7 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+                className="flex-1 min-w-[45%] border-findvenue text-findvenue hover:bg-findvenue/5 hover:border-findvenue/80"
                 onClick={openCalendarModal}
               >
                 <CalendarPlus className="mr-2 h-4 w-4" />
@@ -200,20 +201,20 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
           <Button 
             variant="outline" 
             size="sm" 
-            className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+            className="flex-1 min-w-[45%] border-findvenue text-findvenue hover:bg-findvenue/5 hover:border-findvenue/80"
             onClick={downloadBookingConfirmation}
           >
             <FileText className="mr-2 h-4 w-4" />
-            Download PDF Confirmation
+            Download PDF
           </Button>
           <Button 
             variant="outline" 
             size="sm" 
-            className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+            className="flex-1 min-w-[45%] border-findvenue text-findvenue hover:bg-findvenue/5 hover:border-findvenue/80"
             onClick={handleViewDetails}
           >
             <Eye className="mr-2 h-4 w-4" />
-            View Venue Details
+            View Venue
           </Button>
         </CardFooter>
       </Card>
