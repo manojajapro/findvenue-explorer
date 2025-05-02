@@ -644,6 +644,18 @@ const VenueDetails = () => {
               ))}
             </div>
             
+            {/* Share this venue section - Added at the top of the venue details */}
+            <div className="mb-8 p-4 bg-findvenue-surface/10 rounded-lg border border-white/10">
+              <h3 className="text-lg font-semibold mb-3 text-center">Share This Venue</h3>
+              <SocialShareButtons 
+                url={`${window.location.origin}/venue/${venue?.id}`}
+                title={`Check out ${venue?.name} on FindVenue!`}
+                description={venue?.description}
+                imageUrl={venue?.galleryImages?.[0]}
+                className="mt-2"
+              />
+            </div>
+            
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-3">About this venue</h2>
               <p className="text-findvenue-text-muted mb-4">{venue?.description}</p>
@@ -813,6 +825,18 @@ const VenueDetails = () => {
               {renderVenueType()}
             </Card>
           </div>
+        </div>
+        
+        {/* Social Media Sharing Section - Added before Similar Venues */}
+        <div className="my-10 py-6 bg-findvenue-surface/5 rounded-lg border border-white/10">
+          <h3 className="text-xl font-semibold text-center mb-4">Share This Venue</h3>
+          <SocialShareButtons 
+            url={`${window.location.origin}/venue/${venue?.id}`}
+            title={`Check out ${venue?.name} on FindVenue!`}
+            description={venue?.description}
+            imageUrl={venue?.galleryImages?.[0]}
+            className="mt-2"
+          />
         </div>
         
         {similarVenues.length > 0 && (

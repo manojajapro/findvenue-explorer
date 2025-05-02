@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { MessageSquare, Instagram, Twitter, Send, Share2 } from 'lucide-react';
+import { MessageSquare, Instagram, Twitter, Send, Share2, Link } from 'lucide-react';
 
 interface SocialShareButtonsProps {
   url: string;
@@ -127,8 +127,18 @@ const SocialShareButtons = ({
         variant="outline"
         size="icon"
         className="bg-findvenue/10 hover:bg-findvenue/20 text-findvenue rounded-full"
+        onClick={handleCopyLink}
+        title="Copy Link"
+      >
+        <Link className="h-5 w-5" />
+      </Button>
+
+      <Button
+        variant="outline"
+        size="icon"
+        className="bg-findvenue/10 hover:bg-findvenue/20 text-findvenue rounded-full"
         onClick={handleShare}
-        title="Copy or Share Link"
+        title="Share"
       >
         <Share2 className="h-5 w-5" />
       </Button>
