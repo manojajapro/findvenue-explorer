@@ -3,11 +3,12 @@ import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Users, Eye, FileText, UserPlus } from "lucide-react";
+import { Calendar, Clock, Users, Eye, FileText, UserPlus, CalendarPlus } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import { InviteGuestsModal } from "./InviteGuestsModal";
+import { AddToCalendarModal } from "./AddToCalendarModal";
 
 interface CustomerBookingCardProps {
   booking: {
@@ -27,6 +28,7 @@ interface CustomerBookingCardProps {
 export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
   const navigate = useNavigate();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -136,6 +138,11 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
     setIsInviteModalOpen(true);
   };
   
+  const openCalendarModal = () => {
+    console.log("Opening calendar modal for booking:", booking.id);
+    setIsCalendarModalOpen(true);
+  };
+  
   return (
     <>
       <Card className="glass-card border-white/10 overflow-hidden">
@@ -170,15 +177,26 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
         </CardContent>
         <CardFooter className="pt-2 border-t border-white/10 gap-2 flex-col">
           {booking.status === 'confirmed' && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
-              onClick={openInviteModal}
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Invite Guests
-            </Button>
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+                onClick={openInviteModal}
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Invite Guests
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+                onClick={openCalendarModal}
+              >
+                <CalendarPlus className="mr-2 h-4 w-4" />
+                Add to Calendar
+              </Button>
+            </>
           )}
           <Button 
             variant="outline" 
@@ -204,6 +222,12 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
       <InviteGuestsModal 
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
+        booking={booking}
+      />
+
+      <AddToCalendarModal
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
         booking={booking}
       />
     </>
