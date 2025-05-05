@@ -3,7 +3,21 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Users, Trash2, Loader2, Eye, FileText, UserPlus } from 'lucide-react';
+import { 
+  CheckCircle, 
+  XCircle, 
+  MessageCircle, 
+  Calendar, 
+  CalendarPlus,
+  Mail,
+  Phone,
+  CreditCard,
+  UserPlus,
+  FileText,
+  Eye,
+  Loader2,
+  Trash2
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,6 +37,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { InviteGuestsModal } from '@/components/bookings/InviteGuestsModal';
+import { AddToCalendarModal } from '@/components/bookings/AddToCalendarModal';
+import { CustomerBookingCard } from '@/components/bookings/CustomerBookingCard';
 
 type Booking = {
   id: string;
@@ -54,6 +71,7 @@ const Bookings = () => {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   
   useEffect(() => {
@@ -347,6 +365,11 @@ const Bookings = () => {
     setIsInviteModalOpen(true);
   };
 
+  const openCalendarModal = (booking: Booking) => {
+    setSelectedBooking(booking);
+    setIsCalendarModalOpen(true);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -588,15 +611,27 @@ const Bookings = () => {
                               )}
 
                               {firstBooking.status === 'confirmed' && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
-                                  onClick={() => openInviteModal(firstBooking)}
-                                >
-                                  <UserPlus className="mr-2 h-4 w-4" />
-                                  Invite Guests
-                                </Button>
+                                <>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+                                    onClick={() => openInviteModal(firstBooking)}
+                                  >
+                                    <UserPlus className="mr-2 h-4 w-4" />
+                                    Invite Guests
+                                  </Button>
+                                  
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="w-full border-findvenue/30 text-findvenue hover:bg-findvenue/5"
+                                    onClick={() => openCalendarModal(firstBooking)}
+                                  >
+                                    <CalendarPlus className="mr-2 h-4 w-4" />
+                                    Add to Calendar
+                                  </Button>
+                                </>
                               )}
 
                               <Button 
@@ -663,6 +698,23 @@ const Bookings = () => {
                 );
               })}
             </div>
+          )}
+
+          {/* Modals */}
+          {selectedBooking && isCalendarModalOpen && (
+            <AddToCalendarModal
+              isOpen={isCalendarModalOpen}
+              onClose={() => setIsCalendarModalOpen(false)}
+              booking={selectedBooking}
+            />
+          )}
+
+          {selectedBooking && isInviteModalOpen && (
+            <InviteGuestsModal
+              isOpen={isInviteModalOpen}
+              onClose={() => setIsInviteModalOpen(false)}
+              booking={selectedBooking}
+            />
           )}
         </div>
       </div>
