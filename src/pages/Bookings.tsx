@@ -16,7 +16,9 @@ import {
   FileText,
   Eye,
   Loader2,
-  Trash2
+  Trash2,
+  Clock,
+  Users
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
