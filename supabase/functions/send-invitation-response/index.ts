@@ -67,8 +67,19 @@ const handler = async (req: Request): Promise<Response> => {
       // Keep original format if there's an error
     }
 
-    // IMPORTANT: Use the proper app URL for the invite link
-    const appBaseUrl = 'https://esdmelfzeszjtbnoajig.supabase.co';
+    // Get origin from request or use environment variables
+    let appDomain = "";
+    try {
+      const reqUrl = new URL(req.url);
+      appDomain = reqUrl.searchParams.get('appOrigin') || "";
+    } catch (e) {
+      console.error("Error extracting origin:", e);
+    }
+    
+    // Use the provided appDomain if available, otherwise use a default value
+    const appBaseUrl = appDomain || "http://localhost:8080";
+    
+    // Generate proper links
     const bookingLink = `${appBaseUrl}/bookings/${bookingId}`;
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
 

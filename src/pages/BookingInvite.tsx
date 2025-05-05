@@ -226,6 +226,9 @@ const BookingInvite = () => {
     if (!booking || !inviteInfo?.email) return;
     
     try {
+      // Get the current origin
+      const origin = window.location.origin;
+      
       // Prepare the data for the notification email
       const notificationData = {
         hostEmail: booking.customer_email,
@@ -242,7 +245,14 @@ const BookingInvite = () => {
       };
       
       // Call the edge function to send the notification email
-      const response = await fetch('https://esdmelfzeszjtbnoajig.functions.supabase.co/send-invitation-response', {
+      const functionUrl = `${origin.includes('localhost') 
+        ? "http://localhost:54321" 
+        : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-invitation-response`;
+      
+      console.log("Calling function URL:", functionUrl);
+      console.log("With data:", notificationData);
+      
+      const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -250,12 +260,13 @@ const BookingInvite = () => {
         body: JSON.stringify(notificationData)
       });
       
+      const responseData = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error sending notification email:', errorData);
+        console.error('Error sending notification email:', responseData);
         // Don't display an error to the user, just log it
       } else {
-        console.log('Notification email sent successfully');
+        console.log('Notification email sent successfully:', responseData);
       }
     } catch (err) {
       console.error('Exception sending notification email:', err);

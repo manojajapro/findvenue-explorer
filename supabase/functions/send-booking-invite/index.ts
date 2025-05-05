@@ -84,13 +84,24 @@ const handler = async (req: Request): Promise<Response> => {
     const bookingId = inviteLink.includes('/booking-invite/') 
       ? inviteLink.split('/booking-invite/')[1] 
       : inviteLink;
+
+    // IMPORTANT: Use the correct origin for links
+    // Do not use the Supabase domain, use the application's domain
+    // If origin exists in the request URL, use that, otherwise fallback
+    let appDomain = "";
+    try {
+      const reqUrl = new URL(req.url);
+      appDomain = reqUrl.searchParams.get('appOrigin') || "";
+    } catch (e) {
+      console.error("Error extracting origin:", e);
+    }
     
-    // IMPORTANT: Use the proper app URL for the invite link
-    // Note: Don't use req.url origin as it points to the edge function domain
-    const appBaseUrl = 'https://esdmelfzeszjtbnoajig.supabase.co';
+    // Use the provided appDomain if available, otherwise use a default value
+    // For local development, this would typically be http://localhost:8080
+    const appBaseUrl = appDomain || "http://localhost:8080";
+    
+    // Generate full links with the correct domain
     const fullInviteLink = `${appBaseUrl}/booking-invite/${bookingId}`;
-    
-    // Create venue link using the same app base URL
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
 
     const emailResponse = await resend.emails.send({

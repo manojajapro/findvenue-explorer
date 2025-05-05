@@ -62,7 +62,7 @@ enabled = false
 [functions.send-booking-invite]
 verify_jwt = false
 
-[functions.send-invitation-response] 
+[functions.send-invitation-response]
 verify_jwt = false
 
 [vector]

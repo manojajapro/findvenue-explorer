@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { X, Mail, Plus, Check, Loader2, XCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -103,6 +104,9 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       console.log("Booking ID:", booking.id);
       console.log("Venue ID:", booking.venue_id);
       
+      // Get current origin for links
+      const appOrigin = window.location.origin;
+      
       // Array to track successful sends
       const successfulSends: string[] = [];
       const failedSends: {email: string, error: string}[] = [];
@@ -115,12 +119,21 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         console.log("Processing invite for email:", trimmedEmail);
         
         // Generate invite link - using the booking-invite route
-        const inviteLink = `${window.location.origin}/booking-invite/${booking.id}`;
+        const inviteLink = `${appOrigin}/booking-invite/${booking.id}`;
         
         // Send email via edge function
         try {
-          const { data, error } = await supabase.functions.invoke('send-booking-invite', {
-            body: {
+          // Determine the function URL based on environment
+          const functionUrl = `${appOrigin.includes('localhost') 
+            ? "http://localhost:54321" 
+            : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-booking-invite?appOrigin=${encodeURIComponent(appOrigin)}`;
+          
+          const response = await fetch(functionUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
               email: trimmedEmail,
               recipientName: recipientName,
               venueName: booking.venue_name,
@@ -128,19 +141,20 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               startTime: booking.start_time,
               endTime: booking.end_time,
               address: booking.address,
-              inviteLink: inviteLink,
+              inviteLink: booking.id, // Just pass the ID, we construct the full URL in the function
               venueId: booking.venue_id,
               specialRequests: booking.special_requests,
               guests: booking.guests,
               hostName: booking.customer_name,
               contactEmail: booking.customer_email,
               contactPhone: booking.customer_phone
-            }
+            })
           });
           
-          if (error) {
+          if (!response.ok) {
+            const error = await response.json();
             console.error("Error sending email:", error);
-            failedSends.push({ email: trimmedEmail, error: error.message });
+            failedSends.push({ email: trimmedEmail, error: error.message || "Failed to send invitation" });
           } else {
             successfulSends.push(trimmedEmail);
             console.log("Successfully sent invite to:", trimmedEmail);
