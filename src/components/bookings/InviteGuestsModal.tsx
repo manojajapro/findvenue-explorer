@@ -1,6 +1,5 @@
-
-import { useState } from 'react';
-import { X, Mail, Plus, Check, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Mail, Plus, Check, Loader2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -79,17 +78,18 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       console.log("Sending invitations to:", validEmails);
       console.log("Booking ID:", booking.id);
       
-      // Array to track successful inserts
-      const successfulInserts = [];
-      const failedInserts = [];
+      // Array to track successful sends
+      const successfulSends = [];
+      const failedSends = [];
       
       // Store invitations in database using upsert to avoid duplicates
       for (const email of validEmails) {
         const trimmedEmail = email.toLowerCase().trim();
         
-        console.log("Inserting invite for email:", trimmedEmail);
+        console.log("Processing invite for email:", trimmedEmail);
         
-        const { data, error } = await supabase
+        // First, store in database
+        const { data: dbData, error: dbError } = await supabase
           .from('booking_invites')
           .upsert({
             booking_id: booking.id,
@@ -100,43 +100,66 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             returning: 'minimal'
           });
           
-        if (error) {
-          console.error("Error inserting invite:", error);
-          failedInserts.push({ email: trimmedEmail, error: error.message });
-        } else {
-          successfulInserts.push(trimmedEmail);
-          console.log("Successfully inserted invite for:", trimmedEmail);
+        if (dbError) {
+          console.error("Error inserting invite:", dbError);
+          failedSends.push({ email: trimmedEmail, error: dbError.message });
+          continue;
+        }
+        
+        // Generate invite link
+        const inviteLink = `${window.location.origin}/booking-invite/${booking.id}`;
+        
+        // Now, send email via edge function
+        try {
+          const { error: emailError } = await supabase.functions.invoke('send-booking-invite', {
+            body: {
+              email: trimmedEmail,
+              venueName: booking.venue_name,
+              bookingDate: formattedDate,
+              startTime: booking.start_time,
+              endTime: booking.end_time,
+              address: booking.address,
+              inviteLink: inviteLink
+            }
+          });
+          
+          if (emailError) {
+            console.error("Error sending email:", emailError);
+            failedSends.push({ email: trimmedEmail, error: emailError.message });
+          } else {
+            successfulSends.push(trimmedEmail);
+            console.log("Successfully sent invite to:", trimmedEmail);
+          }
+        } catch (emailErr: any) {
+          console.error("Exception sending email:", emailErr);
+          failedSends.push({ email: trimmedEmail, error: emailErr.message });
         }
       }
       
-      // Create shareable link for the invitation
-      const inviteLink = `${window.location.origin}/booking-invite/${booking.id}`;
-      
-      console.log("Invitation link:", inviteLink);
-      console.log("Successful inserts:", successfulInserts);
-      console.log("Failed inserts:", failedInserts);
-      
-      if (successfulInserts.length > 0) {
+      // Add successful sends to the sent emails list
+      if (successfulSends.length > 0) {
+        setSentEmails(prev => [...prev, ...successfulSends]);
+        
         toast({
           title: "Invitations sent!",
-          description: `Successfully sent invitations to ${successfulInserts.length} guest(s).`,
+          description: `Successfully sent invitations to ${successfulSends.length} guest(s).`,
         });
         
-        // Update sent emails for UI feedback
-        setSentEmails(prev => [...prev, ...successfulInserts]);
+        // Reset form state if at least some were successful
+        if (successfulSends.length === validEmails.length) {
+          setEmails(['']);
+        } else {
+          // Keep emails that failed to send
+          setEmails(failedSends.map(fail => fail.email));
+        }
       }
       
-      if (failedInserts.length > 0) {
+      if (failedSends.length > 0) {
         toast({
           title: "Some invitations failed",
-          description: `Failed to send ${failedInserts.length} invitation(s). Please try again.`,
+          description: `Failed to send ${failedSends.length} invitation(s). Please try again.`,
           variant: "destructive",
         });
-      }
-      
-      // Reset form state if at least some were successful
-      if (successfulInserts.length > 0) {
-        setEmails(['']);
       }
     } catch (error: any) {
       console.error("Error sending invitations:", error);
@@ -152,32 +175,32 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md glass-card border-white/10 bg-gradient-to-b from-findvenue-surface/20 to-transparent">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-findvenue" />
-            Invite Guests
+      <DialogContent className="max-w-md bg-slate-900 border-slate-800 text-slate-100">
+        <DialogHeader className="border-b border-slate-800 pb-4">
+          <DialogTitle className="flex items-center gap-2 text-slate-100">
+            <Mail className="h-5 w-5 text-teal-400" />
+            <span className="text-xl">Invite Guests</span>
           </DialogTitle>
         </DialogHeader>
         
-        <div className="py-4">
-          <div className="mb-4 bg-findvenue/5 p-4 rounded-lg">
-            <h3 className="text-sm font-medium mb-2 text-findvenue">Event Details:</h3>
-            <p className="text-sm text-findvenue-text-muted">{booking.venue_name}</p>
-            <p className="text-sm text-findvenue-text-muted">{formattedDate}</p>
-            <p className="text-sm text-findvenue-text-muted">{booking.start_time} - {booking.end_time}</p>
-            {booking.address && <p className="text-sm text-findvenue-text-muted">{booking.address}</p>}
+        <div className="py-4 space-y-6">
+          <div className="mb-4 bg-slate-800/50 p-4 rounded-lg border border-slate-700/50">
+            <h3 className="text-sm font-medium mb-2 text-teal-400">Event Details:</h3>
+            <p className="text-slate-300">{booking.venue_name}</p>
+            <p className="text-slate-300">{formattedDate}</p>
+            <p className="text-slate-300">{booking.start_time} - {booking.end_time}</p>
+            {booking.address && <p className="text-slate-300">{booking.address}</p>}
           </div>
           
           {sentEmails.length > 0 && (
-            <div className="mb-4 p-3 border border-green-500/30 rounded-lg bg-green-500/10">
-              <h3 className="text-sm font-medium flex items-center gap-1 text-green-500 mb-1">
+            <div className="mb-4 p-4 border border-teal-500/30 rounded-lg bg-teal-500/10">
+              <h3 className="text-sm font-medium flex items-center gap-1 text-teal-400 mb-2">
                 <Check className="h-4 w-4" /> Invitations Sent
               </h3>
               <div className="space-y-1">
                 {sentEmails.map((email, idx) => (
-                  <p key={`sent-${idx}`} className="text-xs text-green-500/80 flex items-center gap-1">
-                    <Check className="h-3 w-3" /> {email}
+                  <p key={`sent-${idx}`} className="text-sm text-teal-300/80 flex items-center gap-2">
+                    <Check className="h-3 w-3 text-teal-400" /> {email}
                   </p>
                 ))}
               </div>
@@ -185,29 +208,28 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           )}
           
           <div className="space-y-3">
-            <h3 className="text-sm font-medium flex items-center gap-2">
-              <Mail className="h-4 w-4 text-findvenue" />
+            <h3 className="text-sm font-medium flex items-center gap-2 text-slate-100">
+              <Mail className="h-4 w-4 text-teal-400" />
               Guest Emails:
             </h3>
             {emails.map((email, index) => (
-              <div key={index} className="flex items-center gap-2">
+              <div key={index} className="flex items-center gap-2 relative">
                 <Input
                   type="email"
                   placeholder="guest@example.com"
                   value={email}
                   onChange={(e) => handleEmailChange(index, e.target.value)}
-                  className="flex-grow"
+                  className="flex-grow bg-slate-800 border-slate-700 text-slate-100 focus:ring-teal-500 focus:border-teal-500"
                 />
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
                   onClick={() => removeEmailField(index)}
                   disabled={emails.length === 1}
-                  className="px-2 hover:bg-findvenue/10 hover:text-findvenue"
+                  className="absolute right-2 focus:outline-none text-slate-400 hover:text-slate-300"
+                  aria-label="Remove email field"
                 >
                   <X className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             ))}
             
@@ -216,31 +238,31 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               variant="outline"
               size="sm"
               onClick={addEmailField}
-              className="w-full mt-2 border-findvenue/30 text-findvenue hover:bg-findvenue/10"
+              className="w-full mt-2 border-teal-500/30 text-teal-400 bg-transparent hover:bg-teal-500/10 flex items-center justify-center gap-2"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4" />
               Add Another Guest
             </Button>
           </div>
         </div>
         
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        <DialogFooter className="flex gap-2 border-t border-slate-800 pt-4">
+          <Button variant="outline" onClick={onClose} className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-slate-100">
             Cancel
           </Button>
           <Button 
             onClick={sendInvitations}
-            className="bg-findvenue hover:bg-findvenue-dark"
+            className="bg-teal-500 hover:bg-teal-600 text-slate-900 flex items-center gap-2"
             disabled={isSending}
           >
             {isSending ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Sending...
               </>
             ) : (
               <>
-                <Mail className="h-4 w-4 mr-2" />
+                <Mail className="h-4 w-4" />
                 Send Invitations
               </>
             )}
