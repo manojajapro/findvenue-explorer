@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ const BookingInvite = () => {
   const [booking, setBooking] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [inviteInfo, setInviteInfo] = useState<any>(null);
+  const [venue, setVenue] = useState<any>(null);
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
@@ -33,6 +34,7 @@ const BookingInvite = () => {
           .from('bookings')
           .select(`
             id,
+            venue_id,
             venue_name,
             booking_date,
             start_time,
@@ -64,6 +66,20 @@ const BookingInvite = () => {
         console.log("Booking data loaded:", bookingData);
         setBooking(bookingData);
         
+        // Fetch venue details if venue_id exists
+        if (bookingData.venue_id) {
+          const { data: venueData } = await supabase
+            .from('venues')
+            .select('*')
+            .eq('id', bookingData.venue_id)
+            .single();
+            
+          if (venueData) {
+            console.log("Venue data loaded:", venueData);
+            setVenue(venueData);
+          }
+        }
+        
         // Also fetch the invite information if available
         const { data: inviteData, error: inviteError } = await supabase
           .from('booking_invites')
@@ -93,7 +109,8 @@ const BookingInvite = () => {
             }
           } else {
             console.log("Multiple invites found but couldn't identify which one to use");
-            // Just show the booking without specific invite info
+            // Ask the user to identify themselves if multiple invites exist
+            // We'll implement this in a moment
           }
         }
       } catch (err) {
@@ -127,6 +144,21 @@ const BookingInvite = () => {
         return 'bg-red-500/80 text-white';
       default:
         return 'bg-slate-500 text-white';
+    }
+  };
+  
+  const identifyUserByEmail = (email: string) => {
+    // Find the invite with this email
+    const { data: inviteData } = supabase
+      .from('booking_invites')
+      .select('email, name, status')
+      .eq('booking_id', id)
+      .eq('email', email)
+      .single();
+      
+    if (inviteData) {
+      setInviteInfo(inviteData);
+      localStorage.setItem('guestEmail', email);
     }
   };
 
@@ -319,6 +351,20 @@ const BookingInvite = () => {
             )}
             
             <div className="flex items-start gap-3">
+              <Building className="h-5 w-5 text-teal-500 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-slate-300">Venue</p>
+                {venue && booking.venue_id ? (
+                  <Link to={`/venue/${booking.venue_id}`} className="text-teal-400 hover:underline">
+                    {booking.venue_name}
+                  </Link>
+                ) : (
+                  <p className="text-white">{booking.venue_name}</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
               <Calendar className="h-5 w-5 text-teal-500 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-slate-300">Date</p>
@@ -393,6 +439,17 @@ const BookingInvite = () => {
                 Decline
               </Button>
             </div>
+          )}
+
+          {venue && booking.venue_id && (
+            <Link to={`/venue/${booking.venue_id}`} className="w-full mt-3">
+              <Button 
+                variant="secondary" 
+                className="w-full bg-slate-800 hover:bg-slate-700"
+              >
+                View Venue Details
+              </Button>
+            </Link>
           )}
           
           <p className="text-xs text-center text-slate-500 mt-4">

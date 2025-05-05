@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -18,6 +19,7 @@ interface SendInviteRequest {
   endTime: string;
   address?: string;
   inviteLink: string;
+  venueId?: string;
   specialRequests?: string;
   guests?: number;
   hostName?: string;
@@ -40,7 +42,8 @@ const handler = async (req: Request): Promise<Response> => {
       startTime, 
       endTime, 
       address, 
-      inviteLink, 
+      inviteLink,
+      venueId,
       specialRequests, 
       guests,
       hostName,
@@ -76,6 +79,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Greeting message based on recipient name
     const greetingName = recipientName ? recipientName : "there";
+
+    // Create a link to the venue page if venueId is available
+    const venueLink = venueId ? `${new URL(inviteLink).origin}/venue/${venueId}` : inviteLink;
 
     const emailResponse = await resend.emails.send({
       from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
@@ -120,7 +126,7 @@ const handler = async (req: Request): Promise<Response> => {
             <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
               <p style="margin: 5px 0; display: flex;">
                 <span style="width: 120px; color: #94a3b8; font-weight: 500;">Time:</span> 
-                <span style="flex: 1; color: #FFFFFF;">${startTime} - ${endTime}</span>
+                <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${startTime} - ${endTime}</span>
               </p>
             </div>
             
@@ -128,7 +134,7 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Location:</span> 
-                  <span style="flex: 1; color: #FFFFFF;">${address}</span>
+                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${address}</span>
                 </p>
               </div>` : ''
             }
@@ -137,7 +143,7 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Contact:</span> 
-                  <span style="flex: 1; color: #FFFFFF;">${contactEmail}</span>
+                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${contactEmail}</span>
                 </p>
               </div>` : ''
             }
@@ -146,7 +152,7 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Phone:</span> 
-                  <span style="flex: 1; color: #FFFFFF;">${contactPhone}</span>
+                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${contactPhone}</span>
                 </p>
               </div>` : ''
             }
@@ -164,15 +170,31 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0;">
                 <p style="margin: 5px 0;">
                   <span style="color: #94a3b8; font-weight: 500; display: block; margin-bottom: 5px;">Special Requests:</span> 
-                  <span style="display: block; padding-left: 10px; border-left: 2px solid #2dd4bf; color: #FFFFFF;">${specialRequests}</span>
+                  <span style="display: block; padding-left: 10px; border-left: 2px solid #2dd4bf; color: #FFFFFF; font-weight: bold;">${specialRequests}</span>
                 </p>
               </div>` : ''
             }
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <p style="margin-bottom: 20px; color: #FFFFFF;">Please let us know if you can attend:</p>
-            <a href="${inviteLink}" style="background-color: #2dd4bf; color: #0f172a; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; display: inline-block;">View Event Details</a>
+            <p style="margin-bottom: 20px; color: #FFFFFF; font-weight: bold;">Please let us know if you can attend:</p>
+            <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
+              <tr>
+                <td align="center">
+                  <div>
+                    <a href="${inviteLink}" style="background-color: #2dd4bf; color: #0f172a; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; display: inline-block;">Respond to Invitation</a>
+                  </div>
+                </td>
+              </tr>
+              ${venueId ? `
+              <tr>
+                <td align="center" style="padding-top: 15px;">
+                  <div>
+                    <a href="${venueLink}" style="background-color: #475569; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; display: inline-block;">View Venue Details</a>
+                  </div>
+                </td>
+              </tr>` : ''}
+            </table>
           </div>
           
           <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">

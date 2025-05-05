@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { X, Mail, Plus, Check, Loader2, XCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,7 @@ interface InviteGuestsModalProps {
   onClose: () => void;
   booking: {
     id: string;
+    venue_id: string;
     venue_name: string;
     booking_date: string;
     start_time: string;
@@ -101,6 +101,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
     try {
       console.log("Sending invitations to:", validEmails);
       console.log("Booking ID:", booking.id);
+      console.log("Venue ID:", booking.venue_id);
       
       // Array to track successful sends
       const successfulSends: string[] = [];
@@ -128,6 +129,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               endTime: booking.end_time,
               address: booking.address,
               inviteLink: inviteLink,
+              venueId: booking.venue_id,
               specialRequests: booking.special_requests,
               guests: booking.guests,
               hostName: booking.customer_name,
