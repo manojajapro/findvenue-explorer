@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { X, Mail, Plus, Check } from 'lucide-react';
+import { X, Mail, Plus, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
   const { toast } = useToast();
   const [emails, setEmails] = useState<string[]>(['']);
   const [isSending, setIsSending] = useState(false);
+  const [sentEmails, setSentEmails] = useState<string[]>([]);
 
   // Format date for display
   const formattedDate = format(new Date(booking.booking_date), 'MMMM d, yyyy');
@@ -120,6 +121,9 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           title: "Invitations sent!",
           description: `Successfully sent invitations to ${successfulInserts.length} guest(s).`,
         });
+        
+        // Update sent emails for UI feedback
+        setSentEmails(prev => [...prev, ...successfulInserts]);
       }
       
       if (failedInserts.length > 0) {
@@ -133,7 +137,6 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       // Reset form state if at least some were successful
       if (successfulInserts.length > 0) {
         setEmails(['']);
-        onClose();
       }
     } catch (error: any) {
       console.error("Error sending invitations:", error);
@@ -149,22 +152,43 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md glass-card border-white/10">
+      <DialogContent className="max-w-md glass-card border-white/10 bg-gradient-to-b from-findvenue-surface/20 to-transparent">
         <DialogHeader>
-          <DialogTitle>Invite Guests</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-findvenue" />
+            Invite Guests
+          </DialogTitle>
         </DialogHeader>
         
         <div className="py-4">
-          <div className="mb-4">
-            <h3 className="text-sm font-medium mb-1">Event Details:</h3>
+          <div className="mb-4 bg-findvenue/5 p-4 rounded-lg">
+            <h3 className="text-sm font-medium mb-2 text-findvenue">Event Details:</h3>
             <p className="text-sm text-findvenue-text-muted">{booking.venue_name}</p>
             <p className="text-sm text-findvenue-text-muted">{formattedDate}</p>
             <p className="text-sm text-findvenue-text-muted">{booking.start_time} - {booking.end_time}</p>
             {booking.address && <p className="text-sm text-findvenue-text-muted">{booking.address}</p>}
           </div>
           
+          {sentEmails.length > 0 && (
+            <div className="mb-4 p-3 border border-green-500/30 rounded-lg bg-green-500/10">
+              <h3 className="text-sm font-medium flex items-center gap-1 text-green-500 mb-1">
+                <Check className="h-4 w-4" /> Invitations Sent
+              </h3>
+              <div className="space-y-1">
+                {sentEmails.map((email, idx) => (
+                  <p key={`sent-${idx}`} className="text-xs text-green-500/80 flex items-center gap-1">
+                    <Check className="h-3 w-3" /> {email}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">Guest Emails:</h3>
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <Mail className="h-4 w-4 text-findvenue" />
+              Guest Emails:
+            </h3>
             {emails.map((email, index) => (
               <div key={index} className="flex items-center gap-2">
                 <Input
@@ -180,7 +204,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
                   size="sm"
                   onClick={() => removeEmailField(index)}
                   disabled={emails.length === 1}
-                  className="px-2"
+                  className="px-2 hover:bg-findvenue/10 hover:text-findvenue"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -192,7 +216,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               variant="outline"
               size="sm"
               onClick={addEmailField}
-              className="w-full mt-2"
+              className="w-full mt-2 border-findvenue/30 text-findvenue hover:bg-findvenue/10"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Another Guest
@@ -211,7 +235,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           >
             {isSending ? (
               <>
-                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Sending...
               </>
             ) : (

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -164,7 +163,7 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
               <Clock className="h-4 w-4 mr-2 text-findvenue" />
               <span>{booking.start_time} - {booking.end_time}</span>
             </div>
-            {booking.address && (
+            {booking.guests > 0 && (
               <div className="flex items-center text-sm">
                 <Users className="h-4 w-4 mr-2 text-findvenue" />
                 <span>{booking.guests} guests</span>
@@ -219,17 +218,22 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
         </CardFooter>
       </Card>
 
-      <InviteGuestsModal 
-        isOpen={isInviteModalOpen}
-        onClose={() => setIsInviteModalOpen(false)}
-        booking={booking}
-      />
+      {/* These modals need to be rendered conditionally based on their open state */}
+      {isInviteModalOpen && (
+        <InviteGuestsModal 
+          isOpen={isInviteModalOpen}
+          onClose={() => setIsInviteModalOpen(false)}
+          booking={booking}
+        />
+      )}
 
-      <AddToCalendarModal
-        isOpen={isCalendarModalOpen}
-        onClose={() => setIsCalendarModalOpen(false)}
-        booking={booking}
-      />
+      {isCalendarModalOpen && (
+        <AddToCalendarModal
+          isOpen={isCalendarModalOpen}
+          onClose={() => setIsCalendarModalOpen(false)}
+          booking={booking}
+        />
+      )}
     </>
   );
 };
