@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { X, Mail, Plus, Check, Loader2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -106,7 +107,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           continue;
         }
         
-        // Generate invite link
+        // Generate invite link - using the new booking-invite route
         const inviteLink = `${window.location.origin}/booking-invite/${booking.id}`;
         
         // Now, send email via edge function

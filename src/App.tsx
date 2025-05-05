@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -25,6 +26,7 @@ import Messages from "./pages/Messages";
 import MyVenues from "./pages/MyVenues";
 import Dashboard from "./pages/Dashboard";
 import EditVenue from "./pages/EditVenue";
+import BookingInvite from "./pages/BookingInvite";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AuthCallback from "./pages/AuthCallback";
@@ -147,6 +149,7 @@ function AppContent() {
             <Route path="/account" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             <Route path="/messages/:contactId" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+            <Route path="/booking-invite/:id" element={<BookingInvite />} />
             
             <Route path="/venue/:id" element={<VenueDetailsRoute />} />
             
