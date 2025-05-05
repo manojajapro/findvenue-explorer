@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building, Loader2 } from 'lucide-react';
@@ -42,7 +41,7 @@ const BookingInvite = () => {
           return;
         }
         
-        // Use .maybeSingle() instead of .single() to avoid errors when no data is found
+        // Use .maybeSingle() to avoid errors when no data is found
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select(`
@@ -189,6 +188,17 @@ const BookingInvite = () => {
       toast({
         title: "Email required",
         description: "Please enter your email address to find your invitation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(guestEmail.trim())) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address.",
         variant: "destructive"
       });
       return;

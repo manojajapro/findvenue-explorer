@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -79,15 +80,18 @@ const handler = async (req: Request): Promise<Response> => {
     // Greeting message based on recipient name
     const greetingName = recipientName ? recipientName : "there";
 
-    // Ensure we have the full booking invite URL with the correct format
-    const fullInviteLink = inviteLink.includes('/booking-invite/') 
-      ? inviteLink 
-      : `${new URL(inviteLink).origin}/booking-invite/${inviteLink.split('/').pop()}`;
-
+    // Make sure we're using the full URL for the booking invite
+    // This ensures it works correctly in all environments (localhost, staging, production)
+    const bookingId = inviteLink.includes('/booking-invite/') 
+      ? inviteLink.split('/booking-invite/')[1] 
+      : inviteLink;
+    
+    // Create the full invite link that will work in the email
+    const origin = new URL(req.url).origin;
+    const fullInviteLink = `${origin}/booking-invite/${bookingId}`;
+    
     // Create a link to the venue page if venueId is available
-    const venueLink = venueId 
-      ? `${new URL(inviteLink).origin}/venue/${venueId}` 
-      : null;
+    const venueLink = venueId ? `${origin}/venue/${venueId}` : null;
 
     const emailResponse = await resend.emails.send({
       from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
