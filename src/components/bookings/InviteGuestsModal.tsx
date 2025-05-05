@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { X, Mail, Plus, Check, Loader2, XCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface InviteGuestsModalProps {
   isOpen: boolean;
@@ -31,6 +33,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
   const [names, setNames] = useState<string[]>(['']);
   const [isSending, setIsSending] = useState(false);
   const [sentEmails, setSentEmails] = useState<string[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Format date for display
   const formattedDate = format(new Date(booking.booking_date), 'MMMM d, yyyy');
@@ -67,6 +70,9 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
   };
 
   const sendInvitations = async () => {
+    // Clear any previous error messages
+    setErrorMessage(null);
+    
     // Filter out empty emails
     const validEmails = emails.filter((email, index) => email.trim() !== '');
     const validIndices = emails.map((email, index) => email.trim() !== '' ? index : -1).filter(idx => idx !== -1);
@@ -97,41 +103,22 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       console.log("Booking ID:", booking.id);
       
       // Array to track successful sends
-      const successfulSends = [];
-      const failedSends = [];
+      const successfulSends: string[] = [];
+      const failedSends: {email: string, error: string}[] = [];
       
-      // Store invitations in database using upsert to avoid duplicates
+      // Send invitations directly without storing in database first
       for (let i = 0; i < validEmails.length; i++) {
         const trimmedEmail = validEmails[i].toLowerCase().trim();
         const recipientName = validNames[i].trim();
         
         console.log("Processing invite for email:", trimmedEmail);
         
-        // First, store in database
-        const { data: dbData, error: dbError } = await supabase
-          .from('booking_invites')
-          .upsert({
-            booking_id: booking.id,
-            email: trimmedEmail,
-            recipient_name: recipientName || null,
-            status: 'pending'
-          }, { 
-            onConflict: 'booking_id,email',
-            returning: 'minimal'
-          });
-          
-        if (dbError) {
-          console.error("Error inserting invite:", dbError);
-          failedSends.push({ email: trimmedEmail, error: dbError.message });
-          continue;
-        }
-        
         // Generate invite link - using the booking-invite route
         const inviteLink = `${window.location.origin}/booking-invite/${booking.id}`;
         
-        // Now, send email via edge function
+        // Send email via edge function
         try {
-          const { error: emailError } = await supabase.functions.invoke('send-booking-invite', {
+          const { data, error } = await supabase.functions.invoke('send-booking-invite', {
             body: {
               email: trimmedEmail,
               recipientName: recipientName,
@@ -149,12 +136,26 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             }
           });
           
-          if (emailError) {
-            console.error("Error sending email:", emailError);
-            failedSends.push({ email: trimmedEmail, error: emailError.message });
+          if (error) {
+            console.error("Error sending email:", error);
+            failedSends.push({ email: trimmedEmail, error: error.message });
           } else {
             successfulSends.push(trimmedEmail);
             console.log("Successfully sent invite to:", trimmedEmail);
+            
+            // Store in database after successful email sending
+            const { error: dbError } = await supabase
+              .from('booking_invites')
+              .insert({
+                booking_id: booking.id,
+                email: trimmedEmail,
+                name: recipientName || null,
+                status: 'pending'
+              });
+              
+            if (dbError) {
+              console.error("Error inserting invite to database:", dbError);
+            }
           }
         } catch (emailErr: any) {
           console.error("Exception sending email:", emailErr);
@@ -178,12 +179,15 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         } else {
           // Keep emails that failed to send
           const failedEmails = failedSends.map(fail => fail.email);
+          const failedIndices = failedEmails.map(email => validEmails.indexOf(email));
+          
           setEmails(failedEmails.length > 0 ? failedEmails : ['']);
-          setNames(failedEmails.length > 0 ? failedEmails.map(() => '') : ['']);
+          setNames(failedEmails.length > 0 ? failedIndices.map(idx => idx !== -1 ? validNames[idx] : '') : ['']);
         }
       }
       
       if (failedSends.length > 0) {
+        setErrorMessage(`Failed to send ${failedSends.length} invitation(s). Please try again.`);
         toast({
           title: "Some invitations failed",
           description: `Failed to send ${failedSends.length} invitation(s). Please try again.`,
@@ -192,6 +196,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       }
     } catch (error: any) {
       console.error("Error sending invitations:", error);
+      setErrorMessage(error?.message || "There was an error sending the invitations. Please try again.");
       toast({
         title: "Failed to send invitations",
         description: error?.message || "There was an error sending the invitations. Please try again.",
@@ -221,6 +226,14 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             {booking.address && <p className="text-slate-300">{booking.address}</p>}
           </div>
           
+          {errorMessage && (
+            <Alert variant="destructive" className="bg-red-900/30 border-red-800 text-red-200">
+              <XCircle className="h-4 w-4" />
+              <AlertTitle>Some invitations failed</AlertTitle>
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
+          
           {sentEmails.length > 0 && (
             <div className="mb-4 p-4 border border-teal-500/30 rounded-lg bg-teal-500/10">
               <h3 className="text-sm font-medium flex items-center gap-1 text-teal-400 mb-2">
@@ -238,7 +251,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           
           <div className="space-y-3">
             <h3 className="text-sm font-medium flex items-center gap-2 text-slate-100">
-              <Mail className="h-4 w-4 text-teal-400" />
+              <User className="h-4 w-4 text-teal-400" />
               Guest Information:
             </h3>
             {emails.map((email, index) => (
