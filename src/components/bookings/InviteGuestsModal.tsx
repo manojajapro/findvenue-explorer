@@ -18,6 +18,8 @@ interface InviteGuestsModalProps {
     start_time: string;
     end_time: string;
     address?: string;
+    guests?: number;
+    special_requests?: string;
   };
 }
 
@@ -107,7 +109,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           continue;
         }
         
-        // Generate invite link - using the new booking-invite route
+        // Generate invite link - using the booking-invite route
         const inviteLink = `${window.location.origin}/booking-invite/${booking.id}`;
         
         // Now, send email via edge function
@@ -116,11 +118,13 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             body: {
               email: trimmedEmail,
               venueName: booking.venue_name,
-              bookingDate: formattedDate,
+              bookingDate: booking.booking_date,
               startTime: booking.start_time,
               endTime: booking.end_time,
               address: booking.address,
-              inviteLink: inviteLink
+              inviteLink: inviteLink,
+              specialRequests: booking.special_requests,
+              guests: booking.guests
             }
           });
           

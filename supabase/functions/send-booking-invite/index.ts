@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -17,6 +18,8 @@ interface SendInviteRequest {
   endTime: string;
   address?: string;
   inviteLink: string;
+  specialRequests?: string;
+  guests?: number;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -26,7 +29,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, venueName, bookingDate, startTime, endTime, address, inviteLink }: SendInviteRequest = await req.json();
+    const { email, venueName, bookingDate, startTime, endTime, address, inviteLink, specialRequests, guests }: SendInviteRequest = await req.json();
 
     if (!email || !venueName || !bookingDate) {
       return new Response(
@@ -60,25 +63,76 @@ const handler = async (req: Request): Promise<Response> => {
       subject: `You're Invited: ${venueName} on ${formattedDate}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #0f172a; color: #e2e8f0;">
-          <h2 style="color: #2dd4bf; text-align: center;">You're Invited!</h2>
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #2dd4bf; font-size: 24px; margin-bottom: 5px;">You're Invited!</h1>
+            <p style="color: #94a3b8; font-size: 16px;">An event awaits your presence</p>
+          </div>
+          
           <p style="font-size: 16px; line-height: 1.5;">Hello,</p>
-          <p style="font-size: 16px; line-height: 1.5;">You've been invited to an event at ${displayVenueName}.</p>
+          <p style="font-size: 16px; line-height: 1.5;">You've been invited to an event at <strong style="color: #2dd4bf;">${displayVenueName}</strong>.</p>
           
           <div style="background-color: #1e293b; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="color: #2dd4bf; margin-top: 0;">Event Details:</h3>
-            <p style="margin: 5px 0;"><strong>Venue:</strong> ${displayVenueName}</p>
-            <p style="margin: 5px 0;"><strong>Date:</strong> ${formattedDate}</p>
-            <p style="margin: 5px 0;"><strong>Time:</strong> ${startTime} - ${endTime}</p>
-            ${address ? `<p style="margin: 5px 0;"><strong>Address:</strong> ${address}</p>` : ''}
+            <h3 style="color: #2dd4bf; margin-top: 0; border-bottom: 1px solid #334155; padding-bottom: 10px;">Event Details:</h3>
+            
+            <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+              <p style="margin: 5px 0; display: flex;">
+                <span style="width: 120px; color: #94a3b8; font-weight: 500;">Venue:</span> 
+                <span style="flex: 1;">${displayVenueName}</span>
+              </p>
+            </div>
+            
+            <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+              <p style="margin: 5px 0; display: flex;">
+                <span style="width: 120px; color: #94a3b8; font-weight: 500;">Date:</span> 
+                <span style="flex: 1;">${formattedDate}</span>
+              </p>
+            </div>
+            
+            <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+              <p style="margin: 5px 0; display: flex;">
+                <span style="width: 120px; color: #94a3b8; font-weight: 500;">Time:</span> 
+                <span style="flex: 1;">${startTime} - ${endTime}</span>
+              </p>
+            </div>
+            
+            ${address ? 
+              `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+                <p style="margin: 5px 0; display: flex;">
+                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Location:</span> 
+                  <span style="flex: 1;">${address}</span>
+                </p>
+              </div>` : ''
+            }
+            
+            ${guests ? 
+              `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+                <p style="margin: 5px 0; display: flex;">
+                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Guests:</span> 
+                  <span style="flex: 1;">${guests} people</span>
+                </p>
+              </div>` : ''
+            }
+            
+            ${specialRequests ? 
+              `<div style="padding: 10px 0;">
+                <p style="margin: 5px 0;">
+                  <span style="color: #94a3b8; font-weight: 500; display: block; margin-bottom: 5px;">Special Requests:</span> 
+                  <span style="display: block; padding-left: 10px; border-left: 2px solid #2dd4bf;">${specialRequests}</span>
+                </p>
+              </div>` : ''
+            }
           </div>
           
-          <div style="text-align: center; margin-top: 25px; margin-bottom: 25px;">
-            <a href="${inviteLink}" style="background-color: #2dd4bf; color: #0f172a; text-decoration: none; padding: 10px 20px; border-radius: 5px; font-weight: bold;">View Event Details</a>
+          <div style="text-align: center; margin: 30px 0;">
+            <p style="margin-bottom: 20px; color: #94a3b8;">Please let us know if you can attend:</p>
+            <a href="${inviteLink}" style="background-color: #2dd4bf; color: #0f172a; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; display: inline-block;">View Event Details</a>
           </div>
           
-          <p style="font-size: 14px; color: #94a3b8; text-align: center; margin-top: 30px;">
-            This invitation was sent via FindVenue
-          </p>
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
+            <p style="font-size: 14px; color: #64748b;">
+              This invitation was sent via <span style="color: #2dd4bf;">FindVenue</span>
+            </p>
+          </div>
         </div>
       `,
     });

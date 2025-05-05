@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Users, Check, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ const BookingInvite = () => {
     const fetchBookingDetails = async () => {
       try {
         setLoading(true);
+        console.log("Fetching booking with ID:", id);
         
         // Fetch booking details
         const { data, error } = await supabase
@@ -33,7 +34,10 @@ const BookingInvite = () => {
             status,
             guests,
             special_requests,
-            address
+            address,
+            total_price,
+            customer_email,
+            customer_phone
           `)
           .eq('id', id)
           .single();
@@ -45,10 +49,12 @@ const BookingInvite = () => {
         }
         
         if (!data) {
+          console.error('No booking found with ID:', id);
           setError('Booking not found');
           return;
         }
         
+        console.log("Booking data loaded:", data);
         setBooking(data);
       } catch (err) {
         console.error('Exception in fetching booking:', err);
@@ -84,6 +90,72 @@ const BookingInvite = () => {
     }
   };
 
+  const handleAccept = async () => {
+    try {
+      // Update the booking invite status in the database
+      const { error } = await supabase
+        .from('booking_invites')
+        .update({ status: 'accepted' })
+        .eq('booking_id', id)
+        .eq('email', booking?.customer_email);
+        
+      if (error) {
+        console.error('Error updating invite status:', error);
+        toast({ 
+          title: "Failed to accept invitation", 
+          description: "There was an error processing your response.",
+          variant: "destructive" 
+        });
+        return;
+      }
+      
+      toast({ 
+        title: "Accepted invitation", 
+        description: "The host has been notified of your attendance."
+      });
+    } catch (err) {
+      console.error('Exception in accepting invitation:', err);
+      toast({ 
+        title: "An error occurred", 
+        description: "Please try again later.",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleDecline = async () => {
+    try {
+      // Update the booking invite status in the database
+      const { error } = await supabase
+        .from('booking_invites')
+        .update({ status: 'declined' })
+        .eq('booking_id', id)
+        .eq('email', booking?.customer_email);
+        
+      if (error) {
+        console.error('Error updating invite status:', error);
+        toast({ 
+          title: "Failed to decline invitation", 
+          description: "There was an error processing your response.",
+          variant: "destructive" 
+        });
+        return;
+      }
+      
+      toast({ 
+        title: "Declined invitation", 
+        description: "The host has been notified that you can't attend."
+      });
+    } catch (err) {
+      console.error('Exception in declining invitation:', err);
+      toast({ 
+        title: "An error occurred", 
+        description: "Please try again later.",
+        variant: "destructive" 
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
@@ -98,7 +170,7 @@ const BookingInvite = () => {
         <Card className="max-w-md w-full bg-slate-900 border-slate-800 text-white">
           <CardHeader>
             <CardTitle className="text-xl text-red-500 flex items-center gap-2">
-              <X className="h-6 w-6" />
+              <AlertCircle className="h-6 w-6" />
               Error
             </CardTitle>
           </CardHeader>
@@ -190,7 +262,7 @@ const BookingInvite = () => {
           <div className="grid grid-cols-2 w-full gap-3">
             <Button 
               className="bg-teal-500 hover:bg-teal-600 text-slate-900 flex items-center gap-2"
-              onClick={() => toast({ title: "Accepted invitation", description: "The host has been notified of your attendance." })}
+              onClick={handleAccept}
             >
               <Check className="h-4 w-4" />
               Accept
@@ -198,7 +270,7 @@ const BookingInvite = () => {
             <Button 
               variant="outline"
               className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
-              onClick={() => toast({ title: "Declined invitation", description: "The host has been notified that you can't attend." })}
+              onClick={handleDecline}
             >
               <X className="h-4 w-4" />
               Decline
