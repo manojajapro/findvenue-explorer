@@ -6,9 +6,11 @@ import {
   CalendarPlus, 
   Calendar, 
   ExternalLink,
-  Copy
+  Copy,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { useState } from "react";
 
 interface AddToCalendarModalProps {
   isOpen: boolean;
@@ -25,6 +27,7 @@ interface AddToCalendarModalProps {
 
 export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarModalProps) => {
   const { toast } = useToast();
+  const [isAdding, setIsAdding] = useState(false);
 
   // Helper function to parse dates from booking data
   const parseBookingDates = () => {
@@ -136,6 +139,32 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
     window.open(googleCalendarUrl, '_blank');
   };
 
+  // New function for one-click Google Calendar add
+  const addToGoogleCalendarDirectly = async () => {
+    setIsAdding(true);
+    try {
+      // Get the Google Calendar URL
+      const googleCalendarUrl = generateGoogleCalendarUrl();
+      
+      // Open in a new tab
+      window.open(googleCalendarUrl, '_blank');
+      
+      toast({
+        title: "Adding to Google Calendar",
+        description: "Your event is being added to Google Calendar.",
+      });
+    } catch (error) {
+      console.error('Error adding to Google Calendar:', error);
+      toast({
+        title: "Failed to add to Google Calendar",
+        description: "Please try again or use another method.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
   const formattedDate = format(new Date(booking.booking_date), 'MMMM d, yyyy');
   
   return (
@@ -158,6 +187,30 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
           </div>
           
           <div className="space-y-4">
+            {/* New primary button for one-click Google Calendar add */}
+            <Button 
+              variant="default" 
+              className="w-full flex items-center justify-center bg-[#4285F4] hover:bg-[#3367d6] text-white transition-all duration-300"
+              onClick={addToGoogleCalendarDirectly}
+              disabled={isAdding}
+            >
+              {isAdding ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Calendar className="h-4 w-4 mr-2" />
+              )}
+              <span>Add to Google Calendar with One Click</span>
+            </Button>
+            
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-findvenue/20"></span>
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-background px-2 text-muted-foreground">Other Options</span>
+              </div>
+            </div>
+            
             <Button 
               variant="outline" 
               className="w-full flex items-center justify-center border-findvenue text-findvenue hover:bg-findvenue/10 transition-all duration-300"
