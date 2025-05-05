@@ -23,6 +23,11 @@ const BookingInvite = () => {
         setLoading(true);
         console.log("Fetching booking with ID:", id);
         
+        if (!id) {
+          setError('Invalid booking ID');
+          return;
+        }
+        
         // Fetch booking details
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
@@ -62,17 +67,38 @@ const BookingInvite = () => {
         // Also fetch the invite information if available
         const { data: inviteData, error: inviteError } = await supabase
           .from('booking_invites')
-          .select('email, status')
-          .eq('booking_id', id)
-          .single();
+          .select('email, name, status')
+          .eq('booking_id', id);
           
-        if (!inviteError && inviteData) {
-          console.log("Invite data loaded:", inviteData);
-          setInviteInfo(inviteData);
+        if (!inviteError && inviteData && inviteData.length > 0) {
+          // Check if we can identify the user by email
+          const userEmail = localStorage.getItem('guestEmail');
+          let matchingInvite = null;
+          
+          if (userEmail) {
+            matchingInvite = inviteData.find(invite => 
+              invite.email.toLowerCase() === userEmail.toLowerCase()
+            );
+          }
+          
+          // If we found a matching invite or there's only one invite, use that
+          if (matchingInvite || inviteData.length === 1) {
+            const inviteToUse = matchingInvite || inviteData[0];
+            console.log("Using invite data:", inviteToUse);
+            setInviteInfo(inviteToUse);
+            
+            // Store the email for future use
+            if (inviteToUse.email) {
+              localStorage.setItem('guestEmail', inviteToUse.email);
+            }
+          } else {
+            console.log("Multiple invites found but couldn't identify which one to use");
+            // Just show the booking without specific invite info
+          }
         }
       } catch (err) {
         console.error('Exception in fetching booking:', err);
-        setError('An unexpected error occurred');
+        setError('An unexpected error occurred while loading booking details');
       } finally {
         setLoading(false);
       }
@@ -106,7 +132,7 @@ const BookingInvite = () => {
 
   const handleAccept = async () => {
     try {
-      if (!inviteInfo?.email) {
+      if (!inviteInfo?.email || !id) {
         toast({ 
           title: "Cannot identify invitation", 
           description: "Unable to process your response at this time.",
@@ -151,7 +177,7 @@ const BookingInvite = () => {
 
   const handleDecline = async () => {
     try {
-      if (!inviteInfo?.email) {
+      if (!inviteInfo?.email || !id) {
         toast({ 
           title: "Cannot identify invitation", 
           description: "Unable to process your response at this time.",
@@ -195,7 +221,7 @@ const BookingInvite = () => {
   };
 
   const getInviteStatus = () => {
-    if (!inviteInfo) return null;
+    if (!inviteInfo || !inviteInfo.status || inviteInfo.status === 'pending') return null;
     
     switch (inviteInfo.status) {
       case 'accepted':
@@ -271,9 +297,11 @@ const BookingInvite = () => {
           <div>
             <h2 className="text-xl font-semibold text-white mb-2">{booking.venue_name}</h2>
             {inviteInfo && (
-              <p className="text-sm text-teal-400/80">
-                Invitation for: {inviteInfo.email}
-              </p>
+              <div className="text-sm text-teal-400/80 flex items-center gap-1">
+                <Mail className="h-3.5 w-3.5" />
+                <span>Invitation for: {inviteInfo.email}</span>
+                {inviteInfo.name && <span>({inviteInfo.name})</span>}
+              </div>
             )}
           </div>
 
@@ -347,7 +375,7 @@ const BookingInvite = () => {
           {getInviteStatus()}
         </CardContent>
         <CardFooter className="flex flex-col gap-4 border-t border-slate-800 pt-4">
-          {(!inviteInfo || inviteInfo.status === 'pending') && (
+          {(!inviteInfo || !inviteInfo.status || inviteInfo.status === 'pending') && (
             <div className="grid grid-cols-2 w-full gap-3">
               <Button 
                 className="bg-teal-500 hover:bg-teal-600 text-slate-900 flex items-center gap-2"

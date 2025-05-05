@@ -82,14 +82,14 @@ const handler = async (req: Request): Promise<Response> => {
       to: [email],
       subject: `You're Invited: ${venueName} on ${formattedDate}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #0f172a; color: #e2e8f0;">
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #0f172a; color: #FFFFFF;">
           <div style="text-align: center; margin-bottom: 30px;">
             <h1 style="color: #2dd4bf; font-size: 24px; margin-bottom: 5px;">You're Invited!</h1>
-            <p style="color: #94a3b8; font-size: 16px;">An event awaits your presence</p>
+            <p style="color: #FFFFFF; font-size: 16px;">An event awaits your presence</p>
           </div>
           
-          <p style="font-size: 16px; line-height: 1.5;">Hello ${greetingName},</p>
-          <p style="font-size: 16px; line-height: 1.5;">You've been invited to an event at <strong style="color: #2dd4bf;">${displayVenueName}</strong>.</p>
+          <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">Hello ${greetingName},</p>
+          <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">You've been invited to an event at <strong style="color: #2dd4bf;">${displayVenueName}</strong>.</p>
           
           <div style="background-color: #1e293b; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <h3 style="color: #2dd4bf; margin-top: 0; border-bottom: 1px solid #334155; padding-bottom: 10px;">Event Details:</h3>
@@ -98,7 +98,7 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Host:</span> 
-                  <span style="flex: 1;">${hostName}</span>
+                  <span style="flex: 1; color: #FFFFFF;">${hostName}</span>
                 </p>
               </div>` : ''
             }
@@ -106,21 +106,21 @@ const handler = async (req: Request): Promise<Response> => {
             <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
               <p style="margin: 5px 0; display: flex;">
                 <span style="width: 120px; color: #94a3b8; font-weight: 500;">Venue:</span> 
-                <span style="flex: 1;">${displayVenueName}</span>
+                <span style="flex: 1; color: #FFFFFF;">${displayVenueName}</span>
               </p>
             </div>
             
             <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
               <p style="margin: 5px 0; display: flex;">
                 <span style="width: 120px; color: #94a3b8; font-weight: 500;">Date:</span> 
-                <span style="flex: 1;">${formattedDate}</span>
+                <span style="flex: 1; color: #FFFFFF;">${formattedDate}</span>
               </p>
             </div>
             
             <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
               <p style="margin: 5px 0; display: flex;">
                 <span style="width: 120px; color: #94a3b8; font-weight: 500;">Time:</span> 
-                <span style="flex: 1;">${startTime} - ${endTime}</span>
+                <span style="flex: 1; color: #FFFFFF;">${startTime} - ${endTime}</span>
               </p>
             </div>
             
@@ -128,7 +128,7 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Location:</span> 
-                  <span style="flex: 1;">${address}</span>
+                  <span style="flex: 1; color: #FFFFFF;">${address}</span>
                 </p>
               </div>` : ''
             }
@@ -137,7 +137,16 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Contact:</span> 
-                  <span style="flex: 1;">${contactEmail}</span>
+                  <span style="flex: 1; color: #FFFFFF;">${contactEmail}</span>
+                </p>
+              </div>` : ''
+            }
+            
+            ${contactPhone ? 
+              `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+                <p style="margin: 5px 0; display: flex;">
+                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Phone:</span> 
+                  <span style="flex: 1; color: #FFFFFF;">${contactPhone}</span>
                 </p>
               </div>` : ''
             }
@@ -146,7 +155,7 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Guests:</span> 
-                  <span style="flex: 1;">${guests} people</span>
+                  <span style="flex: 1; color: #FFFFFF;">${guests} people</span>
                 </p>
               </div>` : ''
             }
@@ -155,21 +164,20 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0;">
                 <p style="margin: 5px 0;">
                   <span style="color: #94a3b8; font-weight: 500; display: block; margin-bottom: 5px;">Special Requests:</span> 
-                  <span style="display: block; padding-left: 10px; border-left: 2px solid #2dd4bf;">${specialRequests}</span>
+                  <span style="display: block; padding-left: 10px; border-left: 2px solid #2dd4bf; color: #FFFFFF;">${specialRequests}</span>
                 </p>
               </div>` : ''
             }
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <p style="margin-bottom: 20px; color: #94a3b8;">Please let us know if you can attend:</p>
+            <p style="margin-bottom: 20px; color: #FFFFFF;">Please let us know if you can attend:</p>
             <a href="${inviteLink}" style="background-color: #2dd4bf; color: #0f172a; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; display: inline-block;">View Event Details</a>
           </div>
           
           <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
-            <p style="font-size: 14px; color: #64748b;">
-              This invitation was sent via <span style="color: #2dd4bf;">FindVenue</span><br>
-              Sent to: ${email}
+            <p style="font-size: 14px; color: #8b94a3;">
+              This invitation was sent via <span style="color: #2dd4bf;">FindVenue</span>
             </p>
           </div>
         </div>
