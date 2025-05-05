@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import ErrorDisplay from '@/components/chat/ErrorDisplay';
 
 const BookingInvite = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,7 +42,7 @@ const BookingInvite = () => {
           return;
         }
         
-        // Fetch booking details
+        // Use .maybeSingle() instead of .single() to avoid errors when no data is found
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select(`
@@ -61,17 +62,17 @@ const BookingInvite = () => {
             customer_name
           `)
           .eq('id', id)
-          .single();
+          .maybeSingle();
         
         if (bookingError) {
           console.error('Error fetching booking details:', bookingError);
-          setError('Unable to load booking details. This booking may not exist or has been removed.');
+          setError('Unable to load booking details. Please try again later.');
           return;
         }
         
         if (!bookingData) {
           console.error('No booking found with ID:', id);
-          setError('Booking not found');
+          setError('Unable to load booking details. This booking may not exist or has been removed.');
           return;
         }
         
@@ -84,7 +85,7 @@ const BookingInvite = () => {
             .from('venues')
             .select('*')
             .eq('id', bookingData.venue_id)
-            .single();
+            .maybeSingle();
             
           if (venueError) {
             console.error('Error fetching venue details:', venueError);
@@ -112,48 +113,53 @@ const BookingInvite = () => {
   const checkForInvites = async (emailToCheck: string) => {
     if (!id) return;
     
-    // Fetch all invites for this booking
-    const { data: inviteData, error: inviteError } = await supabase
-      .from('booking_invites')
-      .select('email, name, status')
-      .eq('booking_id', id);
-      
-    if (inviteError) {
-      console.error('Error fetching invites:', inviteError);
-      return;
-    }
-    
-    if (!inviteData || inviteData.length === 0) {
-      console.log("No invites found for this booking");
-      setError('No invitations found for this booking');
-      return;
-    }
-    
-    console.log("Found invites:", inviteData);
-    
-    // If we have a stored email, try to match it with an invite
-    if (emailToCheck) {
-      const matchingInvite = inviteData.find(invite => 
-        invite.email.toLowerCase() === emailToCheck.toLowerCase()
-      );
-      
-      if (matchingInvite) {
-        console.log("Found matching invite:", matchingInvite);
-        setInviteInfo(matchingInvite);
+    try {
+      // Fetch all invites for this booking
+      const { data: inviteData, error: inviteError } = await supabase
+        .from('booking_invites')
+        .select('email, name, status')
+        .eq('booking_id', id);
+        
+      if (inviteError) {
+        console.error('Error fetching invites:', inviteError);
         return;
       }
-    }
-    
-    // If we have only one invite, use it
-    if (inviteData.length === 1) {
-      console.log("Only one invite found, using it:", inviteData[0]);
-      setInviteInfo(inviteData[0]);
-      localStorage.setItem('guestEmail', inviteData[0].email);
-      setGuestEmail(inviteData[0].email);
-    } else {
-      // Multiple invites found, need to ask which one they are
-      console.log("Multiple invites found, need to identify user");
-      setNeedsEmailConfirmation(true);
+      
+      if (!inviteData || inviteData.length === 0) {
+        console.log("No invites found for this booking");
+        setError('No invitations found for this booking');
+        return;
+      }
+      
+      console.log("Found invites:", inviteData);
+      
+      // If we have a stored email, try to match it with an invite
+      if (emailToCheck) {
+        const matchingInvite = inviteData.find(invite => 
+          invite.email.toLowerCase() === emailToCheck.toLowerCase()
+        );
+        
+        if (matchingInvite) {
+          console.log("Found matching invite:", matchingInvite);
+          setInviteInfo(matchingInvite);
+          return;
+        }
+      }
+      
+      // If we have only one invite, use it
+      if (inviteData.length === 1) {
+        console.log("Only one invite found, using it:", inviteData[0]);
+        setInviteInfo(inviteData[0]);
+        localStorage.setItem('guestEmail', inviteData[0].email);
+        setGuestEmail(inviteData[0].email);
+      } else {
+        // Multiple invites found, need to ask which one they are
+        console.log("Multiple invites found, need to identify user");
+        setNeedsEmailConfirmation(true);
+      }
+    } catch (err) {
+      console.error('Error checking for invites:', err);
+      setError('An error occurred while retrieving invitation information');
     }
   };
 

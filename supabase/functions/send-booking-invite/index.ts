@@ -79,11 +79,15 @@ const handler = async (req: Request): Promise<Response> => {
     // Greeting message based on recipient name
     const greetingName = recipientName ? recipientName : "there";
 
+    // Ensure we have the full booking invite URL with the correct format
+    const fullInviteLink = inviteLink.includes('/booking-invite/') 
+      ? inviteLink 
+      : `${new URL(inviteLink).origin}/booking-invite/${inviteLink.split('/').pop()}`;
+
     // Create a link to the venue page if venueId is available
-    const venueLink = venueId ? `${new URL(inviteLink).origin}/venue/${venueId}` : null;
-    
-    // Make sure we're using the full booking invite URL
-    const fullInviteLink = inviteLink.startsWith('http') ? inviteLink : `${new URL(inviteLink).origin}/booking-invite/${inviteLink.split('/').pop()}`;
+    const venueLink = venueId 
+      ? `${new URL(inviteLink).origin}/venue/${venueId}` 
+      : null;
 
     const emailResponse = await resend.emails.send({
       from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
