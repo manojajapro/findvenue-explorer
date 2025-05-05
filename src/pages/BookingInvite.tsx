@@ -1,24 +1,36 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const BookingInvite = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [booking, setBooking] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [inviteInfo, setInviteInfo] = useState<any>(null);
   const [venue, setVenue] = useState<any>(null);
+  const [guestEmail, setGuestEmail] = useState<string>('');
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
 
   useEffect(() => {
+    // Check if we already have the guest email in local storage
+    const storedEmail = localStorage.getItem('guestEmail');
+    if (storedEmail) {
+      setGuestEmail(storedEmail);
+    }
+    
     const fetchBookingDetails = async () => {
       try {
         setLoading(true);
@@ -68,51 +80,22 @@ const BookingInvite = () => {
         
         // Fetch venue details if venue_id exists
         if (bookingData.venue_id) {
-          const { data: venueData } = await supabase
+          const { data: venueData, error: venueError } = await supabase
             .from('venues')
             .select('*')
             .eq('id', bookingData.venue_id)
             .single();
             
-          if (venueData) {
+          if (venueError) {
+            console.error('Error fetching venue details:', venueError);
+          } else if (venueData) {
             console.log("Venue data loaded:", venueData);
             setVenue(venueData);
           }
         }
         
-        // Also fetch the invite information if available
-        const { data: inviteData, error: inviteError } = await supabase
-          .from('booking_invites')
-          .select('email, name, status')
-          .eq('booking_id', id);
-          
-        if (!inviteError && inviteData && inviteData.length > 0) {
-          // Check if we can identify the user by email
-          const userEmail = localStorage.getItem('guestEmail');
-          let matchingInvite = null;
-          
-          if (userEmail) {
-            matchingInvite = inviteData.find(invite => 
-              invite.email.toLowerCase() === userEmail.toLowerCase()
-            );
-          }
-          
-          // If we found a matching invite or there's only one invite, use that
-          if (matchingInvite || inviteData.length === 1) {
-            const inviteToUse = matchingInvite || inviteData[0];
-            console.log("Using invite data:", inviteToUse);
-            setInviteInfo(inviteToUse);
-            
-            // Store the email for future use
-            if (inviteToUse.email) {
-              localStorage.setItem('guestEmail', inviteToUse.email);
-            }
-          } else {
-            console.log("Multiple invites found but couldn't identify which one to use");
-            // Ask the user to identify themselves if multiple invites exist
-            // We'll implement this in a moment
-          }
-        }
+        // Check for invites
+        await checkForInvites(storedEmail || '');
       } catch (err) {
         console.error('Exception in fetching booking:', err);
         setError('An unexpected error occurred while loading booking details');
@@ -125,6 +108,54 @@ const BookingInvite = () => {
       fetchBookingDetails();
     }
   }, [id]);
+
+  const checkForInvites = async (emailToCheck: string) => {
+    if (!id) return;
+    
+    // Fetch all invites for this booking
+    const { data: inviteData, error: inviteError } = await supabase
+      .from('booking_invites')
+      .select('email, name, status')
+      .eq('booking_id', id);
+      
+    if (inviteError) {
+      console.error('Error fetching invites:', inviteError);
+      return;
+    }
+    
+    if (!inviteData || inviteData.length === 0) {
+      console.log("No invites found for this booking");
+      setError('No invitations found for this booking');
+      return;
+    }
+    
+    console.log("Found invites:", inviteData);
+    
+    // If we have a stored email, try to match it with an invite
+    if (emailToCheck) {
+      const matchingInvite = inviteData.find(invite => 
+        invite.email.toLowerCase() === emailToCheck.toLowerCase()
+      );
+      
+      if (matchingInvite) {
+        console.log("Found matching invite:", matchingInvite);
+        setInviteInfo(matchingInvite);
+        return;
+      }
+    }
+    
+    // If we have only one invite, use it
+    if (inviteData.length === 1) {
+      console.log("Only one invite found, using it:", inviteData[0]);
+      setInviteInfo(inviteData[0]);
+      localStorage.setItem('guestEmail', inviteData[0].email);
+      setGuestEmail(inviteData[0].email);
+    } else {
+      // Multiple invites found, need to ask which one they are
+      console.log("Multiple invites found, need to identify user");
+      setNeedsEmailConfirmation(true);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     try {
@@ -147,29 +178,43 @@ const BookingInvite = () => {
     }
   };
   
-  const identifyUserByEmail = (email: string) => {
-    // Find the invite with this email
-    const { data: inviteData } = supabase
-      .from('booking_invites')
-      .select('email, name, status')
-      .eq('booking_id', id)
-      .eq('email', email)
-      .single();
-      
-    if (inviteData) {
-      setInviteInfo(inviteData);
-      localStorage.setItem('guestEmail', email);
+  const handleIdentifyByEmail = async () => {
+    if (!guestEmail.trim()) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email address to find your invitation.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSubmitting(true);
+    await checkForInvites(guestEmail);
+    setSubmitting(false);
+    
+    if (!inviteInfo) {
+      toast({
+        title: "Invitation not found",
+        description: "No invitation was found with this email address.",
+        variant: "destructive"
+      });
+    } else {
+      setNeedsEmailConfirmation(false);
+      localStorage.setItem('guestEmail', guestEmail);
     }
   };
 
   const handleAccept = async () => {
     try {
+      setSubmitting(true);
+      
       if (!inviteInfo?.email || !id) {
         toast({ 
           title: "Cannot identify invitation", 
           description: "Unable to process your response at this time.",
           variant: "destructive" 
         });
+        setSubmitting(false);
         return;
       }
       
@@ -187,6 +232,7 @@ const BookingInvite = () => {
           description: "There was an error processing your response.",
           variant: "destructive" 
         });
+        setSubmitting(false);
         return;
       }
       
@@ -197,6 +243,7 @@ const BookingInvite = () => {
       
       // Update local state to reflect change
       setInviteInfo({...inviteInfo, status: 'accepted'});
+      setSubmitting(false);
     } catch (err) {
       console.error('Exception in accepting invitation:', err);
       toast({ 
@@ -204,17 +251,21 @@ const BookingInvite = () => {
         description: "Please try again later.",
         variant: "destructive" 
       });
+      setSubmitting(false);
     }
   };
 
   const handleDecline = async () => {
     try {
+      setSubmitting(true);
+      
       if (!inviteInfo?.email || !id) {
         toast({ 
           title: "Cannot identify invitation", 
           description: "Unable to process your response at this time.",
           variant: "destructive" 
         });
+        setSubmitting(false);
         return;
       }
       
@@ -232,6 +283,7 @@ const BookingInvite = () => {
           description: "There was an error processing your response.",
           variant: "destructive" 
         });
+        setSubmitting(false);
         return;
       }
       
@@ -242,6 +294,7 @@ const BookingInvite = () => {
       
       // Update local state to reflect change
       setInviteInfo({...inviteInfo, status: 'declined'});
+      setSubmitting(false);
     } catch (err) {
       console.error('Exception in declining invitation:', err);
       toast({ 
@@ -249,6 +302,7 @@ const BookingInvite = () => {
         description: "Please try again later.",
         variant: "destructive" 
       });
+      setSubmitting(false);
     }
   };
 
@@ -274,6 +328,53 @@ const BookingInvite = () => {
         return null;
     }
   };
+  
+  // Render the email confirmation form
+  if (needsEmailConfirmation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+        <Card className="max-w-md w-full bg-slate-900 border-slate-800 text-white">
+          <CardHeader>
+            <CardTitle className="text-xl text-teal-400">Identify Your Invitation</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-slate-300 mb-4">
+              Multiple invitations were found for this event. Please enter your email address to identify your invitation.
+            </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Your Email Address</Label>
+                <Input 
+                  id="email"
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button 
+              onClick={handleIdentifyByEmail}
+              disabled={submitting || !guestEmail}
+              className="bg-teal-500 hover:bg-teal-600 text-slate-900 w-full flex items-center justify-center gap-2"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Find My Invitation'
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -426,16 +527,18 @@ const BookingInvite = () => {
               <Button 
                 className="bg-teal-500 hover:bg-teal-600 text-slate-900 flex items-center gap-2"
                 onClick={handleAccept}
+                disabled={submitting}
               >
-                <Check className="h-4 w-4" />
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Accept
               </Button>
               <Button 
                 variant="outline"
                 className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
                 onClick={handleDecline}
+                disabled={submitting}
               >
-                <X className="h-4 w-4" />
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                 Decline
               </Button>
             </div>

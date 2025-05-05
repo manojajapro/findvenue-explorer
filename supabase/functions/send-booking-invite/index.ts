@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -81,7 +80,10 @@ const handler = async (req: Request): Promise<Response> => {
     const greetingName = recipientName ? recipientName : "there";
 
     // Create a link to the venue page if venueId is available
-    const venueLink = venueId ? `${new URL(inviteLink).origin}/venue/${venueId}` : inviteLink;
+    const venueLink = venueId ? `${new URL(inviteLink).origin}/venue/${venueId}` : null;
+    
+    // Make sure we're using the full booking invite URL
+    const fullInviteLink = inviteLink.startsWith('http') ? inviteLink : `${new URL(inviteLink).origin}/booking-invite/${inviteLink.split('/').pop()}`;
 
     const emailResponse = await resend.emails.send({
       from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
@@ -104,7 +106,7 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Host:</span> 
-                  <span style="flex: 1; color: #FFFFFF;">${hostName}</span>
+                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${hostName}</span>
                 </p>
               </div>` : ''
             }
@@ -112,14 +114,14 @@ const handler = async (req: Request): Promise<Response> => {
             <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
               <p style="margin: 5px 0; display: flex;">
                 <span style="width: 120px; color: #94a3b8; font-weight: 500;">Venue:</span> 
-                <span style="flex: 1; color: #FFFFFF;">${displayVenueName}</span>
+                <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${displayVenueName}</span>
               </p>
             </div>
             
             <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
               <p style="margin: 5px 0; display: flex;">
                 <span style="width: 120px; color: #94a3b8; font-weight: 500;">Date:</span> 
-                <span style="flex: 1; color: #FFFFFF;">${formattedDate}</span>
+                <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${formattedDate}</span>
               </p>
             </div>
             
@@ -161,7 +163,7 @@ const handler = async (req: Request): Promise<Response> => {
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Guests:</span> 
-                  <span style="flex: 1; color: #FFFFFF;">${guests} people</span>
+                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${guests} people</span>
                 </p>
               </div>` : ''
             }
@@ -182,11 +184,11 @@ const handler = async (req: Request): Promise<Response> => {
               <tr>
                 <td align="center">
                   <div>
-                    <a href="${inviteLink}" style="background-color: #2dd4bf; color: #0f172a; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; display: inline-block;">Respond to Invitation</a>
+                    <a href="${fullInviteLink}" style="background-color: #2dd4bf; color: #0f172a; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 15px;">Respond to Invitation</a>
                   </div>
                 </td>
               </tr>
-              ${venueId ? `
+              ${venueLink ? `
               <tr>
                 <td align="center" style="padding-top: 15px;">
                   <div>
