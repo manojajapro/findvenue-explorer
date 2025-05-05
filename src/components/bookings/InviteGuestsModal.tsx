@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { X, Mail, Plus, Check, Loader2, XCircle } from 'lucide-react';
+import { X, Mail, Plus, Check, Loader2, XCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -20,12 +19,16 @@ interface InviteGuestsModalProps {
     address?: string;
     guests?: number;
     special_requests?: string;
+    customer_name?: string;
+    customer_email?: string;
+    customer_phone?: string;
   };
 }
 
 export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModalProps) => {
   const { toast } = useToast();
   const [emails, setEmails] = useState<string[]>(['']);
+  const [names, setNames] = useState<string[]>(['']);
   const [isSending, setIsSending] = useState(false);
   const [sentEmails, setSentEmails] = useState<string[]>([]);
 
@@ -38,14 +41,24 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
     setEmails(newEmails);
   };
   
+  const handleNameChange = (index: number, value: string) => {
+    const newNames = [...names];
+    newNames[index] = value;
+    setNames(newNames);
+  };
+  
   const addEmailField = () => {
     setEmails([...emails, '']);
+    setNames([...names, '']);
   };
   
   const removeEmailField = (index: number) => {
     const newEmails = [...emails];
+    const newNames = [...names];
     newEmails.splice(index, 1);
+    newNames.splice(index, 1);
     setEmails(newEmails);
+    setNames(newNames);
   };
   
   const validateEmails = () => {
@@ -55,7 +68,9 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
 
   const sendInvitations = async () => {
     // Filter out empty emails
-    const validEmails = emails.filter(email => email.trim() !== '');
+    const validEmails = emails.filter((email, index) => email.trim() !== '');
+    const validIndices = emails.map((email, index) => email.trim() !== '' ? index : -1).filter(idx => idx !== -1);
+    const validNames = validIndices.map(idx => names[idx] || '');
     
     if (validEmails.length === 0) {
       toast({
@@ -86,8 +101,9 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       const failedSends = [];
       
       // Store invitations in database using upsert to avoid duplicates
-      for (const email of validEmails) {
-        const trimmedEmail = email.toLowerCase().trim();
+      for (let i = 0; i < validEmails.length; i++) {
+        const trimmedEmail = validEmails[i].toLowerCase().trim();
+        const recipientName = validNames[i].trim();
         
         console.log("Processing invite for email:", trimmedEmail);
         
@@ -97,6 +113,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           .upsert({
             booking_id: booking.id,
             email: trimmedEmail,
+            recipient_name: recipientName || null,
             status: 'pending'
           }, { 
             onConflict: 'booking_id,email',
@@ -117,6 +134,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           const { error: emailError } = await supabase.functions.invoke('send-booking-invite', {
             body: {
               email: trimmedEmail,
+              recipientName: recipientName,
               venueName: booking.venue_name,
               bookingDate: booking.booking_date,
               startTime: booking.start_time,
@@ -124,7 +142,10 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               address: booking.address,
               inviteLink: inviteLink,
               specialRequests: booking.special_requests,
-              guests: booking.guests
+              guests: booking.guests,
+              hostName: booking.customer_name,
+              contactEmail: booking.customer_email,
+              contactPhone: booking.customer_phone
             }
           });
           
@@ -153,9 +174,12 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         // Reset form state if at least some were successful
         if (successfulSends.length === validEmails.length) {
           setEmails(['']);
+          setNames(['']);
         } else {
           // Keep emails that failed to send
-          setEmails(failedSends.map(fail => fail.email));
+          const failedEmails = failedSends.map(fail => fail.email);
+          setEmails(failedEmails.length > 0 ? failedEmails : ['']);
+          setNames(failedEmails.length > 0 ? failedEmails.map(() => '') : ['']);
         }
       }
       
@@ -215,26 +239,37 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           <div className="space-y-3">
             <h3 className="text-sm font-medium flex items-center gap-2 text-slate-100">
               <Mail className="h-4 w-4 text-teal-400" />
-              Guest Emails:
+              Guest Information:
             </h3>
             {emails.map((email, index) => (
-              <div key={index} className="flex items-center gap-2 relative">
-                <Input
-                  type="email"
-                  placeholder="guest@example.com"
-                  value={email}
-                  onChange={(e) => handleEmailChange(index, e.target.value)}
-                  className="flex-grow bg-slate-800 border-slate-700 text-slate-100 focus:ring-teal-500 focus:border-teal-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeEmailField(index)}
-                  disabled={emails.length === 1}
-                  className="absolute right-2 focus:outline-none text-slate-400 hover:text-slate-300"
-                  aria-label="Remove email field"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+              <div key={index} className="space-y-2">
+                <div className="flex items-center gap-2 relative">
+                  <Input
+                    type="text"
+                    placeholder="Guest Name (optional)"
+                    value={names[index] || ''}
+                    onChange={(e) => handleNameChange(index, e.target.value)}
+                    className="flex-grow bg-slate-800 border-slate-700 text-slate-100 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                </div>
+                <div className="flex items-center gap-2 relative">
+                  <Input
+                    type="email"
+                    placeholder="guest@example.com"
+                    value={email}
+                    onChange={(e) => handleEmailChange(index, e.target.value)}
+                    className="flex-grow bg-slate-800 border-slate-700 text-slate-100 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeEmailField(index)}
+                    disabled={emails.length === 1}
+                    className="absolute right-2 focus:outline-none text-slate-400 hover:text-slate-300"
+                    aria-label="Remove email field"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             ))}
             

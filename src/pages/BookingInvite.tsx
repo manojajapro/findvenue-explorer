@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ const BookingInvite = () => {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<any>(null);
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
@@ -23,7 +24,7 @@ const BookingInvite = () => {
         console.log("Fetching booking with ID:", id);
         
         // Fetch booking details
-        const { data, error } = await supabase
+        const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select(`
             id,
@@ -37,25 +38,38 @@ const BookingInvite = () => {
             address,
             total_price,
             customer_email,
-            customer_phone
+            customer_phone,
+            customer_name
           `)
           .eq('id', id)
           .single();
         
-        if (error) {
-          console.error('Error fetching booking details:', error);
+        if (bookingError) {
+          console.error('Error fetching booking details:', bookingError);
           setError('Unable to load booking details. This booking may not exist or has been removed.');
           return;
         }
         
-        if (!data) {
+        if (!bookingData) {
           console.error('No booking found with ID:', id);
           setError('Booking not found');
           return;
         }
         
-        console.log("Booking data loaded:", data);
-        setBooking(data);
+        console.log("Booking data loaded:", bookingData);
+        setBooking(bookingData);
+        
+        // Also fetch the invite information if available
+        const { data: inviteData, error: inviteError } = await supabase
+          .from('booking_invites')
+          .select('email, status')
+          .eq('booking_id', id)
+          .single();
+          
+        if (!inviteError && inviteData) {
+          console.log("Invite data loaded:", inviteData);
+          setInviteInfo(inviteData);
+        }
       } catch (err) {
         console.error('Exception in fetching booking:', err);
         setError('An unexpected error occurred');
@@ -92,12 +106,21 @@ const BookingInvite = () => {
 
   const handleAccept = async () => {
     try {
+      if (!inviteInfo?.email) {
+        toast({ 
+          title: "Cannot identify invitation", 
+          description: "Unable to process your response at this time.",
+          variant: "destructive" 
+        });
+        return;
+      }
+      
       // Update the booking invite status in the database
       const { error } = await supabase
         .from('booking_invites')
         .update({ status: 'accepted' })
         .eq('booking_id', id)
-        .eq('email', booking?.customer_email);
+        .eq('email', inviteInfo.email);
         
       if (error) {
         console.error('Error updating invite status:', error);
@@ -113,6 +136,9 @@ const BookingInvite = () => {
         title: "Accepted invitation", 
         description: "The host has been notified of your attendance."
       });
+      
+      // Update local state to reflect change
+      setInviteInfo({...inviteInfo, status: 'accepted'});
     } catch (err) {
       console.error('Exception in accepting invitation:', err);
       toast({ 
@@ -125,12 +151,21 @@ const BookingInvite = () => {
 
   const handleDecline = async () => {
     try {
+      if (!inviteInfo?.email) {
+        toast({ 
+          title: "Cannot identify invitation", 
+          description: "Unable to process your response at this time.",
+          variant: "destructive" 
+        });
+        return;
+      }
+      
       // Update the booking invite status in the database
       const { error } = await supabase
         .from('booking_invites')
         .update({ status: 'declined' })
         .eq('booking_id', id)
-        .eq('email', booking?.customer_email);
+        .eq('email', inviteInfo.email);
         
       if (error) {
         console.error('Error updating invite status:', error);
@@ -146,6 +181,9 @@ const BookingInvite = () => {
         title: "Declined invitation", 
         description: "The host has been notified that you can't attend."
       });
+      
+      // Update local state to reflect change
+      setInviteInfo({...inviteInfo, status: 'declined'});
     } catch (err) {
       console.error('Exception in declining invitation:', err);
       toast({ 
@@ -153,6 +191,29 @@ const BookingInvite = () => {
         description: "Please try again later.",
         variant: "destructive" 
       });
+    }
+  };
+
+  const getInviteStatus = () => {
+    if (!inviteInfo) return null;
+    
+    switch (inviteInfo.status) {
+      case 'accepted':
+        return (
+          <div className="mt-4 p-3 bg-teal-500/20 border border-teal-500/30 rounded-lg flex items-center gap-2">
+            <Check className="h-5 w-5 text-teal-500" />
+            <p className="text-teal-300">You've accepted this invitation</p>
+          </div>
+        );
+      case 'declined':
+        return (
+          <div className="mt-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+            <X className="h-5 w-5 text-red-500" />
+            <p className="text-red-300">You've declined this invitation</p>
+          </div>
+        );
+      default:
+        return null;
     }
   };
 
@@ -209,10 +270,25 @@ const BookingInvite = () => {
         <CardContent className="pt-6 space-y-6">
           <div>
             <h2 className="text-xl font-semibold text-white mb-2">{booking.venue_name}</h2>
+            {inviteInfo && (
+              <p className="text-sm text-teal-400/80">
+                Invitation for: {inviteInfo.email}
+              </p>
+            )}
           </div>
 
           <div className="space-y-4 bg-slate-800/50 p-4 rounded-lg border border-slate-700/50">
             <h3 className="text-sm font-medium mb-2 text-teal-400">Event Details:</h3>
+            
+            {booking.customer_name && (
+              <div className="flex items-start gap-3">
+                <User className="h-5 w-5 text-teal-500 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-slate-300">Host</p>
+                  <p className="text-white">{booking.customer_name}</p>
+                </div>
+              </div>
+            )}
             
             <div className="flex items-start gap-3">
               <Calendar className="h-5 w-5 text-teal-500 mt-0.5" />
@@ -240,6 +316,16 @@ const BookingInvite = () => {
               </div>
             )}
             
+            {booking.customer_email && (
+              <div className="flex items-start gap-3">
+                <Mail className="h-5 w-5 text-teal-500 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-slate-300">Contact Email</p>
+                  <p className="text-white">{booking.customer_email}</p>
+                </div>
+              </div>
+            )}
+            
             {booking.guests > 0 && (
               <div className="flex items-start gap-3">
                 <Users className="h-5 w-5 text-teal-500 mt-0.5" />
@@ -257,25 +343,29 @@ const BookingInvite = () => {
               </div>
             )}
           </div>
+          
+          {getInviteStatus()}
         </CardContent>
         <CardFooter className="flex flex-col gap-4 border-t border-slate-800 pt-4">
-          <div className="grid grid-cols-2 w-full gap-3">
-            <Button 
-              className="bg-teal-500 hover:bg-teal-600 text-slate-900 flex items-center gap-2"
-              onClick={handleAccept}
-            >
-              <Check className="h-4 w-4" />
-              Accept
-            </Button>
-            <Button 
-              variant="outline"
-              className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
-              onClick={handleDecline}
-            >
-              <X className="h-4 w-4" />
-              Decline
-            </Button>
-          </div>
+          {(!inviteInfo || inviteInfo.status === 'pending') && (
+            <div className="grid grid-cols-2 w-full gap-3">
+              <Button 
+                className="bg-teal-500 hover:bg-teal-600 text-slate-900 flex items-center gap-2"
+                onClick={handleAccept}
+              >
+                <Check className="h-4 w-4" />
+                Accept
+              </Button>
+              <Button 
+                variant="outline"
+                className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+                onClick={handleDecline}
+              >
+                <X className="h-4 w-4" />
+                Decline
+              </Button>
+            </div>
+          )}
           
           <p className="text-xs text-center text-slate-500 mt-4">
             This invitation was sent via FindVenue

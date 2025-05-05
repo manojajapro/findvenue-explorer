@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -12,6 +11,7 @@ const corsHeaders = {
 
 interface SendInviteRequest {
   email: string;
+  recipientName?: string;
   venueName: string;
   bookingDate: string;
   startTime: string;
@@ -20,6 +20,9 @@ interface SendInviteRequest {
   inviteLink: string;
   specialRequests?: string;
   guests?: number;
+  hostName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -29,7 +32,21 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, venueName, bookingDate, startTime, endTime, address, inviteLink, specialRequests, guests }: SendInviteRequest = await req.json();
+    const { 
+      email, 
+      recipientName,
+      venueName, 
+      bookingDate, 
+      startTime, 
+      endTime, 
+      address, 
+      inviteLink, 
+      specialRequests, 
+      guests,
+      hostName,
+      contactEmail,
+      contactPhone
+    }: SendInviteRequest = await req.json();
 
     if (!email || !venueName || !bookingDate) {
       return new Response(
@@ -57,6 +74,9 @@ const handler = async (req: Request): Promise<Response> => {
       // Keep original format if there's an error
     }
 
+    // Greeting message based on recipient name
+    const greetingName = recipientName ? recipientName : "there";
+
     const emailResponse = await resend.emails.send({
       from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
       to: [email],
@@ -68,12 +88,21 @@ const handler = async (req: Request): Promise<Response> => {
             <p style="color: #94a3b8; font-size: 16px;">An event awaits your presence</p>
           </div>
           
-          <p style="font-size: 16px; line-height: 1.5;">Hello,</p>
+          <p style="font-size: 16px; line-height: 1.5;">Hello ${greetingName},</p>
           <p style="font-size: 16px; line-height: 1.5;">You've been invited to an event at <strong style="color: #2dd4bf;">${displayVenueName}</strong>.</p>
           
           <div style="background-color: #1e293b; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <h3 style="color: #2dd4bf; margin-top: 0; border-bottom: 1px solid #334155; padding-bottom: 10px;">Event Details:</h3>
             
+            ${hostName ? 
+              `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+                <p style="margin: 5px 0; display: flex;">
+                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Host:</span> 
+                  <span style="flex: 1;">${hostName}</span>
+                </p>
+              </div>` : ''
+            }
+
             <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
               <p style="margin: 5px 0; display: flex;">
                 <span style="width: 120px; color: #94a3b8; font-weight: 500;">Venue:</span> 
@@ -104,6 +133,15 @@ const handler = async (req: Request): Promise<Response> => {
               </div>` : ''
             }
             
+            ${contactEmail ? 
+              `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+                <p style="margin: 5px 0; display: flex;">
+                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Contact:</span> 
+                  <span style="flex: 1;">${contactEmail}</span>
+                </p>
+              </div>` : ''
+            }
+            
             ${guests ? 
               `<div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
@@ -130,7 +168,8 @@ const handler = async (req: Request): Promise<Response> => {
           
           <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
             <p style="font-size: 14px; color: #64748b;">
-              This invitation was sent via <span style="color: #2dd4bf;">FindVenue</span>
+              This invitation was sent via <span style="color: #2dd4bf;">FindVenue</span><br>
+              Sent to: ${email}
             </p>
           </div>
         </div>
