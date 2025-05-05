@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building, Loader2 } from 'lucide-react';
@@ -220,6 +221,48 @@ const BookingInvite = () => {
     }
   };
 
+  // Function to send notification email
+  const sendInvitationResponseEmail = async (status: 'accepted' | 'declined') => {
+    if (!booking || !inviteInfo?.email) return;
+    
+    try {
+      // Prepare the data for the notification email
+      const notificationData = {
+        hostEmail: booking.customer_email,
+        hostName: booking.customer_name,
+        guestEmail: inviteInfo.email,
+        guestName: inviteInfo.name,
+        venueName: booking.venue_name,
+        bookingDate: booking.booking_date,
+        startTime: booking.start_time,
+        endTime: booking.end_time,
+        status: status,
+        bookingId: booking.id,
+        venueId: booking.venue_id
+      };
+      
+      // Call the edge function to send the notification email
+      const response = await fetch('https://esdmelfzeszjtbnoajig.functions.supabase.co/send-invitation-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(notificationData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error sending notification email:', errorData);
+        // Don't display an error to the user, just log it
+      } else {
+        console.log('Notification email sent successfully');
+      }
+    } catch (err) {
+      console.error('Exception sending notification email:', err);
+      // Don't display an error to the user, just log it
+    }
+  };
+
   const handleAccept = async () => {
     try {
       setSubmitting(true);
@@ -251,6 +294,9 @@ const BookingInvite = () => {
         setSubmitting(false);
         return;
       }
+      
+      // Send notification email
+      await sendInvitationResponseEmail('accepted');
       
       toast({ 
         title: "Accepted invitation", 
@@ -302,6 +348,9 @@ const BookingInvite = () => {
         setSubmitting(false);
         return;
       }
+      
+      // Send notification email
+      await sendInvitationResponseEmail('declined');
       
       toast({ 
         title: "Declined invitation", 

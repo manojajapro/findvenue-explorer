@@ -80,18 +80,18 @@ const handler = async (req: Request): Promise<Response> => {
     // Greeting message based on recipient name
     const greetingName = recipientName ? recipientName : "there";
 
-    // Make sure we're using the full URL for the booking invite
-    // This ensures it works correctly in all environments (localhost, staging, production)
+    // Extract booking ID from the invite link
     const bookingId = inviteLink.includes('/booking-invite/') 
       ? inviteLink.split('/booking-invite/')[1] 
       : inviteLink;
     
-    // Create the full invite link that will work in the email
-    const origin = new URL(req.url).origin;
-    const fullInviteLink = `${origin}/booking-invite/${bookingId}`;
+    // IMPORTANT: Use the proper app URL for the invite link
+    // Note: Don't use req.url origin as it points to the edge function domain
+    const appBaseUrl = 'https://esdmelfzeszjtbnoajig.supabase.co';
+    const fullInviteLink = `${appBaseUrl}/booking-invite/${bookingId}`;
     
-    // Create a link to the venue page if venueId is available
-    const venueLink = venueId ? `${origin}/venue/${venueId}` : null;
+    // Create venue link using the same app base URL
+    const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
 
     const emailResponse = await resend.emails.send({
       from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
