@@ -125,7 +125,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         try {
           // Determine the function URL based on environment
           const functionUrl = `${appOrigin.includes('localhost') 
-            ? "http://localhost:54321" 
+            ? "http://localhost:8080" 
             : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-booking-invite?appOrigin=${encodeURIComponent(appOrigin)}`;
           
           const response = await fetch(functionUrl, {
@@ -225,7 +225,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md bg-slate-900 border-slate-800 text-slate-100">
+      <DialogContent className="z-[1003] max-w-md bg-slate-900 border-slate-800 text-slate-100">
         <DialogHeader className="border-b border-slate-800 pb-4">
           <DialogTitle className="flex items-center gap-2 text-slate-100">
             <Mail className="h-5 w-5 text-teal-400" />

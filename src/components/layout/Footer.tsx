@@ -43,7 +43,7 @@ const Footer = () => {
           {/* Logo and Description */}
           <div className="lg:col-span-2">
             <Link to="/" className="inline-block mb-4">
-              <span className="text-2xl font-bold gradient-text">FindVenue</span>
+              <span className="text-2xl font-bold gradient-text">Avnu</span>
             </Link>
             <p className="text-findvenue-text-muted text-sm max-w-md mb-6">
               Discover and book the perfect venue for your next event in Saudi Arabia. From weddings to corporate gatherings, we have the spaces you need.
@@ -89,7 +89,7 @@ const Footer = () => {
         </div>
         
         <div className="border-t border-white/10 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-findvenue-text-muted">
-          <p>&copy; {currentYear} FindVenue. All rights reserved.</p>
+          <p>&copy; {currentYear} Avnu. All rights reserved.</p>
           <div className="flex mt-4 md:mt-0 space-x-6">
             <Link to="#" className="hover:text-findvenue transition-colors">
               Terms of Service

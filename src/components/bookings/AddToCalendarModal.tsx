@@ -169,7 +169,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md glass-card border-white/10 bg-gradient-to-b from-findvenue-surface/5 to-transparent">
+      <DialogContent className="z-[1003] max-w-md glass-card border-white/10 bg-gradient-to-b from-findvenue-surface/5 to-transparent">
         <DialogHeader>
           <DialogTitle className="text-center">
             <div className="flex items-center justify-center mb-2">
