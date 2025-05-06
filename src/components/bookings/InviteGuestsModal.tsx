@@ -124,9 +124,17 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         // Send email via edge function
         try {
           // Determine the function URL based on environment
-          const functionUrl = `${appOrigin.includes('localhost') 
-            ? "http://localhost:54321" 
-            : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-booking-invite?appOrigin=${encodeURIComponent(appOrigin)}`;
+          let functionUrl;
+          if (appOrigin.includes('localhost') || appOrigin.includes('127.0.0.1')) {
+            functionUrl = "http://localhost:54321/functions/v1/send-booking-invite";
+          } else if (appOrigin.includes('lovable.app')) {
+            functionUrl = "https://esdmelfzeszjtbnoajig.supabase.co/functions/v1/send-booking-invite";
+          } else {
+            functionUrl = "https://esdmelfzeszjtbnoajig.supabase.co/functions/v1/send-booking-invite";
+          }
+          
+          // Add app origin as query parameter
+          functionUrl += `?appOrigin=${encodeURIComponent(appOrigin)}`;
           
           console.log("Sending invitation using function URL:", functionUrl);
           console.log("App Origin:", appOrigin);

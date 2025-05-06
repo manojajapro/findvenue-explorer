@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -74,6 +75,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log(`Sending booking invite to: ${email} for venue: ${venueName}`);
+    console.log("Invite link provided:", inviteLink);
 
     // Extract just the venue name without special characters for display
     const displayVenueName = venueName;
@@ -93,10 +95,12 @@ const handler = async (req: Request): Promise<Response> => {
     const greetingName = recipientName ? recipientName : "there";
 
     // Extract booking ID from the invite link
-    const bookingId = inviteLink.includes('/booking-invite/') 
-      ? inviteLink.split('/booking-invite/')[1] 
-      : inviteLink;
-
+    let bookingId = inviteLink;
+    if (typeof inviteLink === 'string' && inviteLink.includes('/booking-invite/')) {
+      bookingId = inviteLink.split('/booking-invite/')[1];
+      console.log("Extracted booking ID from URL:", bookingId);
+    }
+    
     // Get app origin from the request
     let appDomain = "";
     try {
