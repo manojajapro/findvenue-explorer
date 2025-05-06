@@ -105,7 +105,7 @@ const handler = async (req: Request): Promise<Response> => {
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
 
     const emailResponse = await resend.emails.send({
-      from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
+      from: "Avnu <onboarding@avnu.dev>", // Replace with your verified domain when in production
       to: [email],
       subject: `You're Invited: ${venueName} on ${formattedDate}`,
       html: `
@@ -220,7 +220,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
             <p style="font-size: 14px; color: #8b94a3;">
-              This invitation was sent via <span style="color: #2dd4bf;">FindVenue</span>
+              This invitation was sent via <span style="color: #2dd4bf;">avnue</span>
             </p>
           </div>
         </div>
