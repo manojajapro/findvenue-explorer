@@ -1,7 +1,7 @@
 
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
-import QRCode from "qrcode";
+import * as QRCode from "qrcode";
 
 interface BookingPDFData {
   id: string;

@@ -20,6 +20,17 @@ import {
   Clock,
   Users
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +39,8 @@ import BookingOwnerChat from '@/components/bookings/BookingOwnerChat';
 import { enableRealtimeForTable } from '@/utils/supabaseRealtime';
 import { useBookingStatusUpdate } from '@/hooks/useBookingStatusUpdate';
 import { generateBookingConfirmationPDF } from '@/utils/pdfGenerator';
+import { AddToCalendarModal } from '@/components/bookings/AddToCalendarModal';
+import { InviteGuestsModal } from '@/components/bookings/InviteGuestsModal';
 
 type Booking = {
   id: string;
@@ -260,12 +273,11 @@ const Bookings = () => {
 
   const downloadBookingConfirmation = async (booking: Booking) => {
     try {
-      // Create PDF document with modern styling
-      const doc = await generateBookingConfirmationPDF(booking);
+      // Use the PDF generator utility function to create and download the PDF
+      const filename = await generateBookingConfirmationPDF(booking);
       
-      // Save PDF with a well-formatted name
-      const filename = `Avnu_Booking_${booking.venue_name.replace(/\s+/g, '_')}_${format(new Date(booking.booking_date), "yyyy-MM-dd")}.pdf`;
-      doc.save(filename);
+      // No need to call doc.save as it's already handled in the utility function
+      
     } catch (error: any) {
       console.error("Error generating PDF:", error);
       toast({
