@@ -126,9 +126,6 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     try {
-      // We're going to check if this booking exists in Supabase in a separate Edge Function
-      // This just handles the email sending portion
-      
       // Send the email
       const emailResponse = await resend.emails.send({
         from: "Avnu <onboarding@resend.dev>",

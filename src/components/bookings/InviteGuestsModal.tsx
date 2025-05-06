@@ -118,24 +118,23 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         
         console.log("Processing invite for email:", trimmedEmail);
         
-        // Store in database before sending email
-        const { error: dbError } = await supabase
-          .from('booking_invites')
-          .insert({
-            booking_id: booking.id,
-            email: trimmedEmail,
-            name: recipientName || null,
-            status: 'pending'
-          });
-            
-        if (dbError) {
-          console.error("Error inserting invite to database:", dbError);
-          failedSends.push({ email: trimmedEmail, error: "Database error: " + dbError.message });
-          continue;
-        }
-        
-        // Send email via edge function
         try {
+          // Store in database before sending email
+          const { error: dbError } = await supabase
+            .from('booking_invites')
+            .insert({
+              booking_id: booking.id,
+              email: trimmedEmail,
+              name: recipientName || null,
+              status: 'pending'
+            });
+              
+          if (dbError) {
+            console.error("Error inserting invite to database:", dbError);
+            failedSends.push({ email: trimmedEmail, error: "Database error: " + dbError.message });
+            continue;
+          }
+          
           // Determine the function URL based on environment
           let functionUrl;
           if (appOrigin.includes('localhost') || appOrigin.includes('127.0.0.1')) {
@@ -173,18 +172,20 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             })
           });
           
-          const responseData = await response.json();
-          
           if (!response.ok) {
-            console.error("Error sending email:", responseData);
-            failedSends.push({ email: trimmedEmail, error: responseData.error || "Failed to send invitation" });
+            const responseData = await response.json();
+            console.error("Error response from edge function:", responseData);
+            failedSends.push({ 
+              email: trimmedEmail, 
+              error: responseData.error || responseData.details || "Failed to send invitation" 
+            });
           } else {
             successfulSends.push(trimmedEmail);
             console.log("Successfully sent invite to:", trimmedEmail);
           }
-        } catch (emailErr: any) {
-          console.error("Exception sending email:", emailErr);
-          failedSends.push({ email: trimmedEmail, error: emailErr.message });
+        } catch (err: any) {
+          console.error("Exception processing email:", err);
+          failedSends.push({ email: trimmedEmail, error: err.message });
         }
       }
       
@@ -204,18 +205,24 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         } else {
           // Keep emails that failed to send
           const failedEmails = failedSends.map(fail => fail.email);
-          const failedIndices = failedEmails.map(email => validEmails.indexOf(email));
           
           setEmails(failedEmails.length > 0 ? failedEmails : ['']);
-          setNames(failedEmails.length > 0 ? failedIndices.map(idx => idx !== -1 ? validNames[idx] : '') : ['']);
+          setNames(failedEmails.length > 0 ? 
+            failedEmails.map(email => {
+              // Find the original index of the failed email
+              const originalIndex = validEmails.findIndex(e => e === email);
+              return originalIndex !== -1 ? validNames[originalIndex] : '';
+            }) : ['']
+          );
         }
       }
       
       if (failedSends.length > 0) {
-        setErrorMessage(`Failed to send ${failedSends.length} invitation(s). Please try again.`);
+        const failureMessage = `Failed to send ${failedSends.length} invitation(s). Please try again.`;
+        setErrorMessage(failureMessage);
         toast({
           title: "Some invitations failed",
-          description: `Failed to send ${failedSends.length} invitation(s). Please try again.`,
+          description: failureMessage,
           variant: "destructive",
         });
       }
