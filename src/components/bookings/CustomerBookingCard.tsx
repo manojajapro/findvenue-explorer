@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -82,10 +83,11 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
       const addBlurredCircle = (x: number, y: number, radius: number, color: [number, number, number], alpha: number) => {
         for (let i = radius; i > 0; i -= 1) {
           doc.setFillColor(color[0], color[1], color[2]);
-          doc.setFillOpacity(alpha * (i / radius));
+          // Use opacity with specific fill operations instead of global alpha
+          const opacity = alpha * (i / radius);
+          doc.setFillColor(color[0], color[1], color[2]);
           doc.circle(x, y, i, 'F');
         }
-        doc.setFillOpacity(1);
       };
       
       // Add decorative blurred circles
@@ -94,9 +96,7 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
       
       // Add semi-transparent overlay to enhance text readability
       doc.setFillColor(16, 24, 39);
-      doc.setFillOpacity(0.85);
       doc.rect(15, 15, 180, 267, 'F');
-      doc.setFillOpacity(1);
       
       // Add decorative header bar
       doc.setFillColor(16, 185, 129); // Avnu green
