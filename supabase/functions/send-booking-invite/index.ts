@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -94,13 +93,6 @@ const handler = async (req: Request): Promise<Response> => {
     // Greeting message based on recipient name
     const greetingName = recipientName ? recipientName : "there";
 
-    // Extract booking ID from the invite link
-    let bookingId = inviteLink;
-    if (typeof inviteLink === 'string' && inviteLink.includes('/booking-invite/')) {
-      bookingId = inviteLink.split('/booking-invite/')[1];
-      console.log("Extracted booking ID from URL:", bookingId);
-    }
-    
     // Get app origin from the request
     let appDomain = "";
     try {
@@ -116,7 +108,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Using app base URL:", appBaseUrl);
     
     // Generate full links with the correct domain
-    const fullInviteLink = `${appBaseUrl}/booking-invite/${bookingId}`;
+    const fullInviteLink = `${appBaseUrl}/booking-invite/${inviteLink}`;
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
     
     console.log("Full invite link:", fullInviteLink);
@@ -133,7 +125,6 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Save the invite to the database first before sending email
     try {
       // We're going to check if this booking exists in Supabase in a separate Edge Function
       // This just handles the email sending portion

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { X, Mail, Plus, Check, Loader2, XCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -110,7 +111,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       const successfulSends: string[] = [];
       const failedSends: {email: string, error: string}[] = [];
       
-      // Send invitations directly without storing in database first
+      // Process each email
       for (let i = 0; i < validEmails.length; i++) {
         const trimmedEmail = validEmails[i].toLowerCase().trim();
         const recipientName = validNames[i].trim();
