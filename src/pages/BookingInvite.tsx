@@ -229,6 +229,19 @@ const BookingInvite = () => {
       // Get the current origin
       const origin = window.location.origin;
       
+      // Determine the function URL based on the current environment
+      let functionUrl;
+      if (origin.includes('localhost')) {
+        // For local development
+        functionUrl = "http://localhost:54321/functions/v1/send-invitation-response";
+      } else {
+        // For production
+        functionUrl = "https://esdmelfzeszjtbnoajig.supabase.co/functions/v1/send-invitation-response";
+      }
+      
+      // Add appOrigin parameter to URL
+      functionUrl = `${functionUrl}?appOrigin=${encodeURIComponent(origin)}`;
+      
       // Prepare the data for the notification email
       const notificationData = {
         hostEmail: booking.customer_email,
@@ -243,11 +256,6 @@ const BookingInvite = () => {
         bookingId: booking.id,
         venueId: booking.venue_id
       };
-      
-      // Call the edge function to send the notification email
-      const functionUrl = `${origin.includes('localhost') 
-        ? "http://localhost:54321" 
-        : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-invitation-response`;
       
       console.log("Calling function URL:", functionUrl);
       console.log("With data:", notificationData);
