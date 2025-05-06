@@ -26,6 +26,7 @@ interface InviteResponseRequest {
   status: 'accepted' | 'declined';
   bookingId: string;
   venueId?: string;
+  userId?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -46,7 +47,8 @@ const handler = async (req: Request): Promise<Response> => {
       endTime,
       status,
       bookingId,
-      venueId
+      venueId,
+      userId
     }: InviteResponseRequest = await req.json();
 
     if (!hostEmail || !guestEmail || !venueName || !bookingDate || !status) {

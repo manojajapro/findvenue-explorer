@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building, Loader2 } from 'lucide-react';
@@ -42,7 +41,7 @@ const BookingInvite = () => {
           return;
         }
         
-        // Use .maybeSingle() to avoid errors when no data is found
+        // First check if booking exists
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select(`
@@ -90,13 +89,14 @@ const BookingInvite = () => {
             
           if (venueError) {
             console.error('Error fetching venue details:', venueError);
+            // Don't set error here, we can continue without venue details
           } else if (venueData) {
             console.log("Venue data loaded:", venueData);
             setVenue(venueData);
           }
         }
         
-        // Check for invites
+        // Check for invites - even if no email is stored yet
         await checkForInvites(storedEmail || '');
       } catch (err) {
         console.error('Exception in fetching booking:', err);
@@ -118,7 +118,7 @@ const BookingInvite = () => {
       // Fetch all invites for this booking
       const { data: inviteData, error: inviteError } = await supabase
         .from('booking_invites')
-        .select('email, name, status')
+        .select('*')
         .eq('booking_id', id);
         
       if (inviteError) {
@@ -126,13 +126,13 @@ const BookingInvite = () => {
         return;
       }
       
+      console.log("Invites found:", inviteData);
+      
       if (!inviteData || inviteData.length === 0) {
         console.log("No invites found for this booking");
         setError('No invitations found for this booking');
         return;
       }
-      
-      console.log("Found invites:", inviteData);
       
       // If we have a stored email, try to match it with an invite
       if (emailToCheck) {
@@ -144,6 +144,7 @@ const BookingInvite = () => {
           console.log("Found matching invite:", matchingInvite);
           setInviteInfo(matchingInvite);
           setGuestEmail(emailToCheck);
+          setNeedsEmailConfirmation(false);
           return;
         }
       }
@@ -154,6 +155,7 @@ const BookingInvite = () => {
         setInviteInfo(inviteData[0]);
         localStorage.setItem('guestEmail', inviteData[0].email);
         setGuestEmail(inviteData[0].email);
+        setNeedsEmailConfirmation(false);
       } else {
         // Multiple invites found, need to ask which one they are
         console.log("Multiple invites found, need to identify user");
@@ -236,7 +238,7 @@ const BookingInvite = () => {
         hostEmail: booking.customer_email,
         hostName: booking.customer_name,
         guestEmail: inviteInfo.email,
-        guestName: inviteInfo.name,
+        guestName: inviteInfo.name || inviteInfo.email.split('@')[0],
         venueName: booking.venue_name,
         bookingDate: booking.booking_date,
         startTime: booking.start_time,
