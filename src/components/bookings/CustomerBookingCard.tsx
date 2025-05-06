@@ -1,16 +1,14 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Users, Eye, FileText, UserPlus, CalendarPlus, MapPin, CreditCard, User } from "lucide-react";
+import { Calendar, Clock, Users, Eye, FileText, UserPlus, CalendarPlus, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import { InviteGuestsModal } from "./InviteGuestsModal";
 import { AddToCalendarModal } from "./AddToCalendarModal";
 import { supabase } from "@/integrations/supabase/client";
-import { useVenueData } from "@/hooks/useVenueData";
 
 interface CustomerBookingCardProps {
   booking: {
@@ -84,10 +82,12 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
       const addBlurredCircle = (x: number, y: number, radius: number, color: [number, number, number], alpha: number) => {
         for (let i = radius; i > 0; i -= 1) {
           doc.setFillColor(color[0], color[1], color[2]);
-          doc.setGlobalAlpha(alpha * (i / radius));
+          // Apply transparency using the correct jsPDF methods
+          const opacity = alpha * (i / radius);
+          doc.setFillOpacity(opacity);
           doc.circle(x, y, i, 'F');
         }
-        doc.setGlobalAlpha(1);
+        doc.setFillOpacity(1); // Reset opacity
       };
       
       // Add decorative blurred circles
@@ -96,9 +96,9 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
       
       // Add semi-transparent overlay to enhance text readability
       doc.setFillColor(16, 24, 39);
-      doc.setGlobalAlpha(0.85);
+      doc.setFillOpacity(0.85);
       doc.rect(15, 15, 180, 267, 'F');
-      doc.setGlobalAlpha(1);
+      doc.setFillOpacity(1); // Reset opacity
       
       // Add decorative header bar
       doc.setFillColor(16, 185, 129); // Avnu green
