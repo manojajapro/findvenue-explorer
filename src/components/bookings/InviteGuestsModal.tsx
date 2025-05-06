@@ -101,6 +101,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
     
     try {
       console.log("Sending invitations to:", validEmails);
+      console.log("With names:", validNames);
       console.log("Booking ID:", booking.id);
       console.log("Venue ID:", booking.venue_id);
       
@@ -116,7 +117,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         const trimmedEmail = validEmails[i].toLowerCase().trim();
         const recipientName = validNames[i].trim();
         
-        console.log("Processing invite for email:", trimmedEmail);
+        console.log("Processing invite for email:", trimmedEmail, "name:", recipientName);
         
         // Generate invite link - using the booking-invite route
         const inviteLink = `${appOrigin}/booking-invite/${booking.id}`;
@@ -125,7 +126,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         try {
           // Determine the function URL based on environment
           const functionUrl = `${appOrigin.includes('localhost') 
-            ? "http://localhost:8080" 
+            ? "http://localhost:54321" 
             : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-booking-invite?appOrigin=${encodeURIComponent(appOrigin)}`;
           
           const response = await fetch(functionUrl, {
@@ -159,18 +160,69 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             successfulSends.push(trimmedEmail);
             console.log("Successfully sent invite to:", trimmedEmail);
             
-            // Store in database after successful email sending
-            const { error: dbError } = await supabase
+            // Check if booking_invites table has a name column
+            const { data: tableData, error: tableError } = await supabase
               .from('booking_invites')
-              .insert({
-                booking_id: booking.id,
-                email: trimmedEmail,
-                name: recipientName || null,
-                status: 'pending'
-              });
+              .select('*')
+              .limit(1);
               
-            if (dbError) {
-              console.error("Error inserting invite to database:", dbError);
+            if (tableError) {
+              console.error("Error checking table schema:", tableError);
+            }
+            
+            // Store in database after successful email sending
+            try {
+              // First check if invite already exists
+              const { data: existingInvite, error: existingError } = await supabase
+                .from('booking_invites')
+                .select('id')
+                .eq('booking_id', booking.id)
+                .eq('email', trimmedEmail)
+                .maybeSingle();
+                
+              if (existingError) {
+                console.error("Error checking existing invite:", existingError);
+              }
+              
+              if (existingInvite) {
+                // Update existing invite
+                const { error: updateError } = await supabase
+                  .from('booking_invites')
+                  .update({ status: 'pending' })
+                  .eq('id', existingInvite.id);
+                  
+                if (updateError) {
+                  console.error("Error updating invite:", updateError);
+                } else {
+                  console.log("Updated existing invite for:", trimmedEmail);
+                }
+              } else {
+                // Create new invite
+                // First check if the name column exists
+                const hasNameColumn = tableData && tableData[0] && 'name' in tableData[0];
+                
+                const inviteData: any = {
+                  booking_id: booking.id,
+                  email: trimmedEmail,
+                  status: 'pending'
+                };
+                
+                if (hasNameColumn && recipientName) {
+                  inviteData.name = recipientName;
+                }
+                
+                const { error: insertError } = await supabase
+                  .from('booking_invites')
+                  .insert([inviteData]);
+                  
+                if (insertError) {
+                  console.error("Error inserting invite to database:", insertError);
+                } else {
+                  console.log("Stored invite in database for:", trimmedEmail);
+                }
+              }
+            } catch (dbErr) {
+              console.error("Exception handling database operation:", dbErr);
             }
           }
         } catch (emailErr: any) {

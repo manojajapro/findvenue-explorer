@@ -51,7 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
       userId
     }: InviteResponseRequest = await req.json();
 
-    if (!hostEmail || !guestEmail || !venueName || !bookingDate || !status) {
+    if (!hostEmail || !guestEmail || !venueName || !bookingDate || !status || !bookingId) {
       return new Response(
         JSON.stringify({ error: "Required fields are missing" }),
         {
@@ -61,7 +61,44 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Processing invitation response from: ${guestEmail}, status: ${status}`);
+    console.log(`Processing invitation response from: ${guestEmail}, status: ${status}, bookingId: ${bookingId}`);
+
+    // Double check that booking exists
+    const { data: bookingData, error: bookingError } = await supabase
+      .from('bookings')
+      .select('id, user_id')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (bookingError || !bookingData) {
+      console.error("Error validating booking:", bookingError || "Booking not found");
+      return new Response(
+        JSON.stringify({ error: "Could not validate booking information" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
+    // Verify the invitation exists
+    const { data: inviteData, error: inviteError } = await supabase
+      .from('booking_invites')
+      .select('*')
+      .eq('booking_id', bookingId)
+      .eq('email', guestEmail)
+      .maybeSingle();
+
+    if (inviteError || !inviteData) {
+      console.error("Error validating invitation:", inviteError || "Invitation not found");
+      return new Response(
+        JSON.stringify({ error: "Could not validate invitation" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
 
     // Format the date for better display in email
     let formattedDate = bookingDate;
@@ -190,21 +227,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     // 2. Send in-app notification to the host (customer)
     try {
-      // Find the booking to get the customer user_id
-      const { data: bookingData, error: bookingError } = await supabase
-        .from('bookings')
-        .select('user_id, customer_name')
-        .eq('id', bookingId)
-        .single();
-
-      if (bookingError) {
-        console.error("Error fetching booking:", bookingError);
-      } else if (bookingData && bookingData.user_id) {
-        console.log("Found customer user ID:", bookingData.user_id);
+      // Use user_id from the booking or from the request
+      const hostUserId = userId || bookingData.user_id;
+      
+      if (hostUserId) {
+        console.log("Found customer user ID:", hostUserId);
         
         // Create notification data
         const notificationData = {
-          user_id: bookingData.user_id,
+          user_id: hostUserId,
           title: `Guest ${status === 'accepted' ? 'Accepted' : 'Declined'} Invitation`,
           message: `${guestName || guestEmail} has ${status} your invitation to ${venueName} on ${formattedDate}.`,
           type: 'booking',
@@ -230,6 +261,8 @@ const handler = async (req: Request): Promise<Response> => {
         } else {
           console.log("In-app notification created successfully");
         }
+      } else {
+        console.error("No user_id found for notification");
       }
     } catch (notificationError) {
       console.error("Error processing notification:", notificationError);

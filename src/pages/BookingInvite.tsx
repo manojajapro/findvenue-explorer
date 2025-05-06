@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building, Loader2 } from 'lucide-react';
@@ -38,6 +39,7 @@ const BookingInvite = () => {
         
         if (!id) {
           setError('Invalid booking ID');
+          setLoading(false);
           return;
         }
         
@@ -67,12 +69,14 @@ const BookingInvite = () => {
         if (bookingError) {
           console.error('Error fetching booking details:', bookingError);
           setError('Unable to load booking details. Please try again later.');
+          setLoading(false);
           return;
         }
         
         if (!bookingData) {
           console.error('No booking found with ID:', id);
           setError('Unable to load booking details. This booking may not exist or has been removed.');
+          setLoading(false);
           return;
         }
         
