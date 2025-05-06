@@ -1,7 +1,6 @@
 
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
-import * as QRCode from "qrcode";
 
 interface BookingPDFData {
   id: string;
@@ -167,51 +166,43 @@ export const generateBookingConfirmationPDF = async (booking: BookingPDFData): P
     doc.text("Don't forget to bring your booking confirmation.", 35, notesY + 28);
   }
   
-  // Generate and add QR code
-  try {
-    const qrCodeData = JSON.stringify({
-      bookingId: booking.id,
-      venueId: booking.venue_id,
-      venueName: booking.venue_name,
-      date: booking.booking_date,
-      status: booking.status
-    });
-    
-    // Generate QR code as data URL
-    const qrCodeDataURL = await QRCode.toDataURL(qrCodeData, {
-      width: 40,
-      margin: 0,
-      color: {
-        dark: '#10b981',  // QR code color (Avnu green)
-        light: '#0d1117'  // Background color
-      }
-    });
-    
-    // Add QR code to PDF
-    doc.addImage(qrCodeDataURL, 'PNG', 85, 220, 40, 40);
-    
-    // Add QR code container with styling
-    doc.setFillColor(40, 50, 70);
-    doc.roundedRect(80, 215, 50, 50, 2, 2, 'F');
-    
-    doc.setDrawColor(16, 185, 129); // Avnu green
-    doc.setLineWidth(0.5);
-    doc.roundedRect(85, 220, 40, 40, 1, 1, 'S');
-    
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text("SCAN QR CODE", 105, 280, { align: 'center' });
-    doc.text("TO VERIFY BOOKING", 105, 286, { align: 'center' });
-  } catch (error) {
-    console.error("Error generating QR code:", error);
-    // Show placeholder if QR generation fails
-    doc.setFillColor(40, 50, 70);
-    doc.roundedRect(80, 215, 50, 50, 2, 2, 'F');
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text("QR CODE", 105, 240, { align: 'center' });
-    doc.text("UNAVAILABLE", 105, 246, { align: 'center' });
+  // Add venue location and address info section (replacing the QR code)
+  const locationY = priceSectionY + 80;
+  doc.setFillColor(30, 41, 59); // Darker blue for location box
+  doc.roundedRect(25, locationY, 160, 50, 3, 3, 'F');
+  
+  doc.setFontSize(11);
+  doc.setTextColor(220, 220, 220);
+  doc.setFont("helvetica", "bold");
+  doc.text("VENUE LOCATION", 35, locationY + 12);
+  
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  
+  // Split address into multiple lines if too long
+  const addressLines = [];
+  let addressText = displayAddress;
+  
+  while (addressText.length > 0) {
+    const maxLength = 50; // Maximum characters per line
+    if (addressText.length <= maxLength) {
+      addressLines.push(addressText);
+      addressText = '';
+    } else {
+      // Find a space to break the line
+      let breakPoint = addressText.lastIndexOf(' ', maxLength);
+      if (breakPoint === -1) breakPoint = maxLength;
+      addressLines.push(addressText.substring(0, breakPoint));
+      addressText = addressText.substring(breakPoint + 1);
+    }
   }
+  
+  // Display address lines
+  let y = locationY + 22;
+  addressLines.forEach(line => {
+    doc.text(line, 35, y);
+    y += 8;
+  });
   
   // Add footer
   const footerY = 275;

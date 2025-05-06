@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,10 +53,11 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
     try {
       setIsGeneratingPDF(true);
       
-      // Fetch additional venue details if needed
+      // Fetch additional venue details including address
       let venueDetails = null;
       let pricePerPerson = 0;
       let cityName = '';
+      let address = booking.address || '';
       
       try {
         const { data: venueData, error: venueError } = await supabase
@@ -68,6 +70,11 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
           venueDetails = venueData;
           pricePerPerson = venueData.price_per_person || 0;
           cityName = venueData.city_name || '';
+          
+          // Use venue address if booking doesn't have one
+          if (!booking.address && venueData.address) {
+            address = venueData.address;
+          }
         }
       } catch (error) {
         console.error("Error fetching venue details:", error);
@@ -76,7 +83,7 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
       // Use our utility function to generate the PDF
       await generateBookingConfirmationPDF({
         ...booking,
-        address: booking.address || venueDetails?.address || 'Address not available',
+        address: address,
         cityName: cityName,
         pricePerPerson: pricePerPerson
       });
