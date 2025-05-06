@@ -54,7 +54,7 @@ export const AddToCalendarModal = ({ isOpen, onClose, booking }: AddToCalendarMo
     const endDateStr = endDateTime.toISOString().replace(/-|:|\.\d+/g, '');
     
     // Create event details
-    const eventTitle = encodeURIComponent(`FindVenue: ${booking.venue_name}`);
+    const eventTitle = encodeURIComponent(`Venue: ${booking.venue_name}`);
     const eventDetails = encodeURIComponent(`Booking Reference: ${booking.id}`);
     const eventLocation = encodeURIComponent(booking.address || booking.venue_name);
     

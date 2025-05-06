@@ -1,4 +1,4 @@
-# FindVenue Explorer
+# Avnu Explorer
 
 A modern web application for exploring and discovering venues.
 
