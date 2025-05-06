@@ -1,13 +1,16 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Users, Eye, FileText, UserPlus, CalendarPlus } from "lucide-react";
+import { Calendar, Clock, Users, Eye, FileText, UserPlus, CalendarPlus, MapPin, CreditCard, User } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import { InviteGuestsModal } from "./InviteGuestsModal";
 import { AddToCalendarModal } from "./AddToCalendarModal";
+import { supabase } from "@/integrations/supabase/client";
+import { useVenueData } from "@/hooks/useVenueData";
 
 interface CustomerBookingCardProps {
   booking: {
@@ -28,6 +31,7 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
   const navigate = useNavigate();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -46,90 +50,167 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
     navigate(`/venue/${booking.venue_id}`, { replace: false });
   };
   
-  const downloadBookingConfirmation = () => {
-    // Create PDF document
-    const doc = new jsPDF();
-    
-    // Set PDF properties
-    doc.setProperties({
-      title: `Booking Confirmation - ${booking.id}`,
-      subject: `Booking for ${booking.venue_name}`,
-      creator: 'Avnu App',
-    });
-    
-    // Add logo or header (placeholder text for now)
-    doc.setFontSize(22);
-    doc.setTextColor(41, 128, 185); // Use brand color
-    doc.text("Avnu", 105, 20, { align: 'center' });
-    
-    // Add confirmation title
-    doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Booking Confirmation", 105, 35, { align: 'center' });
-    
-    // Add horizontal line
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, 40, 190, 40);
-    
-    // Add booking details
-    doc.setFontSize(12);
-    
-    // Status indicator with color
-    doc.setFontSize(14);
-    const statusColors: Record<string, [number, number, number]> = {
-      'confirmed': [39, 174, 96],
-      'pending': [241, 196, 15],
-      'cancelled': [231, 76, 60],
-      'default': [52, 152, 219]
-    };
-    
-    const statusColor = statusColors[booking.status] || statusColors['default'];
-    doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
-    doc.text(`Status: ${booking.status.toUpperCase()}`, 20, 55);
-    
-    // Reset text color for regular content
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(12);
-    
-    // Booking details
-    let y = 70;
-    const leftMargin = 20;
-    const lineHeight = 10;
-    
-    const addLabelValuePair = (label: string, value: string) => {
+  const downloadBookingConfirmation = async () => {
+    try {
+      setIsGeneratingPDF(true);
+      
+      // Fetch additional venue details if needed
+      let venueDetails = null;
+      let pricePerPerson = 0;
+      
+      try {
+        const { data: venueData, error: venueError } = await supabase
+          .from('venues')
+          .select('address, price_per_person, city_name')
+          .eq('id', booking.venue_id)
+          .maybeSingle();
+          
+        if (!venueError && venueData) {
+          venueDetails = venueData;
+          pricePerPerson = venueData.price_per_person || 0;
+        }
+      } catch (error) {
+        console.error("Error fetching venue details:", error);
+      }
+      
+      // Create PDF document with modern styling
+      const doc = new jsPDF();
+      
+      // Add Avnu logo image or text header
+      doc.setFontSize(30);
+      doc.setTextColor(41, 128, 185); // Avnu brand blue
+      doc.text("Avnu", 105, 30, { align: 'center' });
+      
+      // Add confirmation title
+      doc.setFontSize(22);
+      doc.setTextColor(50, 50, 50);
+      doc.text("Booking Confirmation", 105, 50, { align: 'center' });
+      
+      // Add horizontal divider line
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.line(20, 60, 190, 60);
+      
+      // Status section with color
+      const statusColors: Record<string, [number, number, number]> = {
+        'confirmed': [46, 204, 113],
+        'pending': [241, 196, 15],
+        'cancelled': [231, 76, 60],
+        'default': [52, 152, 219]
+      };
+      
+      const statusColor = statusColors[booking.status.toLowerCase()] || statusColors['default'];
+      doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+      doc.setFontSize(18);
+      doc.text(`Status: ${booking.status.toUpperCase()}`, 20, 75);
+      
+      // Reset text color for regular content
+      doc.setTextColor(50, 50, 50);
+      
+      // Booking details section
+      const startY = 90;
+      let currentY = startY;
+      const leftColumnX = 20;
+      const rightColumnX = 95;
+      const lineHeight = 10;
+      
+      // Helper function for adding labeled info
+      const addLabeledInfo = (label: string, value: string, x: number, y: number) => {
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(label, x, y);
+        
+        doc.setFontSize(12);
+        doc.setTextColor(50, 50, 50);
+        doc.text(value || 'N/A', x, y + 7);
+        
+        return y + 20; // Return next Y position
+      };
+      
+      // Left column details
+      currentY = addLabeledInfo("VENUE", booking.venue_name, leftColumnX, currentY);
+      currentY = addLabeledInfo("DATE", format(new Date(booking.booking_date), "MMMM d, yyyy"), leftColumnX, currentY);
+      currentY = addLabeledInfo("TIME", `${booking.start_time} - ${booking.end_time}`, leftColumnX, currentY);
+      currentY = addLabeledInfo("NUMBER OF GUESTS", booking.guests.toString(), leftColumnX, currentY);
+      
+      // Reset for right column
+      currentY = startY;
+      
+      // Right column details
+      const address = venueDetails?.address || booking.address || 'Address not available';
+      const cityName = venueDetails?.city_name || '';
+      const fullAddress = cityName ? `${address}, ${cityName}` : address;
+      
+      currentY = addLabeledInfo("ADDRESS", fullAddress, rightColumnX, currentY);
+      if (pricePerPerson > 0) {
+        currentY = addLabeledInfo("PRICE PER PERSON", `SAR ${pricePerPerson.toLocaleString()}`, rightColumnX, currentY);
+      }
+      currentY = addLabeledInfo("BOOKING ID", booking.id, rightColumnX, currentY);
+      
+      // Add divider before pricing section
+      const priceSectionY = Math.max(currentY + 15, 180);
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, priceSectionY - 10, 190, priceSectionY - 10);
+      
+      // Total price section with larger font
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text("TOTAL PRICE", leftColumnX, priceSectionY);
+      
+      doc.setFontSize(16);
+      doc.setTextColor(41, 128, 185); // Avnu brand blue
       doc.setFont("helvetica", "bold");
-      doc.text(`${label}:`, leftMargin, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(value, leftMargin + 40, y);
-      y += lineHeight;
-    };
-    
-    addLabelValuePair("Venue", booking.venue_name);
-    addLabelValuePair("Date", format(new Date(booking.booking_date), "MMMM d, yyyy"));
-    addLabelValuePair("Time", `${booking.start_time} - ${booking.end_time}`);
-    addLabelValuePair("Guests", booking.guests.toString());
-    
-    if (booking.address) {
-      addLabelValuePair("Address", booking.address);
+      doc.text(`SAR ${booking.total_price.toLocaleString()}`, 190, priceSectionY, { align: 'right' });
+      
+      // If there's price per person, show the calculation
+      if (booking.guests > 1 && pricePerPerson > 0) {
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.setFont("helvetica", "normal");
+        doc.text(`(${booking.guests} guests × SAR ${pricePerPerson.toLocaleString()})`, 190, priceSectionY + 7, { align: 'right' });
+      }
+      
+      // Add special notes section if applicable
+      if (booking.status === 'confirmed') {
+        const notesY = priceSectionY + 25;
+        doc.setDrawColor(240, 240, 240);
+        doc.setFillColor(250, 250, 250);
+        doc.roundedRect(20, notesY, 170, 30, 3, 3, 'FD');
+        
+        doc.setFontSize(11);
+        doc.setTextColor(70, 70, 70);
+        doc.setFont("helvetica", "bold");
+        doc.text("IMPORTANT INFORMATION", leftColumnX + 5, notesY + 10);
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("Please arrive 15 minutes before your booking time. Don't forget to bring your booking confirmation.", leftColumnX + 5, notesY + 20);
+      }
+      
+      // Add footer
+      const footerY = 270;
+      doc.setFontSize(9);
+      doc.setTextColor(130, 130, 130);
+      doc.text("Thank you for choosing Avnu!", 105, footerY, { align: 'center' });
+      doc.text(`Generated on: ${format(new Date(), "MMMM d, yyyy, HH:mm")}`, 105, footerY + 5, { align: 'center' });
+      doc.text(`Confirmation ID: ${booking.id}`, 105, footerY + 10, { align: 'center' });
+      
+      // Add QR code placeholder (you could implement actual QR code generation)
+      doc.setDrawColor(200, 200, 200);
+      doc.setFillColor(250, 250, 250);
+      doc.roundedRect(85, 200, 40, 40, 2, 2, 'FD');
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text("QR CODE", 105, 220, { align: 'center' });
+      
+      // Save PDF with a well-formatted name
+      const filename = `Avnu_Booking_${booking.venue_name.replace(/\s+/g, '_')}_${format(new Date(booking.booking_date), "yyyy-MM-dd")}.pdf`;
+      doc.save(filename);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    } finally {
+      setIsGeneratingPDF(false);
     }
-    
-    // Add price with currency
-    y += lineHeight;
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Total Price:", leftMargin, y);
-    doc.text(`SAR ${booking.total_price.toLocaleString()}`, 190, y, { align: 'right' });
-    
-    // Add footer
-    const footerY = 270;
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text("Thank you for choosing Avnu!", 105, footerY, { align: 'center' });
-    doc.text(`Confirmation ID: ${booking.id}`, 105, footerY + 7, { align: 'center' });
-    doc.text(`Generated on: ${format(new Date(), "MMMM d, yyyy, HH:mm")}`, 105, footerY + 14, { align: 'center' });
-    
-    // Save PDF
-    doc.save(`booking-confirmation-${booking.id}.pdf`);
   };
 
   const openInviteModal = () => {
@@ -169,6 +250,12 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
                 <span>{booking.guests} guests</span>
               </div>
             )}
+            {booking.address && (
+              <div className="flex items-center text-sm">
+                <MapPin className="h-4 w-4 mr-2 text-findvenue" />
+                <span className="truncate">{booking.address}</span>
+              </div>
+            )}
             <div className="mt-2">
               <p className="text-right font-semibold text-findvenue">SAR {booking.total_price.toLocaleString()}</p>
             </div>
@@ -202,9 +289,19 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
             size="sm" 
             className="flex-1 min-w-[45%] border-findvenue text-findvenue hover:bg-findvenue/5 hover:border-findvenue/80"
             onClick={downloadBookingConfirmation}
+            disabled={isGeneratingPDF}
           >
-            <FileText className="mr-2 h-4 w-4" />
-            Download PDF
+            {isGeneratingPDF ? (
+              <>
+                <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-findvenue border-t-transparent" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <FileText className="mr-2 h-4 w-4" />
+                Download PDF
+              </>
+            )}
           </Button>
           <Button 
             variant="outline" 
