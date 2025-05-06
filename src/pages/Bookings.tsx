@@ -280,7 +280,7 @@ const Bookings = () => {
     doc.setProperties({
       title: `Booking Confirmation - ${booking.id}`,
       subject: `Booking for ${booking.venue_name}`,
-      creator: 'FindVenue App',
+      creator: 'Avnu App',
     });
     
     // Add logo or header (placeholder text for now)
@@ -350,7 +350,7 @@ const Bookings = () => {
     const footerY = 270;
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text("Thank you for choosing FindVenue!", 105, footerY, { align: 'center' });
+    doc.text("Thank you for choosing Avnu!", 105, footerY, { align: 'center' });
     doc.text(`Confirmation ID: ${booking.id}`, 105, footerY + 7, { align: 'center' });
     doc.text(`Generated on: ${format(new Date(), "MMMM d, yyyy, HH:mm")}`, 105, footerY + 14, { align: 'center' });
     
