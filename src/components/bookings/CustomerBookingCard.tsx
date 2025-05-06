@@ -60,7 +60,7 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
     // Add logo or header (placeholder text for now)
     doc.setFontSize(22);
     doc.setTextColor(41, 128, 185); // Use brand color
-    doc.text("FindVenue", 105, 20, { align: 'center' });
+    doc.text("Avnu", 105, 20, { align: 'center' });
     
     // Add confirmation title
     doc.setFontSize(16);

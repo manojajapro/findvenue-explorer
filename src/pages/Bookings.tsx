@@ -286,7 +286,7 @@ const Bookings = () => {
     // Add logo or header (placeholder text for now)
     doc.setFontSize(22);
     doc.setTextColor(41, 128, 185); // Use brand color
-    doc.text("FindVenue", 105, 20, { align: 'center' });
+    doc.text("Avnu", 105, 20, { align: 'center' });
     
     // Add confirmation title
     doc.setFontSize(16);
@@ -643,7 +643,7 @@ const Bookings = () => {
                                 onClick={() => downloadBookingConfirmation(firstBooking)}
                               >
                                 <FileText className="mr-2 h-4 w-4" />
-                                Download PDF Confirmation
+                                Download PDF
                               </Button>
                               
                               <Button 
