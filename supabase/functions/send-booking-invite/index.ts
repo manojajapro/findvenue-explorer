@@ -155,7 +155,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const emailResponse = await resend.emails.send({
-      from: "Avnu <onboarding@resend.dev>", // Replace with your verified domain when in production
+      from: "Avnu <onboarding@resend.dev>", // Using the verified Resend default domain
       to: [email],
       subject: `You're Invited: ${venueName} on ${formattedDate}`,
       html: `

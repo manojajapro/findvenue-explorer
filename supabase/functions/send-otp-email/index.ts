@@ -37,14 +37,14 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending OTP email to: ${email} with code: ${otp}`);
 
     const emailResponse = await resend.emails.send({
-      from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
+      from: "Avnu <onboarding@resend.dev>", // Using verified Resend default domain
       to: [email],
       subject: "Your Password Reset Code",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-          <h2 style="color: #4a6cf7; text-align: center;">FindVenue Password Reset</h2>
+          <h2 style="color: #4a6cf7; text-align: center;">Avnu Password Reset</h2>
           <p style="font-size: 16px; line-height: 1.5;">Hello,</p>
-          <p style="font-size: 16px; line-height: 1.5;">We received a request to reset your password for your FindVenue account. Use the following code to complete the reset process:</p>
+          <p style="font-size: 16px; line-height: 1.5;">We received a request to reset your password for your Avnu account. Use the following code to complete the reset process:</p>
           
           <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0; letter-spacing: 5px; font-size: 24px; font-weight: bold;">
             ${otp}
@@ -53,7 +53,7 @@ const handler = async (req: Request): Promise<Response> => {
           <p style="font-size: 16px; line-height: 1.5;">If you didn't request this password reset, you can safely ignore this email.</p>
           <p style="font-size: 16px; line-height: 1.5;">This code will expire in 10 minutes for security reasons.</p>
           
-          <p style="font-size: 16px; line-height: 1.5; margin-top: 30px;">Best regards,<br>The FindVenue Team</p>
+          <p style="font-size: 16px; line-height: 1.5; margin-top: 30px;">Best regards,<br>The Avnu Team</p>
         </div>
       `,
     });
