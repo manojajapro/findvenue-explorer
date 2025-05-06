@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { X, Mail, Plus, Check, Loader2, XCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -106,6 +105,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       
       // Get current origin for links
       const appOrigin = window.location.origin;
+      console.log("Current app origin:", appOrigin);
       
       // Array to track successful sends
       const successfulSends: string[] = [];
@@ -120,20 +120,24 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         
         try {
           // Store in database before sending email
-          const { error: dbError } = await supabase
+          const { error: dbError, data: dbData } = await supabase
             .from('booking_invites')
             .insert({
               booking_id: booking.id,
               email: trimmedEmail,
               name: recipientName || null,
               status: 'pending'
-            });
+            })
+            .select()
+            .single();
               
           if (dbError) {
             console.error("Error inserting invite to database:", dbError);
             failedSends.push({ email: trimmedEmail, error: "Database error: " + dbError.message });
             continue;
           }
+          
+          console.log("Successfully stored invitation in database:", dbData);
           
           // Determine the function URL based on environment
           let functionUrl;
@@ -149,6 +153,11 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           console.log("Sending invitation using function URL:", functionUrl);
           console.log("App Origin:", appOrigin);
           
+          // Create the full invite link directly here instead of relying on the edge function
+          // This ensures we're sending the exact link we want
+          const fullInviteLink = `${appOrigin}/booking-invite/${booking.id}`;
+          console.log("Full invite link being sent:", fullInviteLink);
+          
           const response = await fetch(functionUrl, {
             method: 'POST',
             headers: {
@@ -162,7 +171,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               startTime: booking.start_time,
               endTime: booking.end_time,
               address: booking.address,
-              inviteLink: booking.id,
+              inviteLink: fullInviteLink, // Send the full URL
               venueId: booking.venue_id,
               specialRequests: booking.special_requests,
               guests: booking.guests,
@@ -179,13 +188,40 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               email: trimmedEmail, 
               error: responseData.error || responseData.details || "Failed to send invitation" 
             });
+            
+            // Update the invitation status in the database to 'failed'
+            const { error: updateError } = await supabase
+              .from('booking_invites')
+              .update({ status: 'failed', updated_at: new Date().toISOString() })
+              .eq('booking_id', booking.id)
+              .eq('email', trimmedEmail);
+              
+            if (updateError) {
+              console.error("Error updating invitation status to failed:", updateError);
+            }
           } else {
+            // Success!
             successfulSends.push(trimmedEmail);
             console.log("Successfully sent invite to:", trimmedEmail);
           }
         } catch (err: any) {
           console.error("Exception processing email:", err);
           failedSends.push({ email: trimmedEmail, error: err.message });
+          
+          // Try to update the invitation status in the database to 'failed'
+          try {
+            const { error: updateError } = await supabase
+              .from('booking_invites')
+              .update({ status: 'failed', updated_at: new Date().toISOString() })
+              .eq('booking_id', booking.id)
+              .eq('email', trimmedEmail);
+              
+            if (updateError) {
+              console.error("Error updating invitation status to failed after exception:", updateError);
+            }
+          } catch (updateErr) {
+            console.error("Failed to update invitation status after exception:", updateErr);
+          }
         }
       }
       
@@ -218,6 +254,9 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       }
       
       if (failedSends.length > 0) {
+        const detailedErrors = failedSends.map(f => `${f.email}: ${f.error}`).join('\n');
+        console.error("Failed sends details:", detailedErrors);
+        
         const failureMessage = `Failed to send ${failedSends.length} invitation(s). Please try again.`;
         setErrorMessage(failureMessage);
         toast({

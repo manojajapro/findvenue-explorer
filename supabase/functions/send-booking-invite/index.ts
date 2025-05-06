@@ -46,6 +46,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     const resend = new Resend(apiKey);
 
+    // Get request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log("Request body parsed successfully:", requestBody);
+    } catch (jsonError) {
+      console.error("Failed to parse request JSON:", jsonError);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON in request body" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
+
     const { 
       email, 
       recipientName,
@@ -61,11 +77,16 @@ const handler = async (req: Request): Promise<Response> => {
       hostName,
       contactEmail,
       contactPhone
-    }: SendInviteRequest = await req.json();
+    }: SendInviteRequest = requestBody;
 
-    if (!email || !venueName || !bookingDate) {
+    // Validate required fields
+    if (!email || !venueName || !bookingDate || !inviteLink) {
+      console.error("Required fields missing:", { email, venueName, bookingDate, inviteLink });
       return new Response(
-        JSON.stringify({ error: "Required fields are missing" }),
+        JSON.stringify({ 
+          error: "Required fields are missing",
+          details: { email, venueName, bookingDate, inviteLink }
+        }),
         {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -75,9 +96,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Sending booking invite to: ${email} for venue: ${venueName}`);
     console.log("Invite link provided:", inviteLink);
-
-    // Extract just the venue name without special characters for display
-    const displayVenueName = venueName;
     
     // Format the date for better display in email
     let formattedDate = bookingDate;
@@ -104,26 +122,14 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     // Use the provided appDomain if available, otherwise use a default value
-    const appBaseUrl = appDomain || "http://localhost:8080";
+    const appBaseUrl = appDomain || "https://esdmelfzeszjtbnoajig.supabase.co";
     console.log("Using app base URL:", appBaseUrl);
     
     // Generate full links with the correct domain
-    const fullInviteLink = `${appBaseUrl}/booking-invite/${inviteLink}`;
+    const fullInviteLink = inviteLink.includes('http') ? inviteLink : `${appBaseUrl}/booking-invite/${inviteLink}`;
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
     
     console.log("Full invite link:", fullInviteLink);
-
-    // Check if we have all required data before sending
-    if (!email.trim() || !venueName.trim() || !bookingDate) {
-      console.error("Missing critical data for email:", { email, venueName, bookingDate });
-      return new Response(
-        JSON.stringify({ error: "Critical data missing for email" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
 
     try {
       // Send the email
@@ -139,7 +145,7 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
             
             <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">Hello ${greetingName},</p>
-            <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">You've been invited to an event at <strong style="color: #2dd4bf;">${displayVenueName}</strong>.</p>
+            <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">You've been invited to an event at <strong style="color: #2dd4bf;">${venueName}</strong>.</p>
             
             <div style="background-color: #1e293b; padding: 15px; border-radius: 5px; margin: 20px 0;">
               <h3 style="color: #2dd4bf; margin-top: 0; border-bottom: 1px solid #334155; padding-bottom: 10px;">Event Details:</h3>
@@ -156,7 +162,7 @@ const handler = async (req: Request): Promise<Response> => {
               <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                 <p style="margin: 5px 0; display: flex;">
                   <span style="width: 120px; color: #94a3b8; font-weight: 500;">Venue:</span> 
-                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${displayVenueName}</span>
+                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${venueName}</span>
                 </p>
               </div>
               
