@@ -53,28 +53,20 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
     try {
       setIsGeneratingPDF(true);
       
-      // Fetch additional venue details including address
-      let venueDetails = null;
+      // Fetch additional venue details excluding address
       let pricePerPerson = 0;
       let cityName = '';
-      let address = booking.address || '';
       
       try {
         const { data: venueData, error: venueError } = await supabase
           .from('venues')
-          .select('address, price_per_person, city_name')
+          .select('price_per_person, city_name')
           .eq('id', booking.venue_id)
           .maybeSingle();
           
         if (!venueError && venueData) {
-          venueDetails = venueData;
           pricePerPerson = venueData.price_per_person || 0;
           cityName = venueData.city_name || '';
-          
-          // Use venue address if booking doesn't have one
-          if (!booking.address && venueData.address) {
-            address = venueData.address;
-          }
         }
       } catch (error) {
         console.error("Error fetching venue details:", error);
@@ -83,7 +75,6 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
       // Use our utility function to generate the PDF
       await generateBookingConfirmationPDF({
         ...booking,
-        address: address,
         cityName: cityName,
         pricePerPerson: pricePerPerson
       });

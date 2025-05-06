@@ -11,7 +11,6 @@ interface BookingPDFData {
   status: string;
   total_price: number;
   guests: number;
-  address?: string;
   venue_id: string;
   pricePerPerson?: number;
   cityName?: string;
@@ -109,14 +108,8 @@ export const generateBookingConfirmationPDF = async (booking: BookingPDFData): P
   currentY = addLabeledInfo("TIME", `${booking.start_time} - ${booking.end_time}`, leftColumnX, currentY);
   currentY = addLabeledInfo("NUMBER OF GUESTS", booking.guests.toString(), leftColumnX, currentY);
   
-  // Reset for right column
+  // Right column details
   currentY = startY;
-  
-  // Right column details - Address handling
-  const fullAddress = booking.address || 'Address not available';
-  const displayAddress = booking.cityName ? `${fullAddress}, ${booking.cityName}` : fullAddress;
-  
-  currentY = addLabeledInfo("ADDRESS", displayAddress, rightColumnX, currentY);
   if (booking.pricePerPerson && booking.pricePerPerson > 0) {
     currentY = addLabeledInfo("PRICE PER PERSON", `SAR ${booking.pricePerPerson.toLocaleString()}`, rightColumnX, currentY);
   }
@@ -165,44 +158,6 @@ export const generateBookingConfirmationPDF = async (booking: BookingPDFData): P
     doc.text("Please arrive 15 minutes before your booking time.", 35, notesY + 20);
     doc.text("Don't forget to bring your booking confirmation.", 35, notesY + 28);
   }
-  
-  // Add venue location and address info section (replacing the QR code)
-  const locationY = priceSectionY + 80;
-  doc.setFillColor(30, 41, 59); // Darker blue for location box
-  doc.roundedRect(25, locationY, 160, 50, 3, 3, 'F');
-  
-  doc.setFontSize(11);
-  doc.setTextColor(220, 220, 220);
-  doc.setFont("helvetica", "bold");
-  doc.text("VENUE LOCATION", 35, locationY + 12);
-  
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  
-  // Split address into multiple lines if too long
-  const addressLines = [];
-  let addressText = displayAddress;
-  
-  while (addressText.length > 0) {
-    const maxLength = 50; // Maximum characters per line
-    if (addressText.length <= maxLength) {
-      addressLines.push(addressText);
-      addressText = '';
-    } else {
-      // Find a space to break the line
-      let breakPoint = addressText.lastIndexOf(' ', maxLength);
-      if (breakPoint === -1) breakPoint = maxLength;
-      addressLines.push(addressText.substring(0, breakPoint));
-      addressText = addressText.substring(breakPoint + 1);
-    }
-  }
-  
-  // Display address lines
-  let y = locationY + 22;
-  addressLines.forEach(line => {
-    doc.text(line, 35, y);
-    y += 8;
-  });
   
   // Add footer
   const footerY = 275;
