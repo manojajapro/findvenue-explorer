@@ -67,7 +67,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
   
   const validateEmails = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emails.every(email => email === '' || emailRegex.test(email));
+    return emails.every(email => email === '' || emailRegex.test(email.trim()));
   };
 
   const sendInvitations = async () => {
@@ -128,6 +128,9 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             ? "http://localhost:54321" 
             : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-booking-invite?appOrigin=${encodeURIComponent(appOrigin)}`;
           
+          console.log("Sending invitation using function URL:", functionUrl);
+          console.log("App Origin:", appOrigin);
+          
           const response = await fetch(functionUrl, {
             method: 'POST',
             headers: {
@@ -141,7 +144,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               startTime: booking.start_time,
               endTime: booking.end_time,
               address: booking.address,
-              inviteLink: booking.id, // Just pass the ID, we construct the full URL in the function
+              inviteLink: booking.id,
               venueId: booking.venue_id,
               specialRequests: booking.special_requests,
               guests: booking.guests,
@@ -151,10 +154,11 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             })
           });
           
+          const responseData = await response.json();
+          
           if (!response.ok) {
-            const error = await response.json();
-            console.error("Error sending email:", error);
-            failedSends.push({ email: trimmedEmail, error: error.message || "Failed to send invitation" });
+            console.error("Error sending email:", responseData);
+            failedSends.push({ email: trimmedEmail, error: responseData.error || "Failed to send invitation" });
           } else {
             successfulSends.push(trimmedEmail);
             console.log("Successfully sent invite to:", trimmedEmail);

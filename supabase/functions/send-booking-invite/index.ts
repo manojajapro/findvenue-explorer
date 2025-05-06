@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -89,20 +90,36 @@ const handler = async (req: Request): Promise<Response> => {
     try {
       const reqUrl = new URL(req.url);
       appDomain = reqUrl.searchParams.get('appOrigin') || "";
+      console.log("App domain extracted from URL:", appDomain);
     } catch (e) {
       console.error("Error extracting origin:", e);
     }
     
     // Use the provided appDomain if available, otherwise use a default value
     const appBaseUrl = appDomain || "http://localhost:8080";
+    console.log("Using app base URL:", appBaseUrl);
     
     // Generate full links with the correct domain
     const fullInviteLink = `${appBaseUrl}/booking-invite/${bookingId}`;
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
+    
+    console.log("Full invite link:", fullInviteLink);
+
+    // Check if we have all required data before sending
+    if (!email.trim() || !venueName.trim() || !bookingDate) {
+      console.error("Missing critical data for email:", { email, venueName, bookingDate });
+      return new Response(
+        JSON.stringify({ error: "Critical data missing for email" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
+    }
 
     const emailResponse = await resend.emails.send({
-      from: "Avnu <onboarding@avnu.dev>", // Replace with your verified domain when in production
-      to: [email],
+      from: "Avnu <onboarding@resend.dev>", // Replace with your verified domain when in production
+      to: [email.trim()],
       subject: `You're Invited: ${venueName} on ${formattedDate}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #0f172a; color: #FFFFFF;">
