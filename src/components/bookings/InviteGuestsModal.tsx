@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { X, Mail, Plus, Check, Loader2, XCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -66,7 +67,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
   
   const validateEmails = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emails.every(email => email === '' || emailRegex.test(email.trim()));
+    return emails.every(email => email === '' || emailRegex.test(email));
   };
 
   const sendInvitations = async () => {
@@ -105,58 +106,27 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       
       // Get current origin for links
       const appOrigin = window.location.origin;
-      console.log("Current app origin:", appOrigin);
       
       // Array to track successful sends
       const successfulSends: string[] = [];
       const failedSends: {email: string, error: string}[] = [];
       
-      // Process each email
+      // Send invitations directly without storing in database first
       for (let i = 0; i < validEmails.length; i++) {
         const trimmedEmail = validEmails[i].toLowerCase().trim();
         const recipientName = validNames[i].trim();
         
         console.log("Processing invite for email:", trimmedEmail);
         
+        // Generate invite link - using the booking-invite route
+        const inviteLink = `${appOrigin}/booking-invite/${booking.id}`;
+        
+        // Send email via edge function
         try {
-          // Store in database before sending email
-          const { error: dbError, data: dbData } = await supabase
-            .from('booking_invites')
-            .insert({
-              booking_id: booking.id,
-              email: trimmedEmail,
-              name: recipientName || null,
-              status: 'pending'
-            })
-            .select()
-            .single();
-              
-          if (dbError) {
-            console.error("Error inserting invite to database:", dbError);
-            failedSends.push({ email: trimmedEmail, error: "Database error: " + dbError.message });
-            continue;
-          }
-          
-          console.log("Successfully stored invitation in database:", dbData);
-          
           // Determine the function URL based on environment
-          let functionUrl;
-          if (appOrigin.includes('localhost') || appOrigin.includes('127.0.0.1')) {
-            functionUrl = "http://localhost:54321/functions/v1/send-booking-invite";
-          } else {
-            functionUrl = "https://esdmelfzeszjtbnoajig.supabase.co/functions/v1/send-booking-invite";
-          }
-          
-          // Add app origin as query parameter
-          functionUrl += `?appOrigin=${encodeURIComponent(appOrigin)}`;
-          
-          console.log("Sending invitation using function URL:", functionUrl);
-          console.log("App Origin:", appOrigin);
-          
-          // Create the full invite link directly here instead of relying on the edge function
-          // This ensures we're sending the exact link we want
-          const fullInviteLink = `${appOrigin}/booking-invite/${booking.id}`;
-          console.log("Full invite link being sent:", fullInviteLink);
+          const functionUrl = `${appOrigin.includes('localhost') 
+            ? "http://localhost:54321" 
+            : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-booking-invite?appOrigin=${encodeURIComponent(appOrigin)}`;
           
           const response = await fetch(functionUrl, {
             method: 'POST',
@@ -171,7 +141,7 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
               startTime: booking.start_time,
               endTime: booking.end_time,
               address: booking.address,
-              inviteLink: fullInviteLink, // Send the full URL
+              inviteLink: booking.id, // Just pass the ID, we construct the full URL in the function
               venueId: booking.venue_id,
               specialRequests: booking.special_requests,
               guests: booking.guests,
@@ -182,46 +152,30 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           });
           
           if (!response.ok) {
-            const responseData = await response.json();
-            console.error("Error response from edge function:", responseData);
-            failedSends.push({ 
-              email: trimmedEmail, 
-              error: responseData.error || responseData.details || "Failed to send invitation" 
-            });
-            
-            // Update the invitation status in the database to 'failed'
-            const { error: updateError } = await supabase
-              .from('booking_invites')
-              .update({ status: 'failed', updated_at: new Date().toISOString() })
-              .eq('booking_id', booking.id)
-              .eq('email', trimmedEmail);
-              
-            if (updateError) {
-              console.error("Error updating invitation status to failed:", updateError);
-            }
+            const error = await response.json();
+            console.error("Error sending email:", error);
+            failedSends.push({ email: trimmedEmail, error: error.message || "Failed to send invitation" });
           } else {
-            // Success!
             successfulSends.push(trimmedEmail);
             console.log("Successfully sent invite to:", trimmedEmail);
-          }
-        } catch (err: any) {
-          console.error("Exception processing email:", err);
-          failedSends.push({ email: trimmedEmail, error: err.message });
-          
-          // Try to update the invitation status in the database to 'failed'
-          try {
-            const { error: updateError } = await supabase
+            
+            // Store in database after successful email sending
+            const { error: dbError } = await supabase
               .from('booking_invites')
-              .update({ status: 'failed', updated_at: new Date().toISOString() })
-              .eq('booking_id', booking.id)
-              .eq('email', trimmedEmail);
+              .insert({
+                booking_id: booking.id,
+                email: trimmedEmail,
+                name: recipientName || null,
+                status: 'pending'
+              });
               
-            if (updateError) {
-              console.error("Error updating invitation status to failed after exception:", updateError);
+            if (dbError) {
+              console.error("Error inserting invite to database:", dbError);
             }
-          } catch (updateErr) {
-            console.error("Failed to update invitation status after exception:", updateErr);
           }
+        } catch (emailErr: any) {
+          console.error("Exception sending email:", emailErr);
+          failedSends.push({ email: trimmedEmail, error: emailErr.message });
         }
       }
       
@@ -241,27 +195,18 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         } else {
           // Keep emails that failed to send
           const failedEmails = failedSends.map(fail => fail.email);
+          const failedIndices = failedEmails.map(email => validEmails.indexOf(email));
           
           setEmails(failedEmails.length > 0 ? failedEmails : ['']);
-          setNames(failedEmails.length > 0 ? 
-            failedEmails.map(email => {
-              // Find the original index of the failed email
-              const originalIndex = validEmails.findIndex(e => e === email);
-              return originalIndex !== -1 ? validNames[originalIndex] : '';
-            }) : ['']
-          );
+          setNames(failedEmails.length > 0 ? failedIndices.map(idx => idx !== -1 ? validNames[idx] : '') : ['']);
         }
       }
       
       if (failedSends.length > 0) {
-        const detailedErrors = failedSends.map(f => `${f.email}: ${f.error}`).join('\n');
-        console.error("Failed sends details:", detailedErrors);
-        
-        const failureMessage = `Failed to send ${failedSends.length} invitation(s). Please try again.`;
-        setErrorMessage(failureMessage);
+        setErrorMessage(`Failed to send ${failedSends.length} invitation(s). Please try again.`);
         toast({
           title: "Some invitations failed",
-          description: failureMessage,
+          description: `Failed to send ${failedSends.length} invitation(s). Please try again.`,
           variant: "destructive",
         });
       }

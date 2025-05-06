@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -31,8 +30,6 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log("Received invitation response request");
-    
     const { 
       hostEmail,
       hostName,
@@ -48,7 +45,6 @@ const handler = async (req: Request): Promise<Response> => {
     }: InviteResponseRequest = await req.json();
 
     if (!hostEmail || !guestEmail || !venueName || !bookingDate || !status) {
-      console.error("Required fields are missing:", { hostEmail, guestEmail, venueName, bookingDate, status });
       return new Response(
         JSON.stringify({ error: "Required fields are missing" }),
         {
@@ -76,20 +72,16 @@ const handler = async (req: Request): Promise<Response> => {
     try {
       const reqUrl = new URL(req.url);
       appDomain = reqUrl.searchParams.get('appOrigin') || "";
-      console.log("App domain from request:", appDomain);
     } catch (e) {
       console.error("Error extracting origin:", e);
     }
     
     // Use the provided appDomain if available, otherwise use a default value
     const appBaseUrl = appDomain || "http://localhost:8080";
-    console.log("Using app base URL:", appBaseUrl);
     
     // Generate proper links
     const bookingLink = `${appBaseUrl}/bookings/${bookingId}`;
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
-
-    console.log("Generated links:", { bookingLink, venueLink });
 
     // Create subject and content based on response status
     const subject = status === 'accepted' 
@@ -101,8 +93,8 @@ const handler = async (req: Request): Promise<Response> => {
     const statusText = status === 'accepted' ? 'Accepted' : 'Declined';
 
     const emailResponse = await resend.emails.send({
-      from: "Avnu <onboarding@resend.dev>", // Replace with your verified domain when in production
-      to: [hostEmail.trim()],
+      from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
+      to: [hostEmail],
       subject: subject,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #0f172a; color: #FFFFFF;">
@@ -179,7 +171,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
             <p style="font-size: 14px; color: #8b94a3;">
-              This notification was sent via <span style="color: #2dd4bf;">Avnu</span>
+              This notification was sent via <span style="color: #2dd4bf;">FindVenue</span>
             </p>
           </div>
         </div>

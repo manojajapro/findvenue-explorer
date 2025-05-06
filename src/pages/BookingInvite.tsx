@@ -24,7 +24,6 @@ const BookingInvite = () => {
   const [venue, setVenue] = useState<any>(null);
   const [guestEmail, setGuestEmail] = useState<string>('');
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     // Check if we already have the guest email in local storage
@@ -42,29 +41,8 @@ const BookingInvite = () => {
           setError('Invalid booking ID');
           return;
         }
-
-        // First check if the booking exists
-        const { data: bookingExists, error: existsError } = await supabase
-          .from('bookings')
-          .select('id')
-          .eq('id', id)
-          .maybeSingle();
-
-        if (existsError) {
-          console.error('Error checking booking existence:', existsError);
-          setDebugInfo(prev => prev + '\nError checking booking: ' + JSON.stringify(existsError));
-          setError('Database connection error. Please try again later.');
-          return;
-        }
-
-        if (!bookingExists) {
-          console.error('No booking found with ID:', id);
-          setDebugInfo(prev => prev + '\nNo booking found with ID: ' + id);
-          setError('This booking does not exist or has been removed.');
-          return;
-        }
         
-        // Now fetch full booking details
+        // Use .maybeSingle() to avoid errors when no data is found
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select(`
@@ -88,14 +66,12 @@ const BookingInvite = () => {
         
         if (bookingError) {
           console.error('Error fetching booking details:', bookingError);
-          setDebugInfo(prev => prev + '\nError fetching booking details: ' + JSON.stringify(bookingError));
           setError('Unable to load booking details. Please try again later.');
           return;
         }
         
         if (!bookingData) {
-          console.error('No booking data found with ID:', id);
-          setDebugInfo(prev => prev + '\nNo booking data found with ID: ' + id);
+          console.error('No booking found with ID:', id);
           setError('Unable to load booking details. This booking may not exist or has been removed.');
           return;
         }
@@ -113,7 +89,6 @@ const BookingInvite = () => {
             
           if (venueError) {
             console.error('Error fetching venue details:', venueError);
-            setDebugInfo(prev => prev + '\nError fetching venue: ' + JSON.stringify(venueError));
           } else if (venueData) {
             console.log("Venue data loaded:", venueData);
             setVenue(venueData);
@@ -122,10 +97,9 @@ const BookingInvite = () => {
         
         // Check for invites
         await checkForInvites(storedEmail || '');
-      } catch (err: any) {
+      } catch (err) {
         console.error('Exception in fetching booking:', err);
-        setDebugInfo(prev => prev + '\nException fetching booking: ' + err.message);
-        setError('An unexpected error occurred while loading booking details. Please try again later.');
+        setError('An unexpected error occurred while loading booking details');
       } finally {
         setLoading(false);
       }
@@ -148,19 +122,16 @@ const BookingInvite = () => {
         
       if (inviteError) {
         console.error('Error fetching invites:', inviteError);
-        setDebugInfo(prev => prev + '\nError fetching invites: ' + JSON.stringify(inviteError));
         return;
       }
       
       if (!inviteData || inviteData.length === 0) {
         console.log("No invites found for this booking");
-        setDebugInfo(prev => prev + '\nNo invites found for booking ID: ' + id);
         setError('No invitations found for this booking');
         return;
       }
       
       console.log("Found invites:", inviteData);
-      setDebugInfo(prev => prev + '\nFound invites: ' + JSON.stringify(inviteData));
       
       // If we have a stored email, try to match it with an invite
       if (emailToCheck) {
@@ -186,9 +157,8 @@ const BookingInvite = () => {
         console.log("Multiple invites found, need to identify user");
         setNeedsEmailConfirmation(true);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error checking for invites:', err);
-      setDebugInfo(prev => prev + '\nError checking invites: ' + err.message);
       setError('An error occurred while retrieving invitation information');
     }
   };
@@ -259,11 +229,6 @@ const BookingInvite = () => {
       // Get the current origin
       const origin = window.location.origin;
       
-      // Determine the function URL based on domain
-      const functionUrl = `${origin.includes('localhost') 
-        ? 'http://localhost:54321' 
-        : 'https://esdmelfzeszjtbnoajig.supabase.co'}/functions/v1/send-invitation-response?appOrigin=${encodeURIComponent(origin)}`;
-      
       // Prepare the data for the notification email
       const notificationData = {
         hostEmail: booking.customer_email,
@@ -279,9 +244,13 @@ const BookingInvite = () => {
         venueId: booking.venue_id
       };
       
+      // Call the edge function to send the notification email
+      const functionUrl = `${origin.includes('localhost') 
+        ? "http://localhost:54321" 
+        : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-invitation-response`;
+      
       console.log("Calling function URL:", functionUrl);
       console.log("With data:", notificationData);
-      setDebugInfo(prev => prev + '\nCalling function URL: ' + functionUrl + '\nWith data: ' + JSON.stringify(notificationData));
       
       const response = await fetch(functionUrl, {
         method: 'POST',
@@ -295,15 +264,12 @@ const BookingInvite = () => {
       
       if (!response.ok) {
         console.error('Error sending notification email:', responseData);
-        setDebugInfo(prev => prev + '\nError sending notification: ' + JSON.stringify(responseData));
         // Don't display an error to the user, just log it
       } else {
         console.log('Notification email sent successfully:', responseData);
-        setDebugInfo(prev => prev + '\nNotification email sent successfully');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Exception sending notification email:', err);
-      setDebugInfo(prev => prev + '\nException sending notification: ' + err.message);
       // Don't display an error to the user, just log it
     }
   };
@@ -331,7 +297,6 @@ const BookingInvite = () => {
         
       if (error) {
         console.error('Error updating invite status:', error);
-        setDebugInfo(prev => prev + '\nError updating invite status: ' + JSON.stringify(error));
         toast({ 
           title: "Failed to accept invitation", 
           description: "There was an error processing your response.",
@@ -352,9 +317,8 @@ const BookingInvite = () => {
       // Update local state to reflect change
       setInviteInfo({...inviteInfo, status: 'accepted'});
       setSubmitting(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Exception in accepting invitation:', err);
-      setDebugInfo(prev => prev + '\nException accepting invitation: ' + err.message);
       toast({ 
         title: "An error occurred", 
         description: "Please try again later.",
@@ -387,7 +351,6 @@ const BookingInvite = () => {
         
       if (error) {
         console.error('Error updating invite status:', error);
-        setDebugInfo(prev => prev + '\nError updating invite status: ' + JSON.stringify(error));
         toast({ 
           title: "Failed to decline invitation", 
           description: "There was an error processing your response.",
@@ -408,9 +371,8 @@ const BookingInvite = () => {
       // Update local state to reflect change
       setInviteInfo({...inviteInfo, status: 'declined'});
       setSubmitting(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Exception in declining invitation:', err);
-      setDebugInfo(prev => prev + '\nException declining invitation: ' + err.message);
       toast({ 
         title: "An error occurred", 
         description: "Please try again later.",
@@ -442,19 +404,6 @@ const BookingInvite = () => {
         return null;
     }
   };
-
-  // For debugging - show debug info in development
-  const showDebugInfo = () => {
-    if (process.env.NODE_ENV !== 'production' && debugInfo) {
-      return (
-        <div className="mt-4 p-3 bg-gray-800 border border-gray-700 rounded text-xs text-gray-400 overflow-auto max-h-40">
-          <h4 className="font-bold mb-1">Debug Info:</h4>
-          <pre>{debugInfo}</pre>
-        </div>
-      );
-    }
-    return null;
-  };
   
   // Render the email confirmation form
   if (needsEmailConfirmation) {
@@ -481,7 +430,6 @@ const BookingInvite = () => {
                 />
               </div>
             </div>
-            {showDebugInfo()}
           </CardContent>
           <CardFooter>
             <Button 
@@ -524,7 +472,6 @@ const BookingInvite = () => {
           </CardHeader>
           <CardContent>
             <p className="text-slate-300">{error}</p>
-            {showDebugInfo()}
           </CardContent>
           <CardFooter>
             <Link to="/" className="w-full">
@@ -649,7 +596,6 @@ const BookingInvite = () => {
           </div>
           
           {getInviteStatus()}
-          {showDebugInfo()}
         </CardContent>
         <CardFooter className="flex flex-col gap-4 border-t border-slate-800 pt-4">
           {(!inviteInfo || !inviteInfo.status || inviteInfo.status === 'pending') && (
@@ -686,7 +632,7 @@ const BookingInvite = () => {
           )}
           
           <p className="text-xs text-center text-slate-500 mt-4">
-            This invitation was sent via Avnu
+            This invitation was sent via FindVenue
           </p>
         </CardFooter>
       </Card>
