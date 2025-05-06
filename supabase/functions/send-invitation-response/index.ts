@@ -99,7 +99,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // 1. Send an email notification to the host
     const emailResponse = await resend.emails.send({
-      from: "Avnu <onboarding@avnu.dev>", // Replace with your verified domain in production
+      from: "Avnu <onboarding@resend.dev>", // Replace with your verified domain in production
       to: [hostEmail],
       subject: subject,
       html: `
