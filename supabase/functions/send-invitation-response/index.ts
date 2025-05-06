@@ -1,7 +1,12 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const supabaseUrl = "https://esdmelfzeszjtbnoajig.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzZG1lbGZ6ZXN6anRibm9hamlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4ODUwMTUsImV4cCI6MjA1ODQ2MTAxNX0.1z27OZ04RuR8AYlVGaE9L8vWWYilSrMlyq422BJcX94";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,7 +59,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Sending invitation response notification to: ${hostEmail} for guest: ${guestEmail}, status: ${status}`);
+    console.log(`Processing invitation response from: ${guestEmail}, status: ${status}`);
 
     // Format the date for better display in email
     let formattedDate = bookingDate;
@@ -92,8 +97,9 @@ const handler = async (req: Request): Promise<Response> => {
     const statusBgColor = status === 'accepted' ? '#10b98120' : '#ef444420';
     const statusText = status === 'accepted' ? 'Accepted' : 'Declined';
 
+    // 1. Send an email notification to the host
     const emailResponse = await resend.emails.send({
-      from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
+      from: "Avnu <onboarding@avnu.dev>", // Replace with your verified domain in production
       to: [hostEmail],
       subject: subject,
       html: `
@@ -171,16 +177,67 @@ const handler = async (req: Request): Promise<Response> => {
           
           <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
             <p style="font-size: 14px; color: #8b94a3;">
-              This notification was sent via <span style="color: #2dd4bf;">FindVenue</span>
+              This notification was sent via <span style="color: #2dd4bf;">Avnu</span>
             </p>
           </div>
         </div>
       `,
     });
 
-    console.log("Email sent response:", emailResponse);
+    console.log("Email notification sent to host:", emailResponse);
 
-    return new Response(JSON.stringify(emailResponse), {
+    // 2. Send in-app notification to the host (customer)
+    try {
+      // Find the booking to get the customer user_id
+      const { data: bookingData, error: bookingError } = await supabase
+        .from('bookings')
+        .select('user_id, customer_name')
+        .eq('id', bookingId)
+        .single();
+
+      if (bookingError) {
+        console.error("Error fetching booking:", bookingError);
+      } else if (bookingData && bookingData.user_id) {
+        console.log("Found customer user ID:", bookingData.user_id);
+        
+        // Create notification data
+        const notificationData = {
+          user_id: bookingData.user_id,
+          title: `Guest ${status === 'accepted' ? 'Accepted' : 'Declined'} Invitation`,
+          message: `${guestName || guestEmail} has ${status} your invitation to ${venueName} on ${formattedDate}.`,
+          type: 'booking',
+          link: `/bookings/${bookingId}`,
+          data: {
+            booking_id: bookingId,
+            venue_id: venueId,
+            guest_email: guestEmail,
+            guest_name: guestName,
+            status: status,
+            venue_name: venueName
+          },
+          read: false
+        };
+
+        // Insert notification
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .insert([notificationData]);
+
+        if (notificationError) {
+          console.error("Error creating notification:", notificationError);
+        } else {
+          console.log("In-app notification created successfully");
+        }
+      }
+    } catch (notificationError) {
+      console.error("Error processing notification:", notificationError);
+    }
+
+    return new Response(JSON.stringify(
+      { 
+        success: true,
+        message: `Successfully processed ${status} response for ${guestEmail}`
+      }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });

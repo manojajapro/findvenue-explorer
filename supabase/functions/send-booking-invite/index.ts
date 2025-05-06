@@ -1,8 +1,12 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const supabaseUrl = "https://esdmelfzeszjtbnoajig.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzZG1lbGZ6ZXN6anRibm9hamlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4ODUwMTUsImV4cCI6MjA1ODQ2MTAxNX0.1z27OZ04RuR8AYlVGaE9L8vWWYilSrMlyq422BJcX94";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,28 +85,74 @@ const handler = async (req: Request): Promise<Response> => {
     const greetingName = recipientName ? recipientName : "there";
 
     // Extract booking ID from the invite link
-    const bookingId = inviteLink.includes('/booking-invite/') 
-      ? inviteLink.split('/booking-invite/')[1] 
-      : inviteLink;
+    let bookingId = inviteLink;
+    
+    // If inviteLink contains a full URL, extract just the ID
+    if (typeof inviteLink === 'string' && (inviteLink.includes('/') || inviteLink.includes(':'))) {
+      if (inviteLink.includes('/booking-invite/')) {
+        bookingId = inviteLink.split('/booking-invite/')[1];
+      }
+    }
 
+    console.log("Booking ID extracted:", bookingId);
+    
     // IMPORTANT: Use the correct origin for links
-    // Do not use the Supabase domain, use the application's domain
-    // If origin exists in the request URL, use that, otherwise fallback
+    // Get origin from request or use environment variables
     let appDomain = "";
     try {
       const reqUrl = new URL(req.url);
       appDomain = reqUrl.searchParams.get('appOrigin') || "";
+      console.log("App domain from request:", appDomain);
     } catch (e) {
       console.error("Error extracting origin:", e);
     }
     
     // Use the provided appDomain if available, otherwise use a default value
-    // For local development, this would typically be http://localhost:8080
     const appBaseUrl = appDomain || "http://localhost:8080";
+    console.log("Using app base URL:", appBaseUrl);
     
     // Generate full links with the correct domain
     const fullInviteLink = `${appBaseUrl}/booking-invite/${bookingId}`;
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
+
+    console.log("Full invite link:", fullInviteLink);
+    console.log("Venue link:", venueLink);
+    
+    // First store the invitation in the database before sending the email
+    try {
+      const { data, error } = await supabase
+        .from('booking_invites')
+        .select('*')
+        .eq('booking_id', bookingId)
+        .eq('email', email);
+
+      if (error) {
+        console.error("Error checking existing invite:", error);
+      } else {
+        // Only insert if not exists
+        if (!data || data.length === 0) {
+          const { error: insertError } = await supabase
+            .from('booking_invites')
+            .insert({
+              booking_id: bookingId,
+              email: email,
+              name: recipientName || null,
+              status: 'pending'
+            });
+            
+          if (insertError) {
+            console.error("Error inserting booking invite to database:", insertError);
+          } else {
+            console.log("Successfully stored booking invite in database");
+          }
+        } else {
+          console.log("Invite already exists in database, skipping insert");
+        }
+      }
+    } catch (dbErr) {
+      console.error("Exception storing invitation in database:", dbErr);
+      // Continue with sending email even if DB storage fails
+    }
 
     const emailResponse = await resend.emails.send({
       from: "Avnu <onboarding@avnu.dev>", // Replace with your verified domain when in production
@@ -220,7 +270,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
             <p style="font-size: 14px; color: #8b94a3;">
-              This invitation was sent via <span style="color: #2dd4bf;">avnue</span>
+              This invitation was sent via <span style="color: #2dd4bf;">Avnu</span>
             </p>
           </div>
         </div>

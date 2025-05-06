@@ -59,7 +59,8 @@ const BookingInvite = () => {
             total_price,
             customer_email,
             customer_phone,
-            customer_name
+            customer_name,
+            user_id
           `)
           .eq('id', id)
           .maybeSingle();
@@ -142,6 +143,7 @@ const BookingInvite = () => {
         if (matchingInvite) {
           console.log("Found matching invite:", matchingInvite);
           setInviteInfo(matchingInvite);
+          setGuestEmail(emailToCheck);
           return;
         }
       }
@@ -241,13 +243,14 @@ const BookingInvite = () => {
         endTime: booking.end_time,
         status: status,
         bookingId: booking.id,
-        venueId: booking.venue_id
+        venueId: booking.venue_id,
+        userId: booking.user_id
       };
       
       // Call the edge function to send the notification email
       const functionUrl = `${origin.includes('localhost') 
         ? "http://localhost:54321" 
-        : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-invitation-response`;
+        : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-invitation-response?appOrigin=${encodeURIComponent(origin)}`;
       
       console.log("Calling function URL:", functionUrl);
       console.log("With data:", notificationData);
@@ -264,13 +267,14 @@ const BookingInvite = () => {
       
       if (!response.ok) {
         console.error('Error sending notification email:', responseData);
-        // Don't display an error to the user, just log it
+        return false;
       } else {
         console.log('Notification email sent successfully:', responseData);
+        return true;
       }
     } catch (err) {
       console.error('Exception sending notification email:', err);
-      // Don't display an error to the user, just log it
+      return false;
     }
   };
 
@@ -306,13 +310,20 @@ const BookingInvite = () => {
         return;
       }
       
-      // Send notification email
-      await sendInvitationResponseEmail('accepted');
+      // Send notification email and in-app notification
+      const notificationSent = await sendInvitationResponseEmail('accepted');
       
-      toast({ 
-        title: "Accepted invitation", 
-        description: "The host has been notified of your attendance."
-      });
+      if (notificationSent) {
+        toast({ 
+          title: "Accepted invitation", 
+          description: "The host has been notified of your attendance."
+        });
+      } else {
+        toast({ 
+          title: "Accepted invitation", 
+          description: "Your response has been recorded, but there was an issue notifying the host."
+        });
+      }
       
       // Update local state to reflect change
       setInviteInfo({...inviteInfo, status: 'accepted'});
@@ -360,13 +371,20 @@ const BookingInvite = () => {
         return;
       }
       
-      // Send notification email
-      await sendInvitationResponseEmail('declined');
+      // Send notification email and in-app notification
+      const notificationSent = await sendInvitationResponseEmail('declined');
       
-      toast({ 
-        title: "Declined invitation", 
-        description: "The host has been notified that you can't attend."
-      });
+      if (notificationSent) {
+        toast({ 
+          title: "Declined invitation", 
+          description: "The host has been notified that you can't attend."
+        });
+      } else {
+        toast({ 
+          title: "Declined invitation", 
+          description: "Your response has been recorded, but there was an issue notifying the host."
+        });
+      }
       
       // Update local state to reflect change
       setInviteInfo({...inviteInfo, status: 'declined'});
@@ -603,7 +621,7 @@ const BookingInvite = () => {
               <Button 
                 className="bg-teal-500 hover:bg-teal-600 text-slate-900 flex items-center gap-2"
                 onClick={handleAccept}
-                disabled={submitting}
+                disabled={submitting || booking.status === 'cancelled'}
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Accept
@@ -612,7 +630,7 @@ const BookingInvite = () => {
                 variant="outline"
                 className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
                 onClick={handleDecline}
-                disabled={submitting}
+                disabled={submitting || booking.status === 'cancelled'}
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                 Decline
@@ -632,7 +650,7 @@ const BookingInvite = () => {
           )}
           
           <p className="text-xs text-center text-slate-500 mt-4">
-            This invitation was sent via FindVenue
+            This invitation was sent via Avnu
           </p>
         </CardFooter>
       </Card>
