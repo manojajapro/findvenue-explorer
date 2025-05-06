@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { X, Mail, Plus, Check, Loader2, XCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -118,8 +117,21 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
         
         console.log("Processing invite for email:", trimmedEmail);
         
-        // Generate invite link - using the booking-invite route
-        const inviteLink = `${appOrigin}/booking-invite/${booking.id}`;
+        // Store in database before sending email
+        const { error: dbError } = await supabase
+          .from('booking_invites')
+          .insert({
+            booking_id: booking.id,
+            email: trimmedEmail,
+            name: recipientName || null,
+            status: 'pending'
+          });
+            
+        if (dbError) {
+          console.error("Error inserting invite to database:", dbError);
+          failedSends.push({ email: trimmedEmail, error: "Database error: " + dbError.message });
+          continue;
+        }
         
         // Send email via edge function
         try {
@@ -127,8 +139,6 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           let functionUrl;
           if (appOrigin.includes('localhost') || appOrigin.includes('127.0.0.1')) {
             functionUrl = "http://localhost:54321/functions/v1/send-booking-invite";
-          } else if (appOrigin.includes('lovable.app')) {
-            functionUrl = "https://esdmelfzeszjtbnoajig.supabase.co/functions/v1/send-booking-invite";
           } else {
             functionUrl = "https://esdmelfzeszjtbnoajig.supabase.co/functions/v1/send-booking-invite";
           }
@@ -170,20 +180,6 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
           } else {
             successfulSends.push(trimmedEmail);
             console.log("Successfully sent invite to:", trimmedEmail);
-            
-            // Store in database after successful email sending
-            const { error: dbError } = await supabase
-              .from('booking_invites')
-              .insert({
-                booking_id: booking.id,
-                email: trimmedEmail,
-                name: recipientName || null,
-                status: 'pending'
-              });
-              
-            if (dbError) {
-              console.error("Error inserting invite to database:", dbError);
-            }
           }
         } catch (emailErr: any) {
           console.error("Exception sending email:", emailErr);
