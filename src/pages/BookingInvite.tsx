@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building, Loader2 } from 'lucide-react';
@@ -41,8 +40,27 @@ const BookingInvite = () => {
           setError('Invalid booking ID');
           return;
         }
+
+        // First check if the booking exists
+        const { data: bookingExists, error: existsError } = await supabase
+          .from('bookings')
+          .select('id')
+          .eq('id', id)
+          .maybeSingle();
+
+        if (existsError) {
+          console.error('Error checking booking existence:', existsError);
+          setError('Database connection error. Please try again later.');
+          return;
+        }
+
+        if (!bookingExists) {
+          console.error('No booking found with ID:', id);
+          setError('This booking does not exist or has been removed.');
+          return;
+        }
         
-        // Use .maybeSingle() to avoid errors when no data is found
+        // Now fetch full booking details
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select(`
@@ -71,7 +89,7 @@ const BookingInvite = () => {
         }
         
         if (!bookingData) {
-          console.error('No booking found with ID:', id);
+          console.error('No booking data found with ID:', id);
           setError('Unable to load booking details. This booking may not exist or has been removed.');
           return;
         }
@@ -99,7 +117,7 @@ const BookingInvite = () => {
         await checkForInvites(storedEmail || '');
       } catch (err) {
         console.error('Exception in fetching booking:', err);
-        setError('An unexpected error occurred while loading booking details');
+        setError('An unexpected error occurred while loading booking details. Please try again later.');
       } finally {
         setLoading(false);
       }
