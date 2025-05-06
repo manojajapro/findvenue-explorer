@@ -56,7 +56,6 @@ const BookingInvite = () => {
             status,
             guests,
             special_requests,
-            address,
             total_price,
             customer_email,
             customer_phone,
@@ -254,9 +253,8 @@ const BookingInvite = () => {
       };
       
       // Call the edge function to send the notification email
-      const functionUrl = `${origin.includes('localhost') 
-        ? "http://localhost:54321" 
-        : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-invitation-response?appOrigin=${encodeURIComponent(origin)}`;
+      const supabaseUrl = "https://esdmelfzeszjtbnoajig.supabase.co";
+      const functionUrl = `${supabaseUrl}/functions/v1/send-invitation-response?appOrigin=${encodeURIComponent(origin)}`;
       
       console.log("Calling function URL:", functionUrl);
       console.log("With data:", notificationData);
