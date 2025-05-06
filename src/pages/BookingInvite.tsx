@@ -229,18 +229,10 @@ const BookingInvite = () => {
       // Get the current origin
       const origin = window.location.origin;
       
-      // Determine the function URL based on the current environment
-      let functionUrl;
-      if (origin.includes('localhost')) {
-        // For local development
-        functionUrl = "http://localhost:54321/functions/v1/send-invitation-response";
-      } else {
-        // For production
-        functionUrl = "https://esdmelfzeszjtbnoajig.supabase.co/functions/v1/send-invitation-response";
-      }
-      
-      // Add appOrigin parameter to URL
-      functionUrl = `${functionUrl}?appOrigin=${encodeURIComponent(origin)}`;
+      // Determine the function URL based on domain
+      const functionUrl = `${origin.includes('localhost') 
+        ? 'http://localhost:54321' 
+        : 'https://esdmelfzeszjtbnoajig.supabase.co'}/functions/v1/send-invitation-response?appOrigin=${encodeURIComponent(origin)}`;
       
       // Prepare the data for the notification email
       const notificationData = {
@@ -640,7 +632,7 @@ const BookingInvite = () => {
           )}
           
           <p className="text-xs text-center text-slate-500 mt-4">
-            This invitation was sent via FindVenue
+            This invitation was sent via Avnu
           </p>
         </CardFooter>
       </Card>

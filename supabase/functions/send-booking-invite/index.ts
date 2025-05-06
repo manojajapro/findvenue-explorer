@@ -84,9 +84,7 @@ const handler = async (req: Request): Promise<Response> => {
       ? inviteLink.split('/booking-invite/')[1] 
       : inviteLink;
 
-    // IMPORTANT: Use the correct origin for links
-    // Do not use the Supabase domain, use the application's domain
-    // If origin exists in the request URL, use that, otherwise fallback
+    // Get app origin from the request
     let appDomain = "";
     try {
       const reqUrl = new URL(req.url);
@@ -96,7 +94,6 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     // Use the provided appDomain if available, otherwise use a default value
-    // For local development, this would typically be http://localhost:8080
     const appBaseUrl = appDomain || "http://localhost:8080";
     
     // Generate full links with the correct domain

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -93,7 +94,7 @@ const handler = async (req: Request): Promise<Response> => {
     const statusText = status === 'accepted' ? 'Accepted' : 'Declined';
 
     const emailResponse = await resend.emails.send({
-      from: "FindVenue <onboarding@resend.dev>", // Replace with your verified domain when in production
+      from: "Avnu <onboarding@resend.dev>", // Replace with your verified domain when in production
       to: [hostEmail],
       subject: subject,
       html: `
@@ -171,7 +172,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
             <p style="font-size: 14px; color: #8b94a3;">
-              This notification was sent via <span style="color: #2dd4bf;">FindVenue</span>
+              This notification was sent via <span style="color: #2dd4bf;">Avnu</span>
             </p>
           </div>
         </div>
