@@ -76,58 +76,92 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
       // Create PDF document with modern styling
       const doc = new jsPDF();
       
-      // Add Avnu logo image or text header
-      doc.setFontSize(30);
-      doc.setTextColor(41, 128, 185); // Avnu brand blue
-      doc.text("Avnu", 105, 30, { align: 'center' });
+      // Set background color for the entire page
+      doc.setFillColor(16, 24, 39); // Dark blue background
+      doc.rect(0, 0, 210, 297, 'F');
+      
+      // Add decorative elements - blurred circles in brand colors
+      const addBlurredCircle = (x: number, y: number, radius: number, color: [number, number, number], alpha: number) => {
+        for (let i = radius; i > 0; i -= 1) {
+          doc.setFillColor(color[0], color[1], color[2]);
+          doc.setGlobalAlpha(alpha * (i / radius));
+          doc.circle(x, y, i, 'F');
+        }
+        doc.setGlobalAlpha(1);
+      };
+      
+      // Add decorative blurred circles
+      addBlurredCircle(30, 30, 60, [16, 185, 129], 0.3); // Avnu green
+      addBlurredCircle(170, 240, 80, [41, 128, 185], 0.2); // Avnu blue
+      
+      // Add semi-transparent overlay to enhance text readability
+      doc.setFillColor(16, 24, 39);
+      doc.setGlobalAlpha(0.85);
+      doc.rect(15, 15, 180, 267, 'F');
+      doc.setGlobalAlpha(1);
+      
+      // Add decorative header bar
+      doc.setFillColor(16, 185, 129); // Avnu green
+      doc.rect(15, 15, 180, 8, 'F');
+      
+      // Add Avnu logo/text header
+      doc.setFontSize(38);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.text("AVNU", 105, 40, { align: 'center' });
       
       // Add confirmation title
       doc.setFontSize(22);
-      doc.setTextColor(50, 50, 50);
-      doc.text("Booking Confirmation", 105, 50, { align: 'center' });
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(220, 220, 220);
+      doc.text("Booking Confirmation", 105, 55, { align: 'center' });
       
-      // Add horizontal divider line
-      doc.setDrawColor(200, 200, 200);
+      // Add modern divider
+      doc.setDrawColor(16, 185, 129); // Avnu green
       doc.setLineWidth(0.5);
-      doc.line(20, 60, 190, 60);
+      doc.line(40, 65, 170, 65);
       
       // Status section with color
       const statusColors: Record<string, [number, number, number]> = {
-        'confirmed': [46, 204, 113],
+        'confirmed': [16, 185, 129], // Avnu green
         'pending': [241, 196, 15],
         'cancelled': [231, 76, 60],
-        'default': [52, 152, 219]
+        'default': [41, 128, 185] // Avnu blue
       };
       
       const statusColor = statusColors[booking.status.toLowerCase()] || statusColors['default'];
-      doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
-      doc.setFontSize(18);
-      doc.text(`Status: ${booking.status.toUpperCase()}`, 20, 75);
+      doc.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
+      doc.roundedRect(25, 75, 160, 15, 3, 3, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(`STATUS: ${booking.status.toUpperCase()}`, 105, 84, { align: 'center' });
       
       // Reset text color for regular content
-      doc.setTextColor(50, 50, 50);
+      doc.setTextColor(220, 220, 220);
+      doc.setFont("helvetica", "normal");
       
       // Booking details section
-      const startY = 90;
-      let currentY = startY;
-      const leftColumnX = 20;
-      const rightColumnX = 95;
-      const lineHeight = 10;
+      const startY = 105;
+      const leftColumnX = 25;
+      const rightColumnX = 115;
       
       // Helper function for adding labeled info
       const addLabeledInfo = (label: string, value: string, x: number, y: number) => {
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
         doc.text(label, x, y);
         
         doc.setFontSize(12);
-        doc.setTextColor(50, 50, 50);
+        doc.setTextColor(255, 255, 255);
         doc.text(value || 'N/A', x, y + 7);
         
         return y + 20; // Return next Y position
       };
       
       // Left column details
+      let currentY = startY;
       currentY = addLabeledInfo("VENUE", booking.venue_name, leftColumnX, currentY);
       currentY = addLabeledInfo("DATE", format(new Date(booking.booking_date), "MMMM d, yyyy"), leftColumnX, currentY);
       currentY = addLabeledInfo("TIME", `${booking.start_time} - ${booking.end_time}`, leftColumnX, currentY);
@@ -148,60 +182,69 @@ export const CustomerBookingCard = ({ booking }: CustomerBookingCardProps) => {
       currentY = addLabeledInfo("BOOKING ID", booking.id, rightColumnX, currentY);
       
       // Add divider before pricing section
-      const priceSectionY = Math.max(currentY + 15, 180);
-      doc.setDrawColor(200, 200, 200);
-      doc.line(20, priceSectionY - 10, 190, priceSectionY - 10);
+      const priceSectionY = Math.max(currentY + 15, 200);
+      doc.setDrawColor(16, 185, 129); // Avnu green
+      doc.setLineWidth(0.5);
+      doc.line(25, priceSectionY - 10, 185, priceSectionY - 10);
       
-      // Total price section with larger font
+      // Total price section with larger font and highlight box
+      doc.setFillColor(30, 41, 59); // Darker blue for price box
+      doc.roundedRect(25, priceSectionY - 5, 160, 25, 3, 3, 'F');
+      
       doc.setFontSize(12);
-      doc.setTextColor(100, 100, 100);
-      doc.text("TOTAL PRICE", leftColumnX, priceSectionY);
+      doc.setTextColor(150, 150, 150);
+      doc.text("TOTAL PRICE", 35, priceSectionY + 8);
       
-      doc.setFontSize(16);
-      doc.setTextColor(41, 128, 185); // Avnu brand blue
+      doc.setFontSize(18);
+      doc.setTextColor(16, 185, 129); // Avnu green
       doc.setFont("helvetica", "bold");
-      doc.text(`SAR ${booking.total_price.toLocaleString()}`, 190, priceSectionY, { align: 'right' });
+      doc.text(`SAR ${booking.total_price.toLocaleString()}`, 175, priceSectionY + 8, { align: 'right' });
       
       // If there's price per person, show the calculation
       if (booking.guests > 1 && pricePerPerson > 0) {
         doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
+        doc.setTextColor(150, 150, 150);
         doc.setFont("helvetica", "normal");
-        doc.text(`(${booking.guests} guests × SAR ${pricePerPerson.toLocaleString()})`, 190, priceSectionY + 7, { align: 'right' });
+        doc.text(`(${booking.guests} guests × SAR ${pricePerPerson.toLocaleString()})`, 175, priceSectionY + 18, { align: 'right' });
       }
       
       // Add special notes section if applicable
       if (booking.status === 'confirmed') {
-        const notesY = priceSectionY + 25;
-        doc.setDrawColor(240, 240, 240);
-        doc.setFillColor(250, 250, 250);
-        doc.roundedRect(20, notesY, 170, 30, 3, 3, 'FD');
+        const notesY = priceSectionY + 35;
+        doc.setFillColor(30, 41, 59); // Darker blue
+        doc.roundedRect(25, notesY, 160, 30, 3, 3, 'F');
         
         doc.setFontSize(11);
-        doc.setTextColor(70, 70, 70);
+        doc.setTextColor(220, 220, 220);
         doc.setFont("helvetica", "bold");
-        doc.text("IMPORTANT INFORMATION", leftColumnX + 5, notesY + 10);
+        doc.text("IMPORTANT INFORMATION", 35, notesY + 10);
         
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text("Please arrive 15 minutes before your booking time. Don't forget to bring your booking confirmation.", leftColumnX + 5, notesY + 20);
+        doc.text("Please arrive 15 minutes before your booking time.", 35, notesY + 20);
+        doc.text("Don't forget to bring your booking confirmation.", 35, notesY + 28);
       }
       
+      // Add QR code placeholder with modern styling
+      doc.setFillColor(40, 50, 70);
+      doc.roundedRect(80, 215, 50, 50, 2, 2, 'F');
+      
+      doc.setDrawColor(16, 185, 129); // Avnu green
+      doc.setLineWidth(0.5);
+      doc.roundedRect(85, 220, 40, 40, 1, 1, 'S');
+      
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text("SCAN QR CODE", 105, 240, { align: 'center' });
+      doc.text("TO VERIFY BOOKING", 105, 246, { align: 'center' });
+      
       // Add footer
-      const footerY = 270;
-      doc.setFontSize(9);
-      doc.setTextColor(130, 130, 130);
+      const footerY = 275;
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
       doc.text("Thank you for choosing Avnu!", 105, footerY, { align: 'center' });
       doc.text(`Generated on: ${format(new Date(), "MMMM d, yyyy, HH:mm")}`, 105, footerY + 5, { align: 'center' });
       doc.text(`Confirmation ID: ${booking.id}`, 105, footerY + 10, { align: 'center' });
-      
-      // Add QR code placeholder (you could implement actual QR code generation)
-      doc.setDrawColor(200, 200, 200);
-      doc.setFillColor(250, 250, 250);
-      doc.roundedRect(85, 200, 40, 40, 2, 2, 'FD');
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text("QR CODE", 105, 220, { align: 'center' });
       
       // Save PDF with a well-formatted name
       const filename = `Avnu_Booking_${booking.venue_name.replace(/\s+/g, '_')}_${format(new Date(booking.booking_date), "yyyy-MM-dd")}.pdf`;
