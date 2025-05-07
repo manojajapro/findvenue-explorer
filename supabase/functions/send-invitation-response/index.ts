@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
@@ -151,14 +150,16 @@ const handler = async (req: Request): Promise<Response> => {
     // We can use venue_name from the invitation if available
     const actualVenueName = venueName || inviteData.venue_name || "Event Venue";
     
-    // Check if booking exists, but don't fail if it doesn't
+    // Check if booking exists and fetch user_id of the booking creator
     let bookingData = null;
     let bookingUserId = null;
+    let actualUserId = userId;  // Start with provided userId if available
     
     try {
+      console.log("Fetching booking details to get user_id (creator/host)...");
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, user_id, venue_name, customer_name, customer_email, venue_id, owner_id')
+        .select('id, user_id, venue_name, customer_name, customer_email, venue_id')
         .eq('id', bookingId)
         .maybeSingle();
         
@@ -167,6 +168,11 @@ const handler = async (req: Request): Promise<Response> => {
       } else if (data) {
         bookingData = data;
         bookingUserId = data.user_id;
+        // If no userId was provided in the request, use the one from booking
+        if (!actualUserId && bookingUserId) {
+          actualUserId = bookingUserId;
+          console.log(`Using booking's user_id for notification: ${actualUserId}`);
+        }
         console.log("Found booking data:", bookingData);
       } else {
         console.log("Booking not found with id:", bookingId);
@@ -321,6 +327,8 @@ const handler = async (req: Request): Promise<Response> => {
     // This ensures the update works even with RLS policies
     let inviteUpdated = false;
     try {
+      console.log(`Updating invitation status to ${status} for booking: ${bookingId}, email: ${guestEmail}`);
+      
       // Use admin client instead of public client for more reliable updates
       const { error: updateError } = await adminClient
         .from('booking_invites')
@@ -354,52 +362,15 @@ const handler = async (req: Request): Promise<Response> => {
       inviteUpdated = false;
     }
 
-    // Try to get the host user ID from various possible sources
-    let hostUserId = null;
-    
-    // NEW: More aggressively try to identify the user who created the booking
-    if (userId) {
-      console.log("Using provided userId for notification:", userId);
-      hostUserId = userId;
-    } else if (bookingData?.user_id) {
-      console.log("Using booking's user_id for notification:", bookingData.user_id);
-      hostUserId = bookingData.user_id;
-    } else {
-      // If we don't have the user_id from the request or booking, try to get it from the bookings table
-      try {
-        console.log("Querying bookings table to find the host user ID");
-        const { data: hostData, error: hostError } = await supabase
-          .from('bookings')
-          .select('user_id')
-          .eq('id', bookingId)
-          .maybeSingle();
-          
-        if (hostError) {
-          console.error("Error finding host user ID:", hostError);
-        } else if (hostData && hostData.user_id) {
-          console.log("Found host user ID from bookings table:", hostData.user_id);
-          hostUserId = hostData.user_id;
-        } else {
-          console.log("Could not find a valid host user ID for notification in bookings table");
-        }
-      } catch (err) {
-        console.error("Exception finding host user ID:", err);
-      }
-    }
-    
-    if (!hostUserId) {
-      console.log("Could not find a valid host user ID for notification");
-    }
-
     // Create notification for the host if we have their ID
     let notificationSent = false;
-    if (hostUserId) {
+    if (actualUserId) {
       try {
-        console.log("Creating in-app notification for host with ID:", hostUserId);
+        console.log(`Creating in-app notification for host with ID: ${actualUserId}`);
         
         // Create notification data
         const notificationData = {
-          user_id: hostUserId,
+          user_id: actualUserId,
           title: `Guest ${status === 'accepted' ? 'Accepted' : 'Declined'} Invitation`,
           message: `${guestName || guestEmail} has ${status} your invitation to ${actualVenueName} on ${formattedDate}.`,
           type: 'booking',
@@ -416,47 +387,56 @@ const handler = async (req: Request): Promise<Response> => {
           read: false
         };
 
-        // First try with the admin client for more reliability
-        let notificationError = null;
+        console.log("Notification data to be inserted:", notificationData);
+
+        // Try both clients for maximum reliability
+        let success = false;
+        
+        // First try with admin client (most reliable)
         try {
-          const { error } = await adminClient
+          console.log("Attempting to create notification with admin client...");
+          const { data, error } = await adminClient
             .from('notifications')
-            .insert([notificationData]);
+            .insert([notificationData])
+            .select();
             
-          notificationError = error;
-          
-          if (!error) {
-            console.log("Successfully created in-app notification with admin client");
-            notificationSent = true;
+          if (error) {
+            console.error("Admin client notification failed:", error);
           } else {
-            console.error("Error creating notification with admin client:", error);
+            console.log("Successfully created notification with admin client:", data);
+            success = true;
           }
         } catch (err) {
-          console.error("Error creating notification with admin client:", err);
-          notificationError = err;
+          console.error("Exception with admin client notification:", err);
         }
-
-        // If admin client fails, try with the public client
-        if (notificationError) {
-          console.log("Admin client notification failed, trying public client");
-          const { error: publicError } = await supabase
-            .from('notifications')
-            .insert([notificationData]);
-            
-          if (publicError) {
-            console.error("Error also creating notification with public client:", publicError);
-            notificationSent = false;
-          } else {
-            console.log("Successfully created in-app notification with public client");
-            notificationSent = true;
+        
+        // If admin client fails, try public client
+        if (!success) {
+          console.log("Admin client notification failed, trying public client...");
+          try {
+            const { data, error } = await supabase
+              .from('notifications')
+              .insert([notificationData])
+              .select();
+              
+            if (error) {
+              console.error("Public client notification failed:", error);
+            } else {
+              console.log("Successfully created notification with public client:", data);
+              success = true;
+            }
+          } catch (err) {
+            console.error("Exception with public client notification:", err);
           }
         }
-      } catch (notificationError) {
-        console.error("Error processing notification:", notificationError);
+        
+        notificationSent = success;
+      } catch (err) {
+        console.error("General error creating notification:", err);
         notificationSent = false;
       }
     } else {
-      console.error("No user_id found for notification");
+      console.error("No user_id found for notification - cannot create in-app notification");
     }
 
     // Return results including status of all operations
@@ -467,7 +447,7 @@ const handler = async (req: Request): Promise<Response> => {
         email_sent: emailSent,
         notification_sent: notificationSent,
         invite_updated: inviteUpdated,
-        host_user_id: hostUserId || null
+        host_user_id: actualUserId || null
       }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
