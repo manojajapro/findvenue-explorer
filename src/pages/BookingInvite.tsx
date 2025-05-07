@@ -24,6 +24,7 @@ const BookingInvite = () => {
   const [guestEmail, setGuestEmail] = useState<string>('');
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
   const [invites, setInvites] = useState<any[]>([]);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
     // Check if we already have the guest email in local storage
@@ -52,6 +53,7 @@ const BookingInvite = () => {
         if (inviteError) {
           console.error('Error fetching invites:', inviteError);
           setError('Unable to verify invitation. Please try again later.');
+          setDebugInfo({ type: 'invite_query_error', error: inviteError });
           setLoading(false);
           return;
         }
@@ -61,6 +63,10 @@ const BookingInvite = () => {
         if (!inviteData || inviteData.length === 0) {
           console.error('No invites found for booking ID:', id);
           setError('No invitations found for this booking');
+          setDebugInfo({ 
+            type: 'no_invites', 
+            booking_id: id
+          });
           setLoading(false);
           return;
         }
@@ -93,6 +99,7 @@ const BookingInvite = () => {
         if (bookingError) {
           console.error('Error fetching booking details:', bookingError);
           setError('Unable to load booking details. Please try again later.');
+          setDebugInfo({ type: 'booking_query_error', error: bookingError });
           setLoading(false);
           return;
         }
@@ -100,6 +107,7 @@ const BookingInvite = () => {
         if (!bookingData) {
           console.error('No booking found with ID:', id);
           setError('Unable to load booking details. This booking may not exist or has been removed.');
+          setDebugInfo({ type: 'no_booking', booking_id: id });
           setLoading(false);
           return;
         }
@@ -140,6 +148,7 @@ const BookingInvite = () => {
       } catch (err) {
         console.error('Exception in fetching booking:', err);
         setError('An unexpected error occurred while loading booking details');
+        setDebugInfo({ type: 'unexpected_error', error: err });
       } finally {
         setLoading(false);
       }
@@ -497,6 +506,14 @@ const BookingInvite = () => {
           </CardHeader>
           <CardContent>
             <p className="text-slate-300">{error}</p>
+            {debugInfo && (
+              <div className="mt-4 p-4 bg-slate-800/50 rounded-lg">
+                <p className="text-sm text-yellow-400 font-medium">Debug Information:</p>
+                <pre className="text-xs mt-2 text-slate-300 overflow-auto">
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              </div>
+            )}
             {invites && invites.length > 0 && (
               <div className="mt-4 p-4 bg-slate-800 rounded-lg">
                 <p className="text-teal-400 font-medium mb-2">Available Invitations:</p>

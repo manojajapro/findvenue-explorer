@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
@@ -111,23 +110,19 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       const successfulSends: string[] = [];
       const failedSends: {email: string, error: string}[] = [];
       
-      // Send invitations directly without storing in database first
+      // Send invitations via edge function
       for (let i = 0; i < validEmails.length; i++) {
         const trimmedEmail = validEmails[i].toLowerCase().trim();
         const recipientName = validNames[i].trim();
         
         console.log("Processing invite for email:", trimmedEmail, "name:", recipientName);
         
-        // Generate invite link - using the booking-invite route
-        const inviteLink = `${appOrigin}/booking-invite/${booking.id}`;
+        // Determine the function URL based on environment
+        const functionUrl = `${appOrigin.includes('localhost') 
+          ? "http://localhost:54321" 
+          : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-booking-invite?appOrigin=${encodeURIComponent(appOrigin)}`;
         
-        // Send email via edge function
         try {
-          // Determine the function URL based on environment
-          const functionUrl = `${appOrigin.includes('localhost') 
-            ? "http://localhost:54321" 
-            : "https://esdmelfzeszjtbnoajig.supabase.co"}/functions/v1/send-booking-invite?appOrigin=${encodeURIComponent(appOrigin)}`;
-          
           const response = await fetch(functionUrl, {
             method: 'POST',
             headers: {
@@ -151,16 +146,14 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             })
           });
           
+          const responseData = await response.json();
+          
           if (!response.ok) {
-            const error = await response.json();
-            console.error("Error sending email:", error);
-            failedSends.push({ email: trimmedEmail, error: error.message || "Failed to send invitation" });
+            console.error("Error sending email:", responseData);
+            failedSends.push({ email: trimmedEmail, error: responseData.message || responseData.error || "Failed to send invitation" });
           } else {
             successfulSends.push(trimmedEmail);
-            console.log("Successfully sent invite to:", trimmedEmail);
-            
-            // Skip local database operations since the edge function now handles this properly
-            console.log("Invitation database entry handled by edge function");
+            console.log("Successfully sent invite to:", trimmedEmail, "Response:", responseData);
           }
         } catch (emailErr: any) {
           console.error("Exception sending email:", emailErr);
@@ -192,7 +185,8 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
       }
       
       if (failedSends.length > 0) {
-        setErrorMessage(`Failed to send ${failedSends.length} invitation(s). Please try again.`);
+        const errorDetails = failedSends.map(f => `${f.email}: ${f.error}`).join('; ');
+        setErrorMessage(`Failed to send ${failedSends.length} invitation(s): ${errorDetails}`);
         toast({
           title: "Some invitations failed",
           description: `Failed to send ${failedSends.length} invitation(s). Please try again.`,

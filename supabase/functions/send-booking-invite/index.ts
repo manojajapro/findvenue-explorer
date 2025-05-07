@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
@@ -5,7 +6,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const supabaseUrl = "https://esdmelfzeszjtbnoajig.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzZG1lbGZ6ZXN6anRibm9hamlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4ODUwMTUsImV4cCI6MjA1ODQ2MTAxNX0.1z27OZ04RuR8AYlVGaE9L8vWWYilSrMlyq422BJcX94";
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+// Create a Supabase client with the service role key for admin operations
+const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
+
+// Create a public client with anonymous key for public operations
+const publicClient = createClient(supabaseUrl, supabaseAnonKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,7 +74,7 @@ const handler = async (req: Request): Promise<Response> => {
       startTime,
       endTime,
       address,
-      inviteLink,
+      inviteLink, // This is the booking_id
       venueId,
       specialRequests,
       guests,
@@ -254,48 +266,42 @@ const handler = async (req: Request): Promise<Response> => {
   
       console.log("Invitation email sent:", emailResponse);
       
-      // Store the invitation in the database
+      // Store the invitation in the database using the admin client with service role
       try {
-        // Create admin client for database operations with service role key
-        const adminClient = createClient(
-          supabaseUrl,
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || supabaseAnonKey,
-          {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false
-            }
-          }
-        );
+        console.log("Creating booking invite with booking_id:", inviteLink, "and email:", email);
         
-        // Check if an invitation already exists
+        // First, check if a record already exists
         const { data: existingInvite, error: checkError } = await adminClient
           .from('booking_invites')
-          .select('id')
+          .select('id, email, status')
           .eq('booking_id', inviteLink)
           .eq('email', email)
           .maybeSingle();
-          
+        
         if (checkError) {
           console.error("Error checking existing invite:", checkError);
+          throw new Error(`Error checking existing invite: ${checkError.message}`);
         }
         
+        let result;
         if (existingInvite) {
-          // Update existing invite - avoid using name column if it causes issues
-          console.log("Found existing invite ID:", existingInvite.id);
-          const { error: updateError } = await adminClient
+          console.log("Existing invite found:", existingInvite);
+          // Update existing invite
+          const { data, error } = await adminClient
             .from('booking_invites')
             .update({ status: 'pending' })
-            .eq('id', existingInvite.id);
-            
-          if (updateError) {
-            console.error("Error updating invite:", updateError);
-            throw new Error(`Error updating invite: ${updateError.message}`);
-          } else {
-            console.log("Updated existing invite for:", email);
+            .eq('id', existingInvite.id)
+            .select();
+          
+          if (error) {
+            console.error("Error updating invite:", error);
+            throw new Error(`Error updating invite: ${error.message}`);
           }
+          
+          result = { updated: true, data };
+          console.log("Updated existing invite:", result);
         } else {
-          // Create new invite - without using name column to avoid issues
+          // Create new invite
           const inviteData = {
             booking_id: inviteLink,
             email: email,
@@ -304,21 +310,33 @@ const handler = async (req: Request): Promise<Response> => {
           
           console.log("Creating new invite with data:", inviteData);
           
-          const { data: newInvite, error: insertError } = await adminClient
+          const { data, error } = await adminClient
             .from('booking_invites')
             .insert([inviteData])
             .select();
-            
-          if (insertError) {
-            console.error("Error inserting invite to database:", insertError);
-            throw new Error(`Error inserting invite: ${insertError.message}`);
-          } else {
-            console.log("Stored invite in database:", newInvite);
+          
+          if (error) {
+            console.error("Error creating invite:", error);
+            throw new Error(`Error creating invite: ${error.message}`);
           }
+          
+          result = { created: true, data };
+          console.log("Created new invite:", result);
         }
-      } catch (dbErr) {
-        console.error("Exception handling database operation:", dbErr);
-        throw dbErr;
+        
+      } catch (dbErr: any) {
+        console.error("Database error:", dbErr);
+        return new Response(
+          JSON.stringify({ 
+            error: "Failed to store invitation in database", 
+            details: dbErr.message,
+            success: false
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
       }
       
       return new Response(
