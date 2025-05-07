@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
@@ -157,7 +158,7 @@ const handler = async (req: Request): Promise<Response> => {
     try {
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, user_id, venue_name, customer_name, customer_email')
+        .select('id, user_id, venue_name, customer_name, customer_email, venue_id')
         .eq('id', bookingId)
         .maybeSingle();
         
@@ -198,7 +199,8 @@ const handler = async (req: Request): Promise<Response> => {
     
     // Generate proper links
     const bookingLink = `${appBaseUrl}/bookings/${bookingId}`;
-    const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
+    const actualVenueId = venueId || (bookingData?.venue_id ? bookingData.venue_id : null);
+    const venueLink = actualVenueId ? `${appBaseUrl}/venue/${actualVenueId}` : null;
 
     // Create subject and content based on response status
     const formattedHostName = hostName || bookingData?.customer_name || 'Host'; 
@@ -232,7 +234,7 @@ const handler = async (req: Request): Promise<Response> => {
               
               <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">Hello ${formattedHostName},</p>
               <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">
-                ${guestName || guestEmail} has ${status} your invitation to ${venueName} on ${formattedDate}.
+                ${guestName || guestEmail} has ${status} your invitation to ${actualVenueName} on ${formattedDate}.
               </p>
               
               <div style="background-color: #1e293b; padding: 15px; border-radius: 5px; margin: 20px 0;">
@@ -255,7 +257,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
                   <p style="margin: 5px 0; display: flex;">
                     <span style="width: 120px; color: #94a3b8; font-weight: 500;">Venue:</span> 
-                    <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${venueName}</span>
+                    <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${actualVenueName}</span>
                   </p>
                 </div>
                 
@@ -351,14 +353,29 @@ const handler = async (req: Request): Promise<Response> => {
       inviteUpdated = false;
     }
 
-    // 2. Send in-app notification to the host (customer) if we have a host user ID
+    // 2. Enhanced: First try to get a valid user_id to send notification to
+    // Try from multiple sources and with better error handling
+    let hostUserId = null;
+    
+    // Try to get the host user ID from various possible sources
+    if (userId) {
+      console.log("Using provided userId for notification:", userId);
+      hostUserId = userId;
+    } else if (bookingUserId) {
+      console.log("Using booking's user_id for notification:", bookingUserId);
+      hostUserId = bookingUserId;
+    } else if (bookingData?.user_id) {
+      console.log("Using booking_data user_id for notification:", bookingData.user_id);
+      hostUserId = bookingData.user_id;
+    } else {
+      console.log("Could not find a valid host user ID for notification");
+    }
+
+    // Create notification for the host if we have their ID
     let notificationSent = false;
-    try {
-      // Use user_id from the booking or from the request
-      const hostUserId = userId || bookingUserId;
-      
-      if (hostUserId) {
-        console.log("Found customer user ID:", hostUserId);
+    if (hostUserId) {
+      try {
+        console.log("Creating in-app notification for host with ID:", hostUserId);
         
         // Create notification data
         const notificationData = {
@@ -369,32 +386,53 @@ const handler = async (req: Request): Promise<Response> => {
           link: `/bookings/${bookingId}`,
           data: {
             booking_id: bookingId,
-            venue_id: venueId,
+            venue_id: actualVenueId,
             guest_email: guestEmail,
             guest_name: guestName,
             status: status,
-            venue_name: actualVenueName
+            venue_name: actualVenueName,
+            notification_time: new Date().toISOString()
           },
           read: false
         };
 
-        // Insert notification
-        const { error: notificationError } = await supabase
-          .from('notifications')
-          .insert([notificationData]);
+        // First try with the admin client for more reliability
+        let notificationError = null;
+        try {
+          const { error } = await adminClient
+            .from('notifications')
+            .insert([notificationData]);
+            
+          notificationError = error;
+        } catch (err) {
+          console.error("Error creating notification with admin client:", err);
+          notificationError = err;
+        }
 
+        // If admin client fails, try with the public client
         if (notificationError) {
-          console.error("Error creating notification:", notificationError);
-          notificationSent = false;
+          console.log("Admin client notification failed, trying public client");
+          const { error: publicError } = await supabase
+            .from('notifications')
+            .insert([notificationData]);
+            
+          if (publicError) {
+            console.error("Error also creating notification with public client:", publicError);
+            notificationSent = false;
+          } else {
+            console.log("Successfully created in-app notification with public client");
+            notificationSent = true;
+          }
         } else {
-          console.log("In-app notification created successfully");
+          console.log("Successfully created in-app notification with admin client");
           notificationSent = true;
         }
-      } else {
-        console.error("No user_id found for notification");
+      } catch (notificationError) {
+        console.error("Error processing notification:", notificationError);
+        notificationSent = false;
       }
-    } catch (notificationError) {
-      console.error("Error processing notification:", notificationError);
+    } else {
+      console.error("No user_id found for notification");
     }
 
     // Return results including status of all operations
@@ -404,7 +442,8 @@ const handler = async (req: Request): Promise<Response> => {
         message: `Successfully processed ${status} response for ${guestEmail}`,
         email_sent: emailSent,
         notification_sent: notificationSent,
-        invite_updated: inviteUpdated
+        invite_updated: inviteUpdated,
+        host_user_id: hostUserId || null
       }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },

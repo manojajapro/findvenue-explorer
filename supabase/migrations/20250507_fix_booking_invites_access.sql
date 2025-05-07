@@ -17,4 +17,3 @@ FOR ALL USING (auth.role() = 'service_role');
 -- Allow authenticated users to update invites
 CREATE POLICY "Allow users to update own invites" ON public.booking_invites
 FOR UPDATE USING (auth.uid() IS NOT NULL);
-
