@@ -75,7 +75,7 @@ const BookingInvite = () => {
         console.log("Invites found:", inviteData);
         setInvites(inviteData);
         
-        // Fetch booking details with selective columns to avoid errors with missing fields
+        // Now fetch booking details - this might not exist due to data issues but we'll handle that gracefully
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select(`
@@ -96,46 +96,54 @@ const BookingInvite = () => {
           .eq('id', id)
           .maybeSingle();
         
-        if (bookingError) {
-          console.error('Error fetching booking details:', bookingError);
-          setError('Unable to load booking details. Please try again later.');
-          setDebugInfo({ type: 'booking_query_error', error: bookingError });
-          setLoading(false);
-          return;
-        }
-        
-        if (!bookingData) {
-          console.error('No booking found with ID:', id);
-          setError('Unable to load booking details. This booking may not exist or has been removed.');
-          setDebugInfo({ type: 'no_booking', booking_id: id });
-          setLoading(false);
-          return;
-        }
-        
-        console.log("Booking data loaded:", bookingData);
-        
-        // Set default customer_name if missing
-        const bookingWithDefaults = {
-          ...bookingData,
-          customer_name: bookingData.customer_name || 'Host'
-        };
-        
-        setBooking(bookingWithDefaults);
-        
-        // Fetch venue details if venue_id exists
-        if (bookingData.venue_id) {
-          const { data: venueData, error: venueError } = await supabase
-            .from('venues')
-            .select('*')
-            .eq('id', bookingData.venue_id)
-            .maybeSingle();
-            
-          if (venueError) {
-            console.error('Error fetching venue details:', venueError);
-            // Don't set error here, we can continue without venue details
-          } else if (venueData) {
-            console.log("Venue data loaded:", venueData);
-            setVenue(venueData);
+        // Even if we can't find the booking, we can still allow responses to the invitation
+        // We'll create a limited booking object with just the data from the first invite
+        if (bookingError || !bookingData) {
+          console.error('Error or no booking found:', bookingError || 'No data');
+          
+          // Use invite data to create a placeholder booking object
+          const firstInvite = inviteData[0];
+          const placeholderBooking = {
+            id: id,
+            venue_name: 'Unknown Venue',
+            booking_date: new Date().toISOString().split('T')[0], // Today's date as fallback
+            start_time: '00:00',
+            end_time: '23:59',
+            status: 'pending',
+            customer_name: 'Event Host'
+          };
+          
+          setBooking(placeholderBooking);
+          setError('Some booking details are unavailable, but you can still respond to the invitation.');
+          setDebugInfo({ 
+            type: 'booking_missing_but_invite_exists', 
+            booking_id: id,
+            invite_data: firstInvite
+          });
+        } else {
+          console.log("Booking data loaded:", bookingData);
+          
+          // Set default customer_name if missing
+          const bookingWithDefaults = {
+            ...bookingData,
+            customer_name: bookingData.customer_name || 'Host'
+          };
+          
+          setBooking(bookingWithDefaults);
+          setError(null);
+          
+          // Fetch venue details if venue_id exists
+          if (bookingData.venue_id) {
+            const { data: venueData, error: venueError } = await supabase
+              .from('venues')
+              .select('*')
+              .eq('id', bookingData.venue_id)
+              .maybeSingle();
+              
+            if (!venueError && venueData) {
+              console.log("Venue data loaded:", venueData);
+              setVenue(venueData);
+            }
           }
         }
         
@@ -260,18 +268,18 @@ const BookingInvite = () => {
       
       // Prepare the data for the notification email
       const notificationData = {
-        hostEmail: booking.customer_email,
+        hostEmail: booking.customer_email || '', // This might be missing in some cases
         hostName: hostName,
         guestEmail: inviteInfo.email,
         guestName: inviteInfo.name || inviteInfo.email.split('@')[0],
-        venueName: booking.venue_name,
-        bookingDate: booking.booking_date,
-        startTime: booking.start_time,
-        endTime: booking.end_time,
+        venueName: booking.venue_name || 'Event Venue',
+        bookingDate: booking.booking_date || new Date().toISOString().split('T')[0],
+        startTime: booking.start_time || '00:00',
+        endTime: booking.end_time || '23:59',
         status: status,
         bookingId: booking.id,
-        venueId: booking.venue_id,
-        userId: booking.user_id
+        venueId: booking.venue_id || null,
+        userId: booking.user_id || null
       };
       
       // Call the edge function to send the notification email
@@ -459,7 +467,9 @@ const BookingInvite = () => {
           </CardHeader>
           <CardContent>
             <p className="text-slate-300 mb-4">
-              Multiple invitations were found for this event. Please enter your email address to identify your invitation.
+              {invites.length > 0 
+                ? "Please enter your email address to identify your invitation." 
+                : "Please enter your email address to verify your invitation."}
             </p>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -504,7 +514,8 @@ const BookingInvite = () => {
     );
   }
 
-  if (error) {
+  // Even with an error, we can still show invites if they exist
+  if (error && (!invites || invites.length === 0 || !inviteInfo)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
         <Card className="max-w-md w-full bg-slate-900 border-slate-800 text-white">
@@ -558,7 +569,7 @@ const BookingInvite = () => {
     );
   }
 
-  if (!booking) {
+  if (!booking && !inviteInfo) {
     return null;
   }
 
@@ -570,14 +581,16 @@ const BookingInvite = () => {
             <CardTitle className="text-2xl font-bold text-teal-400">
               Event Invitation
             </CardTitle>
-            <Badge className={getStatusColor(booking.status)}>
-              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-            </Badge>
+            {booking?.status && (
+              <Badge className={getStatusColor(booking.status)}>
+                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+              </Badge>
+            )}
           </div>
         </CardHeader>
         <CardContent className="pt-6 space-y-6">
           <div>
-            <h2 className="text-xl font-semibold text-white mb-2">{booking.venue_name}</h2>
+            <h2 className="text-xl font-semibold text-white mb-2">{booking?.venue_name || "Event"}</h2>
             {inviteInfo && (
               <div className="text-sm text-teal-400/80 flex items-center gap-1">
                 <Mail className="h-3.5 w-3.5" />
@@ -590,7 +603,7 @@ const BookingInvite = () => {
           <div className="space-y-4 bg-slate-800/50 p-4 rounded-lg border border-slate-700/50">
             <h3 className="text-sm font-medium mb-2 text-teal-400">Event Details:</h3>
             
-            {booking.customer_name && (
+            {booking?.customer_name && (
               <div className="flex items-start gap-3">
                 <User className="h-5 w-5 text-teal-500 mt-0.5" />
                 <div>
@@ -604,12 +617,12 @@ const BookingInvite = () => {
               <Building className="h-5 w-5 text-teal-500 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-slate-300">Venue</p>
-                {venue && booking.venue_id ? (
+                {venue && booking?.venue_id ? (
                   <Link to={`/venue/${booking.venue_id}`} className="text-teal-400 hover:underline">
                     {booking.venue_name}
                   </Link>
                 ) : (
-                  <p className="text-white">{booking.venue_name}</p>
+                  <p className="text-white">{booking?.venue_name || "Event Venue"}</p>
                 )}
               </div>
             </div>
@@ -618,19 +631,21 @@ const BookingInvite = () => {
               <Calendar className="h-5 w-5 text-teal-500 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-slate-300">Date</p>
-                <p className="text-white">{formatDate(booking.booking_date)}</p>
+                <p className="text-white">{booking?.booking_date ? formatDate(booking.booking_date) : "Date not specified"}</p>
               </div>
             </div>
             
-            <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-teal-500 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-slate-300">Time</p>
-                <p className="text-white">{booking.start_time} - {booking.end_time}</p>
+            {(booking?.start_time || booking?.end_time) && (
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-teal-500 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-slate-300">Time</p>
+                  <p className="text-white">{booking.start_time || "00:00"} - {booking.end_time || "23:59"}</p>
+                </div>
               </div>
-            </div>
+            )}
             
-            {booking.address && (
+            {booking?.address && (
               <div className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-teal-500 mt-0.5" />
                 <div>
@@ -640,7 +655,7 @@ const BookingInvite = () => {
               </div>
             )}
             
-            {booking.customer_email && (
+            {booking?.customer_email && (
               <div className="flex items-start gap-3">
                 <Mail className="h-5 w-5 text-teal-500 mt-0.5" />
                 <div>
@@ -650,7 +665,7 @@ const BookingInvite = () => {
               </div>
             )}
             
-            {booking.guests > 0 && (
+            {booking?.guests > 0 && (
               <div className="flex items-start gap-3">
                 <Users className="h-5 w-5 text-teal-500 mt-0.5" />
                 <div>
@@ -660,10 +675,17 @@ const BookingInvite = () => {
               </div>
             )}
             
-            {booking.special_requests && (
+            {booking?.special_requests && (
               <div className="mt-4 pt-4 border-t border-slate-700">
                 <p className="text-sm font-medium text-slate-300 mb-1">Special Requests:</p>
                 <p className="text-white">{booking.special_requests}</p>
+              </div>
+            )}
+            
+            {error && (
+              <div className="mt-4 pt-4 border-t border-slate-700 text-amber-400">
+                <AlertCircle className="inline-block h-4 w-4 mr-1" />
+                <span className="text-sm">{error}</span>
               </div>
             )}
           </div>
@@ -676,7 +698,7 @@ const BookingInvite = () => {
               <Button 
                 className="bg-teal-500 hover:bg-teal-600 text-slate-900 flex items-center gap-2"
                 onClick={handleAccept}
-                disabled={submitting || booking.status === 'cancelled'}
+                disabled={submitting || (booking?.status === 'cancelled')}
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Accept
@@ -685,7 +707,7 @@ const BookingInvite = () => {
                 variant="outline"
                 className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
                 onClick={handleDecline}
-                disabled={submitting || booking.status === 'cancelled'}
+                disabled={submitting || (booking?.status === 'cancelled')}
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                 Decline
@@ -693,7 +715,7 @@ const BookingInvite = () => {
             </div>
           )}
 
-          {venue && booking.venue_id && (
+          {venue && booking?.venue_id && (
             <Link to={`/venue/${booking.venue_id}`} className="w-full mt-3">
               <Button 
                 variant="secondary" 
