@@ -156,26 +156,41 @@ const handler = async (req: Request): Promise<Response> => {
     let actualUserId = userId;  // Start with provided userId if available
     
     try {
-      console.log("Fetching booking details to get user_id (creator/host)...");
-      const { data, error } = await supabase
+      console.log("Fetching booking details to get user_id of host...");
+      const { data, error } = await adminClient
         .from('bookings')
         .select('id, user_id, venue_name, customer_name, customer_email, venue_id')
         .eq('id', bookingId)
         .maybeSingle();
         
       if (error) {
-        console.error("Error checking booking:", error);
+        console.error("Error checking booking with admin client:", error);
+        // Fallback to public client
+        const { data: publicData, error: publicError } = await supabase
+          .from('bookings')
+          .select('id, user_id, venue_name, customer_name, customer_email, venue_id')
+          .eq('id', bookingId)
+          .maybeSingle();
+          
+        if (publicError) {
+          console.error("Error also with public client:", publicError);
+        } else if (publicData) {
+          bookingData = publicData;
+          bookingUserId = publicData.user_id;
+          console.log("Found booking data with public client:", bookingData);
+        }
       } else if (data) {
         bookingData = data;
         bookingUserId = data.user_id;
-        // If no userId was provided in the request, use the one from booking
-        if (!actualUserId && bookingUserId) {
-          actualUserId = bookingUserId;
-          console.log(`Using booking's user_id for notification: ${actualUserId}`);
-        }
-        console.log("Found booking data:", bookingData);
+        console.log("Found booking data with admin client:", bookingData);
       } else {
         console.log("Booking not found with id:", bookingId);
+      }
+      
+      // If no userId was provided in the request, use the one from booking
+      if (!actualUserId && bookingUserId) {
+        actualUserId = bookingUserId;
+        console.log(`Using booking's user_id for notification: ${actualUserId}`);
       }
     } catch (err) {
       console.error("Exception checking booking:", err);
@@ -362,8 +377,9 @@ const handler = async (req: Request): Promise<Response> => {
       inviteUpdated = false;
     }
 
-    // Create notification for the host if we have their ID
+    // Create in-app notification for the host
     let notificationSent = false;
+    
     if (actualUserId) {
       try {
         console.log(`Creating in-app notification for host with ID: ${actualUserId}`);
@@ -431,6 +447,14 @@ const handler = async (req: Request): Promise<Response> => {
         }
         
         notificationSent = success;
+        
+        // Enable realtime for the notifications table to ensure real-time updates
+        try {
+          await adminClient.rpc('enable_realtime_for_table', { table_name: 'notifications' });
+          console.log("Enabled realtime for notifications table");
+        } catch (err) {
+          console.error("Error enabling realtime:", err);
+        }
       } catch (err) {
         console.error("General error creating notification:", err);
         notificationSent = false;

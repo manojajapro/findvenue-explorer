@@ -17,3 +17,7 @@ FOR ALL USING (auth.role() = 'service_role');
 -- Allow authenticated users to update invites
 CREATE POLICY "Allow users to update own invites" ON public.booking_invites
 FOR UPDATE USING (auth.uid() IS NOT NULL);
+
+-- Enable realtime for booking_invites table
+ALTER TABLE public.booking_invites REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE booking_invites;

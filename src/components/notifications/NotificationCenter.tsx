@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +49,7 @@ const NotificationCenter = () => {
 
     const fetchNotifications = async () => {
       try {
+        console.log("Fetching notifications for user:", user.id);
         const { data, error } = await supabase
           .from('notifications')
           .select('*')
@@ -62,6 +62,7 @@ const NotificationCenter = () => {
           return;
         }
         
+        console.log("Fetched notifications:", data);
         setNotifications(data as Notification[]);
         setUnreadCount(data.filter((n: any) => !n.read).length);
       } catch (error) {
@@ -76,7 +77,9 @@ const NotificationCenter = () => {
     // Enable realtime for notifications table
     const enableRealtimeForNotifications = async () => {
       try {
+        console.log("Enabling realtime for notifications table...");
         await supabase.rpc('enable_realtime_for_table', { table_name: 'notifications' });
+        console.log("Realtime enabled for notifications table");
       } catch (e) {
         console.error('Could not enable realtime for notifications:', e);
       }
@@ -85,7 +88,8 @@ const NotificationCenter = () => {
     enableRealtimeForNotifications();
 
     // Subscribe to new notifications
-    const channel = supabase
+    console.log("Setting up notification subscription for user:", user.id);
+    const notificationsChannel = supabase
       .channel('notification_changes')
       .on('postgres_changes', 
         { 
@@ -99,6 +103,7 @@ const NotificationCenter = () => {
           
           if (payload.eventType === 'INSERT') {
             const newNotification = payload.new as Notification;
+            console.log("New notification received:", newNotification);
             setNotifications(prev => [newNotification, ...prev]);
             if (!newNotification.read) {
               setUnreadCount(prev => prev + 1);
@@ -120,6 +125,7 @@ const NotificationCenter = () => {
             }
           } else if (payload.eventType === 'UPDATE') {
             // Update existing notification
+            console.log("Notification updated:", payload.new);
             setNotifications(prev => 
               prev.map(n => n.id === payload.new.id ? payload.new as Notification : n)
             );
@@ -131,7 +137,29 @@ const NotificationCenter = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Notification subscription status:", status);
+      });
+      
+    // Also subscribe to booking_invites changes to create notifications when status changes
+    const bookingInvitesChannel = supabase
+      .channel('booking_invites_changes')
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'booking_invites'
+        },
+        async (payload) => {
+          console.log('Booking invite change detected:', payload);
+          if (payload.new && payload.old && payload.new.status !== payload.old.status) {
+            console.log(`Invite status changed from ${payload.old.status} to ${payload.new.status}`);
+            // Notification will be handled by the edge function
+          }
+        })
+      .subscribe((status) => {
+        console.log("Booking invites subscription status:", status);
+      });
       
     // Request notification permission if not already granted
     if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
@@ -139,7 +167,8 @@ const NotificationCenter = () => {
     }
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(notificationsChannel);
+      supabase.removeChannel(bookingInvitesChannel);
     };
   }, [user, navigate]);
 
@@ -188,6 +217,8 @@ const NotificationCenter = () => {
       case "confirmed": return "Confirmed";
       case "cancelled": return "Cancelled";
       case "pending": return "Pending";
+      case "accepted": return "Accepted";
+      case "declined": return "Declined";
       default: return status;
     }
   };
@@ -197,6 +228,8 @@ const NotificationCenter = () => {
       case "confirmed": return "bg-green-500/10 text-green-500";
       case "cancelled": return "bg-red-500/10 text-red-500";
       case "pending": return "bg-yellow-500/10 text-yellow-500";
+      case "accepted": return "bg-green-500/10 text-green-500";
+      case "declined": return "bg-red-500/10 text-red-500";
       default: return "bg-blue-500/10 text-blue-500";
     }
   };
