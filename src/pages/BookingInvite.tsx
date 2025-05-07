@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building, Loader2 } from 'lucide-react';
@@ -329,23 +328,27 @@ const BookingInvite = () => {
         return;
       }
       
-      // Update the booking invite status in the database
-      const { error } = await supabase
+      console.log("Updating invitation status to accepted for:", inviteInfo.email);
+      
+      // Important - Use direct Supabase update rather than just sending email
+      const { error: updateError } = await supabase
         .from('booking_invites')
         .update({ status: 'accepted' })
         .eq('booking_id', id)
         .eq('email', inviteInfo.email);
         
-      if (error) {
-        console.error('Error updating invite status:', error);
+      if (updateError) {
+        console.error('Error updating invite status:', updateError);
         toast({ 
           title: "Failed to accept invitation", 
-          description: "There was an error processing your response.",
+          description: "There was an error processing your response. Please try again.",
           variant: "destructive" 
         });
         setSubmitting(false);
         return;
       }
+      
+      console.log("Successfully updated invitation status to accepted");
       
       // Send notification email and in-app notification
       const notificationSent = await sendInvitationResponseEmail('accepted');
@@ -390,23 +393,27 @@ const BookingInvite = () => {
         return;
       }
       
-      // Update the booking invite status in the database
-      const { error } = await supabase
+      console.log("Updating invitation status to declined for:", inviteInfo.email);
+      
+      // Important - Use direct Supabase update rather than just sending email
+      const { error: updateError } = await supabase
         .from('booking_invites')
         .update({ status: 'declined' })
         .eq('booking_id', id)
         .eq('email', inviteInfo.email);
         
-      if (error) {
-        console.error('Error updating invite status:', error);
+      if (updateError) {
+        console.error('Error updating invite status:', updateError);
         toast({ 
           title: "Failed to decline invitation", 
-          description: "There was an error processing your response.",
+          description: "There was an error processing your response. Please try again.",
           variant: "destructive" 
         });
         setSubmitting(false);
         return;
       }
+      
+      console.log("Successfully updated invitation status to declined");
       
       // Send notification email and in-app notification
       const notificationSent = await sendInvitationResponseEmail('declined');
@@ -437,8 +444,9 @@ const BookingInvite = () => {
     }
   };
 
+  // Updated code for rendering the status banner
   const getInviteStatus = () => {
-    if (!inviteInfo || !inviteInfo.status || inviteInfo.status === 'pending') return null;
+    if (!inviteInfo || !inviteInfo.status) return null;
     
     switch (inviteInfo.status) {
       case 'accepted':
@@ -455,6 +463,8 @@ const BookingInvite = () => {
             <p className="text-red-300">You've declined this invitation</p>
           </div>
         );
+      case 'pending':
+        return null;
       default:
         return null;
     }

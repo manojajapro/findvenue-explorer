@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
@@ -6,7 +5,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const supabaseUrl = "https://esdmelfzeszjtbnoajig.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVzZG1lbGZ6ZXN6anRibm9hamlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4ODUwMTUsImV4cCI6MjA1ODQ2MTAxNX0.1z27OZ04RuR8AYlVGaE9L8vWWYilSrMlyq422BJcX94";
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+// Create a Supabase client with anonymous key for public operations
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Create a Supabase admin client with service role key for admin operations
+const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -304,20 +314,36 @@ const handler = async (req: Request): Promise<Response> => {
       // Continue with the rest of the process even if email fails
     }
 
-    // Update the invitation status in the database
+    // Update the invitation status in the database using the admin client
+    // This ensures the update works even with RLS policies
     let inviteUpdated = false;
     try {
-      const { error: updateError } = await supabase
+      // Use admin client instead of public client for more reliable updates
+      const { error: updateError } = await adminClient
         .from('booking_invites')
-        .update({ status })
+        .update({ status: status })
         .eq('booking_id', bookingId)
         .eq('email', guestEmail);
 
       if (updateError) {
-        console.error("Error updating invitation status:", updateError);
-        inviteUpdated = false;
+        console.error("Error updating invitation status with admin client:", updateError);
+        
+        // Fallback to public client if admin client fails
+        const { error: publicUpdateError } = await supabase
+          .from('booking_invites')
+          .update({ status: status })
+          .eq('booking_id', bookingId)
+          .eq('email', guestEmail);
+          
+        if (publicUpdateError) {
+          console.error("Error also updating with public client:", publicUpdateError);
+          inviteUpdated = false;
+        } else {
+          console.log(`Successfully updated invitation status to ${status} for ${guestEmail} using public client`);
+          inviteUpdated = true;
+        }
       } else {
-        console.log(`Successfully updated invitation status to ${status} for ${guestEmail}`);
+        console.log(`Successfully updated invitation status to ${status} for ${guestEmail} using admin client`);
         inviteUpdated = true;
       }
     } catch (dbError) {
