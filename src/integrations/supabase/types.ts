@@ -82,6 +82,7 @@ export type Database = {
           booking_date: string
           created_at: string
           customer_email: string | null
+          customer_name: string | null
           customer_phone: string | null
           end_time: string
           guests: number
@@ -100,6 +101,7 @@ export type Database = {
           booking_date: string
           created_at?: string
           customer_email?: string | null
+          customer_name?: string | null
           customer_phone?: string | null
           end_time: string
           guests?: number
@@ -118,6 +120,7 @@ export type Database = {
           booking_date?: string
           created_at?: string
           customer_email?: string | null
+          customer_name?: string | null
           customer_phone?: string | null
           end_time?: string
           guests?: number

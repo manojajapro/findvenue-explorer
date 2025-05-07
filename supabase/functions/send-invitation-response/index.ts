@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
@@ -67,16 +68,13 @@ const handler = async (req: Request): Promise<Response> => {
       userId
     } = requestData;
 
-    // Check required fields (make hostName optional)
-    if (!guestEmail || !venueName || !bookingDate || !status || !bookingId) {
+    // Check required fields (make hostName and hostEmail optional)
+    if (!guestEmail || !bookingId) {
       return new Response(
         JSON.stringify({ 
           error: "Required fields are missing",
           missingFields: [
             !guestEmail && "guestEmail",
-            !venueName && "venueName", 
-            !bookingDate && "bookingDate",
-            !status && "status",
             !bookingId && "bookingId",
           ].filter(Boolean)
         }),
@@ -89,36 +87,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Processing invitation response from: ${guestEmail}, status: ${status}, bookingId: ${bookingId}`);
 
-    // Double check that booking exists
-    const { data: bookingData, error: bookingError } = await supabase
-      .from('bookings')
-      .select('id, user_id')
-      .eq('id', bookingId)
-      .maybeSingle();
-
-    if (bookingError) {
-      console.error("Error validating booking:", bookingError);
-      return new Response(
-        JSON.stringify({ error: "Could not validate booking information", details: bookingError.message }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
-    
-    if (!bookingData) {
-      console.error("Booking not found with id:", bookingId);
-      return new Response(
-        JSON.stringify({ error: "Booking not found" }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
-
-    // Verify the invitation exists
+    // Verify the invitation exists first - this is the most important check
     const { data: inviteData, error: inviteError } = await supabase
       .from('booking_invites')
       .select('*')
@@ -167,6 +136,31 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Since we have a valid invite, we can proceed even if booking details are limited
+
+    // Check if booking exists, but don't fail if it doesn't
+    let bookingData = null;
+    let bookingUserId = null;
+    
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('id, user_id, venue_name, customer_name, customer_email')
+        .eq('id', bookingId)
+        .maybeSingle();
+        
+      if (error) {
+        console.error("Error checking booking:", error);
+      } else if (data) {
+        bookingData = data;
+        bookingUserId = data.user_id;
+      } else {
+        console.log("Booking not found with id:", bookingId);
+      }
+    } catch (err) {
+      console.error("Exception checking booking:", err);
+    }
+
     // Format the date for better display in email
     let formattedDate = bookingDate;
     try {
@@ -195,7 +189,8 @@ const handler = async (req: Request): Promise<Response> => {
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
 
     // Create subject and content based on response status
-    const formattedHostName = hostName || 'Host'; // Use a default if hostName is missing
+    const formattedHostName = hostName || bookingData?.customer_name || 'Host'; 
+    const actualHostEmail = hostEmail || bookingData?.customer_email || "";
     
     const subject = status === 'accepted' 
       ? `${guestName || 'A guest'} has accepted your event invitation`
@@ -205,14 +200,14 @@ const handler = async (req: Request): Promise<Response> => {
     const statusBgColor = status === 'accepted' ? '#10b98120' : '#ef444420';
     const statusText = status === 'accepted' ? 'Accepted' : 'Declined';
 
-    // 1. Send an email notification to the host
+    // 1. Send an email notification to the host if we have an email address
+    let emailSent = false;
+    
     try {
-      if (!hostEmail) {
-        console.log("No host email provided, skipping email notification");
-      } else {
+      if (actualHostEmail) {
         const emailResponse = await resend.emails.send({
           from: "Avnu <onboarding@resend.dev>", // Using verified Resend default domain
-          to: [hostEmail],
+          to: [actualHostEmail],
           subject: subject,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #0f172a; color: #FFFFFF;">
@@ -295,15 +290,20 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
           `,
         });
-    
+        
         console.log("Email notification sent to host:", emailResponse);
+        emailSent = true;
+      } else {
+        console.log("No host email provided, skipping email notification");
       }
     } catch (emailError: any) {
       console.error("Error sending email:", emailError);
+      emailSent = false;
       // Continue with the rest of the process even if email fails
     }
 
     // Update the invitation status in the database
+    let inviteUpdated = false;
     try {
       const { error: updateError } = await supabase
         .from('booking_invites')
@@ -313,17 +313,21 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (updateError) {
         console.error("Error updating invitation status:", updateError);
+        inviteUpdated = false;
       } else {
         console.log(`Successfully updated invitation status to ${status} for ${guestEmail}`);
+        inviteUpdated = true;
       }
     } catch (dbError) {
       console.error("Error updating invitation in database:", dbError);
+      inviteUpdated = false;
     }
 
-    // 2. Send in-app notification to the host (customer)
+    // 2. Send in-app notification to the host (customer) if we have a host user ID
+    let notificationSent = false;
     try {
       // Use user_id from the booking or from the request
-      const hostUserId = userId || bookingData.user_id;
+      const hostUserId = userId || bookingUserId;
       
       if (hostUserId) {
         console.log("Found customer user ID:", hostUserId);
@@ -353,8 +357,10 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (notificationError) {
           console.error("Error creating notification:", notificationError);
+          notificationSent = false;
         } else {
           console.log("In-app notification created successfully");
+          notificationSent = true;
         }
       } else {
         console.error("No user_id found for notification");
@@ -363,10 +369,14 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("Error processing notification:", notificationError);
     }
 
+    // Return results including status of all operations
     return new Response(JSON.stringify(
       { 
-        success: true,
-        message: `Successfully processed ${status} response for ${guestEmail}`
+        success: inviteUpdated,
+        message: `Successfully processed ${status} response for ${guestEmail}`,
+        email_sent: emailSent,
+        notification_sent: notificationSent,
+        invite_updated: inviteUpdated
       }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
