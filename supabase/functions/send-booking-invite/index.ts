@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
@@ -257,7 +256,7 @@ const handler = async (req: Request): Promise<Response> => {
       
       // Store the invitation in the database
       try {
-        // Create admin client for database operations
+        // Create admin client for database operations with service role key
         const adminClient = createClient(
           supabaseUrl,
           Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || supabaseAnonKey,
@@ -282,14 +281,11 @@ const handler = async (req: Request): Promise<Response> => {
         }
         
         if (existingInvite) {
-          // Update existing invite
+          // Update existing invite - avoid using name column if it causes issues
           console.log("Found existing invite ID:", existingInvite.id);
           const { error: updateError } = await adminClient
             .from('booking_invites')
-            .update({ 
-              status: 'pending',
-              name: recipientName || null
-            })
+            .update({ status: 'pending' })
             .eq('id', existingInvite.id);
             
           if (updateError) {
@@ -299,12 +295,11 @@ const handler = async (req: Request): Promise<Response> => {
             console.log("Updated existing invite for:", email);
           }
         } else {
-          // Create new invite
+          // Create new invite - without using name column to avoid issues
           const inviteData = {
             booking_id: inviteLink,
             email: email,
-            status: 'pending',
-            name: recipientName || null
+            status: 'pending'
           };
           
           console.log("Creating new invite with data:", inviteData);

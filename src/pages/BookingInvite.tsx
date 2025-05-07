@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building, Loader2 } from 'lucide-react';
@@ -56,6 +55,8 @@ const BookingInvite = () => {
           setLoading(false);
           return;
         }
+        
+        console.log("Invites query result:", inviteData);
         
         if (!inviteData || inviteData.length === 0) {
           console.error('No invites found for booking ID:', id);

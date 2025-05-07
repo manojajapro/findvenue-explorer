@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { X, Mail, Plus, Check, Loader2, XCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -160,70 +159,8 @@ export const InviteGuestsModal = ({ isOpen, onClose, booking }: InviteGuestsModa
             successfulSends.push(trimmedEmail);
             console.log("Successfully sent invite to:", trimmedEmail);
             
-            // Check if booking_invites table has a name column
-            const { data: tableData, error: tableError } = await supabase
-              .from('booking_invites')
-              .select('*')
-              .limit(1);
-              
-            if (tableError) {
-              console.error("Error checking table schema:", tableError);
-            }
-            
-            // Store in database after successful email sending
-            try {
-              // First check if invite already exists
-              const { data: existingInvite, error: existingError } = await supabase
-                .from('booking_invites')
-                .select('id')
-                .eq('booking_id', booking.id)
-                .eq('email', trimmedEmail)
-                .maybeSingle();
-                
-              if (existingError) {
-                console.error("Error checking existing invite:", existingError);
-              }
-              
-              if (existingInvite) {
-                // Update existing invite
-                const { error: updateError } = await supabase
-                  .from('booking_invites')
-                  .update({ status: 'pending' })
-                  .eq('id', existingInvite.id);
-                  
-                if (updateError) {
-                  console.error("Error updating invite:", updateError);
-                } else {
-                  console.log("Updated existing invite for:", trimmedEmail);
-                }
-              } else {
-                // Create new invite
-                // First check if the name column exists
-                const hasNameColumn = tableData && tableData[0] && 'name' in tableData[0];
-                
-                const inviteData: any = {
-                  booking_id: booking.id,
-                  email: trimmedEmail,
-                  status: 'pending'
-                };
-                
-                if (hasNameColumn && recipientName) {
-                  inviteData.name = recipientName;
-                }
-                
-                const { error: insertError } = await supabase
-                  .from('booking_invites')
-                  .insert([inviteData]);
-                  
-                if (insertError) {
-                  console.error("Error inserting invite to database:", insertError);
-                } else {
-                  console.log("Stored invite in database for:", trimmedEmail);
-                }
-              }
-            } catch (dbErr) {
-              console.error("Exception handling database operation:", dbErr);
-            }
+            // Skip local database operations since the edge function now handles this properly
+            console.log("Invitation database entry handled by edge function");
           }
         } catch (emailErr: any) {
           console.error("Exception sending email:", emailErr);
