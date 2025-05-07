@@ -158,7 +158,7 @@ const handler = async (req: Request): Promise<Response> => {
     try {
       const { data, error } = await supabase
         .from('bookings')
-        .select('id, user_id, venue_name, customer_name, customer_email, venue_id')
+        .select('id, user_id, venue_name, customer_name, customer_email, venue_id, owner_id')
         .eq('id', bookingId)
         .maybeSingle();
         
@@ -167,6 +167,7 @@ const handler = async (req: Request): Promise<Response> => {
       } else if (data) {
         bookingData = data;
         bookingUserId = data.user_id;
+        console.log("Found booking data:", bookingData);
       } else {
         console.log("Booking not found with id:", bookingId);
       }
@@ -353,21 +354,40 @@ const handler = async (req: Request): Promise<Response> => {
       inviteUpdated = false;
     }
 
-    // 2. Enhanced: First try to get a valid user_id to send notification to
-    // Try from multiple sources and with better error handling
+    // Try to get the host user ID from various possible sources
     let hostUserId = null;
     
-    // Try to get the host user ID from various possible sources
+    // NEW: More aggressively try to identify the user who created the booking
     if (userId) {
       console.log("Using provided userId for notification:", userId);
       hostUserId = userId;
-    } else if (bookingUserId) {
-      console.log("Using booking's user_id for notification:", bookingUserId);
-      hostUserId = bookingUserId;
     } else if (bookingData?.user_id) {
-      console.log("Using booking_data user_id for notification:", bookingData.user_id);
+      console.log("Using booking's user_id for notification:", bookingData.user_id);
       hostUserId = bookingData.user_id;
     } else {
+      // If we don't have the user_id from the request or booking, try to get it from the bookings table
+      try {
+        console.log("Querying bookings table to find the host user ID");
+        const { data: hostData, error: hostError } = await supabase
+          .from('bookings')
+          .select('user_id')
+          .eq('id', bookingId)
+          .maybeSingle();
+          
+        if (hostError) {
+          console.error("Error finding host user ID:", hostError);
+        } else if (hostData && hostData.user_id) {
+          console.log("Found host user ID from bookings table:", hostData.user_id);
+          hostUserId = hostData.user_id;
+        } else {
+          console.log("Could not find a valid host user ID for notification in bookings table");
+        }
+      } catch (err) {
+        console.error("Exception finding host user ID:", err);
+      }
+    }
+    
+    if (!hostUserId) {
       console.log("Could not find a valid host user ID for notification");
     }
 
@@ -404,6 +424,13 @@ const handler = async (req: Request): Promise<Response> => {
             .insert([notificationData]);
             
           notificationError = error;
+          
+          if (!error) {
+            console.log("Successfully created in-app notification with admin client");
+            notificationSent = true;
+          } else {
+            console.error("Error creating notification with admin client:", error);
+          }
         } catch (err) {
           console.error("Error creating notification with admin client:", err);
           notificationError = err;
@@ -423,9 +450,6 @@ const handler = async (req: Request): Promise<Response> => {
             console.log("Successfully created in-app notification with public client");
             notificationSent = true;
           }
-        } else {
-          console.log("Successfully created in-app notification with admin client");
-          notificationSent = true;
         }
       } catch (notificationError) {
         console.error("Error processing notification:", notificationError);
