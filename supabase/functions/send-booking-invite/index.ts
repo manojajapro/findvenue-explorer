@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.31.0";
@@ -256,8 +257,20 @@ const handler = async (req: Request): Promise<Response> => {
       
       // Store the invitation in the database
       try {
+        // Create admin client for database operations
+        const adminClient = createClient(
+          supabaseUrl,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || supabaseAnonKey,
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false
+            }
+          }
+        );
+        
         // Check if an invitation already exists
-        const { data: existingInvite, error: checkError } = await supabase
+        const { data: existingInvite, error: checkError } = await adminClient
           .from('booking_invites')
           .select('id')
           .eq('booking_id', inviteLink)
@@ -270,7 +283,8 @@ const handler = async (req: Request): Promise<Response> => {
         
         if (existingInvite) {
           // Update existing invite
-          const { error: updateError } = await supabase
+          console.log("Found existing invite ID:", existingInvite.id);
+          const { error: updateError } = await adminClient
             .from('booking_invites')
             .update({ 
               status: 'pending',
@@ -280,33 +294,36 @@ const handler = async (req: Request): Promise<Response> => {
             
           if (updateError) {
             console.error("Error updating invite:", updateError);
+            throw new Error(`Error updating invite: ${updateError.message}`);
           } else {
             console.log("Updated existing invite for:", email);
           }
         } else {
           // Create new invite
-          const inviteData: any = {
+          const inviteData = {
             booking_id: inviteLink,
             email: email,
-            status: 'pending'
+            status: 'pending',
+            name: recipientName || null
           };
           
-          if (recipientName) {
-            inviteData.name = recipientName;
-          }
+          console.log("Creating new invite with data:", inviteData);
           
-          const { error: insertError } = await supabase
+          const { data: newInvite, error: insertError } = await adminClient
             .from('booking_invites')
-            .insert([inviteData]);
+            .insert([inviteData])
+            .select();
             
           if (insertError) {
             console.error("Error inserting invite to database:", insertError);
+            throw new Error(`Error inserting invite: ${insertError.message}`);
           } else {
-            console.log("Stored invite in database for:", email);
+            console.log("Stored invite in database:", newInvite);
           }
         }
       } catch (dbErr) {
         console.error("Exception handling database operation:", dbErr);
+        throw dbErr;
       }
       
       return new Response(
