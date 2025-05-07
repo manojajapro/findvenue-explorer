@@ -68,12 +68,12 @@ const handler = async (req: Request): Promise<Response> => {
       userId
     } = requestData;
 
-    if (!hostEmail || !guestEmail || !venueName || !bookingDate || !status || !bookingId) {
+    // Check required fields (make hostName optional)
+    if (!guestEmail || !venueName || !bookingDate || !status || !bookingId) {
       return new Response(
         JSON.stringify({ 
           error: "Required fields are missing",
           missingFields: [
-            !hostEmail && "hostEmail",
             !guestEmail && "guestEmail",
             !venueName && "venueName", 
             !bookingDate && "bookingDate",
@@ -196,6 +196,8 @@ const handler = async (req: Request): Promise<Response> => {
     const venueLink = venueId ? `${appBaseUrl}/venue/${venueId}` : null;
 
     // Create subject and content based on response status
+    const formattedHostName = hostName || 'Host'; // Use a default if hostName is missing
+    
     const subject = status === 'accepted' 
       ? `${guestName || 'A guest'} has accepted your event invitation`
       : `${guestName || 'A guest'} has declined your event invitation`;
@@ -206,93 +208,97 @@ const handler = async (req: Request): Promise<Response> => {
 
     // 1. Send an email notification to the host
     try {
-      const emailResponse = await resend.emails.send({
-        from: "Avnu <onboarding@resend.dev>", // Using verified Resend default domain
-        to: [hostEmail],
-        subject: subject,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #0f172a; color: #FFFFFF;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #2dd4bf; font-size: 24px; margin-bottom: 5px;">Invitation Response</h1>
-              <p style="color: #FFFFFF; font-size: 16px;">
-                <span style="background-color: ${statusBgColor}; color: ${statusColor}; padding: 4px 12px; border-radius: 20px; font-weight: bold;">${statusText}</span>
-              </p>
-            </div>
-            
-            <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">Hello ${hostName || 'there'},</p>
-            <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">
-              ${guestName || guestEmail} has ${status} your invitation to ${venueName} on ${formattedDate}.
-            </p>
-            
-            <div style="background-color: #1e293b; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #2dd4bf; margin-top: 0; border-bottom: 1px solid #334155; padding-bottom: 10px;">Event Details:</h3>
-              
-              <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
-                <p style="margin: 5px 0; display: flex;">
-                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Guest:</span> 
-                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${guestName || guestEmail}</span>
+      if (!hostEmail) {
+        console.log("No host email provided, skipping email notification");
+      } else {
+        const emailResponse = await resend.emails.send({
+          from: "Avnu <onboarding@resend.dev>", // Using verified Resend default domain
+          to: [hostEmail],
+          subject: subject,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #0f172a; color: #FFFFFF;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #2dd4bf; font-size: 24px; margin-bottom: 5px;">Invitation Response</h1>
+                <p style="color: #FFFFFF; font-size: 16px;">
+                  <span style="background-color: ${statusBgColor}; color: ${statusColor}; padding: 4px 12px; border-radius: 20px; font-weight: bold;">${statusText}</span>
                 </p>
               </div>
+              
+              <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">Hello ${formattedHostName},</p>
+              <p style="font-size: 16px; line-height: 1.5; color: #FFFFFF;">
+                ${guestName || guestEmail} has ${status} your invitation to ${venueName} on ${formattedDate}.
+              </p>
+              
+              <div style="background-color: #1e293b; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h3 style="color: #2dd4bf; margin-top: 0; border-bottom: 1px solid #334155; padding-bottom: 10px;">Event Details:</h3>
+                
+                <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+                  <p style="margin: 5px 0; display: flex;">
+                    <span style="width: 120px; color: #94a3b8; font-weight: 500;">Guest:</span> 
+                    <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${guestName || guestEmail}</span>
+                  </p>
+                </div>
 
-              <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
-                <p style="margin: 5px 0; display: flex;">
-                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Status:</span> 
-                  <span style="flex: 1; color: ${statusColor}; font-weight: bold;">${statusText}</span>
-                </p>
+                <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+                  <p style="margin: 5px 0; display: flex;">
+                    <span style="width: 120px; color: #94a3b8; font-weight: 500;">Status:</span> 
+                    <span style="flex: 1; color: ${statusColor}; font-weight: bold;">${statusText}</span>
+                  </p>
+                </div>
+                
+                <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+                  <p style="margin: 5px 0; display: flex;">
+                    <span style="width: 120px; color: #94a3b8; font-weight: 500;">Venue:</span> 
+                    <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${venueName}</span>
+                  </p>
+                </div>
+                
+                <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
+                  <p style="margin: 5px 0; display: flex;">
+                    <span style="width: 120px; color: #94a3b8; font-weight: 500;">Date:</span> 
+                    <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${formattedDate}</span>
+                  </p>
+                </div>
+                
+                <div style="padding: 10px 0;">
+                  <p style="margin: 5px 0; display: flex;">
+                    <span style="width: 120px; color: #94a3b8; font-weight: 500;">Time:</span> 
+                    <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${startTime} - ${endTime}</span>
+                  </p>
+                </div>
               </div>
               
-              <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
-                <p style="margin: 5px 0; display: flex;">
-                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Venue:</span> 
-                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${venueName}</span>
-                </p>
+              <div style="text-align: center; margin: 30px 0;">
+                <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td align="center">
+                      <div>
+                        <a href="${bookingLink}" style="background-color: #2dd4bf; color: #0f172a; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 15px;">View Booking</a>
+                      </div>
+                    </td>
+                  </tr>
+                  ${venueLink ? `
+                  <tr>
+                    <td align="center" style="padding-top: 15px;">
+                      <div>
+                        <a href="${venueLink}" style="background-color: #475569; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; display: inline-block;">View Venue Details</a>
+                      </div>
+                    </td>
+                  </tr>` : ''}
+                </table>
               </div>
               
-              <div style="padding: 10px 0; border-bottom: 1px solid #334155;">
-                <p style="margin: 5px 0; display: flex;">
-                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Date:</span> 
-                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${formattedDate}</span>
-                </p>
-              </div>
-              
-              <div style="padding: 10px 0;">
-                <p style="margin: 5px 0; display: flex;">
-                  <span style="width: 120px; color: #94a3b8; font-weight: 500;">Time:</span> 
-                  <span style="flex: 1; color: #FFFFFF; font-weight: bold;">${startTime} - ${endTime}</span>
+              <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
+                <p style="font-size: 14px; color: #8b94a3;">
+                  This notification was sent via <span style="color: #2dd4bf;">Avnu</span>
                 </p>
               </div>
             </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <table width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation">
-                <tr>
-                  <td align="center">
-                    <div>
-                      <a href="${bookingLink}" style="background-color: #2dd4bf; color: #0f172a; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; display: inline-block; margin-bottom: 15px;">View Booking</a>
-                    </div>
-                  </td>
-                </tr>
-                ${venueLink ? `
-                <tr>
-                  <td align="center" style="padding-top: 15px;">
-                    <div>
-                      <a href="${venueLink}" style="background-color: #475569; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; display: inline-block;">View Venue Details</a>
-                    </div>
-                  </td>
-                </tr>` : ''}
-              </table>
-            </div>
-            
-            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155; text-align: center;">
-              <p style="font-size: 14px; color: #8b94a3;">
-                This notification was sent via <span style="color: #2dd4bf;">Avnu</span>
-              </p>
-            </div>
-          </div>
-        `,
-      });
-  
-      console.log("Email notification sent to host:", emailResponse);
+          `,
+        });
+    
+        console.log("Email notification sent to host:", emailResponse);
+      }
     } catch (emailError: any) {
       console.error("Error sending email:", emailError);
       // Continue with the rest of the process even if email fails

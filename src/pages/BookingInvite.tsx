@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Users, Check, X, AlertCircle, Mail, User, Building, Loader2 } from 'lucide-react';
@@ -74,7 +75,7 @@ const BookingInvite = () => {
         console.log("Invites found:", inviteData);
         setInvites(inviteData);
         
-        // Fetch booking details
+        // Fetch booking details with selective columns to avoid errors with missing fields
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select(`
@@ -90,7 +91,6 @@ const BookingInvite = () => {
             total_price,
             customer_email,
             customer_phone,
-            customer_name,
             user_id
           `)
           .eq('id', id)
@@ -113,7 +113,14 @@ const BookingInvite = () => {
         }
         
         console.log("Booking data loaded:", bookingData);
-        setBooking(bookingData);
+        
+        // Set default customer_name if missing
+        const bookingWithDefaults = {
+          ...bookingData,
+          customer_name: bookingData.customer_name || 'Host'
+        };
+        
+        setBooking(bookingWithDefaults);
         
         // Fetch venue details if venue_id exists
         if (bookingData.venue_id) {
@@ -248,10 +255,13 @@ const BookingInvite = () => {
       // Get the current origin
       const origin = window.location.origin;
       
+      // Default host name if customer_name is not available
+      const hostName = booking.customer_name || 'Host';
+      
       // Prepare the data for the notification email
       const notificationData = {
         hostEmail: booking.customer_email,
-        hostName: booking.customer_name,
+        hostName: hostName,
         guestEmail: inviteInfo.email,
         guestName: inviteInfo.name || inviteInfo.email.split('@')[0],
         venueName: booking.venue_name,
