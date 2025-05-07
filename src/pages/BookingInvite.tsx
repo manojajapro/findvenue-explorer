@@ -24,6 +24,7 @@ const BookingInvite = () => {
   const [venue, setVenue] = useState<any>(null);
   const [guestEmail, setGuestEmail] = useState<string>('');
   const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
+  const [invites, setInvites] = useState<any[]>([]);
 
   useEffect(() => {
     // Check if we already have the guest email in local storage
@@ -64,6 +65,7 @@ const BookingInvite = () => {
         }
         
         console.log("Invites found:", inviteData);
+        setInvites(inviteData);
         
         // Fetch booking details
         const { data: bookingData, error: bookingError } = await supabase
@@ -122,7 +124,18 @@ const BookingInvite = () => {
         }
         
         // Check for invites with the stored email
-        await checkForInvites(storedEmail || '');
+        if (storedEmail) {
+          await checkForInvites(storedEmail);
+        } else if (inviteData.length === 1) {
+          // If there's only one invite, use it automatically
+          setInviteInfo(inviteData[0]);
+          setGuestEmail(inviteData[0].email);
+          localStorage.setItem('guestEmail', inviteData[0].email);
+          setNeedsEmailConfirmation(false);
+        } else {
+          // If multiple invites, ask for email
+          setNeedsEmailConfirmation(true);
+        }
       } catch (err) {
         console.error('Exception in fetching booking:', err);
         setError('An unexpected error occurred while loading booking details');
@@ -137,55 +150,33 @@ const BookingInvite = () => {
   }, [id]);
 
   const checkForInvites = async (emailToCheck: string) => {
-    if (!id) return;
+    if (!id || !emailToCheck || invites.length === 0) return;
     
     try {
-      // Fetch all invites for this booking
-      const { data: inviteData, error: inviteError } = await supabase
-        .from('booking_invites')
-        .select('*')
-        .eq('booking_id', id);
-        
-      if (inviteError) {
-        console.error('Error fetching invites:', inviteError);
-        return;
-      }
+      const trimmedEmail = emailToCheck.toLowerCase().trim();
       
-      console.log("Invites found:", inviteData);
+      // Find matching invite from the already fetched invites
+      const matchingInvite = invites.find(invite => 
+        invite.email.toLowerCase().trim() === trimmedEmail
+      );
       
-      if (!inviteData || inviteData.length === 0) {
-        console.log("No invites found for this booking");
-        setError('No invitations found for this booking');
-        return;
-      }
-      
-      // If we have a stored email, try to match it with an invite
-      if (emailToCheck) {
-        const matchingInvite = inviteData.find(invite => 
-          invite.email.toLowerCase() === emailToCheck.toLowerCase()
-        );
-        
-        if (matchingInvite) {
-          console.log("Found matching invite:", matchingInvite);
-          setInviteInfo(matchingInvite);
-          setGuestEmail(emailToCheck);
-          setNeedsEmailConfirmation(false);
-          return;
-        }
-      }
-      
-      // If we have only one invite, use it
-      if (inviteData.length === 1) {
-        console.log("Only one invite found, using it:", inviteData[0]);
-        setInviteInfo(inviteData[0]);
-        localStorage.setItem('guestEmail', inviteData[0].email);
-        setGuestEmail(inviteData[0].email);
+      if (matchingInvite) {
+        console.log("Found matching invite:", matchingInvite);
+        setInviteInfo(matchingInvite);
+        setGuestEmail(emailToCheck);
+        localStorage.setItem('guestEmail', emailToCheck);
         setNeedsEmailConfirmation(false);
-      } else {
-        // Multiple invites found, need to ask which one they are
-        console.log("Multiple invites found, need to identify user");
-        setNeedsEmailConfirmation(true);
+        return;
       }
+      
+      // If no matching invite found
+      console.log("No invite found for email:", emailToCheck);
+      toast({
+        title: "Invitation not found",
+        description: "No invitation was found with this email address.",
+        variant: "destructive"
+      });
+      setNeedsEmailConfirmation(true);
     } catch (err) {
       console.error('Error checking for invites:', err);
       setError('An error occurred while retrieving invitation information');
@@ -237,17 +228,6 @@ const BookingInvite = () => {
     setSubmitting(true);
     await checkForInvites(guestEmail);
     setSubmitting(false);
-    
-    if (!inviteInfo) {
-      toast({
-        title: "Invitation not found",
-        description: "No invitation was found with this email address.",
-        variant: "destructive"
-      });
-    } else {
-      setNeedsEmailConfirmation(false);
-      localStorage.setItem('guestEmail', guestEmail);
-    }
   };
 
   // Function to send notification email
@@ -516,6 +496,27 @@ const BookingInvite = () => {
           </CardHeader>
           <CardContent>
             <p className="text-slate-300">{error}</p>
+            {invites && invites.length > 0 && (
+              <div className="mt-4 p-4 bg-slate-800 rounded-lg">
+                <p className="text-teal-400 font-medium mb-2">Available Invitations:</p>
+                <div className="space-y-2">
+                  {invites.map((invite, idx) => (
+                    <div key={idx} className="text-sm text-slate-300">
+                      {invite.email}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm mt-4 text-slate-400">
+                  If your email address is listed above, please click the button below to identify yourself.
+                </p>
+                <Button 
+                  className="w-full mt-4 bg-teal-500 hover:bg-teal-600 text-slate-900"
+                  onClick={() => setNeedsEmailConfirmation(true)}
+                >
+                  Identify Myself
+                </Button>
+              </div>
+            )}
           </CardContent>
           <CardFooter>
             <Link to="/" className="w-full">

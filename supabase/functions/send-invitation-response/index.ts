@@ -139,9 +139,28 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     if (!inviteData) {
-      console.error("Invitation not found for email:", guestEmail);
+      // Try to find any invites for this booking
+      const { data: allInvites, error: allInvitesError } = await supabase
+        .from('booking_invites')
+        .select('email')
+        .eq('booking_id', bookingId);
+        
+      if (allInvitesError) {
+        console.error("Error checking all invitations:", allInvitesError);
+      }
+      
+      const errorMsg = allInvites && allInvites.length > 0
+        ? `Invitation not found for email: ${guestEmail}. Available invitations are for: ${allInvites.map(i => i.email).join(', ')}`
+        : `Invitation not found for email: ${guestEmail}`;
+        
+      console.error(errorMsg);
+      
       return new Response(
-        JSON.stringify({ error: "Invitation not found" }),
+        JSON.stringify({ 
+          error: "Invitation not found",
+          details: errorMsg,
+          availableInvites: allInvites
+        }),
         {
           status: 404,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -277,6 +296,23 @@ const handler = async (req: Request): Promise<Response> => {
     } catch (emailError: any) {
       console.error("Error sending email:", emailError);
       // Continue with the rest of the process even if email fails
+    }
+
+    // Update the invitation status in the database
+    try {
+      const { error: updateError } = await supabase
+        .from('booking_invites')
+        .update({ status })
+        .eq('booking_id', bookingId)
+        .eq('email', guestEmail);
+
+      if (updateError) {
+        console.error("Error updating invitation status:", updateError);
+      } else {
+        console.log(`Successfully updated invitation status to ${status} for ${guestEmail}`);
+      }
+    } catch (dbError) {
+      console.error("Error updating invitation in database:", dbError);
     }
 
     // 2. Send in-app notification to the host (customer)
