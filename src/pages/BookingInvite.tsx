@@ -43,7 +43,29 @@ const BookingInvite = () => {
           return;
         }
         
-        // First check if booking exists
+        // First check if any invites exist for this booking
+        const { data: inviteData, error: inviteError } = await supabase
+          .from('booking_invites')
+          .select('*')
+          .eq('booking_id', id);
+        
+        if (inviteError) {
+          console.error('Error fetching invites:', inviteError);
+          setError('Unable to verify invitation. Please try again later.');
+          setLoading(false);
+          return;
+        }
+        
+        if (!inviteData || inviteData.length === 0) {
+          console.error('No invites found for booking ID:', id);
+          setError('No invitations found for this booking');
+          setLoading(false);
+          return;
+        }
+        
+        console.log("Invites found:", inviteData);
+        
+        // Fetch booking details
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select(`
@@ -99,7 +121,7 @@ const BookingInvite = () => {
           }
         }
         
-        // Check for invites - even if no email is stored yet
+        // Check for invites with the stored email
         await checkForInvites(storedEmail || '');
       } catch (err) {
         console.error('Exception in fetching booking:', err);
