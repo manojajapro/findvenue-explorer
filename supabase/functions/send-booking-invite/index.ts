@@ -289,7 +289,10 @@ const handler = async (req: Request): Promise<Response> => {
           // Update existing invite
           const { data, error } = await adminClient
             .from('booking_invites')
-            .update({ status: 'pending' })
+            .update({ 
+              status: 'pending',
+              venue_name: venueName  // Store the venue name
+            })
             .eq('id', existingInvite.id)
             .select();
           
@@ -305,7 +308,8 @@ const handler = async (req: Request): Promise<Response> => {
           const inviteData = {
             booking_id: inviteLink,
             email: email,
-            status: 'pending'
+            status: 'pending',
+            venue_name: venueName  // Store the venue name
           };
           
           console.log("Creating new invite with data:", inviteData);

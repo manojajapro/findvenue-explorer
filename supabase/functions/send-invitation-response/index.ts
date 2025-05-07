@@ -137,7 +137,9 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Since we have a valid invite, we can proceed even if booking details are limited
-
+    // We can use venue_name from the invitation if available
+    const actualVenueName = venueName || inviteData.venue_name || "Event Venue";
+    
     // Check if booking exists, but don't fail if it doesn't
     let bookingData = null;
     let bookingUserId = null;
@@ -336,7 +338,7 @@ const handler = async (req: Request): Promise<Response> => {
         const notificationData = {
           user_id: hostUserId,
           title: `Guest ${status === 'accepted' ? 'Accepted' : 'Declined'} Invitation`,
-          message: `${guestName || guestEmail} has ${status} your invitation to ${venueName} on ${formattedDate}.`,
+          message: `${guestName || guestEmail} has ${status} your invitation to ${actualVenueName} on ${formattedDate}.`,
           type: 'booking',
           link: `/bookings/${bookingId}`,
           data: {
@@ -345,7 +347,7 @@ const handler = async (req: Request): Promise<Response> => {
             guest_email: guestEmail,
             guest_name: guestName,
             status: status,
-            venue_name: venueName
+            venue_name: actualVenueName
           },
           read: false
         };

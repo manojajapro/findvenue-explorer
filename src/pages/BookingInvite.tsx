@@ -105,7 +105,7 @@ const BookingInvite = () => {
           const firstInvite = inviteData[0];
           const placeholderBooking = {
             id: id,
-            venue_name: 'Unknown Venue',
+            venue_name: firstInvite.venue_name || 'Unknown Venue',
             booking_date: new Date().toISOString().split('T')[0], // Today's date as fallback
             start_time: '00:00',
             end_time: '23:59',
@@ -266,13 +266,16 @@ const BookingInvite = () => {
       // Default host name if customer_name is not available
       const hostName = booking.customer_name || 'Host';
       
+      // Get venue name from the booking, invite data, or use a default
+      const actualVenueName = booking.venue_name || inviteInfo.venue_name || "Event Venue";
+      
       // Prepare the data for the notification email
       const notificationData = {
         hostEmail: booking.customer_email || '', // This might be missing in some cases
         hostName: hostName,
         guestEmail: inviteInfo.email,
         guestName: inviteInfo.name || inviteInfo.email.split('@')[0],
-        venueName: booking.venue_name || 'Event Venue',
+        venueName: actualVenueName,
         bookingDate: booking.booking_date || new Date().toISOString().split('T')[0],
         startTime: booking.start_time || '00:00',
         endTime: booking.end_time || '23:59',

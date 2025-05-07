@@ -52,6 +52,7 @@ export type Database = {
           email: string
           id: string
           status: string
+          venue_name: string | null
         }
         Insert: {
           booking_id: string
@@ -59,6 +60,7 @@ export type Database = {
           email: string
           id?: string
           status?: string
+          venue_name?: string | null
         }
         Update: {
           booking_id?: string
@@ -66,6 +68,7 @@ export type Database = {
           email?: string
           id?: string
           status?: string
+          venue_name?: string | null
         }
         Relationships: [
           {
